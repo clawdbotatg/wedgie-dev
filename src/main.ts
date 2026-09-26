@@ -130,13 +130,14 @@ app.innerHTML = `
     <div class="sec-head">
       <span class="kicker">Agents</span>
       <h2>Hand your wedgie to your agent.</h2>
-      <p>One skill file teaches your coding agent the hardware: the screen, the buttons, the chip, and how to put code on it.</p>
+      <p>One skill file teaches your coding agent the wedgie: how to write an app, install it, see the real screen, and press the buttons. <code>wedgie.py</code> is the one-file tool it uses to do that over USB.</p>
     </div>
     <div class="card wide skill">
       <div class="recess code"><span id="skill-url">${esc(SKILL_URL)}</span></div>
       <div class="row">
         <button class="btn btn-green btn-sm" id="copy-prompt">Copy a prompt for your agent</button>
         <a class="btn btn-sm" href="/skill.md" target="_blank">Read skill.md</a>
+        <a class="btn btn-sm" href="/wedgie.py" download>wedgie.py</a>
       </div>
     </div>
   </section>
