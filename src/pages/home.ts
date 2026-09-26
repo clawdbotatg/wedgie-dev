@@ -1,5 +1,5 @@
 // The front page: give yourself a wedgie. Get one, or build one; agents at the bottom.
-import { place3D, SCREENS } from "../ui/place3d";
+import { place3D } from "../ui/place3d";
 
 const CASE = "https://raw.githubusercontent.com/clawdbotatg/clawd-pico-case/main/stl/current/";
 
@@ -95,7 +95,7 @@ export function home(main: HTMLElement) {
   </section>
 `;
 
-  place3D(main.querySelector<HTMLElement>("#art-order")!, { interactive: false, screens: SCREENS.wallet, side: 1 });
+  place3D(main.querySelector<HTMLElement>("#art-order")!, { demo: "WEDGIE", side: 1 });
 
   main.querySelectorAll<HTMLButtonElement>(".seg button").forEach((b) => (b.onclick = () => {
     main.querySelectorAll<HTMLButtonElement>(".seg button").forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-checked", String(x === b)); });

@@ -48,7 +48,7 @@ export function connect(main: HTMLElement) {
       if (!tray.querySelector(".empty")) {
         tray.replaceChildren();
         tray.insertAdjacentHTML("beforeend", `<div class="empty"><div class="empty-dev"></div><p>No wedgies yet. Plug one in and press <b>Connect</b>. After the first time, it shows up by itself.</p></div>`);
-        place3D(tray.querySelector<HTMLElement>(".empty-dev")!, { interactive: false, screen: idScreen("PLUG IN", "usb-c"), side: -1 });
+        place3D(tray.querySelector<HTMLElement>(".empty-dev")!, { demo: "PLUGIN", side: -1 });
       }
     } else {
       tray.querySelector(".empty")?.remove();

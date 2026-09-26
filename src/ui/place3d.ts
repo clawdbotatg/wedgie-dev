@@ -3,18 +3,23 @@
 import type { Wedgie3D, Wedgie3DOptions } from "./wedgie3d";
 import { deviceSvg, type Screen } from "./device";
 
-export function place3D(el: HTMLElement, opts: Wedgie3DOptions & { fallback?: Screen } = {}): Promise<Wedgie3D | null> {
+export function place3D(el: HTMLElement, opts: Wedgie3DOptions & { fallback?: Screen; demo?: string } = {}): Promise<Wedgie3D | null> {
   if (!el.firstChild) el.innerHTML = deviceSvg(opts.fallback || { kind: "off" });
+  // demo: a clickable pretend wedgie (launcher + apps, hard-coded) instead of a still screen
+  const demo = opts.demo !== undefined ? import("./demo").then((m) => m.createDemo(opts.demo)) : null;
   return new Promise((resolve) => {
     const io = new IntersectionObserver(async (es) => {
       if (!es.some((e) => e.isIntersecting)) return;
       io.disconnect();
       try {
         const { mountWedgie3D } = await import("./wedgie3d");
+        const d = demo ? await demo : null;
         const holder = document.createElement("div");
         holder.className = "w3d-holder";
         el.replaceChildren(holder);
-        resolve(await mountWedgie3D(holder, opts));
+        const w = await mountWedgie3D(holder, d ? { ...opts, interactive: true, screen: d.canvas, screens: undefined, onKey: (k, down) => { holder.dataset.lastKey = `${k} ${down ? "down" : "up"}`; d.key(k, down); } } : opts);
+        d?.attach(w);
+        resolve(w);
       } catch (err) {
         console.error("3D wedgie:", err);
         el.innerHTML = deviceSvg(opts.fallback || { kind: "off" });

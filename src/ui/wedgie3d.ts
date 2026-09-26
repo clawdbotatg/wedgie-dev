@@ -243,10 +243,15 @@ export async function mountWedgie3D(el: HTMLElement, opts: Wedgie3DOptions = {})
     const h = ray.intersectObjects(targets, false)[0];
     if (!h) return null;
     if (h.object.name !== "joystick") return h.object.name;
-    const p = inner.worldToLocal(h.point.clone());
-    const dx = p.x - STICK.x, dy = p.y - STICK.y;           // case mm: +x is up on screen, +y is left
-    if (Math.hypot(dx, dy) < 1.8) return "press";
-    return Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "up" : "down") : (dy > 0 ? "left" : "right");
+    // The stick is tall and seen at an angle, so read the push in screen space: where you clicked
+    // against where the top of the stick shows. Near the middle = press straight down.
+    const top = new THREE.Vector3(STICK.x, STICK.y, 9).applyMatrix4(inner.matrixWorld).project(camera);
+    const edge = new THREE.Vector3(STICK.x + 5, STICK.y, 9).applyMatrix4(inner.matrixWorld).project(camera);
+    const px = (v: THREE.Vector3) => [(v.x * 0.5 + 0.5) * r.width, (-v.y * 0.5 + 0.5) * r.height];
+    const [tx, ty] = px(top), [ex, ey] = px(edge);
+    const dx = e.clientX - r.left - tx, dy = e.clientY - r.top - ty;
+    if (Math.hypot(dx, dy) < Math.hypot(ex - tx, ey - ty) * 0.35) return "press";
+    return Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
   }
   function visual(k: string, down: boolean) {
     if (KEYS.includes(k)) pressed.set(k, down);
@@ -275,7 +280,7 @@ export async function mountWedgie3D(el: HTMLElement, opts: Wedgie3DOptions = {})
   const up = (e: PointerEvent) => { const k = pointers.get(e.pointerId); if (k) { pointers.delete(e.pointerId); set(k, false); } };
   cv.addEventListener("pointerup", up);
   cv.addEventListener("pointercancel", up);
-  cv.addEventListener("pointermove", (e) => { cv.style.cursor = hit(e) ? "pointer" : "default"; });
+  cv.addEventListener("pointermove", (e) => { if (e.pointerType === "mouse") cv.style.cursor = hit(e) ? "pointer" : "default"; });
   const KEYMAP: Record<string, string> = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", Enter: "press", " ": "press",
     a: "A", b: "B", x: "X", y: "Y", A: "A", B: "B", X: "X", Y: "Y" };
   const held = new Set<string>();

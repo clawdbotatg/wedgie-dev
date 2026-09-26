@@ -226,7 +226,7 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 22px; }
 .virtual-copy p { color: #474947; margin: 10px 0 18px; }
 .virtual-dev { width: 100%; }
 @media (max-width: 860px) { .virtual { grid-template-columns: 1fr; } }
-.w3d { display: block; outline: none; border-radius: 24px; touch-action: none; }
+.w3d { display: block; outline: none; border-radius: 24px; touch-action: pan-y; }   /* swipes still scroll the page; taps on keys press them */
 .w3d:focus-visible { box-shadow: none; }
 
 .w3d-holder { width: 100%; }
