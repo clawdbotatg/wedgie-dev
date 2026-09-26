@@ -1,5 +1,7 @@
 import { defineConfig, type Plugin } from "vite";
 import { readFileSync, statSync } from "node:fs";
+// @ts-ignore plain JS build helper
+import { buildFirmware } from "./tools/fw.mjs";
 
 // The page paints the underwear and the loading bar from the first byte of HTML (index.html inlines
 // both). Everything else is fetched by the inline loader with byte-level progress, like the
@@ -9,6 +11,13 @@ import { readFileSync, statSync } from "node:fs";
 const PRELOAD_IMAGES = ["/img/sticker-wedgie-dev.webp", "/img/sticker.webp"];
 // Only the latin subsets are fetched up front; the others load on demand through unicode-range.
 const FONT_UP_FRONT = /(latin-wght-normal|dm-mono-latin-500-normal|silkscreen-latin-400-normal)[^/]*\.woff2$/;
+
+function firmware(): Plugin {
+  return { name: "wedgie-firmware", buildStart() { buildFirmware(); }, configureServer(server) {
+    server.watcher.add("firmware");
+    server.watcher.on("change", (f) => { if (f.includes("/firmware/")) buildFirmware(); });
+  } };
+}
 
 function loaderManifest(): Plugin {
   return {
@@ -43,6 +52,6 @@ function loaderManifest(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [loaderManifest()],
+  plugins: [firmware(), loaderManifest()],
   build: { target: "es2022", assetsInlineLimit: 0 },
 });
