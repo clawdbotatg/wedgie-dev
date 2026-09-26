@@ -18,6 +18,9 @@ export type Wedgie = {
   micropython?: string;
   files?: string[];
   firmware?: string;     // what it runs, if it said
+  kind?: "wedgie" | "wallet" | "micropython";
+  version?: string;      // wedgie firmware version
+  apps?: string[];
   chip?: any;            // from probe chip()
   error?: string;
   log: string;
@@ -34,6 +37,8 @@ export const supported = () => "serial" in navigator;
 export const wedgies = () => list.filter((w) => w.state !== "gone");
 export function onChange(fn: Listener) { listeners.add(fn); return () => listeners.delete(fn); }
 const emit = () => listeners.forEach((fn) => fn());
+/** Something about a wedgie changed outside identify (the panel updated it): repaint. */
+export const touch = emit;
 
 export function boardName(cpu: string, wifi: boolean, machine = "") {
   if (cpu === "RP2350") return wifi ? "Pico 2 W" : "Pico 2";
@@ -90,10 +95,15 @@ async function identify(w: Wedgie) {
       await new Promise((res) => setTimeout(res, 150));
       const h = await r.hello();
       if (h) {
-        // A wallet/wedgie firmware: take what it says, leave it running.
-        w.firmware = `${h.name || "wedgie"} ${h.fw || ""}`.trim();
+        // wedgie firmware (or the wallet app): take what it says, leave it running.
+        w.firmware = `${h.name || "wedgie"} ${h.version || h.fw || ""}`.trim();
+        w.kind = String(h.fw || "").startsWith("wedgie-") ? "wedgie" : "wallet";
+        w.version = h.version;
+        w.apps = h.apps;
         w.uid = h.uid || h.serial;
-        w.chip = h.backend ? { type: h.backend === "atecc608" ? "ATECC608" : h.backend, serial: h.serial } : undefined;
+        w.micropython = h.micropython;
+        w.cpu = h.cpu;
+        if (h.backend) w.chip = { type: h.backend === "atecc608" ? "ATECC608" : h.backend, serial: h.serial };
         w.board = h.board || "wedgie";
         return;
       }
@@ -109,7 +119,8 @@ async function identify(w: Wedgie) {
       const cpu = got.machine.includes("RP2350") ? "RP2350" : got.machine.includes("RP2040") ? "RP2040" : "?";
       w.uid = got.uid; w.cpu = cpu; w.micropython = got.mp; w.files = got.files;
       w.board = boardName(cpu, got.wifi, got.machine);
-      w.firmware = got.files.includes("main.py") ? "main.py" : "empty";
+      w.firmware = got.files.includes("main.py") ? "its own main.py" : "nothing yet";
+      w.kind = "micropython";
     });
     w.short = w.uid ? shortId(w.uid) : "??????";
     w.state = "ready";

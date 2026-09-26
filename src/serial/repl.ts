@@ -54,8 +54,10 @@ export class Repl {
       if (line.startsWith("@") && this.onLine) {
         const sp = line.indexOf(" ");
         try { this.onLine(line.slice(1, sp), JSON.parse(line.slice(sp + 1))); } catch {}
-      } else if (line.startsWith("{") && this.onJson) {
-        try { this.onJson(JSON.parse(line)); } catch {}
+      } else if (line.startsWith("{")) {
+        let v: any;
+        try { v = JSON.parse(line); } catch { continue; }
+        this.json(v);
       }
     }
   }
@@ -93,6 +95,32 @@ export class Repl {
       await this.writer!.write(bytes.slice(i, i + 256));
       if (bytes.length > 256) await sleep(5);
     }
+  }
+
+  private nextId = 100;
+  private pending = new Map<number, { parts: any[]; res: (v: any) => void; rej: (e: Error) => void; t: number }>();
+
+  /** One JSON request to the wedgie launcher (menu.py). Shots arrive in parts; they're joined. */
+  request(msg: Record<string, unknown>, ms = 5000): Promise<any> {
+    const id = this.nextId++;
+    return new Promise((res, rej) => {
+      const t = window.setTimeout(() => { this.pending.delete(id); rej(new Error("wedgie did not answer")); }, ms);
+      this.pending.set(id, { parts: [], res, rej, t });
+      this.write(JSON.stringify({ ...msg, id }) + "\n").catch(rej);
+    });
+  }
+
+  private json(v: any) {
+    const p = v && typeof v.id === "number" ? this.pending.get(v.id) : undefined;
+    if (!p) { this.onJson?.(v); return; }
+    if (v.type === "shot") {
+      p.parts[v.i] = v.data;
+      if (p.parts.filter((x) => x !== undefined).length < v.n) return;
+      v = { id: v.id, type: "shot", w: v.w, h: v.h, fmt: v.fmt, data: p.parts.join("") };
+    }
+    clearTimeout(p.t);
+    this.pending.delete(v.id);
+    p.res(v);
   }
 
   /** Ask a running wedgie firmware who it is, without interrupting it. Null if nothing answers. */

@@ -6,7 +6,8 @@ export type Screen =
   | { kind: "loading"; p: number }
   | { kind: "id"; id: string; sub?: string }
   | { kind: "color"; css: string }
-  | { kind: "text"; text: string };
+  | { kind: "text"; text: string }
+  | { kind: "live" };
 
 export const KEYS = ["up", "down", "left", "right", "press", "A", "B", "X", "Y"] as const;
 
@@ -76,6 +77,8 @@ function screenSvg(s: Screen, i: number): string {
         `<rect x="${X}" y="${Y + 32}" width="${W}" height="4" fill="#e3312c"/>` +
         `<text x="${X + W / 2}" y="${Y + 66}" text-anchor="middle" class="lcd lcd-big">${esc(s.id)}</text>` +
         (s.sub ? `<text x="${X + W / 2}" y="${Y + 84}" text-anchor="middle" class="lcd lcd-sub">${esc(s.sub)}</text>` : "");
+    case "live":
+      return bg("#16161a") + `<image class="live" x="${X}" y="${Y}" width="${W}" height="${W}" preserveAspectRatio="none" style="image-rendering:pixelated"/>`;
     case "text":
       return bg("#101014") + `<text x="${X + 6}" y="${Y + 16}" class="lcd lcd-txt">${esc(s.text)}</text>`;
   }

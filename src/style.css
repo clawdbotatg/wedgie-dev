@@ -197,3 +197,26 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 22px; }
   .top .tag { font-size: 18px; }
 }
 @media (prefers-reduced-motion: reduce) { .sticker { animation: none; } html { scroll-behavior: auto; } }
+
+/* panel: apps, firmware, install meter */
+.applist { display: grid; gap: 12px; }
+.applist > p { color: #474947; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.appcard, .fwrow { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 16px; border-radius: 20px;
+  background: var(--shell); box-shadow: inset 0 1.5px 0 #fff, inset 0 -3px 0 #e0e0db, 0 6px 14px -8px rgba(0,0,0,.3); }
+.appcard h4, .fwrow h4 { margin: 0; font-size: 18px; font-weight: 900; }
+.appcard p, .fwrow p { margin: 2px 0 0; font-size: 15px; color: #555855; }
+.fwrow { margin-bottom: 14px; }
+.meter { display: grid; gap: 8px; margin-top: 6px; }
+.meter[hidden] { display: none; }
+.meter-track { height: 30px; border-radius: 999px; padding: 6px; background: linear-gradient(#c0c1c3, #dadbdd);
+  box-shadow: inset 0 3px 3px rgba(70,70,72,.45), 0 0 0 5px #fff, 0 0 0 6px #e1e2e4, 0 6px 14px -4px rgba(0,0,0,.25); }
+.meter-fill { height: 100%; width: 8%; border-radius: 999px; background: var(--grey-fill); transition: width .25s;
+  box-shadow: inset 0 -2px 0 rgba(40,40,42,.47), inset 0 4px 4px -2px rgba(255,255,255,.25); }
+.meter.done .meter-fill { background: var(--green-fill); }
+#p-meter-t { font-size: 14px; color: var(--muted); font-family: var(--mono); }
+.name { border: 0; height: 44px; padding: 0 14px; font: 700 15px var(--font); color: var(--ink); width: 150px; outline: none; }
+.wedgie.remote .k { cursor: pointer; }
+.wedgie.remote .k:active .cap { filter: brightness(1.4); }
+.badge { display: inline-block; font-size: 12px; font-weight: 900; padding: 2px 9px; border-radius: 999px; color: #fff; background: var(--green-fill); margin-left: 4px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.3), inset 0 -2px 0 rgba(0,0,0,.18); }
+.badge.grey { background: var(--grey-fill); }

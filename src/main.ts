@@ -5,6 +5,15 @@ import "./style.css";
 import { deviceSvg, esc } from "./ui/device";
 import * as W from "./serial/wedgies";
 import { openPanel } from "./ui/panel";
+import { firmwareManifest } from "./serial/install";
+
+let latest = "";
+firmwareManifest().then((m) => { latest = m.version; drawTray(); }).catch(() => {});
+function badge(w: W.Wedgie) {
+  if (w.state !== "ready") return "";
+  if (w.kind === "wedgie") return latest && w.version !== latest ? `<span class="badge">update</span>` : "";
+  return `<span class="badge grey">needs firmware</span>`;
+}
 
 const CASE = "https://raw.githubusercontent.com/clawdbotatg/clawd-pico-case/main/stl/current/";
 const SKILL_URL = location.origin + "/skill.md";
@@ -170,7 +179,7 @@ function drawTray() {
     tray.querySelectorAll<HTMLElement>(".slot").forEach((el) => { if (!keep.has(el.dataset.key!)) el.remove(); });
     for (const w of ws) {
       let el = tray.querySelector<HTMLElement>(`.slot[data-key="${w.key}"]`);
-      const sig = `${w.state}|${w.short}|${w.board}|${w.error}`;
+      const sig = `${w.state}|${w.short}|${w.board}|${w.error}|${w.kind}|${w.version}|${latest}`;
       if (!el) {
         el = document.createElement("button");
         el.className = "slot";
@@ -182,7 +191,7 @@ function drawTray() {
       el.dataset.sig = sig;
       el.innerHTML = deviceSvg(screenFor(w)) +
         `<span class="idtag">${w.state === "identifying" ? "finding…" : w.state === "error" ? "can't talk" : esc(w.short)}</span>` +
-        `<span class="meta">${w.state === "error" ? esc(w.error) : esc([w.board, w.chip?.type].filter(Boolean).join(" · "))}</span>`;
+        `<span class="meta">${w.state === "error" ? esc(w.error) : esc([w.board, w.kind === "wedgie" ? "wedgie " + w.version : w.chip?.type].filter(Boolean).join(" · "))}${badge(w)}</span>`;
     }
   }
   actions.innerHTML = `<button class="btn btn-green" id="connect">${ws.length ? "Connect another" : "Connect a wedgie"}</button>`;
