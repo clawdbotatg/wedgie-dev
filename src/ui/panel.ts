@@ -287,8 +287,8 @@ export function openPanel(w: W.Wedgie) {
       const ch = c?.found?.find((f: any) => !f.error);
       w.chip = ch || { type: "none" };
       if (ch) status(`Found <b>${esc(chipText(ch))}</b>.`);
-      else if (c && (!c.lines.sda || !c.lines.scl)) status(`<b class="bad">No chip.</b> SDA/SCL aren't pulled up, so the chip has no power or isn't connected. Check the blue (GP4) and yellow (GP5) wires, then red and black.`);
-      else status(`<b class="bad">No chip answered</b>, but the lines have power. Check that red (3V3, pin 36) and black (GND, pin 38) aren't swapped.`);
+      else if (c && (!c.lines.sda || !c.lines.scl)) status(`<b class="bad">No chip.</b> SDA/SCL aren't pulled up, so the chip has no power or isn't connected. Count the plug from its GND end (GND, 3.3 V, SDA, SCL; colors vary): SDA goes left 6th hole from the USB end, SCL left 7th, GND right 3rd, 3.3 V right 5th.`);
+      else status(`<b class="bad">No chip answered</b>, but the lines have power. A data wire and the power wire are probably swapped (the chip can power itself through a data pin, so it looks fine). Count the plug from its GND end and check 3.3 V is right 5th, not a data hole.`);
     }),
     screen: () => act("Screen test", async (r) => {
       await r.exec("screen()", 10000);

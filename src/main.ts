@@ -77,7 +77,7 @@ app.innerHTML = `
         <h3>Put it together</h3>
         <ol>
           <li>Plug the Pico into the hat's header: parts toward the screen, USB at the joystick end.</li>
-          <li>Plug the cable into the chip. Push its four bare wires into the hat's header <em>beside</em> the Pico pins: red to 3V3 (pin 36), black to GND (pin 38), blue to GP4 (pin 6), yellow to GP5 (pin 7).</li>
+          <li>Plug the cable into the chip. Its plug runs GND, 3.3 V, SDA, SCL from one end: <em>trust that order, not the wire colors</em>. Looking at the Pico side with USB at the top, push the bare wires into the hat's header <em>beside</em> the Pico pins, counting holes from the USB end: GND right 3rd, 3.3 V right 5th (never the 4th), SDA left 6th, SCL left 7th.</li>
           <li>Wedge the chip into the gap between the two boards, wires flat.</li>
           <li>Snap it into the case and plug it in. It shows up <a href="#plug">above</a>.</li>
         </ol>
@@ -96,7 +96,7 @@ app.innerHTML = `
           <a class="btn btn-sm" href="${CASE}joystick.stl" download>Joystick</a>
           <a class="btn btn-sm" href="${CASE}button.stl" download>Button ×4</a>
         </div>
-        <p class="fine">Source, measurements, and every iteration: <a href="https://github.com/clawdbotatg/clawd-pico-case" target="_blank" rel="noopener">clawd-pico-case</a>.</p>
+        <p class="fine">Source, measurements, and every iteration: <a href="https://github.com/clawdbotatg/clawd-pico-case" target="_blank" rel="noopener">clawd-pico-case</a>. Why it's called a wedgie: <a href="/lore.md" target="_blank">the lore</a>.</p>
       </div>
     </div>
   </section>

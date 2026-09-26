@@ -21,6 +21,7 @@ export function buildFirmware() {
   const version = (readFileSync(join(src, "wedgie.py"), "utf8").match(/VERSION = "([^"]+)"/) || [])[1] || "0";
   const apps = JSON.parse(readFileSync(join(src, "apps.json"), "utf8"));
   writeFileSync(join(out, "manifest.json"), JSON.stringify({ version, files, apps }, null, 1));
+  copyFileSync(join(root, "LORE.md"), join(root, "public/lore.md")); // served at wedgie.dev/lore.md
   return { version, count: files.length };
 }
 if (process.argv[1] === fileURLToPath(import.meta.url)) console.log(buildFirmware());
