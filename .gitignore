@@ -1,0 +1,8 @@
+node_modules
+dist
+.vercel
+*.local
+.DS_Store
+HANDOFF-*.md
+REVIEW-*.md
+shots
