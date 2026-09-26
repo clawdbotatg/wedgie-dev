@@ -139,6 +139,16 @@ export async function connectNew() {
   return add(port);
 }
 
+/** Count plugged-in wedgies without talking to them (the header's Connect button, on any page).
+ *  Only ports this site was granted once are visible; opening none of them interrupts nothing. */
+export function watchCount(cb: (n: number) => void) {
+  if (!supported()) { cb(0); return; }
+  const count = async () => cb((await navigator.serial.getPorts()).filter((p) => p.getInfo().usbVendorId === RPI_VID && (p as any).connected !== false).length);
+  count();
+  navigator.serial.addEventListener("connect", () => setTimeout(count, 300));
+  navigator.serial.addEventListener("disconnect", () => setTimeout(count, 300));
+}
+
 export async function start() {
   if (!supported()) return;
   for (const p of await navigator.serial.getPorts()) if (p.getInfo().usbVendorId === RPI_VID) add(p);

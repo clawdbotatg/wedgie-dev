@@ -2,156 +2,19 @@ import "@fontsource-variable/nunito/wght.css";
 import "@fontsource/dm-mono/500.css";
 import "@fontsource/silkscreen/400.css";
 import "./style.css";
-import { deviceSvg, esc } from "./ui/device";
-import { place3D, idScreen, SCREENS } from "./ui/place3d";
-import * as W from "./serial/wedgies";
-import { openPanel } from "./ui/panel";
-import { firmwareManifest } from "./serial/install";
+import { watchCount } from "./serial/wedgies";
+import { home } from "./pages/home";
+import { connect } from "./pages/connect";
 
-let latest = "";
-firmwareManifest().then((m) => { latest = m.version; drawTray(); }).catch(() => {});
-function badge(w: W.Wedgie) {
-  if (w.state !== "ready") return "";
-  if (w.kind === "wedgie") return latest && w.version !== latest ? `<span class="badge">update</span>` : "";
-  return `<span class="badge grey">needs firmware</span>`;
-}
-
-const CASE = "https://raw.githubusercontent.com/clawdbotatg/clawd-pico-case/main/stl/current/";
-const SKILL_URL = location.origin + "/skill.md";
+const onConnect = location.pathname.replace(/\/+$/, "") === "/connect";
 
 const app = document.getElementById("app")!;
 app.innerHTML = `
 <header class="top">
-  <a class="brand" href="#top"><img src="/img/sticker.webp" alt="" width="46" height="35"><span class="tag">wedgie.dev</span></a>
-  <nav>
-    <a class="pill" href="#get">Get one</a>
-    <a class="pill" href="#build">Build one</a>
-    <a class="pill" href="#plug">Plug in <span class="led" id="led"></span><b id="count"></b></a>
-    <a class="pill" href="#agents">Agents</a>
-  </nav>
+  <a class="brand" href="/"><img src="/img/sticker.webp" alt="wedgie.dev home" width="46" height="35"></a>
+  <a class="connect-btn${onConnect ? " here" : ""}" id="connect-btn" href="/connect"><span class="led"></span><span class="lbl">Connect</span><b class="n"></b></a>
 </header>
-
-<main id="top">
-  <section class="hero">
-    <div class="hero-copy">
-      <h1>Give yourself<br>a wedgie.</h1>
-      <p class="lede">A pocket computer from three off-the-shelf parts: a Pico, a screen hat, and a secure chip
-      <em>wedged</em> in between. Make it a wallet, a game, or whatever you and your agent dream up.
-      Every file is MIT.</p>
-      <div class="row">
-        <a class="btn btn-green" href="#get">Get a wedgie · $50</a>
-        <a class="btn" href="#build">Build your own</a>
-      </div>
-    </div>
-    <div class="hero-art"><img class="sticker" src="/img/sticker-wedgie-dev.webp" alt="a pair of white briefs with a green, grey and red waistband and a wedgie.dev tag"></div>
-  </section>
-
-  <div class="band" aria-hidden="true"><i></i><i></i><i></i></div>
-
-  <section id="plug" class="sec">
-    <div class="sec-head">
-      <span class="kicker">Plug in</span>
-      <h2>Your wedgies</h2>
-      <p>Plug a wedgie into USB-C. It shows up here with its ID. Click it to test it, send it code, or debug it.</p>
-    </div>
-    <div class="tray" id="tray"></div>
-    <div class="row center" id="plug-actions"></div>
-    <div class="card wide virtual" id="virtual-card">
-      <div class="virtual-copy">
-        <h3>No wedgie yet? Try a virtual one.</h3>
-        <p>The real wedgie firmware, running right here in your browser. Click its buttons, or click it and use the arrow keys, Enter, and A B X Y.</p>
-        <div class="row"><button class="btn btn-green btn-sm" id="virtual-go">Turn it on</button></div>
-      </div>
-      <div class="virtual-dev" id="virtual"></div>
-    </div>
-  </section>
-
-  <section id="build" class="sec">
-    <div class="sec-head">
-      <span class="kicker">Build one</span>
-      <h2>Three parts. One wedge.</h2>
-      <p>No soldering. Order the parts anywhere, from anyone. To a store it's just a dev board, a screen, and a chip.</p>
-    </div>
-    <div class="parts">
-      <div class="card part"><div class="num">1</div><h3>A Pico</h3><p>The brain. The printed case fits the USB-C RP2040 Pico. A Pico 2 W runs the same code.</p>
-        <div class="price">~$5–12</div><a class="btn btn-sm" href="https://www.amazon.com/s?k=RP2040+pico+USB-C+pre-soldered+header" target="_blank" rel="noopener">Find one</a></div>
-      <div class="card part"><div class="num">2</div><h3>The screen hat</h3><p>Waveshare Pico-LCD-1.3: a 240×240 screen, a joystick, and four buttons. The Pico plugs straight in.</p>
-        <div class="price">~$15</div><a class="btn btn-sm" href="https://www.amazon.com/dp/B092VVCBQP" target="_blank" rel="noopener">Amazon</a></div>
-      <div class="card part"><div class="num">3</div><h3>The chip</h3><p>An ATECC608 secure element on a STEMMA QT cable. Its bare wires push into the header, and the chip gets wedged between the boards.</p>
-        <div class="price">~$6 + cable</div><a class="btn btn-sm" href="https://www.adafruit.com/product/4314" target="_blank" rel="noopener">Adafruit</a></div>
-    </div>
-
-    <div class="card wide assemble">
-      <div>
-        <h3>Put it together</h3>
-        <ol>
-          <li>Plug the Pico into the hat's header: parts toward the screen, USB at the joystick end.</li>
-          <li>Plug the cable into the chip. Its plug runs GND, 3.3 V, SDA, SCL from one end: <em>trust that order, not the wire colors</em>. Looking at the Pico side with USB at the top, push the bare wires into the hat's header <em>beside</em> the Pico pins, counting holes from the USB end: GND right 3rd, 3.3 V right 5th (never the 4th), SDA left 6th, SCL left 7th.</li>
-          <li>Wedge the chip into the gap between the two boards, wires flat.</li>
-          <li>Snap it into the case and plug it in. It shows up <a href="#plug">above</a>.</li>
-        </ol>
-      </div>
-      <div class="assemble-art" id="art-build"></div>
-    </div>
-
-    <div class="card wide case">
-      <div>
-        <h3>Print the case</h3>
-        <p>A snap-together shell with no screws, designed from scratch and MIT licensed. PETG, 0.16 mm layers, 4 walls, no supports. Print the lid face down, the base floor down, and the caps flange down.</p>
-        <div class="row">
-          <a class="btn btn-sm btn-green" href="${CASE}full-set.stl" download>Full set (.stl)</a>
-          <a class="btn btn-sm" href="${CASE}lid.stl" download>Lid</a>
-          <a class="btn btn-sm" href="${CASE}base.stl" download>Base</a>
-          <a class="btn btn-sm" href="${CASE}joystick.stl" download>Joystick</a>
-          <a class="btn btn-sm" href="${CASE}button.stl" download>Button ×4</a>
-        </div>
-        <p class="fine">Source, measurements, and every iteration: <a href="https://github.com/clawdbotatg/clawd-pico-case" target="_blank" rel="noopener">clawd-pico-case</a>. Why it's called a wedgie: <a href="/lore.md" target="_blank">the lore</a>.</p>
-      </div>
-    </div>
-  </section>
-
-  <section id="get" class="sec">
-    <div class="sec-head">
-      <span class="kicker">Get one</span>
-      <h2>Or we'll give you a wedgie.</h2>
-      <p>Assembled, tested, and mailed to you. Or send one to someone who needs one.</p>
-    </div>
-    <div class="card order">
-      <div class="order-art" id="art-order"></div>
-      <div class="order-body">
-        <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
-        <div class="order-price">$50 <span>shipped</span></div>
-        <p>One wedgie: Pico, screen hat, and chip, wedged, cased, and flashed.</p>
-        <div class="seg" role="radiogroup" aria-label="who is it for">
-          <button class="on" data-for="me" role="radio" aria-checked="true">For me</button>
-          <button data-for="gift" role="radio" aria-checked="false">Give someone a wedgie</button>
-        </div>
-        <div class="row">
-          <button class="btn btn-green" data-pay="usdc" disabled>Pay with USDC</button>
-          <button class="btn" data-pay="card" disabled>Pay with card</button>
-        </div>
-        <p class="fine soon">Checkout opens soon. Everything is MIT, so you can always <a href="#build">build your own</a>.</p>
-      </div>
-    </div>
-  </section>
-
-  <section id="agents" class="sec">
-    <div class="sec-head">
-      <span class="kicker">Agents</span>
-      <h2>Hand your wedgie to your agent.</h2>
-      <p>One skill file teaches your coding agent the wedgie: how to write an app, install it, see the real screen, and press the buttons. <code>wedgie.py</code> is the one-file tool it uses to do that over USB.</p>
-    </div>
-    <div class="card wide skill">
-      <div class="recess code"><span id="skill-url">${esc(SKILL_URL)}</span></div>
-      <div class="row">
-        <button class="btn btn-green btn-sm" id="copy-prompt">Copy a prompt for your agent</button>
-        <a class="btn btn-sm" href="/skill.md" target="_blank">Read skill.md</a>
-        <a class="btn btn-sm" href="/wedgie.py" download>wedgie.py</a>
-      </div>
-    </div>
-  </section>
-</main>
-
+<main id="top"></main>
 <footer class="foot">
   <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
   <p>Hardware, case, firmware, and this site are MIT licensed. Build it, fork it, sell it.</p>
@@ -161,121 +24,13 @@ app.innerHTML = `
 </footer>
 `;
 
-// ---- the tray of plugged-in wedgies ---------------------------------------------------------------
-const tray = document.getElementById("tray")!;
-const actions = document.getElementById("plug-actions")!;
+// Grey "Connect" until a wedgie is plugged in; then green with how many. Live as you plug and unplug.
+const btn = document.getElementById("connect-btn")!;
+watchCount((n) => {
+  btn.classList.toggle("on", n > 0);
+  btn.querySelector(".n")!.textContent = n ? String(n) : "";
+  btn.setAttribute("aria-label", n ? `${n} wedgie${n > 1 ? "s" : ""} connected` : "Connect a wedgie");
+});
 
-function screenFor(w: W.Wedgie) {
-  if (w.state === "identifying") return idScreen("...", "finding it");
-  if (w.state === "error") return idScreen("?", "can't talk");
-  return idScreen(w.short || "", w.board);
-}
-
-// Repaint by key: frames change several times while a wedgie identifies; keep nodes stable (each slot
-// holds a 3D wedgie that must not be rebuilt).
-function drawTray() {
-  const ws = W.wedgies();
-  document.getElementById("count")!.textContent = ws.length ? String(ws.length) : "";
-  document.getElementById("led")!.classList.toggle("on", ws.some((w) => w.state === "ready"));
-  if (!W.supported()) {
-    tray.innerHTML = `<div class="empty"><p><b>This browser can't see USB devices.</b><br>Open wedgie.dev in Chrome or Edge on a computer to plug in a wedgie.</p></div>`;
-    actions.innerHTML = "";
-    return;
-  }
-  if (!ws.length) {
-    if (!tray.querySelector(".empty")) {
-      tray.replaceChildren();
-      tray.insertAdjacentHTML("beforeend", `<div class="empty"><div class="empty-dev"></div><p>No wedgies yet. Plug one in and press <b>Connect</b>. After the first time, it shows up by itself.</p></div>`);
-      place3D(tray.querySelector<HTMLElement>(".empty-dev")!, { interactive: false, screen: idScreen("PLUG IN", "usb-c"), side: -1 });
-    }
-  } else {
-    tray.querySelector(".empty")?.remove();
-    const keep = new Set(ws.map((w) => String(w.key)));
-    tray.querySelectorAll<HTMLElement>(".slot").forEach((el) => { if (!keep.has(el.dataset.key!)) { (el as any)._w3d?.then((x: any) => x?.destroy()); el.remove(); } });
-    for (const w of ws) {
-      let el = tray.querySelector<HTMLElement>(`.slot[data-key="${w.key}"]`);
-      const sig = `${w.state}|${w.short}|${w.board}|${w.error}|${w.kind}|${w.version}|${latest}`;
-      if (!el) {
-        el = document.createElement("button");
-        el.className = "slot";
-        el.dataset.key = String(w.key);
-        el.onclick = () => openPanel(w);
-        el.innerHTML = `<div class="dev"></div><span class="idtag"></span><span class="meta"></span>`;
-        tray.appendChild(el);
-        (el as any)._w3d = place3D(el.querySelector<HTMLElement>(".dev")!, { interactive: false, screen: screenFor(w), side: w.key % 2 ? 1 : -1 });
-      }
-      if (el.dataset.sig === sig) continue;
-      el.dataset.sig = sig;
-      (el as any)._w3d.then((x: any) => x?.setScreen(screenFor(w)));
-      el.querySelector(".idtag")!.innerHTML = w.state === "identifying" ? "finding…" : w.state === "error" ? "can't talk" : esc(w.short);
-      el.querySelector(".meta")!.innerHTML = `${w.state === "error" ? esc(w.error) : esc([w.board, w.kind === "wedgie" ? "wedgie " + w.version : w.chip?.type].filter(Boolean).join(" · "))}${badge(w)}`;
-    }
-  }
-  actions.innerHTML = `<button class="btn btn-green" id="connect">${ws.length ? "Connect another" : "Connect a wedgie"}</button>`;
-  document.getElementById("connect")!.onclick = () => W.connectNew().catch(() => {});
-}
-W.onChange(drawTray);
-drawTray();
-W.start();
-
-// ---- the virtual wedgie: a 3D model of the real case; "Turn it on" runs the real firmware on it ------
-// The emulator renders into a hidden element; the 3D wedgie shows its screen and sends it the keys.
-const vbox = document.getElementById("virtual")!;
-let w3d: import("./ui/wedgie3d").Wedgie3D | null = null;
-let vw: import("./emu").VirtualWedgie | null = null;
-const w3dReady = place3D(vbox, { screen: "/screens/launcher.png", onKey: (k, down) => vw?.hold(k, down) }).then((x) => (w3d = x));
-const show3d = () => w3dReady;
-
-// The other wedgies on the page: real firmware screens, cycling.
-place3D(document.getElementById("art-build")!, { interactive: false, screens: SCREENS.apps, side: -1 });
-place3D(document.getElementById("art-order")!, { interactive: false, screens: SCREENS.wallet, side: 1 });
-
-document.getElementById("virtual-go")!.onclick = async (e) => {
-  const b = e.currentTarget as HTMLButtonElement;
-  b.disabled = true;
-  b.textContent = "Booting…";
-  try {
-    await show3d();
-    const { mountVirtualWedgie } = await import("./emu");
-    const hidden = document.createElement("div");
-    hidden.style.cssText = "position:absolute;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none";
-    document.body.appendChild(hidden);
-    vw = await mountVirtualWedgie(hidden, {});
-    (window as any).__wedgieVirtual = vw;   // tools/screens.mjs drives it to capture real screens
-    if (w3d) {
-      let screenSet = false;
-      vw.onFrame((f) => { if (!screenSet) { screenSet = true; w3d!.setScreen(f.canvas); } });
-      const scr = hidden.querySelector("canvas") as HTMLCanvasElement | null;
-      if (scr) { w3d.setScreen(scr); setInterval(() => w3d!.setBacklight(parseFloat(scr.style.opacity || "1")), 50); }
-      (vbox.querySelector("canvas.w3d") as HTMLCanvasElement | null)?.focus({ preventScroll: true });
-    } else {
-      vbox.replaceChildren(hidden); hidden.style.cssText = "";   // no WebGL: show the drawn virtual wedgie
-    }
-    b.remove();
-  } catch (err) {
-    b.textContent = "Couldn't start it";
-    console.error(err);
-  }
-};
-
-// ---- small bits -----------------------------------------------------------------------------------
-document.querySelectorAll<HTMLButtonElement>(".seg button").forEach((b) => (b.onclick = () => {
-  document.querySelectorAll<HTMLButtonElement>(".seg button").forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-checked", String(x === b)); });
-}));
-document.getElementById("copy-prompt")!.onclick = async (e) => {
-  const b = e.currentTarget as HTMLButtonElement;
-  await navigator.clipboard.writeText(`Read ${SKILL_URL} and help me build an app for my wedgie.`).catch(() => {});
-  b.textContent = "Copied";
-  setTimeout(() => (b.textContent = "Copy a prompt for your agent"), 1600);
-};
-
-// The sticker leans toward the pointer, a little.
-const sticker = document.querySelector<HTMLElement>(".sticker");
-if (sticker && matchMedia("(hover: hover) and (prefers-reduced-motion: no-preference)").matches) {
-  addEventListener("pointermove", (e) => {
-    const x = e.clientX / innerWidth - 0.5, y = e.clientY / innerHeight - 0.5;
-    sticker.style.transform = `perspective(900px) rotateY(${x * 10}deg) rotateX(${-y * 8}deg) rotate(-3deg)`;
-  });
-}
-
+(onConnect ? connect : home)(document.getElementById("top")!);
 (window as any).__wedgieReady?.();
