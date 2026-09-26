@@ -55,6 +55,14 @@ app.innerHTML = `
     </div>
     <div class="tray" id="tray"></div>
     <div class="row center" id="plug-actions"></div>
+    <div class="card wide virtual" id="virtual-card">
+      <div class="virtual-copy">
+        <h3>No wedgie yet? Try a virtual one.</h3>
+        <p>The real wedgie firmware, running right here in your browser. Click its buttons, or click it and use the arrow keys, Enter, and A B X Y.</p>
+        <div class="row"><button class="btn btn-green btn-sm" id="virtual-go">Turn it on</button></div>
+      </div>
+      <div class="virtual-dev" id="virtual"></div>
+    </div>
   </section>
 
   <section id="build" class="sec">
@@ -201,6 +209,24 @@ function drawTray() {
 W.onChange(drawTray);
 drawTray();
 W.start();
+
+// ---- the virtual wedgie: loads only when asked --------------------------------------------------
+document.getElementById("virtual-go")!.onclick = async (e) => {
+  const b = e.currentTarget as HTMLButtonElement;
+  b.disabled = true;
+  b.textContent = "Booting…";
+  try {
+    const { mountVirtualWedgie } = await import("./emu");
+    const box = document.getElementById("virtual")!;
+    box.innerHTML = ""; // the placeholder drawing; the virtual wedgie draws its own
+    await mountVirtualWedgie(box, { autofocus: true });
+    b.remove();
+  } catch (err) {
+    b.textContent = "Couldn't start it";
+    console.error(err);
+  }
+};
+document.getElementById("virtual")!.innerHTML = deviceSvg({ kind: "off" });
 
 // ---- small bits -----------------------------------------------------------------------------------
 document.querySelectorAll<HTMLButtonElement>(".seg button").forEach((b) => (b.onclick = () => {
