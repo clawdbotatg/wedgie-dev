@@ -19,6 +19,7 @@
   "dependencies": {
     "@fontsource-variable/nunito": "^5.3.0",
     "@fontsource/dm-mono": "^5.3.0",
-    "@fontsource/silkscreen": "^5.3.0"
+    "@fontsource/silkscreen": "^5.3.0",
+    "@micropython/micropython-webassembly-pyscript": "1.26.0"
   }
 }
