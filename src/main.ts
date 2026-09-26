@@ -210,23 +210,48 @@ W.onChange(drawTray);
 drawTray();
 W.start();
 
-// ---- the virtual wedgie: loads only when asked --------------------------------------------------
+// ---- the virtual wedgie: a 3D model of the real case; "Turn it on" runs the real firmware on it ------
+// The emulator renders into a hidden element; the 3D wedgie shows its screen and sends it the keys.
+const vbox = document.getElementById("virtual")!;
+vbox.innerHTML = deviceSvg({ kind: "off" });
+let w3d: import("./ui/wedgie3d").Wedgie3D | null = null;
+let vw: import("./emu").VirtualWedgie | null = null;
+const show3d = async () => {
+  if (w3d) return;
+  try {
+    const { mountWedgie3D } = await import("./ui/wedgie3d");
+    const holder = document.createElement("div");
+    w3d = await mountWedgie3D(holder, { onKey: (k, down) => vw?.hold(k, down) });
+    vbox.replaceChildren(holder);
+  } catch (err) { console.error("3D wedgie:", err); }     // the drawn one stays
+};
+new IntersectionObserver((es, o) => { if (es.some((e) => e.isIntersecting)) { o.disconnect(); show3d(); } }, { rootMargin: "300px" }).observe(vbox);
 document.getElementById("virtual-go")!.onclick = async (e) => {
   const b = e.currentTarget as HTMLButtonElement;
   b.disabled = true;
   b.textContent = "Booting…";
   try {
+    await show3d();
     const { mountVirtualWedgie } = await import("./emu");
-    const box = document.getElementById("virtual")!;
-    box.innerHTML = ""; // the placeholder drawing; the virtual wedgie draws its own
-    await mountVirtualWedgie(box, { autofocus: true });
+    const hidden = document.createElement("div");
+    hidden.style.cssText = "position:absolute;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none";
+    document.body.appendChild(hidden);
+    vw = await mountVirtualWedgie(hidden, {});
+    if (w3d) {
+      let screenSet = false;
+      vw.onFrame((f) => { if (!screenSet) { screenSet = true; w3d!.setScreen(f.canvas); } });
+      const scr = hidden.querySelector("canvas") as HTMLCanvasElement | null;
+      if (scr) { w3d.setScreen(scr); setInterval(() => w3d!.setBacklight(parseFloat(scr.style.opacity || "1")), 50); }
+      (vbox.querySelector("canvas.w3d") as HTMLCanvasElement | null)?.focus({ preventScroll: true });
+    } else {
+      vbox.replaceChildren(hidden); hidden.style.cssText = "";   // no WebGL: show the drawn virtual wedgie
+    }
     b.remove();
   } catch (err) {
     b.textContent = "Couldn't start it";
     console.error(err);
   }
 };
-document.getElementById("virtual")!.innerHTML = deviceSvg({ kind: "off" });
 
 // ---- small bits -----------------------------------------------------------------------------------
 document.querySelectorAll<HTMLButtonElement>(".seg button").forEach((b) => (b.onclick = () => {
