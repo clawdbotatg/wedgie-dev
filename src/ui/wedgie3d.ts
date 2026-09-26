@@ -9,8 +9,21 @@ import { toCreasedNormals } from "three/examples/jsm/utils/BufferGeometryUtils.j
 type Part = { name: string; verts: number; tris: number; lo: number[]; hi: number[]; pos: number; idx: number; wide: boolean };
 type Geo = { parts: Part[]; glass: { cx: number; cy: number; w: number; h: number; z: number } };
 
+export type Wedgie3DOptions = {
+  onKey?: (key: string, down: boolean) => void;
+  /** false: just a picture of a wedgie (clicks go to whatever holds it). Default true. */
+  interactive?: boolean;
+  screen?: HTMLCanvasElement | string;
+  screens?: string[];
+  /** Which way it swings as it scrolls past: 1 or -1. */
+  side?: number;
+};
+
 export type Wedgie3D = {
-  setScreen(canvas: HTMLCanvasElement | null): void;
+  /** A live canvas (redrawn every frame), a picture URL (e.g. /screens/launcher.png), or off. */
+  setScreen(src: HTMLCanvasElement | string | null): void;
+  /** Cycle through pictures, one every `ms`. */
+  setScreens(urls: string[], ms?: number): void;
   setBacklight(v: number): void;
   keyVisual(key: string, down: boolean): void;
   destroy(): void;
@@ -29,7 +42,13 @@ function loadGeo() {
   return geoP;
 }
 
+const geoCache = new Map<string, THREE.BufferGeometry>();
 function partGeometry(p: Part, bin: ArrayBuffer) {
+  let g = geoCache.get(p.name);
+  if (!g) { g = buildGeometry(p, bin); geoCache.set(p.name, g); }   // shared by every wedgie on the page
+  return g;
+}
+function buildGeometry(p: Part, bin: ArrayBuffer) {
   const q = new Uint16Array(bin, p.pos, p.verts * 3);
   const pos = new Float32Array(p.verts * 3);
   for (let i = 0; i < pos.length; i++) { const a = i % 3; pos[i] = p.lo[a] + (q[i] / 65535) * (p.hi[a] - p.lo[a]); }
@@ -39,7 +58,9 @@ function partGeometry(p: Part, bin: ArrayBuffer) {
   return toCreasedNormals(g, (35 * Math.PI) / 180);    // smooth curves, crisp printed edges
 }
 
-export async function mountWedgie3D(el: HTMLElement, opts: { onKey?: (key: string, down: boolean) => void } = {}): Promise<Wedgie3D> {
+export async function mountWedgie3D(el: HTMLElement, opts: Wedgie3DOptions = {}): Promise<Wedgie3D> {
+  const interactive = opts.interactive !== false;
+  const side = opts.side ?? 1;
   const { meta, bin } = await loadGeo();
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(2, devicePixelRatio));
@@ -47,11 +68,16 @@ export async function mountWedgie3D(el: HTMLElement, opts: { onKey?: (key: strin
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 0.9;
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.VSMShadowMap;
   const cv = renderer.domElement;
   cv.className = "w3d";
-  cv.tabIndex = 0;
-  cv.setAttribute("aria-label", "a wedgie: click its buttons, or use the arrow keys, Enter, and A B X Y");
+  if (interactive) {
+    cv.tabIndex = 0;
+    cv.setAttribute("aria-label", "a wedgie: click its buttons, or use the arrow keys, Enter, and A B X Y");
+  } else {
+    cv.style.pointerEvents = "none";
+    cv.setAttribute("aria-hidden", "true");
+  }
   el.appendChild(cv);
 
   const scene = new THREE.Scene();
@@ -59,8 +85,8 @@ export async function mountWedgie3D(el: HTMLElement, opts: { onKey?: (key: strin
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
   scene.environmentIntensity = 0.55;
   const camera = new THREE.PerspectiveCamera(22, 1, 10, 2000);
-  camera.position.set(0, -26, 190);
-  camera.lookAt(0, -2, 0);
+  camera.position.set(0, -20, 128);        // close: the wedgie fills its frame
+  camera.lookAt(0, -1.5, 0);
 
   const key = new THREE.DirectionalLight(0xffffff, 2.2);
   key.position.set(-35, 45, 160);
@@ -122,8 +148,38 @@ export async function mountWedgie3D(el: HTMLElement, opts: { onKey?: (key: strin
   screen.position.set(G.cx, G.cy, G.z + 0.05);
   screen.rotation.z = -Math.PI / 2;          // image right = case -y, image up = case +x
   inner.add(screen);
-  let tex: THREE.CanvasTexture | null = null;
-  let backlight = 0;
+  let tex: THREE.Texture | null = null;
+  let live = false;          // a canvas that keeps changing (vs a still picture)
+  let backlight = 1;
+  const loader = new THREE.TextureLoader();
+  const pics = new Map<string, THREE.Texture>();
+  const picture = (url: string) => {
+    let t = pics.get(url);
+    if (!t) {
+      t = loader.load(url);
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.magFilter = THREE.NearestFilter;          // crisp pixels, like the real panel
+      t.anisotropy = 4;
+      pics.set(url, t);
+    }
+    return t;
+  };
+  function useScreen(src: HTMLCanvasElement | string | null) {
+    if (tex && live) tex.dispose();
+    live = src instanceof HTMLCanvasElement;
+    tex = !src ? null : live ? new THREE.CanvasTexture(src as HTMLCanvasElement) : picture(src as string);
+    if (tex && live) { tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4; }
+    screenMat.map = tex; screenMat.color.set(tex ? 0xffffff : 0x000000); screenMat.needsUpdate = true;
+  }
+  let cycle = 0;
+  function useScreens(urls: string[], ms = 2600) {
+    clearInterval(cycle);
+    let i = 0;
+    useScreen(urls[0] || null);
+    urls.forEach(picture);
+    if (urls.length > 1) cycle = window.setInterval(() => { i = (i + 1) % urls.length; useScreen(urls[i]); }, ms);
+  }
+  if (opts.screens) useScreens(opts.screens); else if (opts.screen) useScreen(opts.screen);
 
   // ---- sizing, pointer lean, render loop --------------------------------------------------------
   let W = 0, H = 0;
@@ -150,19 +206,24 @@ export async function mountWedgie3D(el: HTMLElement, opts: { onKey?: (key: strin
   const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting; if (visible) loop(); });
   io.observe(cv);
   const t0 = performance.now();
+  let scroll = 0;
   function loop() {
     cancelAnimationFrame(raf);
     if (dead || !visible || document.hidden) return;
     raf = requestAnimationFrame(loop);
     const t = (performance.now() - t0) / 1000;
     cur.x += (aim.x - cur.x) * 0.06; cur.y += (aim.y - cur.y) * 0.06;
-    tilt.rotation.y = cur.x * 0.14 + Math.sin(t * 0.6) * 0.012;
-    tilt.rotation.x = -0.05 + cur.y * 0.1 + Math.sin(t * 0.45) * 0.01;
+    // Lean as it scrolls past (-1 entering at the bottom, +1 leaving at the top), and toward the pointer.
+    const r = cv.getBoundingClientRect();
+    const sc = Math.max(-1.2, Math.min(1.2, (r.top + r.height / 2 - innerHeight / 2) / (innerHeight / 2)));
+    scroll += (sc - scroll) * 0.12;
+    tilt.rotation.y = cur.x * 0.12 + scroll * 0.22 * side + Math.sin(t * 0.6 + side) * 0.012;
+    tilt.rotation.x = -0.05 + cur.y * 0.08 + scroll * 0.28 + Math.sin(t * 0.45) * 0.01;
     for (const k of KEYS) {
       const m = meshes.get(k)!; const want = pressed.get(k) ? -0.45 : 0;
       m.position.z += (want - m.position.z) * 0.5;
     }
-    if (tex) tex.needsUpdate = true;
+    if (tex && live) tex.needsUpdate = true;
     screenMat.opacity = tex ? Math.max(0.02, backlight) : 1;
     renderer.render(scene, camera);
   }
@@ -199,6 +260,8 @@ export async function mountWedgie3D(el: HTMLElement, opts: { onKey?: (key: strin
     }
   }
   const set = (k: string, down: boolean) => { visual(k, down); opts.onKey?.(k, down); };
+  if (interactive) wire();
+  function wire() {
   cv.addEventListener("pointerdown", (e) => {
     const k = hit(e);
     cv.focus({ preventScroll: true });
@@ -218,18 +281,15 @@ export async function mountWedgie3D(el: HTMLElement, opts: { onKey?: (key: strin
   cv.addEventListener("keydown", (e) => { const k = KEYMAP[e.key]; if (!k) return; e.preventDefault(); if (!held.has(k)) { held.add(k); set(k, true); } });
   cv.addEventListener("keyup", (e) => { const k = KEYMAP[e.key]; if (k && held.delete(k)) set(k, false); });
   cv.addEventListener("blur", () => { for (const k of held) set(k, false); held.clear(); });
+  }
 
   return {
-    setScreen(canvas) {
-      tex?.dispose();
-      tex = canvas ? new THREE.CanvasTexture(canvas) : null;
-      if (tex) { tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4; }
-      screenMat.map = tex; screenMat.color.set(tex ? 0xffffff : 0x000000); screenMat.needsUpdate = true;
-    },
+    setScreen(src) { clearInterval(cycle); useScreen(src); },
+    setScreens: useScreens,
     setBacklight(v) { backlight = v; },
     keyVisual: visual,
     destroy() {
-      dead = true; cancelAnimationFrame(raf); ro.disconnect(); io.disconnect();
+      dead = true; cancelAnimationFrame(raf); clearInterval(cycle); ro.disconnect(); io.disconnect();
       removeEventListener("pointermove", onMove); document.removeEventListener("visibilitychange", loop);
       renderer.dispose(); pmrem.dispose(); cv.remove();
     },

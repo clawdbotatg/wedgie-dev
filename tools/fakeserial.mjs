@@ -11,14 +11,14 @@ const url = process.argv[2] || "http://localhost:4173/";
 const out = process.argv[3] || "shots";
 const cache = homedir() + "/Library/Caches/ms-playwright";
 const shell = readdirSync(cache).filter((d) => d.startsWith("chromium_headless_shell-")).sort().reverse()[0];
-const browser = await chromium.launch({ executablePath: `${cache}/${shell}/chrome-headless-shell-mac-arm64/chrome-headless-shell` });
+const browser = await chromium.launch({ executablePath: `${cache}/${shell}/chrome-headless-shell-mac-arm64/chrome-headless-shell`, args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
 const ctx = await browser.newContext({ viewport: { width: 1360, height: 900 }, deviceScaleFactor: 2 });
 await ctx.addInitScript(() => {
   const enc = new TextEncoder(), dec = new TextDecoder();
   const hex = (b) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
   const sha = async (u8) => hex(await crypto.subtle.digest("SHA-256", u8));
   function board(uid, machine, files) {
-    const st = { files, launched: null, presses: [] };
+    const st = { files, launched: null, presses: [], shots: 0 };
     let push = () => {};
     let raw = false, code = "", line = "", cur = null, curName = "";
     const wedgie = () => st.files.has("menu.py") && st.files.has("main.py");
@@ -57,6 +57,7 @@ await ctx.addInitScript(() => {
       if (msg.type === "home") { st.launched = null; return push(JSON.stringify({ id, type: "ok" }) + "\r\n"); }
       if (msg.type === "press") { st.presses.push(msg.key); return push(JSON.stringify({ id, type: "ok" }) + "\r\n"); }
       if (msg.type === "shot") {
+        st.shots++;
         // white screen, waistband stripes, a green box where "the app" is
         const px = new Uint8Array(240 * 240 * 2);
         const c565 = (r, g, b) => ((r & 0xf8) << 8) | ((g & 0xfc) << 3) | (b >> 3);
@@ -133,14 +134,15 @@ await page.click(".panel .x");
 
 // 2. the wedgie: live screen, open an app, press a drawn button
 await page.click(".slot >> nth=1");
-await page.waitForFunction(() => document.querySelector("image.live")?.getAttribute("href")?.startsWith("data:image/png"), null, { timeout: 8000 });
-step("live screen mirrored");
+await page.waitForFunction(() => document.querySelector(".panel-dev canvas.w3d") && window.__ports[1]._st.shots >= 2, null, { timeout: 15000 });
+step("3D panel up, live screen mirrored (" + (await page.evaluate(() => window.__ports[1]._st.shots)) + " shots)");
 await page.click('[data-open="hello"]');
 await page.waitForFunction(() => window.__ports[1]._st.launched === "hello", null, { timeout: 5000 });
 step("launched hello over JSON");
-await page.dispatchEvent('.panel-dev .k[data-k="A"]', "pointerdown");
+await page.focus(".panel-dev canvas.w3d");
+await page.keyboard.press("a");
 await page.waitForFunction(() => window.__ports[1]._st.presses.includes("A"), null, { timeout: 5000 });
-step("drawn A pressed the real A");
+step("A on the 3D wedgie pressed the real A");
 await page.waitForTimeout(1600);
 await page.screenshot({ path: `${out}/fake-panel.png` });
 console.log(errs.length ? "ERRORS: " + errs.join(" | ") : "no page errors");

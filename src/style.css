@@ -100,7 +100,7 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 22px; }
 
 /* tray of plugged-in wedgies: a recessed shelf */
 .tray { background: var(--recess); box-shadow: var(--recess-shadow); border-radius: 34px; padding: 28px; min-height: 250px;
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 24px; margin-bottom: 22px; }
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr)); gap: 24px; margin-bottom: 22px; }
 .tray .empty { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 26px; color: #555855; text-align: left; flex-wrap: wrap; }
 .tray .empty p { max-width: 360px; }
 .wedgie { display: block; width: 100%; height: auto; overflow: visible; }
@@ -133,14 +133,14 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 22px; }
 .part:nth-child(1) .num { background: var(--green-fill); }
 .part:nth-child(3) .num { background: var(--red-fill); }
 .wide { margin-bottom: 22px; }
-.assemble { display: grid; grid-template-columns: 1.2fr 1fr; gap: 30px; align-items: center; }
+.assemble { display: grid; grid-template-columns: 1fr 1.25fr; gap: 30px; align-items: center; }
 .assemble ol { padding-left: 22px; margin: 14px 0 0; display: grid; gap: 10px; color: #3b3d3b; }
 .assemble em { font-style: normal; font-weight: 900; }
 .case p { margin: 12px 0 18px; color: #474947; max-width: 50em; }
 .case .fine { margin: 16px 0 0; }
 
 /* order */
-.order { display: grid; grid-template-columns: 1fr 1.1fr; gap: 34px; align-items: center; padding: 34px; }
+.order { display: grid; grid-template-columns: 1.3fr 1fr; gap: 34px; align-items: center; padding: 34px; }
 .order-price { font-weight: 900; font-size: 64px; letter-spacing: -.03em; line-height: 1; }
 .order-price span { font-size: 20px; color: var(--muted); letter-spacing: 0; }
 .order-body > p { margin: 10px 0 18px; color: #474947; }
@@ -222,9 +222,17 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 22px; }
 .badge.grey { background: var(--grey-fill); }
 
 /* the virtual wedgie */
-.virtual { display: grid; grid-template-columns: 1fr 1.1fr; gap: 28px; align-items: center; margin-top: 8px; }
+.virtual { display: grid; grid-template-columns: .75fr 1.5fr; gap: 28px; align-items: center; margin-top: 8px; }
 .virtual-copy p { color: #474947; margin: 10px 0 18px; }
-.virtual-dev { max-width: 460px; justify-self: center; width: 100%; }
+.virtual-dev { width: 100%; }
 @media (max-width: 860px) { .virtual { grid-template-columns: 1fr; } }
 .w3d { display: block; outline: none; border-radius: 24px; touch-action: none; }
 .w3d:focus-visible { box-shadow: none; }
+
+.w3d-holder { width: 100%; }
+.assemble-art, .order-art, .slot .dev { width: 100%; }
+.slot { width: 100%; }
+.tray .empty-dev { width: min(440px, 100%); }
+@media (min-width: 861px) { .assemble-art, .order-art, .virtual-dev { margin: -20px -10px; } }
+.w3d-holder, .w3d { max-width: 100%; }
+html, body { overflow-x: clip; }

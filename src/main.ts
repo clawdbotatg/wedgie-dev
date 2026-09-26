@@ -3,6 +3,7 @@ import "@fontsource/dm-mono/500.css";
 import "@fontsource/silkscreen/400.css";
 import "./style.css";
 import { deviceSvg, esc } from "./ui/device";
+import { place3D, idScreen, SCREENS } from "./ui/place3d";
 import * as W from "./serial/wedgies";
 import { openPanel } from "./ui/panel";
 import { firmwareManifest } from "./serial/install";
@@ -90,7 +91,7 @@ app.innerHTML = `
           <li>Snap it into the case and plug it in. It shows up <a href="#plug">above</a>.</li>
         </ol>
       </div>
-      <div class="assemble-art">${deviceSvg({ kind: "id", id: "WEDGIE", sub: "hello" })}</div>
+      <div class="assemble-art" id="art-build"></div>
     </div>
 
     <div class="card wide case">
@@ -116,7 +117,7 @@ app.innerHTML = `
       <p>Assembled, tested, and mailed to you. Or send one to someone who needs one.</p>
     </div>
     <div class="card order">
-      <div class="order-art">${deviceSvg({ kind: "loading", p: 0.62 })}</div>
+      <div class="order-art" id="art-order"></div>
       <div class="order-body">
         <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
         <div class="order-price">$50 <span>shipped</span></div>
@@ -165,12 +166,13 @@ const tray = document.getElementById("tray")!;
 const actions = document.getElementById("plug-actions")!;
 
 function screenFor(w: W.Wedgie) {
-  if (w.state === "identifying") return { kind: "loading", p: 0.4 } as const;
-  if (w.state === "error") return { kind: "text", text: "?" } as const;
-  return { kind: "id", id: w.short || "", sub: w.board } as const;
+  if (w.state === "identifying") return idScreen("...", "finding it");
+  if (w.state === "error") return idScreen("?", "can't talk");
+  return idScreen(w.short || "", w.board);
 }
 
-// Repaint by key: frames change several times while a wedgie identifies; keep nodes stable.
+// Repaint by key: frames change several times while a wedgie identifies; keep nodes stable (each slot
+// holds a 3D wedgie that must not be rebuilt).
 function drawTray() {
   const ws = W.wedgies();
   document.getElementById("count")!.textContent = ws.length ? String(ws.length) : "";
@@ -181,11 +183,15 @@ function drawTray() {
     return;
   }
   if (!ws.length) {
-    tray.innerHTML = `<div class="empty">${deviceSvg({ kind: "off" }, { cls: "ghost" })}<p>No wedgies yet. Plug one in and press <b>Connect</b>. After the first time, it shows up by itself.</p></div>`;
+    if (!tray.querySelector(".empty")) {
+      tray.replaceChildren();
+      tray.insertAdjacentHTML("beforeend", `<div class="empty"><div class="empty-dev"></div><p>No wedgies yet. Plug one in and press <b>Connect</b>. After the first time, it shows up by itself.</p></div>`);
+      place3D(tray.querySelector<HTMLElement>(".empty-dev")!, { interactive: false, screen: idScreen("PLUG IN", "usb-c"), side: -1 });
+    }
   } else {
     tray.querySelector(".empty")?.remove();
     const keep = new Set(ws.map((w) => String(w.key)));
-    tray.querySelectorAll<HTMLElement>(".slot").forEach((el) => { if (!keep.has(el.dataset.key!)) el.remove(); });
+    tray.querySelectorAll<HTMLElement>(".slot").forEach((el) => { if (!keep.has(el.dataset.key!)) { (el as any)._w3d?.then((x: any) => x?.destroy()); el.remove(); } });
     for (const w of ws) {
       let el = tray.querySelector<HTMLElement>(`.slot[data-key="${w.key}"]`);
       const sig = `${w.state}|${w.short}|${w.board}|${w.error}|${w.kind}|${w.version}|${latest}`;
@@ -194,13 +200,15 @@ function drawTray() {
         el.className = "slot";
         el.dataset.key = String(w.key);
         el.onclick = () => openPanel(w);
+        el.innerHTML = `<div class="dev"></div><span class="idtag"></span><span class="meta"></span>`;
         tray.appendChild(el);
+        (el as any)._w3d = place3D(el.querySelector<HTMLElement>(".dev")!, { interactive: false, screen: screenFor(w), side: w.key % 2 ? 1 : -1 });
       }
       if (el.dataset.sig === sig) continue;
       el.dataset.sig = sig;
-      el.innerHTML = deviceSvg(screenFor(w)) +
-        `<span class="idtag">${w.state === "identifying" ? "finding…" : w.state === "error" ? "can't talk" : esc(w.short)}</span>` +
-        `<span class="meta">${w.state === "error" ? esc(w.error) : esc([w.board, w.kind === "wedgie" ? "wedgie " + w.version : w.chip?.type].filter(Boolean).join(" · "))}${badge(w)}</span>`;
+      (el as any)._w3d.then((x: any) => x?.setScreen(screenFor(w)));
+      el.querySelector(".idtag")!.innerHTML = w.state === "identifying" ? "finding…" : w.state === "error" ? "can't talk" : esc(w.short);
+      el.querySelector(".meta")!.innerHTML = `${w.state === "error" ? esc(w.error) : esc([w.board, w.kind === "wedgie" ? "wedgie " + w.version : w.chip?.type].filter(Boolean).join(" · "))}${badge(w)}`;
     }
   }
   actions.innerHTML = `<button class="btn btn-green" id="connect">${ws.length ? "Connect another" : "Connect a wedgie"}</button>`;
@@ -213,19 +221,15 @@ W.start();
 // ---- the virtual wedgie: a 3D model of the real case; "Turn it on" runs the real firmware on it ------
 // The emulator renders into a hidden element; the 3D wedgie shows its screen and sends it the keys.
 const vbox = document.getElementById("virtual")!;
-vbox.innerHTML = deviceSvg({ kind: "off" });
 let w3d: import("./ui/wedgie3d").Wedgie3D | null = null;
 let vw: import("./emu").VirtualWedgie | null = null;
-const show3d = async () => {
-  if (w3d) return;
-  try {
-    const { mountWedgie3D } = await import("./ui/wedgie3d");
-    const holder = document.createElement("div");
-    w3d = await mountWedgie3D(holder, { onKey: (k, down) => vw?.hold(k, down) });
-    vbox.replaceChildren(holder);
-  } catch (err) { console.error("3D wedgie:", err); }     // the drawn one stays
-};
-new IntersectionObserver((es, o) => { if (es.some((e) => e.isIntersecting)) { o.disconnect(); show3d(); } }, { rootMargin: "300px" }).observe(vbox);
+const w3dReady = place3D(vbox, { screen: "/screens/launcher.png", onKey: (k, down) => vw?.hold(k, down) }).then((x) => (w3d = x));
+const show3d = () => w3dReady;
+
+// The other wedgies on the page: real firmware screens, cycling.
+place3D(document.getElementById("art-build")!, { interactive: false, screens: SCREENS.apps, side: -1 });
+place3D(document.getElementById("art-order")!, { interactive: false, screens: SCREENS.wallet, side: 1 });
+
 document.getElementById("virtual-go")!.onclick = async (e) => {
   const b = e.currentTarget as HTMLButtonElement;
   b.disabled = true;
@@ -237,6 +241,7 @@ document.getElementById("virtual-go")!.onclick = async (e) => {
     hidden.style.cssText = "position:absolute;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none";
     document.body.appendChild(hidden);
     vw = await mountVirtualWedgie(hidden, {});
+    (window as any).__wedgieVirtual = vw;   // tools/screens.mjs drives it to capture real screens
     if (w3d) {
       let screenSet = false;
       vw.onFrame((f) => { if (!screenSet) { screenSet = true; w3d!.setScreen(f.canvas); } });

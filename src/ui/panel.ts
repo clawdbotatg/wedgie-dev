@@ -2,7 +2,9 @@
 // device shows the real screen (shot every ~0.7 s) and its buttons press the real ones; the Apps tab
 // opens apps on it; nothing is interrupted. Firmware installs/updates it. Test and Code talk to
 // MicroPython's raw REPL (the wedgie restarts its launcher when they finish).
-import { deviceSvg, esc, setKey, KEYS, type Screen } from "./device";
+import { esc, KEYS, type Screen } from "./device";
+import { place3D, idScreen as idCanvas, colorScreen } from "./place3d";
+import type { Wedgie3D } from "./wedgie3d";
 import * as W from "../serial/wedgies";
 import { pyStr, type Repl } from "../serial/repl";
 import { install, firmwareManifest, type App } from "../serial/install";
@@ -107,19 +109,30 @@ export function openPanel(w: W.Wedgie) {
   document.documentElement.classList.add("noscroll");
   const $ = <T extends Element = HTMLElement>(s: string) => el.querySelector(s) as T;
 
-  // ---- the drawn device --------------------------------------------------------------------------
+  // ---- the 3D wedgie: shows its real screen (mirrored), and pressing its buttons presses the real ones --
   const dev = $(".panel-dev");
+  const canvas = document.createElement("canvas");      // the mirrored screen
+  canvas.width = canvas.height = 240;
   let live = false;
-  const setScreen = (s: Screen) => {
-    dev.innerHTML = deviceSvg(s, { cls: wedgie() ? "remote" : "" });
-    live = s.kind === "live";
-    dev.querySelectorAll<SVGElement>(".k").forEach((k) => k.addEventListener("pointerdown", (e) => {
-      e.preventDefault();
-      if (wedgie() && link && !busy) link.request({ type: "press", key: k.dataset.k }).catch(() => {});
-    }));
+  let w3: Wedgie3D | null = null;
+  const tex = (s: Screen): HTMLCanvasElement | string => {
+    switch (s.kind) {
+      case "live": return canvas;
+      case "id": return idCanvas(s.id, s.sub);
+      case "color": return colorScreen(s.css);
+      case "loading": return idCanvas(`${Math.round(s.p * 100)}%`, "installing");
+      case "text": return idCanvas(s.text);
+      default: return colorScreen("#101012");
+    }
   };
+  let shown: Screen = { kind: "off" };
+  const setScreen = (s: Screen) => { shown = s; live = s.kind === "live"; w3?.setScreen(tex(s)); };
   const idScreen = (): Screen => (w.state === "ready" ? { kind: "id", id: w.short || "", sub: w.board } : { kind: "loading", p: 0.5 });
   setScreen(wedgie() ? { kind: "live" } : idScreen());
+  place3D(dev, {
+    screen: tex(shown),
+    onKey: (k, down) => { if (down && wedgie() && link && !busy) link.request({ type: "press", key: k }).catch(() => {}); },
+  }).then((x) => { w3 = x; x?.setScreen(tex(shown)); });
 
   const drawInfo = () => {
     $("#p-kv").innerHTML = [
@@ -161,9 +174,7 @@ export function openPanel(w: W.Wedgie) {
     $("#p-fw").innerHTML = `<p class="bad">Can't open it: ${esc(e?.message || e)}</p>`;
   });
 
-  // The real screen, mirrored onto the drawn one.
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = 240;
+  // The real screen, mirrored onto the 3D one (its texture follows this canvas).
   const cx = canvas.getContext("2d")!;
   const img = cx.createImageData(240, 240);
   async function mirror() {
@@ -177,7 +188,6 @@ export function openPanel(w: W.Wedgie) {
             img.data[j] = ((v >> 11) & 31) * 255 / 31; img.data[j + 1] = ((v >> 5) & 63) * 255 / 63; img.data[j + 2] = (v & 31) * 255 / 31; img.data[j + 3] = 255;
           }
           cx.putImageData(img, 0, 0);
-          dev.querySelector("image.live")?.setAttribute("href", canvas.toDataURL());
         } catch {}
       }
       await new Promise((res) => setTimeout(res, 700));
@@ -222,7 +232,7 @@ export function openPanel(w: W.Wedgie) {
     if (!wedgie()) {
       box.innerHTML = `<p>These run on wedgie firmware. Install it from the <a href="#" data-go="fw">Firmware</a> tab, then open them here or from the wedgie's own menu.</p>` + appCards(false);
     } else {
-      box.innerHTML = `<p class="fine">Opens on the wedgie; its screen shows up on the left, and you can click the drawn buttons. <button class="btn btn-sm" data-home>Home</button></p>` + appCards(true);
+      box.innerHTML = `<p class="fine">Opens on the wedgie. Its real screen shows on the left; press its buttons there to drive it. <button class="btn btn-sm" data-home>Home</button></p>` + appCards(true);
     }
     box.querySelector<HTMLElement>("[data-go]")?.addEventListener("click", (e) => { e.preventDefault(); showTab("fw"); });
     box.querySelector<HTMLButtonElement>("[data-home]")?.addEventListener("click", () => link?.request({ type: "home" }).catch(() => {}));
@@ -302,15 +312,14 @@ export function openPanel(w: W.Wedgie) {
     }),
     keys: () => act("Button test", async (r) => {
       setScreen(idScreen());
-      const root = dev.querySelector("svg")!;
-      KEYS.forEach((k) => setKey(root, k, ""));
+      KEYS.forEach((k) => w3?.keyVisual(k, false));
       const seen = new Set<string>();
       status(`Press every button on the wedgie: joystick up, down, left, right, push it in, then A, B, X, Y. <span id="p-left"></span>`);
       const left = () => { const l = KEYS.filter((k) => !seen.has(k)); const e = el.querySelector("#p-left"); if (e) e.textContent = l.length ? `Left: ${l.join(" ")}` : ""; };
       left();
       r.onLine = (t, v) => {
         if (t === "stuck" && v.length) status(`<b class="bad">Held down from the start:</b> ${esc(v.join(", "))}`);
-        if (t === "key") { if (!v.down) seen.add(v.key); setKey(root, v.key, v.down ? "down" : "done"); left(); }
+        if (t === "key") { if (!v.down) seen.add(v.key); w3?.keyVisual(v.key, v.down); left(); }
       };
       stopFn = () => r.interrupt();
       try { await r.exec("keys(180)", 190000); } catch {}
@@ -359,7 +368,7 @@ except AttributeError:
   $(".tab[data-tab=code] .row").insertAdjacentHTML("beforeend", `<input id="p-appname" class="recess name" placeholder="app name" maxlength="12" value="My app">`);
   el.querySelectorAll<HTMLButtonElement>("[data-act]").forEach((b) => (b.onclick = () => handlers[b.dataset.act!]?.()));
 
-  (el as any)._cleanup = () => { clearInterval(logTimer); stopFn?.(); closeSession?.(); closeSession = null; };
+  (el as any)._cleanup = () => { clearInterval(logTimer); stopFn?.(); closeSession?.(); closeSession = null; w3?.destroy(); };
 }
 
 function chipText(c: any) {
