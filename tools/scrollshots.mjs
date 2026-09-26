@@ -16,7 +16,7 @@ for (const [name, vp] of [["desktop", { width: 1360, height: 860 }], ["phone", {
   p.on("console", (m) => m.type() === "error" && errs.push(m.text()));
   await p.goto(url);
   await p.waitForFunction(() => !document.getElementById("wl"));
-  for (const sec of ["#get", "#build .parts", "#build .assemble", "#agents"]) {
+  for (const sec of ["#get", "#build .parts", "#build .case", "#agents"]) {
     await p.locator(sec).scrollIntoViewIfNeeded();
     await p.evaluate((s) => document.querySelector(s).scrollIntoView({ block: "center" }), sec);
     await p.waitForTimeout(2500);

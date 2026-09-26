@@ -30,20 +30,20 @@ export type Wedgie3D = {
 };
 
 // Printed colors, in the site's palette: white lid, black base, green A, grey B X and joystick, red Y.
-const COLORS: Record<string, number> = { lid: 0xf3f2ee, base: 0x1c1c1e, A: 0x2dbd57, B: 0x75767a, X: 0x75767a, Y: 0xdf342e, joystick: 0x75767a };
+export const COLORS: Record<string, number> = { lid: 0xf3f2ee, base: 0x1c1c1e, A: 0x2dbd57, B: 0x75767a, X: 0x75767a, Y: 0xdf342e, joystick: 0x75767a };
 const KEYS = ["A", "B", "X", "Y"];
 const STICK = { x: 13.17, y: 46.13 };          // joystick centre in case mm
 const ACTIVE = 23.4;                            // 1.3" 240x240 active area, mm
 
 let geoP: Promise<{ meta: Geo; bin: ArrayBuffer }> | null = null;
-function loadGeo() {
+export function loadGeo() {
   if (!geoP) geoP = Promise.all([fetch("/3d/wedgie.json").then((r) => r.json()), fetch("/3d/wedgie.bin").then((r) => r.arrayBuffer())])
     .then(([meta, bin]) => ({ meta, bin }));
   return geoP;
 }
 
 const geoCache = new Map<string, THREE.BufferGeometry>();
-function partGeometry(p: Part, bin: ArrayBuffer) {
+export function partGeometry(p: Part, bin: ArrayBuffer) {
   let g = geoCache.get(p.name);
   if (!g) { g = buildGeometry(p, bin); geoCache.set(p.name, g); }   // shared by every wedgie on the page
   return g;
@@ -117,6 +117,7 @@ export async function mountWedgie3D(el: HTMLElement, opts: Wedgie3DOptions = {})
 
   const meshes = new Map<string, THREE.Mesh>();
   for (const p of meta.parts) {
+    if (p.name === "hat" || p.name === "pico") continue;   // the boards: only the assembly shows them
     const m = new THREE.Mesh(partGeometry(p, bin), new THREE.MeshPhysicalMaterial({
       color: COLORS[p.name] ?? 0xcccccc, roughness: p.name === "base" ? 0.55 : 0.5, clearcoat: 0.2, clearcoatRoughness: 0.5,
     }));

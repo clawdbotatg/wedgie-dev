@@ -11,7 +11,7 @@ const onConnect = location.pathname.replace(/\/+$/, "") === "/connect";
 const app = document.getElementById("app")!;
 app.innerHTML = `
 <header class="top">
-  <a class="brand" href="/"><img src="/img/sticker.webp" alt="wedgie.dev home" width="46" height="35"></a>
+  <a class="brand" href="/"><img src="/img/sticker.webp" alt="" width="46" height="35"><span class="tag">wedgie.dev</span></a>
   <a class="connect-btn${onConnect ? " here" : ""}" id="connect-btn" href="/connect"><span class="led"></span><span class="lbl">Connect</span><b class="n"></b></a>
 </header>
 <main id="top"></main>

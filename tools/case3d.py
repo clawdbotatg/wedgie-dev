@@ -36,7 +36,9 @@ def split_x(ts, k):
     return groups
 
 
-meshes = {"lid": tris(parts["lid"]["stl"]), "base": tris(parts["base"]["stl"]), "joystick": tris(parts["joystick_cap"]["stl"])}
+meshes = {"lid": tris(parts["lid"]["stl"]), "base": tris(parts["base"]["stl"]), "joystick": tris(parts["joystick_cap"]["stl"]),
+          # the boards (the case repo's own stand-in models): for the assembly animation
+          "hat": tris(parts["hat"]["stl"]), "pico": tris(parts["pico"]["stl"])}
 caps = split_x(tris(parts["button_caps"]["stl"]), 4)          # x ascending: Y X B A
 for name, g in zip(("Y", "X", "B", "A"), caps):
     meshes[name] = g
