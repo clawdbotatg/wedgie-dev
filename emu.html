@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>virtual wedgie (test page)</title>
+<link rel="icon" href="/img/favicon.png">
+<style>
+  body { margin: 0; background: #fefefe; font: 14px/1.4 system-ui, sans-serif; color: #1a1b1a; }
+  main { max-width: 640px; margin: 0 auto; padding: 24px 16px; }
+  #vw { max-width: 560px; margin: 12px auto; }
+  #bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  #log { height: 160px; overflow: auto; background: #101012; color: #d6d6d6; font: 12px/1.35 ui-monospace, monospace; padding: 8px; border-radius: 8px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<main>
+  <p>Development test page for <code>mountVirtualWedgie</code> (src/emu). Click the device, then arrows / Enter / A B X Y.</p>
+  <div id="vw"></div>
+  <div id="bar"><button id="reboot">reboot</button><button id="shot">screenshot</button><span id="fps"></span></div>
+  <pre id="log"></pre>
+</main>
+<script type="module" src="/src/emu/test-page.ts"></script>
+</body>
+</html>

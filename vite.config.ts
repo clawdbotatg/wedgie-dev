@@ -25,6 +25,7 @@ function loaderManifest(): Plugin {
     transformIndexHtml: {
       order: "post",
       handler(html, ctx) {
+        if (!html.includes("__MANIFEST__")) return html;   // other pages (emu.html) load normally
         html = html.replace("%LOADER_LOGO%", readFileSync("src/loader-logo.txt", "utf8").trim());
         const files: { u: string; n: number; t: string }[] = [];
         for (const u of PRELOAD_IMAGES) files.push({ u, n: statSync("public" + u).size, t: "img" });
@@ -51,7 +52,16 @@ function loaderManifest(): Plugin {
   };
 }
 
+// The virtual wedgie (src/emu) needs SharedArrayBuffer, i.e. cross-origin isolation. vercel.json
+// sends the same headers in production.
+const ISOLATE = { "Cross-Origin-Opener-Policy": "same-origin", "Cross-Origin-Embedder-Policy": "require-corp" };
+
 export default defineConfig({
   plugins: [firmware(), loaderManifest()],
-  build: { target: "es2022", assetsInlineLimit: 0 },
+  // emu.html (the virtual wedgie's test page) is served by `vite` in dev; it is built only for
+  // tools/emuprobe.mjs (WEDGIE_EMU_TEST=1), so the production site's chunks stay as they were.
+  build: { target: "es2022", assetsInlineLimit: 0, ...(process.env.WEDGIE_EMU_TEST ? { rollupOptions: { input: { main: "index.html", emu: "emu.html" } } } : {}) },
+  worker: { format: "es" },
+  server: { headers: ISOLATE },
+  preview: { headers: ISOLATE },
 });
