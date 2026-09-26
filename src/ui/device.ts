@@ -26,7 +26,10 @@ export function deviceSvg(screen: Screen, opts: { cls?: string } = {}) {
   <defs>
     <linearGradient id="lid${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e9e8e3"/></linearGradient>
     <linearGradient id="bw${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cfcec9"/><stop offset="1" stop-color="#ecebe6"/></linearGradient>
-    <radialGradient id="joy${i}" cx=".4" cy=".35" r=".7"><stop offset="0" stop-color="#7a7a80"/><stop offset="1" stop-color="#434347"/></radialGradient>
+    <radialGradient id="joy${i}" cx=".4" cy=".35" r=".7"><stop offset="0" stop-color="#7c7d7f"/><stop offset="1" stop-color="#48494b"/></radialGradient>
+    <linearGradient id="kg${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#46cd64"/><stop offset="1" stop-color="#168c34"/></linearGradient>
+    <linearGradient id="kk${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7c7d7f"/><stop offset="1" stop-color="#48494b"/></linearGradient>
+    <linearGradient id="kr${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f0554f"/><stop offset="1" stop-color="#b8201b"/></linearGradient>
     <linearGradient id="well${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9c8c3"/><stop offset="1" stop-color="#eeede8"/></linearGradient>
     <filter id="sh${i}" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="10" stdDeviation="9" flood-color="#000" flood-opacity=".22"/></filter>
     <clipPath id="scr${i}"><rect x="118" y="38" width="104" height="104" rx="3"/></clipPath>
@@ -50,7 +53,7 @@ export function deviceSvg(screen: Screen, opts: { cls?: string } = {}) {
     <path class="k arrow" data-k="up" d="M58 55 l6 7 h-12z"/><path class="k arrow" data-k="down" d="M58 125 l6 -7 h-12z"/>
     <path class="k arrow" data-k="left" d="M23 90 l7 -6 v12z"/><path class="k arrow" data-k="right" d="M93 90 l-7 -6 v12z"/>
   </g>
-  ${btn("A", 26, "#27b04b")}${btn("B", 62, "#77777b")}${btn("X", 98, "#77777b")}${btn("Y", 134, "#d7263d")}
+  ${btn("A", 26, `url(#kg${i})`)}${btn("B", 62, `url(#kk${i})`)}${btn("X", 98, `url(#kk${i})`)}${btn("Y", 134, `url(#kr${i})`)}
 </svg>`;
 }
 
