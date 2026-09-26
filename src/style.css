@@ -249,3 +249,5 @@ html, body { overflow-x: clip; }
 .connect-btn .n:empty { display: none; }
 .connect-btn .n { font-family: var(--mono); font-size: 14px; background: rgba(0,0,0,.18); border-radius: 999px; padding: 1px 8px; }
 .connect { min-height: 60vh; padding-top: 40px; }
+.buy { display: flex; flex-wrap: wrap; gap: 8px; }
+.part .buy .btn { align-self: auto; }

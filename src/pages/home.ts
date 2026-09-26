@@ -55,12 +55,12 @@ export function home(main: HTMLElement) {
       <p>No soldering. Order the parts anywhere, from anyone. To a store it's just a dev board, a screen, and a chip.</p>
     </div>
     <div class="parts">
-      <div class="card part"><div class="num">1</div><h3>A Pico</h3><p>The brain. The printed case fits the USB-C RP2040 Pico. A Pico 2 W runs the same code.</p>
-        <div class="price">~$5–12</div><a class="btn btn-sm" href="https://www.amazon.com/s?k=RP2040+pico+USB-C+pre-soldered+header" target="_blank" rel="noopener">Find one</a></div>
+      <div class="card part"><div class="num">1</div><h3>A Pico</h3><p>The brain: a Raspberry Pi Pico 2 W with headers. Any Pico-shaped board runs the same code; the printed case fits the USB-C RP2040 kind.</p>
+        <div class="price">~$7–12</div><div class="buy"><a class="btn btn-sm btn-green" href="https://www.amazon.com/dp/B0DRJXPPWL" target="_blank" rel="noopener">Amazon</a><a class="btn btn-sm" href="https://www.adafruit.com/product/6315" target="_blank" rel="noopener">Adafruit</a><a class="btn btn-sm" href="https://www.microcenter.com/product/692334/raspberry-pi-pico-2w-with-header" target="_blank" rel="noopener">Micro Center</a></div></div>
       <div class="card part"><div class="num">2</div><h3>The screen hat</h3><p>Waveshare Pico-LCD-1.3: a 240×240 screen, a joystick, and four buttons. The Pico plugs straight in.</p>
-        <div class="price">~$15</div><a class="btn btn-sm" href="https://www.amazon.com/dp/B092VVCBQP" target="_blank" rel="noopener">Amazon</a></div>
-      <div class="card part"><div class="num">3</div><h3>The chip</h3><p>An ATECC608 secure element on a STEMMA QT cable. Its bare wires push into the header, and the chip gets wedged between the boards.</p>
-        <div class="price">~$6 + cable</div><a class="btn btn-sm" href="https://www.adafruit.com/product/4314" target="_blank" rel="noopener">Adafruit</a></div>
+        <div class="price">~$13–15</div><div class="buy"><a class="btn btn-sm btn-green" href="https://www.amazon.com/dp/B092VVCBQP" target="_blank" rel="noopener">Amazon</a><a class="btn btn-sm" href="https://www.waveshare.com/pico-lcd-1.3.htm" target="_blank" rel="noopener">Waveshare</a><a class="btn btn-sm" href="https://thepihut.com/products/1-3-ips-lcd-display-module-for-raspberry-pi-pico-240x240" target="_blank" rel="noopener">The Pi Hut</a></div></div>
+      <div class="card part"><div class="num">3</div><h3>The chip</h3><p>Adafruit's ATECC608 breakout, plus a STEMMA QT / Qwiic cable with bare wire ends. The wires push into the header; the chip gets wedged between the boards.</p>
+        <div class="price">~$5 + cable</div><div class="buy"><a class="btn btn-sm btn-green" href="https://www.amazon.com/dp/B07YYRCJ9M" target="_blank" rel="noopener">Amazon</a><a class="btn btn-sm" href="https://www.adafruit.com/product/4314" target="_blank" rel="noopener">Adafruit</a><a class="btn btn-sm" href="https://www.digikey.com/en/products/detail/adafruit-industries-llc/4314/10419053" target="_blank" rel="noopener">DigiKey</a></div></div>
     </div>
 
     <div class="card wide assemble">
