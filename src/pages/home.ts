@@ -30,7 +30,7 @@ export function home(main: HTMLElement) {
       <div class="order-body">
         <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
         <div class="order-price">$67 <span>shipped</span></div>
-        <p>One wedgie: Pico, screen hat, and chip, wedged, cased, and flashed.</p>
+        <p>One wedgie: pico, screen, chip, and case.</p>
         <div class="seg" role="radiogroup" aria-label="who is it for">
           <button class="on" data-for="me" role="radio" aria-checked="true">For me</button>
           <button data-for="gift" role="radio" aria-checked="false">Give someone a wedgie</button>
