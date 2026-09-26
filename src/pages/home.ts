@@ -14,7 +14,7 @@ export function home(main: HTMLElement) {
       <em>wedged</em> in between. Make it a wallet, a game, or whatever you and your agent dream up.
       Every file is MIT.</p>
       <div class="row">
-        <a class="btn btn-green" href="#get">Get a wedgie · $50</a>
+        <a class="btn btn-green" href="#get">Get a wedgie · $67</a>
         <a class="btn" href="#build">Build your own</a>
       </div>
     </div>
@@ -33,7 +33,7 @@ export function home(main: HTMLElement) {
       <div class="order-art" id="art-order"></div>
       <div class="order-body">
         <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
-        <div class="order-price">$50 <span>shipped</span></div>
+        <div class="order-price">$67 <span>shipped</span></div>
         <p>One wedgie: Pico, screen hat, and chip, wedged, cased, and flashed.</p>
         <div class="seg" role="radiogroup" aria-label="who is it for">
           <button class="on" data-for="me" role="radio" aria-checked="true">For me</button>
@@ -43,7 +43,7 @@ export function home(main: HTMLElement) {
           <button class="btn btn-green" data-pay="usdc" disabled>Pay with USDC</button>
           <button class="btn" data-pay="card" disabled>Pay with card</button>
         </div>
-        <p class="fine soon">Checkout opens soon. Everything is MIT, so you can always <a href="#build">build your own</a>.</p>
+        <p class="fine soon">Checkout opens soon.</p>
       </div>
     </div>
   </section>
