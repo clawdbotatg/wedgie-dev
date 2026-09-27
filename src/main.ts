@@ -2,7 +2,7 @@ import "@fontsource-variable/nunito/wght.css";
 import "@fontsource/dm-mono/500.css";
 import "@fontsource/silkscreen/400.css";
 import "./style.css";
-import { watchCount } from "./serial/wedgies";
+import { watchCount, supported, allow, connectNew } from "./serial/wedgies";
 import { home } from "./pages/home";
 import { connect } from "./pages/connect";
 
@@ -24,12 +24,25 @@ app.innerHTML = `
 </footer>
 `;
 
-// Grey "Connect" until a wedgie is plugged in; then green with how many. Live as you plug and unplug.
+// Red "Allow wedgie connection" until this site can see a plugged-in wedgie: a tap opens the browser's
+// device picker right here. Then green with how many, linking to /connect. Grey "Connect" where the
+// browser has no Web Serial (/connect explains). Live as you plug and unplug.
 const btn = document.getElementById("connect-btn")!;
+const lbl = btn.querySelector(".lbl")!;
+let seen = 0;
+btn.addEventListener("click", (e) => {
+  if (seen || !supported()) return;
+  e.preventDefault();
+  (onConnect ? connectNew() : allow()).catch(() => {});
+});
 watchCount((n) => {
+  seen = n;
+  const ask = !n && supported();
   btn.classList.toggle("on", n > 0);
+  btn.classList.toggle("ask", ask);
+  lbl.innerHTML = ask ? `Allow <span class="long">wedgie </span>connection` : n ? "Connected" : "Connect";
   btn.querySelector(".n")!.textContent = n ? String(n) : "";
-  btn.setAttribute("aria-label", n ? `${n} wedgie${n > 1 ? "s" : ""} connected` : "Connect a wedgie");
+  btn.setAttribute("aria-label", n ? `${n} wedgie${n > 1 ? "s" : ""} connected` : ask ? "Allow wedgie connection" : "Connect a wedgie");
 });
 
 const top = document.getElementById("top")!;

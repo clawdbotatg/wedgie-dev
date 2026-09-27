@@ -134,9 +134,18 @@ async function identify(w: Wedgie) {
 
 export function reidentify(w: Wedgie) { identify(w); }
 
-export async function connectNew() {
+// A new grant fires no connect event, so the header's count is told directly.
+const granted = new Set<() => void>();
+
+/** The browser's device picker. Grants this site the port; talks to nothing. */
+export async function allow() {
   const port = await navigator.serial.requestPort({ filters: [{ usbVendorId: RPI_VID }] });
-  return add(port);
+  granted.forEach((fn) => fn());
+  return port;
+}
+
+export async function connectNew() {
+  return add(await allow());
 }
 
 /** Count plugged-in wedgies without talking to them (the header's Connect button, on any page).
@@ -145,6 +154,7 @@ export function watchCount(cb: (n: number) => void) {
   if (!supported()) { cb(0); return; }
   const count = async () => cb((await navigator.serial.getPorts()).filter((p) => p.getInfo().usbVendorId === RPI_VID && (p as any).connected !== false).length);
   count();
+  granted.add(count);
   navigator.serial.addEventListener("connect", () => setTimeout(count, 300));
   navigator.serial.addEventListener("disconnect", () => setTimeout(count, 300));
 }

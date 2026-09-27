@@ -214,7 +214,7 @@ export async function mountWedgie3D(el: HTMLElement, opts: Wedgie3DOptions = {})
   const t0 = performance.now();
   let scroll = 0;
   // intro: -1 = waiting for the page to show, then seconds since it did; done after INTRO seconds
-  const INTRO = 1.9;
+  const GROW = 1.6, INTRO = 2.1;
   let introStart = opts.intro ? -1 : 0, introT = opts.intro ? 0 : INTRO;
   function loop() {
     cancelAnimationFrame(raf);
@@ -232,12 +232,16 @@ export async function mountWedgie3D(el: HTMLElement, opts: Wedgie3DOptions = {})
     if (introT < INTRO) {
       if (introStart < 0 && document.documentElement.classList.contains("ready")) introStart = performance.now();
       introT = introStart < 0 ? 0 : (performance.now() - introStart) / 1000;
-      const k = Math.min(1, introT / 0.95), flip = 1 - k * k * (3 - 2 * k);           // tumbling, easing to a stop
-      tilt.rotation.x += flip * Math.PI * 4;
-      tilt.rotation.y += flip * Math.PI * 1.5;
-      const w = Math.max(0, introT - 0.95);                                            // stuck: wobble back
-      tilt.rotation.z += 0.22 * Math.exp(-5 * w) * Math.sin(13 * w) * (introT > 0.95 ? 1 : 0);
-      tilt.scale.setScalar(Math.max(0.02, 1 - 0.98 * Math.exp(-4.2 * introT) * Math.cos(6.5 * introT)));   // overshoots: too close, then back
+      // grow from 1% over GROW s with a small overshoot (~106%); tumble only while small, so it's
+      // steady by the time it's full size; then a tiny settle.
+      const g = Math.pow(Math.min(1, introT / GROW), 1.35), c = 1.3, x = g - 1;        // slow start
+      const size = 0.01 + 0.99 * (1 + (c + 1) * x * x * x + c * x * x);                // easeOutBack: ~105% then 100%
+      tilt.scale.setScalar(size);
+      const spin = Math.pow(Math.max(0, 1 - size), 1.6);                                // spins only while small
+      tilt.rotation.x += spin * Math.PI * 3;
+      tilt.rotation.y += spin * Math.PI * 1.2;
+      const w = Math.max(0, introT - GROW);
+      tilt.rotation.z += introT > GROW ? 0.05 * Math.exp(-6 * w) * Math.sin(12 * w) : 0;
       if (introT >= INTRO) tilt.scale.setScalar(1);
     }
     for (const k of KEYS) {
