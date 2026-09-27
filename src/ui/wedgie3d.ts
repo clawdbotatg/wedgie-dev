@@ -203,6 +203,7 @@ export async function mountWedgie3D(el: HTMLElement, opts: Wedgie3DOptions = {})
   addEventListener("pointermove", onMove);
 
   const pressed = new Map<string, boolean>();
+  const vel = new Map<string, number>();
   let visible = true, raf = 0, dead = false;
   const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting; if (visible) loop(); });
   io.observe(cv);
@@ -221,8 +222,11 @@ export async function mountWedgie3D(el: HTMLElement, opts: Wedgie3DOptions = {})
     tilt.rotation.y = cur.x * 0.12 + scroll * 0.22 * side + Math.sin(t * 0.6 + side) * 0.012;
     tilt.rotation.x = -0.05 + cur.y * 0.08 + scroll * 0.28 + Math.sin(t * 0.45) * 0.01;
     for (const k of KEYS) {
-      const m = meshes.get(k)!; const want = pressed.get(k) ? -0.45 : 0;
-      m.position.z += (want - m.position.z) * 0.5;
+      // a spring: snaps down ~1.8 mm when pressed, pops back up with a little overshoot
+      const m = meshes.get(k)!; const want = pressed.get(k) ? -1.8 : 0;
+      const v = (vel.get(k) || 0) * 0.55 + (want - m.position.z) * 0.38;
+      vel.set(k, v);
+      m.position.z += v;
     }
     if (tex && live) tex.needsUpdate = true;
     screenMat.opacity = tex ? Math.max(0.02, backlight) : 1;
@@ -256,12 +260,12 @@ export async function mountWedgie3D(el: HTMLElement, opts: Wedgie3DOptions = {})
   function visual(k: string, down: boolean) {
     if (KEYS.includes(k)) pressed.set(k, down);
     else {
-      const lean = 0.28;
+      const lean = 0.42;
       joyPiv.rotation.set(0, 0, 0);
       if (down) {
         if (k === "up") joyPiv.rotation.y = lean; if (k === "down") joyPiv.rotation.y = -lean;
         if (k === "left") joyPiv.rotation.x = -lean; if (k === "right") joyPiv.rotation.x = lean;
-        if (k === "press") joyPiv.position.z = 2.05 - 0.4; else joyPiv.position.z = 2.05;
+        if (k === "press") joyPiv.position.z = 2.05 - 1.4; else joyPiv.position.z = 2.05;
       } else joyPiv.position.z = 2.05;
     }
   }
