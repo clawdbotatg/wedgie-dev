@@ -214,7 +214,7 @@ export async function mountWedgie3D(el: HTMLElement, opts: Wedgie3DOptions = {})
   const t0 = performance.now();
   let scroll = 0;
   // intro: -1 = waiting for the page to show, then seconds since it did; done after INTRO seconds
-  const GROW = 1.6, INTRO = 2.1;
+  const GROW = 1.0, INTRO = 1.35;
   let introStart = opts.intro ? -1 : 0, introT = opts.intro ? 0 : INTRO;
   function loop() {
     cancelAnimationFrame(raf);

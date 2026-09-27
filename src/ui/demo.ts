@@ -118,7 +118,7 @@ export function createDemo(id = "WEDGIE", opts: { boot?: boolean } = {}) {
   document.fonts?.ready.then(draw);
   draw();
   if (bootT < 1) {
-    const BOOT = 1900;           // green (0.85) at ~1.6 s: right as the fly-in lands (wedgie3d GROW)
+    const BOOT = 1200;           // green (0.85) at ~1.0 s: right as the fly-in lands (wedgie3d GROW)
     const tick = () => {
       bootT = Math.min(1, (performance.now() - (tick as any).t0) / BOOT);
       draw();
