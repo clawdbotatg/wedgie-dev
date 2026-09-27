@@ -312,3 +312,6 @@ html, body { overflow-x: clip; }
 .seg { flex-wrap: nowrap; max-width: 100%; }
 .seg button { white-space: nowrap; }
 @media (max-width: 480px) { .seg button { font-size: 13.5px; padding: 8px 11px; } }
+.case { display: grid; grid-template-columns: 1fr 1.3fr; gap: 24px; align-items: center; }
+.case .case-3d { height: 260px; order: 2; }
+@media (max-width: 860px) { .case { grid-template-columns: 1fr; } .case .case-3d { order: 0; height: 220px; } }

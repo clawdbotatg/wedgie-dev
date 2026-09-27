@@ -2,12 +2,12 @@
 // cable and bare copper tips). It sways as the page scrolls past, and a little on its own.
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
-import { loadGeo, partGeometry } from "./wedgie3d";
+import { loadGeo, partGeometry, COLORS } from "./wedgie3d";
 import { PART_COLORS, picoPins, chipBoard, PLUG, WIRE_COLORS, wire } from "./parts-geo";
 
 export type Part3D = { destroy(): void };
 
-export async function mountPart3D(el: HTMLElement, which: "pico" | "hat" | "chip", phase = 0): Promise<Part3D> {
+export async function mountPart3D(el: HTMLElement, which: "pico" | "hat" | "chip" | "case", phase = 0): Promise<Part3D> {
   const { meta, bin } = await loadGeo();
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(2, devicePixelRatio));
@@ -48,6 +48,21 @@ export async function mountPart3D(el: HTMLElement, which: "pico" | "hat" | "chip
     m.add(glass);
     holder.add(m);
 
+  } else if (which === "case") {
+    // The printed pieces, loose: lid (face up) and base side by side, the caps and joystick cap in front.
+    const plastic = (c: number) => new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.6, clearcoat: 0.1 });
+    // (case frame: x across 33 mm, y along 58 mm; each part's geometry sits where it is when assembled)
+    const lid = part("lid", COLORS.lid); lid.material = plastic(COLORS.lid); lid.position.set(-22 - 13.2, 0, -4.2);
+    const base = part("base", COLORS.base); base.material = plastic(COLORS.base); base.position.set(22 - 13.2, 0, 20.6 - 20);
+    holder.add(lid, base);
+    const capX: Record<string, number> = { Y: 4.8, X: 10.5, B: 16.1, A: 21.8 };
+    ["A", "B", "X", "Y"].forEach((k, i) => {
+      const m = part(k, COLORS[k]); m.material = plastic(COLORS[k]);
+      m.position.set(54 - capX[k], 40 - i * 11 - 4, -2.6 - 3);
+      holder.add(m);
+    });
+    const joy = part("joystick", COLORS.joystick); joy.material = plastic(COLORS.joystick); joy.position.set(54 - 13.17, -2 - 46.1, -2 - 3);
+    holder.add(joy);
   } else {
     const chip = chipBoard();
     holder.add(chip);
@@ -89,7 +104,7 @@ export async function mountPart3D(el: HTMLElement, which: "pico" | "hat" | "chip
     if (r.bottom < 0 || r.top > innerHeight || document.hidden) return;
     const t = (performance.now() - t0) / 1000;
     const sc = (r.top + r.height / 2 - innerHeight / 2) / innerHeight;       // -0.5..0.5 across the screen
-    spin.rotation.z = Math.PI / 2 + Math.sin(sc * 3.2 + phase) * 0.5 + Math.sin(t * 0.7 + phase) * 0.05;
+    spin.rotation.z = (which === "case" ? 0 : Math.PI / 2) + Math.sin(sc * 3.2 + phase) * (which === "case" ? 0.18 : 0.5) + Math.sin(t * 0.7 + phase) * 0.05;
     spin.rotation.x = -0.35 + sc * 0.9 + Math.sin(t * 0.5 + phase) * 0.04;
     spin.rotation.y = Math.sin(sc * 2.4 + phase * 1.7) * 0.35;
     renderer.render(scene, camera);

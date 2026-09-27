@@ -49,6 +49,7 @@ export function home(main: HTMLElement): Promise<unknown> {
     </div>
 
     <div class="card wide case">
+      <div class="case-3d part-3d" data-part="case"></div>
       <div>
         <h3>Print the case</h3>
         <p>A snap-together shell with no screws, designed from scratch and MIT licensed. PETG, 0.16 mm layers, 4 walls, no supports. Print the lid face down, the base floor down, and the caps flange down.</p>
@@ -110,7 +111,7 @@ export function home(main: HTMLElement): Promise<unknown> {
     new IntersectionObserver(async (es, o) => {
       if (!es.some((e) => e.isIntersecting)) return;
       o.disconnect();
-      try { await pageShown; const { mountPart3D } = await import("../ui/parts3d"); await mountPart3D(el, el.dataset.part as "pico" | "hat" | "chip", i * 1.3); }
+      try { await pageShown; const { mountPart3D } = await import("../ui/parts3d"); await mountPart3D(el, el.dataset.part as "pico" | "hat" | "chip" | "case", i * 1.3); }
       catch (err) { console.error("part:", err); }
     }, { rootMargin: "300px" }).observe(el);
   });
