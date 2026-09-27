@@ -138,12 +138,15 @@ export class Repl {
   }
 
   /** Stop whatever runs, raw REPL, soft reset so no app timers keep running (main.py is skipped in raw mode). */
-  async enter() {
+  // reset: false stops what runs (Ctrl-C) without a soft reset. Wedgie firmware 0.1.1+ re-adds its USB
+  // drive in boot.py, and a soft reset runs boot.py, which re-enumerates USB and drops this port.
+  async enter(opts: { reset?: boolean } = {}) {
     await this.write("\r\x03\x03");
     await sleep(150);
     this.buf = "";
     await this.write("\x01");
     await this.waitFor(RAW_PROMPT, 4000);
+    if (opts.reset === false) return;
     await this.write("\x04");
     await this.waitFor("soft reboot", 4000);
     await this.waitFor(RAW_PROMPT, 25000); // boot.py may bring WiFi up
@@ -165,8 +168,14 @@ export class Repl {
   interrupt() { return this.write("\x03"); }
 
   /** Leave raw mode and soft reset: the wedgie's main.py runs again. */
-  async leave() {
-    try { await this.write("\x02"); await sleep(50); await this.write("\x04"); } catch {}
+  // reset: false goes back to the launcher by running main.py again, with no soft reset (so the port
+  // stays up); use it after tests. A reset is needed to boot new firmware after an install.
+  async leave(opts: { reset?: boolean } = {}) {
+    try {
+      await this.write("\x02"); await sleep(50);
+      if (opts.reset === false) await this.write('exec(open("main.py").read())\r');
+      else await this.write("\x04");
+    } catch {}
   }
 
   async close() {

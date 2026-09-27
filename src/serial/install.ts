@@ -39,7 +39,7 @@ print("@hashes", json.dumps({"hashes": {n: _h(n) for n in ${JSON.stringify(names
 export async function install(r: Repl, onProgress: (p: number, what: string) => void) {
   const m = await firmwareManifest();
   onProgress(0, "stopping what it runs");
-  await r.enter();
+  await r.enter({ reset: false });           // no soft reset: on 0.1.1+ that would drop the USB port
   let have: { hashes: Record<string, string | null>; files: string[] } | null = null;
   r.onLine = (t, v) => { if (t === "hashes") have = v; };
   onProgress(0.02, "checking what's on it");

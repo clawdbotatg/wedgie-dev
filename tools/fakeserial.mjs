@@ -7,7 +7,7 @@ import { chromium } from "playwright-core";
 import { readdirSync } from "node:fs";
 import { homedir } from "node:os";
 
-const url = process.argv[2] || "http://localhost:4173/";
+const url = process.argv[2] || "http://localhost:4173/connect";
 const out = process.argv[3] || "shots";
 const cache = homedir() + "/Library/Caches/ms-playwright";
 const shell = readdirSync(cache).filter((d) => d.startsWith("chromium_headless_shell-")).sort().reverse()[0];
@@ -18,7 +18,7 @@ await ctx.addInitScript(() => {
   const hex = (b) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
   const sha = async (u8) => hex(await crypto.subtle.digest("SHA-256", u8));
   function board(uid, machine, files) {
-    const st = { files, launched: null, presses: [], shots: 0 };
+    const st = { files, launched: null, presses: [], shots: 0, resets: 0, resetHook: null };
     let push = () => {};
     let raw = false, code = "", line = "", cur = null, curName = "";
     const wedgie = () => st.files.has("menu.py") && st.files.has("main.py");
@@ -82,7 +82,13 @@ await ctx.addInitScript(() => {
           if (ch === "\x01") { raw = true; code = ""; push("raw REPL; CTRL-B to exit\r\n>"); continue; }
           if (ch === "\x02") { raw = false; continue; }
           if (!raw) {
-            if (ch === "\x04") { if (wedgie()) setTimeout(() => push(hello(null, "ready") + "\r\n"), 300); continue; }
+            if (ch === "\x04") {
+              st.resets++;
+              // wedgie 0.1.1+: boot.py re-adds the USB drive, which drops the port and plugs it back in
+              if (st.files.has("wedgiedrive.py") && st.resetHook) { st.resetHook(); continue; }
+              if (wedgie()) setTimeout(() => push(hello(null, "ready") + "\r\n"), 300);
+              continue;
+            }
             if (ch === "\n") { const l = line; line = ""; if (l.startsWith("{")) { try { onJson(JSON.parse(l)); } catch {} } continue; }
             line += ch; continue;
           }
@@ -102,6 +108,10 @@ await ctx.addInitScript(() => {
     board("de6474e3a3152a2f", "Raspberry Pi Pico with RP2040", wedgieFiles)];
   window.__ports = ports;
   const t = new EventTarget();
+  for (const p of ports) p._st.resetHook = () => {
+    setTimeout(() => t.dispatchEvent(Object.assign(new Event("disconnect"), { port: p })), 50);
+    setTimeout(() => t.dispatchEvent(Object.assign(new Event("connect"), { port: p })), 600);
+  };
   Object.defineProperty(navigator, "serial", { value: Object.assign(t, { getPorts: async () => ports, requestPort: async () => ports[0] }) });
 });
 
@@ -113,27 +123,36 @@ await page.goto(url);
 await page.waitForFunction(() => !document.getElementById("wl"));
 await page.waitForFunction(() => document.querySelectorAll(".slot .idtag").length === 2 && ![...document.querySelectorAll(".slot .idtag")].some((e) => e.textContent.includes("finding")), null, { timeout: 10000 });
 step("tray: " + JSON.stringify(await page.$$eval(".slot .meta", (els) => els.map((e) => e.textContent))));
-await page.locator("#plug").scrollIntoViewIfNeeded();
 await page.screenshot({ path: `${out}/fake-tray.png` });
 
-// 1. the bare board: install firmware
+// 1. the bare board: install firmware. The copy must not reset it (that would drop the port on a
+// board with the drive); the one reset at the end does drop it, and it must come back on its own.
+const slot = (re) => page.evaluate((re) => [...document.querySelectorAll(".slot")].findIndex((e) => new RegExp(re).test(e.textContent)), re);
 await page.click(".slot >> nth=0");
 await page.click('[data-fw]');
-await page.waitForFunction(() => document.querySelector("#p-meter.done"), null, { timeout: 60000 });
-step("install: " + (await page.textContent("#p-meter-t")));
+await page.waitForFunction(() => document.querySelector("#p-meter.done"), null, { timeout: 180000 }).catch(async () => {
+  console.log("STUCK: meter", await page.textContent("#p-meter-t").catch(() => "?"), "| status", await page.textContent("#p-status").catch(() => "?"), "| fw", await page.textContent("#p-fw").catch(() => "?"));
+  console.log("log tail:", JSON.stringify((await page.evaluate(() => document.querySelector("#p-log")?.textContent || "")).slice(-400)));
+  process.exit(1);
+});
+step("install: " + (await page.textContent("#p-meter-t")) + ` (resets during the copy: ${await page.evaluate(() => window.__ports[0]._st.resets)})`);
 await page.screenshot({ path: `${out}/fake-install.png` });
-await page.waitForFunction(() => document.querySelector(".tab[data-tab=fw] h4")?.textContent.startsWith("wedgie"), null, { timeout: 15000 });
 const nfiles = await page.evaluate(() => window.__ports[0]._st.files.size);
-step(`board now has ${nfiles} files; fw tab says: ${await page.textContent(".tab[data-tab=fw] h4")}`);
+await page.waitForFunction(() => !document.querySelector(".panel"), null, { timeout: 10000 });
+await page.waitForFunction(() => [...document.querySelectorAll(".slot .meta")].some((e) => /Pico 2 W · wedgie/.test(e.textContent)), null, { timeout: 15000 });
+step(`board has ${nfiles} files; after its reboot the panel closed and it came back: ${await page.evaluate(() => [...document.querySelectorAll(".slot .meta")].map((e) => e.textContent).join(" | "))}`);
 // installing again copies nothing
+await page.click(`.slot >> nth=${await slot("Pico 2 W")}`);
+await page.click('.tabs button[data-tab="fw"]');
+await page.waitForFunction(() => document.querySelector(".tab[data-tab=fw] h4")?.textContent.startsWith("wedgie"), null, { timeout: 15000 });
+step("fw tab: " + (await page.textContent(".tab[data-tab=fw] h4")));
 await page.click('[data-fw]');
 await page.waitForFunction(() => document.querySelector("#p-meter.done") && /up to date/.test(document.querySelector("#p-meter-t").textContent), null, { timeout: 30000 });
 step("reinstall: " + (await page.textContent("#p-meter-t")));
-await page.waitForFunction(() => !document.querySelector("[data-fw]")?.disabled, null, { timeout: 15000 });
-await page.click(".panel .x");
+await page.waitForFunction(() => !document.querySelector(".panel"), null, { timeout: 10000 });
 
 // 2. the wedgie: live screen, open an app, press a drawn button
-await page.click(".slot >> nth=1");
+await page.click(`.slot >> nth=${await slot("RP2040")}`);
 await page.waitForFunction(() => document.querySelector(".panel-dev canvas.w3d") && window.__ports[1]._st.shots >= 2, null, { timeout: 15000 });
 step("3D panel up, live screen mirrored (" + (await page.evaluate(() => window.__ports[1]._st.shots)) + " shots)");
 await page.click('[data-open="hello"]');

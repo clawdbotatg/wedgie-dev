@@ -112,16 +112,14 @@ class Wedgie:
             data += self.s.read(4096)
 
     def enter(self):
-        """Stop what it runs, raw REPL, soft reset (main.py is skipped in raw mode)."""
+        """Stop what it runs (Ctrl-C) and go to the raw REPL. No soft reset: wedgie firmware 0.1.1+ re-adds
+        its USB drive at boot, which re-enumerates USB and would drop this port mid-command."""
         self.s.write(b"\r\x03\x03")
         time.sleep(0.15)
         self.s.reset_input_buffer()
         self.buf = b""
         self.s.write(b"\x01")
         self._read_until(b"raw REPL; CTRL-B to exit\r\n>", 4)
-        self.s.write(b"\x04")
-        self._read_until(b"soft reboot", 4)
-        self._read_until(b"raw REPL; CTRL-B to exit\r\n>", 25)
 
     def exec(self, code, timeout=30, echo=False):
         data = code.encode()
@@ -151,11 +149,12 @@ class Wedgie:
             raise RuntimeError(err.decode("utf8", "replace").strip().splitlines()[-1])
         return None if echo else return_out
 
-    def leave(self):
-        """Out of raw mode, soft reset: main.py (the launcher) starts again."""
+    def leave(self, reset=True):
+        """Out of raw mode and back to the launcher. reset=True soft-resets (needed after writing firmware;
+        on 0.1.1+ the port drops and comes back); False just runs main.py again, port stays up."""
         self.s.write(b"\x02")
         time.sleep(0.05)
-        self.s.write(b"\x04")
+        self.s.write(b"\x04" if reset else b'exec(open("main.py").read())\r')
 
     def put(self, name, data):
         tmp = "_wedgie.tmp"
@@ -266,11 +265,11 @@ def main():
         elif c == "apps":
             wg.enter()
             print(wg.exec("print(open('apps.json').read())").strip())
-            wg.leave()
+            wg.leave(reset=False)
         elif c == "ls":
             wg.enter()
             print(wg.exec("import os\nfor n in sorted(os.listdir()):\n    print('%7d  %s' % (os.stat(n)[6], n))"))
-            wg.leave()
+            wg.leave(reset=False)
         elif c == "run":
             src = open(args.rest[0]).read()
             wg.enter()

@@ -194,24 +194,32 @@ export function openPanel(w: W.Wedgie) {
     }
   }
 
-  // Raw-REPL work: stop the launcher, run fn, then soft-reset so the wedgie starts again.
-  const act = async (name: string, fn: (r: Repl) => Promise<void>, opts: { probe?: boolean; keep?: boolean } = {}) => {
+  // Raw-REPL work: stop the launcher, run fn, then start it again. No soft reset on wedgie firmware:
+  // 0.1.1+ re-adds its USB drive at boot, and that drops this port. Only an install reboots (it must,
+  // to run the new files); the wedgie then comes back on its own and the tray picks it up.
+  const act = async (name: string, fn: (r: Repl) => Promise<void>, opts: { probe?: boolean; keep?: boolean; reboot?: boolean } = {}) => {
     if (busy || !link) return;
     busy = true;
     el.querySelectorAll<HTMLButtonElement>("[data-act], .applist button, #p-fw button").forEach((b) => (b.disabled = b.dataset.act !== "stop"));
     const r = link;
     try {
-      await r.enter();
+      await r.enter({ reset: !wedgie() });
       if (opts.probe !== false) await r.exec(await W.probe(), 10000);
       await fn(r);
     } catch (e: any) {
       status(`<b class="bad">${esc(name)} failed:</b> ${esc(e?.message || e)}`);
       out.textContent += `\n${name} failed: ${e?.message || e}`;
     }
+    if (opts.reboot) { await reboot(r); return; }
     if (!opts.keep) await restart(r);
   };
+  const reboot = async (r: Repl) => {
+    await r.leave();                           // soft reset: boots the new firmware (the port drops)
+    status("Restarting it on the new firmware. It shows up again in a few seconds.");
+    setTimeout(() => { closePanel(); W.touch(); }, 1800);
+  };
   const restart = async (r: Repl) => {
-    await r.leave();
+    await r.leave({ reset: !wedgie() });
     await new Promise((res) => setTimeout(res, 2200)); // boot logo + loader + launcher
     if (wedgie()) {
       const h = await r.hello(1500).catch(() => null);
@@ -275,7 +283,7 @@ export function openPanel(w: W.Wedgie) {
           meter.classList.add("done");
           t.textContent = res.written ? `wedgie ${res.version} installed. Restarting…` : "Already up to date. Restarting…";
           w.kind = "wedgie"; w.version = res.version;
-        }, { probe: false });
+        }, { probe: false, reboot: true });
       };
     });
   }
