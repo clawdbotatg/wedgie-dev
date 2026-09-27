@@ -17,8 +17,7 @@
    device pixels times --u, so the proportions match tools/bar exactly. */
 html, body { margin: 0; background: #fefefe; }
 #wl { position: fixed; inset: 0; z-index: 100; background: #fefefe; display: grid; place-items: center;
-  --u: min(calc(100vw / 240 * 1.35), calc(100vh / 240 * 1.1), 3.4px); transition: opacity .35s ease; }
-#wl.out { opacity: 0; pointer-events: none; }
+  --u: min(calc(100vw / 240 * 1.35), calc(100vh / 240 * 1.1), 3.4px); }
 #wl .col { display: flex; flex-direction: column; align-items: center; transform: translateY(calc(var(--u) * 15)); }
 #wl img { width: calc(var(--u) * 96); height: calc(var(--u) * 77); display: block; }
 #wl .shell { margin-top: calc(var(--u) * 15); width: calc(var(--u) * 150); height: calc(var(--u) * 30); box-sizing: border-box;
@@ -51,7 +50,7 @@ html, body { margin: 0; background: #fefefe; }
 <div id="app"></div>
 <script>
 // Fetch everything the site needs with byte progress, fill the bar grey by bytes, then load the app,
-// turn the bar green, and fade it out. Mirrors firmware/loader.py: fill by each file's share of the
+// turn the bar green, and go. Mirrors firmware/loader.py: fill by each file's share of the
 // total size, green when done, wiped when the app shows its first screen.
 (function () {
   var files = __MANIFEST__;
@@ -61,21 +60,19 @@ html, body { margin: 0; background: #fefefe; }
   window.__wedgieReady = function () { appUp = true; maybeDone(); };
   files.forEach(function (f) { total += f.n || 1; });
   function draw() {
-    shown += (target - shown) * 0.22;
-    if (target - shown < 0.002) shown = target;
+    shown = target;                       // the bar is the real progress: no easing
     var w = track.clientWidth, h = track.clientHeight, pad = h / 8, fh = h - 2 * pad;
     fill.style.width = (fh + (w - 2 * pad - fh) * shown) + "px";
     if (shown > 0) fill.classList.remove("empty");
     el.setAttribute("aria-valuenow", Math.round(shown * 100));
     if (shown < 1 || !finished) requestAnimationFrame(draw); else green();
   }
-  function green() {
+  function green() {                      // green for one frame, then straight to the site: no hold, no fade
     el.classList.add("done");
-    setTimeout(function () {
-      el.classList.add("out");
+    requestAnimationFrame(function () {
       document.documentElement.classList.add("ready");
-      setTimeout(function () { el.remove(); }, 400);
-    }, 420);
+      el.remove();
+    });
   }
   function fetchOne(f) {
     return fetch(f.u, { credentials: "same-origin" }).then(function (r) {
