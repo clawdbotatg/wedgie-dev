@@ -63,7 +63,7 @@ export function mountSixSeven(box: HTMLElement) {
   ro.observe(cv);
 
   let raf = 0, t0 = 0, playing = false;
-  const DUR = 2.6;
+  const DUR = 5.2;
   function frame() {
     const t = (performance.now() - t0) / 1000;
     if (t > DUR) { playing = false; cv.classList.remove("on"); return; }
