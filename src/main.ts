@@ -5,8 +5,11 @@ import "./style.css";
 import { watchCount, supported, allow, connectNew } from "./serial/wedgies";
 import { home } from "./pages/home";
 import { connect } from "./pages/connect";
+import { assemble } from "./pages/assemble";
 
-const onConnect = location.pathname.replace(/\/+$/, "") === "/connect";
+const path = location.pathname.replace(/\/+$/, "");
+const onConnect = path === "/connect";
+const onAssemble = path === "/assemble";
 
 const app = document.getElementById("app")!;
 app.innerHTML = `
@@ -50,5 +53,5 @@ watchCount((n) => {
 const top = document.getElementById("top")!;
 // Ready when the page's first screen is really there: on the home page that includes the hero wedgie
 // (its files are in the loader's byte count, and it has drawn a frame). Other 3D waits for the page.
-const up = onConnect ? (connect(top), Promise.resolve()) : home(top);
+const up = onConnect ? (connect(top), Promise.resolve()) : onAssemble ? (assemble(top), Promise.resolve()) : home(top);
 up.then(() => (window as any).__wedgieReady?.(), () => (window as any).__wedgieReady?.());

@@ -43,6 +43,7 @@ export function home(main: HTMLElement): Promise<unknown> {
             <li class="step" data-n="3"><b>Snap the case on.</b> <span>Boards into the base, USB first. Caps on, lid down until it clicks.</span></li>
             <li class="step" data-n="4"><b>Plug it in.</b> <span>USB-C, then press <b>Allow wedgie connection</b> at the top and pick it. It boots to the underwear.</span></li>
           </ol>
+          <p class="fine" style="margin-top:16px"><a href="/assemble">Detailed assembly guide →</a></p>
         </div>
         <div class="assembly-stage" id="assembly-stage"></div>
       </div>
@@ -112,8 +113,8 @@ export function home(main: HTMLElement): Promise<unknown> {
 
   main.querySelectorAll<HTMLButtonElement>(".seg button").forEach((b) => (b.onclick = () => {
     main.querySelectorAll<HTMLButtonElement>(".seg button").forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-checked", String(x === b)); });
-    main.querySelector("#order-what")!.textContent = b.dataset.for === "kit"
-      ? "Every part in the mail with assembly instructions."
+    main.querySelector("#order-what")!.innerHTML = b.dataset.for === "kit"
+      ? `Every part in the mail with <a href="/assemble">assembly instructions</a>.`
       : "One wedgie: pico, screen, chip, and case.";
   }));
   assembly(main.querySelector<HTMLElement>("#assembly")!);

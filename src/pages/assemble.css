@@ -1,0 +1,57 @@
+/* /assemble: one white plastic card per step, copy left, a recessed photo slot right. */
+.asm { padding-top: 40px; }
+.asm-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 22px; }
+.asm-step { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: center; scroll-margin-top: 90px; }
+.asm-step.solo { grid-template-columns: 1fr; }
+.asm-head { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
+.asm-head .num { flex-shrink: 0; width: 46px; height: 46px; border-radius: 14px; font-size: 22px; }
+.asm-step:nth-child(3n+2) .num { background: var(--grey-fill); }
+.asm-step:nth-child(3n+3) .num { background: var(--red-fill); }
+.asm-step:nth-child(3n+1) .num { background: var(--green-fill); }
+.asm-copy > p { color: #474947; }
+.asm-copy > p + p, .asm-copy .row { margin-top: 14px; }
+.asm-copy b { font-weight: 900; color: var(--ink); }
+
+/* a small printed tag, not a banner */
+.note { font-size: 15px; line-height: 1.5; color: #474947; padding: 12px 16px 12px 40px; border-radius: 16px; position: relative;
+  background: var(--recess); box-shadow: var(--recess-shadow); }
+.note::before { content: ""; position: absolute; left: 16px; top: 17px; width: 10px; height: 10px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #8cf5a6, #1bb24a); box-shadow: 0 0 6px rgba(34,196,82,.6); }
+.note.bad::before { background: radial-gradient(circle at 35% 35%, #ffd2cf, #e3312c); box-shadow: 0 0 6px rgba(227,49,44,.6); }
+
+/* the four holes as pressed keycaps */
+.pins { list-style: none; margin: 16px 0 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pins li { font-size: 15px; font-weight: 700; color: #555855; padding: 8px 12px; border-radius: 12px; background: var(--shell);
+  box-shadow: inset 0 1.5px 0 #fff, inset 0 -3px 0 #e0e0db, 0 0 0 1.5px var(--line), 0 6px 12px -8px rgba(0,0,0,.3); }
+.pins b { font-family: var(--mono); font-weight: 500; margin-right: 6px; }
+
+/* photo slot: recessed tray, 4:3, waiting for a picture */
+.shot { margin: 0; aspect-ratio: 4 / 3; border-radius: 22px; background: var(--recess); box-shadow: var(--recess-shadow);
+  display: grid; place-items: center; overflow: hidden; }
+.shot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.shot span { font-weight: 800; font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: #a3a5a2; text-shadow: 0 1px 0 #fff; }
+
+/* the header diagram */
+.asm-art { padding: 18px; border-radius: 22px; }
+.header-art { display: block; width: 100%; height: auto; }
+.header-art .strip { fill: #2a2b2c; }
+.header-art .hole { fill: #121313; stroke: #3c3d3f; stroke-width: 1.5; }
+.header-art .hole.lit { fill: #22c452; stroke: #168c34; }
+.header-art .hole.no { fill: #3a1b1a; stroke: #e3312c; }
+.header-art .x { stroke: #ff6a62; stroke-width: 3; stroke-linecap: round; }
+.header-art .usb { fill: #fff; stroke: #cfcfca; stroke-width: 1.5; }
+.header-art .usbt { font: 800 11px var(--font); fill: var(--muted); letter-spacing: .1em; }
+.header-art .pn { font: 500 10px var(--mono); fill: #9a9c99; }
+.header-art .pn.on { fill: var(--ink); }
+.header-art .rn { font: 800 10px var(--font); fill: #6f7072; }
+.header-art .wl { font: 900 14px var(--font); fill: var(--mint-d); }
+
+.asm-trouble { margin-top: 34px; }
+.asm-trouble dl { margin: 18px 0 0; display: grid; gap: 14px; }
+.asm-trouble dt { font-weight: 900; }
+.asm-trouble dd { margin: 2px 0 0; color: #474947; }
+
+@media (max-width: 860px) {
+  .asm-step { grid-template-columns: 1fr; gap: 18px; padding: 22px; }
+  .pins { grid-template-columns: 1fr; }
+}
