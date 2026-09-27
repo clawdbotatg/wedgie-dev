@@ -73,7 +73,7 @@ export function home(main: HTMLElement): Promise<unknown> {
     <div class="card order">
       <div class="order-art truck-lane" aria-hidden="true"><img class="truck" src="/img/truck.webp" alt=""></div>
       <div class="order-body">
-        <div class="order-price">$67 <span>shipped</span><i class="sixseven-box"></i></div>
+        <div class="order-price"><i class="sixseven-box"></i>$67 <span>shipped</span></div>
         <p id="order-what">One wedgie: pico, screen, chip, and case.</p>
         <div class="seg" role="radiogroup" aria-label="who is it for">
           <button class="on" data-for="me" role="radio" aria-checked="true">For me</button>
@@ -104,7 +104,7 @@ export function home(main: HTMLElement): Promise<unknown> {
     await pageShown;
     if (!hands) { const { mountSixSeven } = await import("../ui/sixseven"); hands = mountSixSeven(price.querySelector(".sixseven-box")!); }
     hands.play();
-  }, { threshold: 1 }).observe(price);
+  }, { threshold: 0.6 }).observe(price);
 
   // The truck drives in when its section comes into view, then keeps bouncing along.
   const lane = main.querySelector<HTMLElement>(".truck-lane")!;

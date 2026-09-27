@@ -315,7 +315,9 @@ html, body { overflow-x: clip; }
 .case { display: grid; grid-template-columns: 1fr 1.3fr; gap: 24px; align-items: center; }
 .case .case-3d { height: 260px; order: 2; }
 @media (max-width: 860px) { .case { grid-template-columns: 1fr; } .case .case-3d { order: 0; height: 220px; } }
-/* the 6-7 hands, small and subtle, right after "$67 shipped" */
-.sixseven-box { display: inline-block; vertical-align: middle; width: 96px; height: 62px; margin-left: 6px; pointer-events: none; }
+/* the 6-7 hands, small and subtle, just left of "$67" */
+.order-price { position: relative; }
+.sixseven-box { position: absolute; right: 100%; top: 50%; width: 96px; height: 62px; transform: translate(4px, -50%); pointer-events: none; }   /* outside the flow: the price never moves */
+@media (max-width: 860px) { .sixseven-box { right: auto; left: 0; top: auto; bottom: 100%; width: 80px; height: 52px; transform: none; } }
 .sixseven { width: 100%; height: 100%; opacity: 0; transition: opacity .3s; }
 .sixseven.on { opacity: .9; }
