@@ -46,9 +46,10 @@ export function test(main: HTMLElement) {
     <div class="test-setup card">
       <h3>First time on this computer?</h3>
       <p>Chrome asks before a page can use each new Pico. The test-bench profile tells it wedgie.dev may, so the bench runs hands-off.</p>
-      <p><a class="btn btn-sm" href="/wedgie-test.mobileconfig" download>Mac: get the profile</a></p>
-      <p class="fine">Open it, then System Settings → Privacy &amp; Security → Profiles → Install. Restart Chrome.
-      chrome://policy should list <span class="mono">WebUsbAllowDevicesForUrls</span>.</p>
+      <p><b>Linux</b> (Omarchy, Arch, Ubuntu): run this once, then restart the browser.</p>
+      <pre class="recess test-cmd">curl -fsSL https://wedgie.dev/bench-linux.sh | sudo sh</pre>
+      <p><b>Mac:</b> <a href="/wedgie-test.mobileconfig" download>get the profile</a>, open it, then System Settings → Privacy &amp; Security → Profiles → Install. Restart Chrome.</p>
+      <p class="fine">Check it worked: chrome://policy lists <span class="mono">WebUsbAllowDevicesForUrls</span>.</p>
     </div>
   </section>`;
   const $ = (id: string) => document.getElementById(id)!;
@@ -270,10 +271,27 @@ export function test(main: HTMLElement) {
       return void toBoot(next);
     }
     const bad = ws.find((w) => w.state === "error" && !done(w));
+    if (bad && /No MicroPython/.test(bad.error || "")) {
+      // New boards often ship with a maker's demo on them. Opening the port at 1200 baud is the
+      // standard "reboot into BOOTSEL" knock (pico-sdk, CircuitPython and Arduino builds all obey it).
+      tested.add(bad.key);
+      reset();
+      waitBoot = Date.now();
+      status("Restarting it into boot mode…", "It came with something else on it. That gets wiped.");
+      buttons("");
+      try { await bad.port.open({ baudRate: 1200 }); await bad.port.close(); } catch {}
+      setTimeout(() => {
+        if (!busy && waitBoot && Date.now() - waitBoot >= 8000) {
+          needPick("boot");
+          status("Still waiting for boot mode", "If Pick it doesn't list it: unplug it, hold BOOTSEL, plug it back in.");
+        }
+      }, 8000);
+      return;
+    }
     if (bad) {
       tested.add(bad.key);
       reset();
-      const noMp = /No MicroPython/.test(bad.error || "");
+      const noMp = false;
       status("Can't talk to it", noMp ? "Something other than MicroPython is on it. Unplug it, hold BOOTSEL, plug it back in." : bad.error || "", "bad");
       buttons(`<button class="btn" id="t-retry">Try again</button>`);
       $("t-retry").onclick = () => { tested.delete(bad.key); W.reidentify(bad); };
