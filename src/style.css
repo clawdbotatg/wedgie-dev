@@ -282,3 +282,6 @@ html, body { overflow-x: clip; }
   .step.on { display: block; }
   .step::before { left: 10px; top: 10px; }
 }
+.btn-xs { height: 38px; padding: 0 14px; font-size: 14px; }
+.buy { flex-wrap: nowrap; gap: 6px; }
+@media (max-width: 380px) { .buy { flex-wrap: wrap; } }
