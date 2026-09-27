@@ -43,7 +43,7 @@ const STEPS: Step[] = [
     p: `The plug's four contacts run <b>GND, 3.3 V, SDA, SCL</b> from one end. Count from the GND end. <b>Trust the order, not the colors</b>: Adafruit uses black, red, blue, yellow, but other bags use other colors.`,
     shot: "plug" },
   { t: "Push the wires into the header",
-    p: `Hold the hat back up with its USB end at the top, and look at the empty header socket. Count holes down from the USB end:`,
+    p: `Hold the hat screen down, joystick end at the top (that's where the Pico's USB will sit), and look at the empty header socket. Count holes down from the top:`,
     art: HEADER,
     tip: `Each wire shares its hole with a Pico pin: the wire goes in first, the pin goes in beside it, and the spring contact holds both.`,
     warn: `Never put anything in the 4th hole on the right. That's 3V3_EN: grounding it switches the 3.3 V supply off. And never use VBUS or VSYS, they're 5 V.` },
