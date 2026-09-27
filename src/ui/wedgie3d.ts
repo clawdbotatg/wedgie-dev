@@ -268,19 +268,42 @@ export async function mountWedgie3D(el: HTMLElement, opts: Wedgie3DOptions = {})
   const set = (k: string, down: boolean) => { visual(k, down); opts.onKey?.(k, down); };
   if (interactive) wire();
   function wire() {
+  // Buttons: down on press, up on release. The joystick: a click pushes it in (press); a drag tilts it
+  // the way you drag and holds that direction (and can swing round to another) until you let go.
+  const JOY = new Set(["up", "down", "left", "right", "press"]);
+  const sticks = new Map<number, { x: number; y: number; dir: string | null }>();
   cv.addEventListener("pointerdown", (e) => {
     const k = hit(e);
     cv.focus({ preventScroll: true });
     if (!k) return;
     e.preventDefault();
     cv.setPointerCapture(e.pointerId);
+    if (JOY.has(k)) { sticks.set(e.pointerId, { x: e.clientX, y: e.clientY, dir: null }); cv.style.cursor = "grabbing"; return; }
     pointers.set(e.pointerId, k);
     set(k, true);
   });
-  const up = (e: PointerEvent) => { const k = pointers.get(e.pointerId); if (k) { pointers.delete(e.pointerId); set(k, false); } };
+  const up = (e: PointerEvent) => {
+    const st = sticks.get(e.pointerId);
+    if (st) {
+      sticks.delete(e.pointerId);
+      if (st.dir) set(st.dir, false);
+      else { set("press", true); setTimeout(() => set("press", false), 140); }     // a click: push it in
+      return;
+    }
+    const k = pointers.get(e.pointerId); if (k) { pointers.delete(e.pointerId); set(k, false); }
+  };
   cv.addEventListener("pointerup", up);
   cv.addEventListener("pointercancel", up);
-  cv.addEventListener("pointermove", (e) => { if (e.pointerType === "mouse") cv.style.cursor = hit(e) ? "pointer" : "default"; });
+  cv.addEventListener("pointermove", (e) => {
+    const st = sticks.get(e.pointerId);
+    if (st) {
+      const dx = e.clientX - st.x, dy = e.clientY - st.y;
+      const dir = Math.hypot(dx, dy) < 10 ? st.dir : Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
+      if (dir !== st.dir) { if (st.dir) set(st.dir, false); if (dir) set(dir, true); st.dir = dir; }
+      return;
+    }
+    if (e.pointerType === "mouse") cv.style.cursor = hit(e) ? (JOY.has(hit(e)!) ? "grab" : "pointer") : "default";
+  });
   const KEYMAP: Record<string, string> = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", Enter: "press", " ": "press",
     a: "A", b: "B", x: "X", y: "Y", A: "A", B: "B", X: "X", Y: "Y" };
   const held = new Set<string>();
