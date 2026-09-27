@@ -1,5 +1,5 @@
 // The front page: give yourself a wedgie. Get one, or build one; agents at the bottom.
-import { place3D } from "../ui/place3d";
+import { place3D, pageShown } from "../ui/place3d";
 
 const CASE = "https://raw.githubusercontent.com/clawdbotatg/clawd-pico-case/main/stl/current/";
 
@@ -106,7 +106,7 @@ export function home(main: HTMLElement): Promise<unknown> {
     new IntersectionObserver(async (es, o) => {
       if (!es.some((e) => e.isIntersecting)) return;
       o.disconnect();
-      try { const { mountPart3D } = await import("../ui/parts3d"); await mountPart3D(el, el.dataset.part as "pico" | "hat" | "chip", i * 1.3); }
+      try { await pageShown; const { mountPart3D } = await import("../ui/parts3d"); await mountPart3D(el, el.dataset.part as "pico" | "hat" | "chip", i * 1.3); }
       catch (err) { console.error("part:", err); }
     }, { rootMargin: "300px" }).observe(el);
   });
@@ -135,6 +135,7 @@ function assembly(box: HTMLElement) {
     if (!es.some((e) => e.isIntersecting)) return;
     o.disconnect();
     try {
+      await pageShown;
       const { mountAssembly3D } = await import("../ui/assembly3d");
       a3d = await mountAssembly3D(stage);
       update();
