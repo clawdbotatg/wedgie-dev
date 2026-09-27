@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 # Builds firmware/drive.bin: the read-only WEDGIE drive a wedgie shows when plugged in (wedgiedrive.py).
 # A tiny FAT12 volume, written from scratch here so it's reproducible anywhere:
-#   Open wedgie.dev.html    double-click: opens wedgie.dev in the browser (any OS)
+#   Open wedgie.app         Mac: opens wedgie.dev/connect in Chrome (or the default browser), underwear icon
+#   Open wedgie (Windows).url  Windows: an internet shortcut to wedgie.dev/connect
 #   README.txt              what this is
 #   .VolumeIcon.icns        the underwear as the drive icon on macOS          (hidden)
 #   autorun.inf + wedgie.ico  the underwear as the drive icon on Windows      (hidden)
 # Stored sparse: only the sectors that aren't all zeros.   python3 tools/drive.py [--img out.img]
+# Needs macOS (osacompile, codesign, iconutil) to build the app; the output (firmware/drive.bin) is committed.
 import io, struct, subprocess, sys, tempfile
 from pathlib import Path
 from PIL import Image
@@ -18,14 +20,12 @@ DATA0 = RESERVED + NFATS * FAT_SECTORS + ROOT_SECTORS
 LABEL = b"WEDGIE     "
 
 # ---- the files ------------------------------------------------------------------------------------
-html = b"""<!doctype html><meta charset="utf-8"><title>wedgie.dev</title>
-<meta http-equiv="refresh" content="0; url=https://wedgie.dev/connect">
-<p>Opening <a href="https://wedgie.dev/connect">wedgie.dev</a>...</p>
-"""
+URL = "https://wedgie.dev/connect"
+url_win = f"[InternetShortcut]\r\nURL={URL}\r\n".encode()
 readme = b"""This is a wedgie.
 
-Open "Open wedgie.dev.html" (or go to https://wedgie.dev/connect in Chrome or Edge) to see it,
-install apps, test it, and give it to your agent.
+Open "Open wedgie" (Mac) or "Open wedgie (Windows)", or go to https://wedgie.dev/connect in Chrome
+or Edge, to see it, install apps, test it, and give it to your agent.
 
 This drive is read-only and tiny; it's just the front door. The wedgie itself talks to wedgie.dev
 over USB serial. Hold Y while plugging in to start without this drive.
@@ -46,11 +46,32 @@ with tempfile.TemporaryDirectory() as t:
         square(n).save(iconset / f"icon_{n}x{n}.png"); square(n * 2).save(iconset / f"icon_{n}x{n}@2x.png")
     subprocess.run(["iconutil", "-c", "icns", str(iconset), "-o", str(Path(t) / "w.icns")], check=True)
     icns = (Path(t) / "w.icns").read_bytes()
+    # The Mac opener: an AppleScript applet that prefers Chrome (Web Serial) and falls back to the default
+    # browser. Its icon is the underwear; ad-hoc signed so Apple Silicon runs it.
+    app = Path(t) / "Open wedgie.app"
+    script = f'do shell script "open -a \\"Google Chrome\\" \\"{URL}\\" || open \\"{URL}\\""'
+    subprocess.run(["osacompile", "-o", str(app), "-e", script], check=True)
+    res = app / "Contents/Resources"
+    (res / "Assets.car").unlink(missing_ok=True)
+    (res / "applet.icns").write_bytes(icns)
+    plist = app / "Contents/Info.plist"
+    subprocess.run(["/usr/libexec/PlistBuddy", "-c", "Delete :CFBundleIconName", str(plist)], capture_output=True)
+    subprocess.run(["/usr/libexec/PlistBuddy", "-c", "Add :CFBundleIdentifier string dev.wedgie.open", str(plist)], capture_output=True)
+    subprocess.run(["codesign", "--force", "--deep", "-s", "-", str(app)], check=True, capture_output=True)
+    subprocess.run(["codesign", "--verify", "--deep", "--strict", str(app)], check=True)
+    def tree(d):
+        return [(c.name, tree(c) if c.is_dir() else c.read_bytes(), 0) for c in sorted(d.iterdir())]
+    app_tree = tree(app)
+
+# macOS shows .VolumeIcon.icns as the drive icon only if the volume root has the "custom icon" Finder
+# flag. On FAT that flag lives in a hidden AppleDouble file named "._." at the root (what macOS itself
+# writes after `SetFile -a C`). Captured from macOS once; its one extended attribute (provenance) removed.
+appledouble = (root / "art/volume-appledouble.bin").read_bytes()   # macOS's own, custom-icon flag set, provenance xattr removed
 
 HIDDEN, READONLY, ARCHIVE, VOLUME = 0x02, 0x01, 0x20, 0x08
-files = [("Open wedgie.dev.html", html, READONLY), ("README.txt", readme, READONLY),
+files = [("Open wedgie.app", app_tree, READONLY), ("Open wedgie (Windows).url", url_win, READONLY), ("README.txt", readme, READONLY),
          (".VolumeIcon.icns", icns, READONLY | HIDDEN), ("autorun.inf", autorun, READONLY | HIDDEN),
-         ("wedgie.ico", ico.getvalue(), READONLY | HIDDEN)]
+         ("wedgie.ico", ico.getvalue(), READONLY | HIDDEN), ("._.", appledouble, READONLY | HIDDEN)]
 
 # ---- FAT12 ------------------------------------------------------------------------------------------
 img = bytearray(TOTAL * SECTOR)
@@ -62,10 +83,9 @@ bs[43:54] = LABEL; bs[54:62] = b"FAT12   "; bs[510:512] = b"\x55\xAA"
 img[0:SECTOR] = bs
 
 fat = {0: 0xFF8, 1: 0xFFF}
-root_dir = bytearray(ROOT_SECTORS * SECTOR)
-entries = []
-entries.append(LABEL + bytes([VOLUME]) + bytes(20))
 next_cluster = 2
+DIRATTR = 0x10
+CL = SECTOR * SPC
 
 def short_name(name, n):
     base, _, ext = name.upper().lstrip(".").rpartition(".")
@@ -92,26 +112,60 @@ def fits_83(name):
     b, _, e = name.rpartition(".")
     return name == name.upper() and b and 1 <= len(b) <= 8 and len(e) <= 3 and name.replace(".", "", 1).isalnum()
 
-for n, (name, data, attr) in enumerate(files, 1):
-    clusters = (len(data) + SECTOR * SPC - 1) // (SECTOR * SPC)
+def alloc(nbytes):
+    global next_cluster
+    n = max(1, (nbytes + CL - 1) // CL)
     first = next_cluster
-    for c in range(first, first + clusters):
-        fat[c] = c + 1 if c < first + clusters - 1 else 0xFFF
-    off = (DATA0 + (first - 2) * SPC) * SECTOR
+    for c in range(first, first + n):
+        fat[c] = c + 1 if c < first + n - 1 else 0xFFF
+    next_cluster += n
+    return first
+
+def put(cluster, data):
+    off = (DATA0 + (cluster - 2) * SPC) * SECTOR
     img[off:off + len(data)] = data
-    next_cluster += clusters
+
+def dirent(sfn, attr, cluster, size):
+    d = bytearray(32)
+    d[0:11] = sfn; d[11] = attr
+    struct.pack_into("<HHHHHHHI", d, 14, 0x6000, 0x5D3A, 0x5D3A, 0, 0x6000, 0x5D3A, cluster, size)  # 2026-09-26 12:00
+    return bytes(d)
+
+def name_entries(name, n):
+    """(lfn entries, short name) for one child."""
     if fits_83(name):
         b, _, e = name.partition(".")
-        sfn = (b.ljust(8) + e.ljust(3)).encode()
-    else:
-        sfn = short_name(name, n)
-        entries += lfn_entries(name, sfn)
-    d = bytearray(32)
-    d[0:11] = sfn; d[11] = attr | ARCHIVE
-    struct.pack_into("<HHHHHHHI", d, 14, 0x6000, 0x5D3A, 0x5D3A, 0, 0x6000, 0x5D3A, first, len(data))  # 2026-09-26 12:00
-    entries.append(bytes(d))
+        return [], (b.ljust(8) + e.ljust(3)).encode()
+    if name == "._.":
+        # exactly what macOS writes: a FAT name can't end in ".", so the last dot is stored as U+F029
+        sfn = b"~13        "
+        return lfn_entries("._\uf029", sfn), sfn
+    sfn = short_name(name, n)
+    return lfn_entries(name, sfn), sfn
 
-assert len(entries) <= ROOT_ENTRIES and next_cluster - 2 <= (TOTAL - DATA0) // SPC
+def write_dir(children, parent):
+    """Directory entries for children (files get data clusters; subdirs recurse). parent: its cluster or None (root)."""
+    out = []
+    for n, (name, data, attr) in enumerate(children, 1):
+        lfn, sfn = name_entries(name, n)
+        if name == "._.":
+            attr = HIDDEN
+        if isinstance(data, list):
+            count = 2 + sum(1 + len(name_entries(c[0], i)[0]) for i, c in enumerate(data, 1))
+            me = alloc(count * 32)
+            body = [dirent(b".          ", DIRATTR, me, 0), dirent(b"..         ", DIRATTR, parent or 0, 0)] + write_dir(data, me)
+            put(me, b"".join(body))
+            out += lfn + [dirent(sfn, DIRATTR | (attr & HIDDEN), me, 0)]
+        else:
+            c = alloc(len(data)) if data else 0
+            if data:
+                put(c, data)
+            out += lfn + [dirent(sfn, attr | ARCHIVE, c, len(data))]
+    return out
+
+entries = [LABEL + bytes([VOLUME]) + bytes(20)] + write_dir(files, None)
+root_dir = bytearray(ROOT_SECTORS * SECTOR)
+assert len(entries) <= ROOT_ENTRIES and next_cluster - 2 <= (TOTAL - DATA0) // SPC, (len(entries), next_cluster)
 for i, e in enumerate(entries):
     root_dir[i * 32:(i + 1) * 32] = e
 fatb = bytearray(FAT_SECTORS * SECTOR)
@@ -134,4 +188,4 @@ out += b"".join(bytes(img[i * SECTOR:(i + 1) * SECTOR]) for i in used)
 (root / "firmware/drive.bin").write_bytes(out)
 if "--img" in sys.argv:
     Path(sys.argv[sys.argv.index("--img") + 1]).write_bytes(img)
-print(f"firmware/drive.bin: {len(out)} bytes ({len(used)} of {TOTAL} sectors); files: " + ", ".join(f"{n} {len(d)}B" for n, d, _ in files))
+print(f"firmware/drive.bin: {len(out)} bytes ({len(used)} of {TOTAL} sectors); top level: " + ", ".join(n for n, d, _ in files))
