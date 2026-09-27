@@ -260,12 +260,12 @@ export async function mountWedgie3D(el: HTMLElement, opts: Wedgie3DOptions = {})
   function visual(k: string, down: boolean) {
     if (KEYS.includes(k)) pressed.set(k, down);
     else {
-      const lean = 0.42;
+      const lean = 0.18;          // more and the cap's flange swings up through the lid
       joyPiv.rotation.set(0, 0, 0);
       if (down) {
         if (k === "up") joyPiv.rotation.y = lean; if (k === "down") joyPiv.rotation.y = -lean;
         if (k === "left") joyPiv.rotation.x = -lean; if (k === "right") joyPiv.rotation.x = lean;
-        if (k === "press") joyPiv.position.z = 2.05 - 1.4; else joyPiv.position.z = 2.05;
+        if (k === "press") joyPiv.position.z = 2.05 - 0.6; else joyPiv.position.z = 2.05;
       } else joyPiv.position.z = 2.05;
     }
   }
