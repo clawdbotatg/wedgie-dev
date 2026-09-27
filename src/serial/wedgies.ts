@@ -91,45 +91,55 @@ print("@id", json.dumps({"uid": machine.unique_id().hex(), "machine": m, "mp": o
 async function identify(w: Wedgie) {
   w.state = "identifying"; w.error = undefined; emit();
   try {
-    await withRepl(w, async (r) => {
-      await new Promise((res) => setTimeout(res, 150));
-      const h = await r.hello();
-      if (h) {
-        // wedgie firmware (or the wallet app): take what it says, leave it running.
-        w.firmware = `${h.name || "wedgie"} ${h.version || h.fw || ""}`.trim();
-        w.kind = String(h.fw || "").startsWith("wedgie-") ? "wedgie" : "wallet";
-        w.version = h.version;
-        w.apps = h.apps;
-        w.uid = h.uid || h.serial;
-        w.micropython = h.micropython;
-        w.cpu = h.cpu;
-        if (h.backend) w.chip = { type: h.backend === "atecc608" ? "ATECC608" : h.backend, serial: h.serial };
-        w.board = h.board || "wedgie";
-        return;
+    // A board that just rebooted or re-plugged its USB can't be opened for a moment: retry that.
+    for (let tries = 0; ; tries++) {
+      try { await talk(w); break; } catch (e: any) {
+        if (tries >= 5 || !/failed to open|busy|access denied|already open/i.test(e?.message || "")) throw e;
+        await new Promise((res) => setTimeout(res, 700));
       }
-      let got: any = null;
-      r.onLine = (tag, v) => { if (tag === "id") got = v; };
-      await r.write("\r\x03\x03");
-      await new Promise((res) => setTimeout(res, 120));
-      await r.write("\x01");
-      await r.waitFor("raw REPL; CTRL-B to exit\r\n>", 3000).catch(() => { throw new Error("No MicroPython answered. Is it flashed?"); });
-      await r.exec(ID_PY, 5000);
-      await r.leave(); // back to normal REPL + soft reset: its main.py starts again
-      if (!got) throw new Error("no answer");
-      const cpu = got.machine.includes("RP2350") ? "RP2350" : got.machine.includes("RP2040") ? "RP2040" : "?";
-      w.uid = got.uid; w.cpu = cpu; w.micropython = got.mp; w.files = got.files;
-      w.board = boardName(cpu, got.wifi, got.machine);
-      w.firmware = got.files.includes("main.py") ? "its own main.py" : "nothing yet";
-      w.kind = "micropython";
-    });
+    }
     w.short = w.uid ? shortId(w.uid) : "??????";
     w.state = "ready";
   } catch (e: any) {
     w.state = "error";
     w.error = e?.message || String(e);
-    if (/open|busy|access/i.test(w.error || "")) w.error = "The port is busy. Close other tabs or tools (mpremote, Thonny) using this wedgie.";
+    if (/failed to open|busy|access denied|already open/i.test(w.error || "")) w.error = "Something else has this wedgie open: another wedgie.dev tab, mpremote or Thonny. Close it, then unplug and replug.";
   }
   emit();
+}
+
+function talk(w: Wedgie) {
+  return withRepl(w, async (r) => {
+    await new Promise((res) => setTimeout(res, 150));
+    const h = await r.hello();
+    if (h) {
+      // wedgie firmware (or the wallet app): take what it says, leave it running.
+      w.firmware = `${h.name || "wedgie"} ${h.version || h.fw || ""}`.trim();
+      w.kind = String(h.fw || "").startsWith("wedgie-") ? "wedgie" : "wallet";
+      w.version = h.version;
+      w.apps = h.apps;
+      w.uid = h.uid || h.serial;
+      w.micropython = h.micropython;
+      w.cpu = h.cpu;
+      if (h.backend) w.chip = { type: h.backend === "atecc608" ? "ATECC608" : h.backend, serial: h.serial };
+      w.board = h.board || "wedgie";
+      return;
+    }
+    let got: any = null;
+    r.onLine = (tag, v) => { if (tag === "id") got = v; };
+    await r.write("\r\x03\x03");
+    await new Promise((res) => setTimeout(res, 120));
+    await r.write("\x01");
+    await r.waitFor("raw REPL; CTRL-B to exit\r\n>", 3000).catch(() => { throw new Error("No MicroPython answered. Is it flashed?"); });
+    await r.exec(ID_PY, 5000);
+    await r.leave(); // back to normal REPL + soft reset: its main.py starts again
+    if (!got) throw new Error("no answer");
+    const cpu = got.machine.includes("RP2350") ? "RP2350" : got.machine.includes("RP2040") ? "RP2040" : "?";
+    w.uid = got.uid; w.cpu = cpu; w.micropython = got.mp; w.files = got.files;
+    w.board = boardName(cpu, got.wifi, got.machine);
+    w.firmware = got.files.includes("main.py") ? "its own main.py" : "nothing yet";
+    w.kind = "micropython";
+  });
 }
 
 export function reidentify(w: Wedgie) { identify(w); }
