@@ -188,3 +188,40 @@ def bench(chip_ok, chip_line):
 
 def verdict(ok, line):
     _say("PASS" if ok else "FAIL", line or ("UNPLUG IT" if ok else ""), _GREEN if ok else _RED, _PAPER)
+
+
+# --- use the chip, lock nothing ---------------------------------------------
+def chipwork(kind):
+    """ATECC608: SHA-256 of random bytes on the chip (the page checks the digest) and two Random
+    reads (a chip whose config isn't locked yet answers a fixed pattern: that's normal, and we don't
+    lock it). Trust M: its random, its Infineon certificate, and a signature with its factory key
+    over random bytes, all checked on the page. Needs the wedgie firmware's atecc.py / trustm.py."""
+    import hashlib, binascii
+    hx = lambda b: binascii.hexlify(b).decode()
+    msg = os.urandom(100)
+    d = {"kind": kind, "msg": hx(msg)}
+    try:
+        if kind == "atecc":
+            import atecc
+            a = atecc.ATECC608(sda=4, scl=5)
+            a.wake()
+            try:
+                a.command(0x47, 0x00, 0, resp_len=1, wait_ms=10)                     # SHA start
+                a.command(0x47, 0x01, 64, msg[:64], resp_len=1, wait_ms=10)          # 64 bytes
+                sha = a.command(0x47, 0x02, 36, msg[64:], resp_len=32, wait_ms=10)   # last 36, digest
+                r1 = a.command(0x1B, 0x01, 0, resp_len=32, wait_ms=25)               # Random, seed untouched
+                r2 = a.command(0x1B, 0x01, 0, resp_len=32, wait_ms=25)
+            finally:
+                a.sleep()
+            d.update(sha=hx(sha), random=[hx(r1), hx(r2)])
+        else:
+            import trustm
+            trustm.bus(4, 5)
+            s = trustm.Session()
+            d["random"] = [hx(s.random(32)), hx(s.random(32))]
+            d["cert"] = hx(s.get_all(0xE0E0))
+            r, sg = s.sign(0xE0F0, hashlib.sha256(msg).digest())
+            d.update(r="%064x" % r, s="%064x" % sg)
+    except Exception as e:
+        d["error"] = str(e) or type(e).__name__
+    out("chipwork", d)

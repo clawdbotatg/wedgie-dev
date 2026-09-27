@@ -4,11 +4,14 @@
 //  0. a used one (anything answering on serial) is told to reboot into BOOTSEL;
 //  1. BOOTSEL (a blank Pico boots there): wipe + plain MicroPython over WebUSB (picoboot.ts);
 //  2. board facts (bench.py); a board with the Pico W's WiFi chip goes round once more for the W build;
-//  3. the chip over I2C; 4. the wedgie firmware (before the buttons, so unplugging at the end is safe);
+//  3. the wedgie firmware (before the buttons, so unplugging at the end is safe; its chip drivers);
+//  4. the chip, used without locking it: ATECC608 hashes on-chip, Trust M signs and its certificate
+//     chains to Infineon (chipcheck.ts);
 //  5. on its screen: each button alone, in order; then each again, filling the screen with its color.
 import * as W from "../serial/wedgies";
 import type { Repl } from "../serial/repl";
 import { install } from "../serial/install";
+import { checkChip } from "../serial/chipcheck";
 import { usbSupported, bootDevices, isBoot, pickBoot, flashMicroPython, BOOT_PIDS } from "../serial/picoboot";
 
 type State = "waiting" | "running" | "pass" | "fail" | "skip";
@@ -17,7 +20,7 @@ const NAME: Record<string, string> = { up: "UP", down: "DOWN", left: "LEFT", rig
 const ICON: Record<State, string> = { waiting: "", running: "…", pass: "✓", fail: "✗", skip: "–" };
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 const RAW = "raw REPL; CTRL-B to exit\r\n>";
-const BOARD = 0, CHIP = 1, FW = 2, BUTTONS = 3, COLORS = 4;
+const BOARD = 0, FW = 1, CHIP = 2, BUTTONS = 3, COLORS = 4;
 let bench: Promise<string> | null = null;
 const benchPy = () => (bench ??= fetch("/device/bench.py").then((r) => { if (!r.ok) throw new Error("bench.py missing"); return r.text(); }));
 
@@ -57,7 +60,7 @@ export function test(main: HTMLElement) {
   const meter = $("t-meter"), fill = meter.querySelector<HTMLElement>(".meter-fill")!;
 
   const tests: { name: string; state: State; detail: string }[] =
-    ["Board", "Chip", "Firmware", "Buttons", "Colors"].map((name) => ({ name, state: "waiting", detail: "" }));
+    ["Board", "Firmware", "Chip", "Buttons", "Colors"].map((name) => ({ name, state: "waiting", detail: "" }));
   const draw = () => {
     grid.innerHTML = tests.map((t) =>
       `<div class="test-card ${t.state}"><div class="test-icon">${ICON[t.state]}</div><div class="test-name">${t.name}</div><div class="test-detail">${esc(t.detail)}</div></div>`).join("");
@@ -175,20 +178,30 @@ export function test(main: HTMLElement) {
             return;
           }
           if (b.wbuild && !b.wifi) fact("WiFi", `didn't start: ${b.wifiError || "?"}`);
-          set(BOARD, "pass", `${name} · ${b.uid.slice(-6).toUpperCase()}`); step = CHIP;
-
-          set(CHIP, "running", "Asking it over I2C");
-          const c = await chip(r);
-          set(CHIP, c.pass ? "pass" : "fail", c.detail); step = FW;
+          set(BOARD, "pass", `${name} · ${b.uid.slice(-6).toUpperCase()}`); step = FW;
 
           set(FW, "running", "Installing");
           status("Installing the wedgie firmware…", "Don't unplug it.");
           progress(0);
           const got = await install(r, (p) => progress(p));
           progress(null);
-          set(FW, "pass", `wedgie ${got.version}`); step = BUTTONS;
+          set(FW, "pass", `wedgie ${got.version}`); step = CHIP;
           await r.exec(await W.probe(), 10000);        // install restarted it: load the bench again
           await r.exec(await benchPy(), 10000);
+
+          set(CHIP, "running", "Asking it over I2C");
+          status("Testing the chip…", "Using it, not locking it.");
+          let c = await chip(r);
+          if (c.pass) {
+            set(CHIP, "running", c.kind === "atecc" ? "Hashing on the chip" : "Signing, checking with Infineon");
+            let cw: any = null;
+            r.onLine = (t, v) => { if (t === "chipwork") cw = v; };
+            await r.exec(`chipwork(${JSON.stringify(c.kind)})`, 30000);
+            const k = cw ? await checkChip(cw).catch((e) => ({ pass: false, detail: `check failed: ${e?.message || e}`, facts: [] as [string, string][] })) : { pass: false, detail: "No answer from the chip test", facts: [] as [string, string][] };
+            k.facts.forEach(([a, b]) => fact(a, b));
+            c = { ...c, pass: k.pass, detail: k.detail, short: k.pass ? c.short : "CHIP TEST" };
+          }
+          set(CHIP, c.pass ? "pass" : "fail", c.detail); step = BUTTONS;
 
           status("Follow its screen", "Each button on its own, in order. Then each again for its color.");
           r.onLine = (t, v) => {
@@ -235,7 +248,7 @@ export function test(main: HTMLElement) {
     let c: any = null;
     r.onLine = (t, v) => { if (t === "chip") c = v; };
     await r.exec("chip()", 20000);
-    if (!c) return { pass: false, detail: "No answer from the chip check", short: "NO ANSWER" };
+    if (!c) return { pass: false, detail: "No answer from the chip check", short: "NO ANSWER", kind: "" };
     fact("I2C lines", `SDA ${c.lines.sda ? "pulled up" : "no pull-up"}, SCL ${c.lines.scl ? "pulled up" : "no pull-up"}`);
     fact("I2C answered at", c.scan.length ? c.scan.join(", ") : "nothing");
     // A Trust M acks its address even when the wiring is half right; only its UID proves it talks.
@@ -248,11 +261,11 @@ export function test(main: HTMLElement) {
     }
     if (ok.length) {
       const f = ok[0];
-      return f.type === "ATECC608" ? { pass: true, detail: `ATECC608 ${f.serial.slice(-6)}`, short: "ATECC608" } : { pass: true, detail: "Trust M, ID read", short: "TRUST M" };
+      return f.type === "ATECC608" ? { pass: true, detail: `ATECC608 ${f.serial.slice(-6)}`, short: "ATECC608", kind: "atecc" } : { pass: true, detail: "Trust M, ID read", short: "TRUST M", kind: "trustm" };
     }
-    if ((c.found || []).some((f: any) => f.type === "OPTIGA Trust M")) return { pass: false, detail: "Trust M there but won't give its ID. Check the wires.", short: "TRUST M NO ID" };
-    if (!c.lines.sda || !c.lines.scl) return { pass: false, detail: "No power on SDA/SCL. Check the wires.", short: "NO POWER" };
-    return { pass: false, detail: "Lines have power but no chip answered. A wire is swapped.", short: "NO ANSWER" };
+    if ((c.found || []).some((f: any) => f.type === "OPTIGA Trust M")) return { pass: false, detail: "Trust M there but won't give its ID. Check the wires.", short: "TRUST M NO ID", kind: "" };
+    if (!c.lines.sda || !c.lines.scl) return { pass: false, detail: "No power on SDA/SCL. Check the wires.", short: "NO POWER", kind: "" };
+    return { pass: false, detail: "Lines have power but no chip answered. A wire is swapped.", short: "NO ANSWER", kind: "" };
   }
 
   // ---- what to do next ------------------------------------------------------------------------------
