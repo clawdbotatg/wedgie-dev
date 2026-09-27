@@ -7,7 +7,8 @@ import { RPI_VID } from "./wedgies";
 
 export const BOOT_PIDS: Record<number, "RP2040" | "RP2350"> = { 0x0003: "RP2040", 0x000f: "RP2350" };
 const FAMILY = { RP2040: 0xe48bff56, RP2350: 0xe48bff59 };
-const UF2 = { RP2040: "/mp/RPI_PICO.uf2", RP2350: "/mp/RPI_PICO2.uf2" };
+// The plain builds boot on any board; a board found to have the Pico W's WiFi chip gets the W build.
+const UF2 = { RP2040: ["/mp/RPI_PICO.uf2", "/mp/RPI_PICO_W.uf2"], RP2350: ["/mp/RPI_PICO2.uf2", "/mp/RPI_PICO2_W.uf2"] };
 const MAGIC = 0x431fd10b;
 const FLASH = 0x10000000, FLASH_END = 0x11000000, SECTOR = 4096, BLOCK = 0x10000;
 // The flash size each MicroPython build assumes (its filesystem ends there): Pico 2 MB, Pico 2 4 MB.
@@ -40,9 +41,9 @@ export function sectors(uf2: ArrayBuffer, family: number) {
 }
 
 /** Wipe a BOOTSEL Pico, put MicroPython on it and reboot it. It comes back as a serial port. */
-export async function flashMicroPython(dev: USBDevice, onProgress: (p: number) => void) {
+export async function flashMicroPython(dev: USBDevice, onProgress: (p: number) => void, wifi = false) {
   const chip = BOOT_PIDS[dev.productId];
-  const uf2 = await (await fetch(UF2[chip])).arrayBuffer();
+  const uf2 = await (await fetch(UF2[chip][wifi ? 1 : 0])).arrayBuffer();
   const secs = [...sectors(uf2, FAMILY[chip])].sort((a, b) => a[0] - b[0]);
   if (!secs.length) throw new Error("the MicroPython file has nothing for " + chip);
   const wipeFrom = Math.ceil((secs[secs.length - 1][0] + SECTOR) / BLOCK) * BLOCK, wipeTo = FLASH + BUILD_FLASH[chip];

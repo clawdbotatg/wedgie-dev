@@ -130,7 +130,7 @@ function talk(w: Wedgie) {
     await r.write("\r\x03\x03");
     await new Promise((res) => setTimeout(res, 120));
     await r.write("\x01");
-    await r.waitFor("raw REPL; CTRL-B to exit\r\n>", 3000).catch(() => { throw new Error("No MicroPython answered. Is it flashed?"); });
+    await r.waitFor("raw REPL; CTRL-B to exit\r\n>", 8000).catch(() => { throw new Error("No MicroPython answered. Is it flashed?"); });
     await r.exec(ID_PY, 5000);
     await r.leave(); // back to normal REPL + soft reset: its main.py starts again
     if (!got) throw new Error("no answer");

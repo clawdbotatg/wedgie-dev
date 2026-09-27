@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>PayloadDisplayName</key><string>wedgie.dev test bench</string>
+  <key>PayloadDescription</key><string>Lets https://wedgie.dev use Raspberry Pi Picos (USB vendor 0x2E8A) in Chrome without asking each time: the boot-mode Pico over WebUSB, and MicroPython's serial port. Nothing else.</string>
+  <key>PayloadIdentifier</key><string>dev.wedgie.testbench</string>
+  <key>PayloadType</key><string>Configuration</string>
+  <key>PayloadUUID</key><string>4D8938AE-E42E-48F8-8535-155536219F42</string>
+  <key>PayloadVersion</key><integer>1</integer>
+  <key>PayloadScope</key><string>System</string>
+  <key>PayloadContent</key>
+  <array>
+    <dict>
+      <key>PayloadDisplayName</key><string>Chrome: wedgie.dev may use Picos</string>
+      <key>PayloadIdentifier</key><string>dev.wedgie.testbench.chrome</string>
+      <key>PayloadType</key><string>com.google.Chrome</string>
+      <key>PayloadUUID</key><string>080249CC-7CD2-4524-A52A-009B7311AB4F</string>
+      <key>PayloadVersion</key><integer>1</integer>
+      <key>WebUsbAllowDevicesForUrls</key>
+      <array>
+        <dict>
+          <key>devices</key>
+          <array>
+            <dict><key>vendor_id</key><integer>11914</integer><key>product_id</key><integer>3</integer></dict>
+            <dict><key>vendor_id</key><integer>11914</integer><key>product_id</key><integer>15</integer></dict>
+          </array>
+          <key>urls</key><array><string>https://wedgie.dev</string></array>
+        </dict>
+      </array>
+      <key>SerialAllowUsbDevicesForUrls</key>
+      <array>
+        <dict>
+          <key>devices</key>
+          <array><dict><key>vendor_id</key><integer>11914</integer></dict></array>
+          <key>urls</key><array><string>https://wedgie.dev</string></array>
+        </dict>
+      </array>
+    </dict>
+  </array>
+</dict>
+</plist>
