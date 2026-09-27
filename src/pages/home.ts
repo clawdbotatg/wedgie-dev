@@ -73,7 +73,7 @@ export function home(main: HTMLElement): Promise<unknown> {
     <div class="card order">
       <div class="order-art truck-lane" aria-hidden="true"><img class="truck" src="/img/truck.webp" alt=""></div>
       <div class="order-body">
-        <div class="order-price">$67 <span>shipped</span></div>
+        <div class="order-price">$67 <span>shipped</span><i class="sixseven-box"></i></div>
         <p id="order-what">One wedgie: pico, screen, chip, and case.</p>
         <div class="seg" role="radiogroup" aria-label="who is it for">
           <button class="on" data-for="me" role="radio" aria-checked="true">For me</button>
@@ -96,6 +96,16 @@ export function home(main: HTMLElement): Promise<unknown> {
 
   const hero = place3D(main.querySelector<HTMLElement>("#hero-dev")!, { demo: "WEDGIE", boot: true, intro: true, eager: true, side: 1, fallback: { kind: "off" } });
 
+  // $67: the 6-7 hands, for a moment, each time the price comes into view.
+  const price = main.querySelector<HTMLElement>(".order-price")!;
+  let hands: { play(): void } | null = null;
+  new IntersectionObserver(async (es) => {
+    if (!es.some((e) => e.isIntersecting)) return;
+    await pageShown;
+    if (!hands) { const { mountSixSeven } = await import("../ui/sixseven"); hands = mountSixSeven(price.querySelector(".sixseven-box")!); }
+    hands.play();
+  }, { threshold: 1 }).observe(price);
+
   // The truck drives in when its section comes into view, then keeps bouncing along.
   const lane = main.querySelector<HTMLElement>(".truck-lane")!;
   new IntersectionObserver((es, o) => { if (es.some((e) => e.isIntersecting)) { lane.classList.add("go"); o.disconnect(); } }, { threshold: 0.35 }).observe(lane);
@@ -103,7 +113,7 @@ export function home(main: HTMLElement): Promise<unknown> {
   main.querySelectorAll<HTMLButtonElement>(".seg button").forEach((b) => (b.onclick = () => {
     main.querySelectorAll<HTMLButtonElement>(".seg button").forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-checked", String(x === b)); });
     main.querySelector("#order-what")!.textContent = b.dataset.for === "kit"
-      ? "Every part in the mail, not put together, with instructions."
+      ? "Every part in the mail with assembly instructions."
       : "One wedgie: pico, screen, chip, and case.";
   }));
   assembly(main.querySelector<HTMLElement>("#assembly")!);
