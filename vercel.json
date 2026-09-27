@@ -60,6 +60,10 @@
     {
       "source": "/assemble",
       "destination": "/index.html"
+    },
+    {
+      "source": "/test",
+      "destination": "/index.html"
     }
   ]
 }
