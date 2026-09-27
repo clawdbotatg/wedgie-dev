@@ -32,5 +32,7 @@ watchCount((n) => {
   btn.setAttribute("aria-label", n ? `${n} wedgie${n > 1 ? "s" : ""} connected` : "Connect a wedgie");
 });
 
-(onConnect ? connect : home)(document.getElementById("top")!);
-(window as any).__wedgieReady?.();
+const top = document.getElementById("top")!;
+// The loader holds until the page's first wedgie is up (or 6 s, whichever first).
+const up = onConnect ? (connect(top), Promise.resolve()) : home(top);
+Promise.race([up, new Promise((r) => setTimeout(r, 6000))]).then(() => (window as any).__wedgieReady?.());

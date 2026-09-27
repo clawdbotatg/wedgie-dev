@@ -63,6 +63,10 @@ def cutout(src, dst, width):
 
 cutout("sticker-wedgie-dev.jpg", "sticker-wedgie-dev.webp", 1100)
 cutout("sticker.jpg", "sticker.webp", 900)
+cutout("truck.jpg", "truck.webp", 1100)
+# the truck drives left on the site (toward the copy), so flip it
+from PIL import ImageOps
+tr = Image.open(out / "truck.webp"); ImageOps.mirror(tr).save(out / "truck.webp", "WEBP", quality=88, method=6)
 
 # favicon / touch icon from the plain sticker
 ico = Image.open(out / "sticker.webp").convert("RGBA")

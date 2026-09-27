@@ -8,19 +8,13 @@
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { loadGeo, partGeometry, COLORS } from "./wedgie3d";
+import { PART_COLORS, ROW_L, ROW_R, pinY, SOCKET_BOTTOM, picoPins, chipBoard, PLUG, WIRE_COLORS, wire } from "./parts-geo";
 
 export type Assembly3D = { setProgress(p: number): void; destroy(): void };
 
-const ROW_L = 13.22 + 8.89, ROW_R = 13.22 - 8.89;       // left/right as seen from the Pico side, USB at top
-const PIN1_Y = 51.77 - 1.61;
-const hole = (x: number, n: number) => new THREE.Vector3(x, PIN1_Y - (n - 1) * 2.54, -10.66);
+const hole = (x: number, n: number) => new THREE.Vector3(x, pinY(n), SOCKET_BOTTOM);
 // plug order GND, V+, SDA, SCL -> right 3rd (pin 38), right 5th (pin 36), left 6th (GP4), left 7th (GP5)
-const WIRES = [
-  { color: 0x1a1a1a, to: hole(ROW_R, 3) },
-  { color: 0xd8262a, to: hole(ROW_R, 5) },
-  { color: 0x2f6fd6, to: hole(ROW_L, 6) },
-  { color: 0xf2c417, to: hole(ROW_L, 7) },
-];
+const HOLES = [hole(ROW_R, 3), hole(ROW_R, 5), hole(ROW_L, 6), hole(ROW_L, 7)];
 const CHIP_IN = { x: 13.2, y: 17, z: -7.5, roll: 0.32 };          // wedged: jammed in at an angle
 const CHIP_OUT = { x: 48, y: 16, z: -13, roll: 0 };
 
@@ -79,8 +73,9 @@ export async function mountAssembly3D(el: HTMLElement): Promise<Assembly3D> {
     inner.add(m);
     return m;
   };
-  const hat = mesh("hat", new THREE.MeshStandardMaterial({ color: 0x1f5a7a, roughness: 0.6 }));
-  const pico = mesh("pico", new THREE.MeshStandardMaterial({ color: 0x2b8a48, roughness: 0.55 }));
+  mesh("hat", new THREE.MeshStandardMaterial({ color: PART_COLORS.hat, roughness: 0.6 }));
+  const pico = mesh("pico", new THREE.MeshStandardMaterial({ color: PART_COLORS.pico, roughness: 0.55 }));
+  pico.add(picoPins());                      // they ride up with the Pico into the sockets
   const lid = mesh("lid", plastic(COLORS.lid));
   const base = mesh("base", plastic(COLORS.base, 0.55));
   const caps = ["A", "B", "X", "Y", "joystick"].map((k) => mesh(k, plastic(COLORS[k])));
@@ -119,32 +114,20 @@ export async function mountAssembly3D(el: HTMLElement): Promise<Assembly3D> {
   }
   function round(x: number, y: number, w: number, h: number, r: number) { sg.beginPath(); sg.roundRect(x, y, w, h, r); }
 
-  // The chip on its breakout, and its four wires to the header.
-  const chip = new THREE.Group();
-  const board = new THREE.Mesh(new THREE.BoxGeometry(17.7, 25.5, 1.6), new THREE.MeshStandardMaterial({ color: 0x17171a, roughness: 0.6 }));
-  const ic = new THREE.Mesh(new THREE.BoxGeometry(5, 6, 1.2), new THREE.MeshStandardMaterial({ color: 0x0b0b0c, roughness: 0.4 }));
-  ic.position.set(0, -2, 1.3);
-  const jst = new THREE.Mesh(new THREE.BoxGeometry(6, 4, 3), new THREE.MeshStandardMaterial({ color: 0xf1ede2, roughness: 0.7 }));
-  jst.position.set(0, 12, 1.8);
-  board.castShadow = true;
-  chip.add(board, ic, jst);
+  // The chip on its breakout, and its four wires to the header (bare copper tips go into the holes).
+  const chip = chipBoard();
   inner.add(chip);
-  const wires = WIRES.map((w) => {
-    const m = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshStandardMaterial({ color: w.color, roughness: 0.45 }));
-    m.castShadow = true;
-    inner.add(m);
-    return { ...w, m };
-  });
+  const wires = WIRE_COLORS.map((c, i) => { const w = wire(c); inner.add(w.group); return { ...w, to: HOLES[i] }; });
+  const UP = new THREE.Vector3(0, 0, 1);
   function placeWires(insert: number) {
-    const plug = new THREE.Vector3(0, 13.5, 2.2).applyMatrix4(chip.matrix);
+    const plug = PLUG.clone().applyMatrix4(chip.matrix);
     wires.forEach((w, i) => {
       const start = plug.clone().add(new THREE.Vector3((i - 1.5) * 1.1, 0, 0));
       const tip = w.to.clone().add(new THREE.Vector3(0, 0, lerp(-9, 1.5, insert)));    // slides up into the socket
-      const below = tip.clone().add(new THREE.Vector3(0, 0, -6));
+      const insEnd = tip.clone().add(new THREE.Vector3(0, 0, -3));                      // copper: the last 3 mm
+      const below = insEnd.clone().add(new THREE.Vector3(0, 0, -5));
       const mid = start.clone().lerp(below, 0.5).add(new THREE.Vector3(0, 0, -5));
-      const curve = new THREE.CatmullRomCurve3([start, mid, below, tip]);
-      w.m.geometry.dispose();
-      w.m.geometry = new THREE.TubeGeometry(curve, 40, 0.55, 8, false);
+      w.set([start, mid, below, insEnd], UP);
     });
   }
 

@@ -3,7 +3,8 @@ import { place3D } from "../ui/place3d";
 
 const CASE = "https://raw.githubusercontent.com/clawdbotatg/clawd-pico-case/main/stl/current/";
 
-export function home(main: HTMLElement) {
+/** Returns once the hero wedgie is up (the loader waits for it). */
+export function home(main: HTMLElement): Promise<unknown> {
   main.innerHTML = `
   <section class="hero">
     <div class="hero-copy">
@@ -15,7 +16,7 @@ export function home(main: HTMLElement) {
         <a class="btn" href="#build">Build your own</a>
       </div>
     </div>
-    <div class="hero-art"><img class="sticker" src="/img/sticker.webp" alt="a pair of white briefs with a green, grey and red waistband"></div>
+    <div class="hero-art" id="hero-dev"></div>
   </section>
 
   <div class="band" aria-hidden="true"><i></i><i></i><i></i></div>
@@ -26,7 +27,7 @@ export function home(main: HTMLElement) {
       <h2>We'll give you a wedgie.</h2>
     </div>
     <div class="card order">
-      <div class="order-art" id="art-order"></div>
+      <div class="order-art truck-lane" aria-hidden="true"><img class="truck" src="/img/truck.webp" alt=""></div>
       <div class="order-body">
         <div class="order-price">$67 <span>shipped</span></div>
         <p>One wedgie: pico, screen, chip, and case.</p>
@@ -50,9 +51,9 @@ export function home(main: HTMLElement) {
       <p>No soldering. Order the parts anywhere, from anyone. To a store it's just a dev board, a screen, and a chip.</p>
     </div>
     <div class="parts">
-      <div class="card part"><div class="num">1</div><h3>A Pico</h3><p>The brain: a Raspberry Pi Pico 2 W with headers. Any Pico-shaped board runs the same code; the printed case fits the USB-C RP2040 kind.</p><div class="buy"><a class="btn btn-xs" href="https://www.amazon.com/s?k=raspberry+pi+pico+with+header&i=electronics" target="_blank" rel="noopener">Amazon</a><a class="btn btn-xs" href="https://www.adafruit.com/product/6315" target="_blank" rel="noopener">Adafruit</a><a class="btn btn-xs" href="https://www.microcenter.com/product/692334/raspberry-pi-pico-2w-with-header" target="_blank" rel="noopener">Micro Center</a></div></div>
-      <div class="card part"><div class="num">2</div><h3>The screen hat</h3><p>Waveshare Pico-LCD-1.3: a 240×240 screen, a joystick, and four buttons. The Pico plugs straight in.</p><div class="buy"><a class="btn btn-xs" href="https://www.amazon.com/dp/B092VVCBQP" target="_blank" rel="noopener">Amazon</a><a class="btn btn-xs" href="https://www.waveshare.com/pico-lcd-1.3.htm" target="_blank" rel="noopener">Waveshare</a><a class="btn btn-xs" href="https://thepihut.com/products/1-3-ips-lcd-display-module-for-raspberry-pi-pico-240x240" target="_blank" rel="noopener">The Pi Hut</a></div></div>
-      <div class="card part"><div class="num">3</div><h3>The chip</h3><p>Adafruit's ATECC608 breakout, plus a STEMMA QT / Qwiic cable with bare wire ends. The wires push into the header; the chip gets wedged between the boards.</p><div class="buy"><a class="btn btn-xs" href="https://www.amazon.com/s?k=ATECC608&i=electronics" target="_blank" rel="noopener">Amazon</a><a class="btn btn-xs" href="https://www.adafruit.com/product/4314" target="_blank" rel="noopener">Adafruit</a><a class="btn btn-xs" href="https://www.digikey.com/en/products/detail/adafruit-industries-llc/4314/10419053" target="_blank" rel="noopener">DigiKey</a></div></div>
+      <div class="card part"><div class="num">1</div><div class="part-3d" data-part="pico"></div><h3>A Pico</h3><p>The brain: a Raspberry Pi Pico 2 W with headers. Any Pico-shaped board runs the same code; the printed case fits the USB-C RP2040 kind.</p><div class="buy"><a class="btn btn-xs" href="https://www.amazon.com/s?k=raspberry+pi+pico+with+header&i=electronics" target="_blank" rel="noopener">Amazon</a><a class="btn btn-xs" href="https://www.adafruit.com/product/6315" target="_blank" rel="noopener">Adafruit</a><a class="btn btn-xs" href="https://www.microcenter.com/product/692334/raspberry-pi-pico-2w-with-header" target="_blank" rel="noopener">Micro Center</a></div></div>
+      <div class="card part"><div class="num">2</div><div class="part-3d" data-part="hat"></div><h3>The screen hat</h3><p>Waveshare Pico-LCD-1.3: a 240×240 screen, a joystick, and four buttons. The Pico plugs straight in.</p><div class="buy"><a class="btn btn-xs" href="https://www.amazon.com/dp/B092VVCBQP" target="_blank" rel="noopener">Amazon</a><a class="btn btn-xs" href="https://www.waveshare.com/pico-lcd-1.3.htm" target="_blank" rel="noopener">Waveshare</a><a class="btn btn-xs" href="https://thepihut.com/products/1-3-ips-lcd-display-module-for-raspberry-pi-pico-240x240" target="_blank" rel="noopener">The Pi Hut</a></div></div>
+      <div class="card part"><div class="num">3</div><div class="part-3d" data-part="chip"></div><h3>The chip</h3><p>Adafruit's ATECC608 breakout, plus a STEMMA QT / Qwiic cable with bare wire ends. The wires push into the header; the chip gets wedged between the boards.</p><div class="buy"><a class="btn btn-xs" href="https://www.amazon.com/s?k=ATECC608&i=electronics" target="_blank" rel="noopener">Amazon</a><a class="btn btn-xs" href="https://www.adafruit.com/product/4314" target="_blank" rel="noopener">Adafruit</a><a class="btn btn-xs" href="https://www.digikey.com/en/products/detail/adafruit-industries-llc/4314/10419053" target="_blank" rel="noopener">DigiKey</a></div></div>
     </div>
 
     <div class="assembly" id="assembly">
@@ -91,21 +92,26 @@ export function home(main: HTMLElement) {
   </section>
 `;
 
-  place3D(main.querySelector<HTMLElement>("#art-order")!, { demo: "WEDGIE", side: 1 });
+  const hero = place3D(main.querySelector<HTMLElement>("#hero-dev")!, { demo: "WEDGIE", boot: true, side: 1, fallback: { kind: "loading", p: 0.5 } });
+
+  // The truck drives in when its section comes into view, then keeps bouncing along.
+  const lane = main.querySelector<HTMLElement>(".truck-lane")!;
+  new IntersectionObserver((es, o) => { if (es.some((e) => e.isIntersecting)) { lane.classList.add("go"); o.disconnect(); } }, { threshold: 0.35 }).observe(lane);
 
   main.querySelectorAll<HTMLButtonElement>(".seg button").forEach((b) => (b.onclick = () => {
     main.querySelectorAll<HTMLButtonElement>(".seg button").forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-checked", String(x === b)); });
   }));
   assembly(main.querySelector<HTMLElement>("#assembly")!);
+  main.querySelectorAll<HTMLElement>(".part-3d").forEach((el, i) => {
+    new IntersectionObserver(async (es, o) => {
+      if (!es.some((e) => e.isIntersecting)) return;
+      o.disconnect();
+      try { const { mountPart3D } = await import("../ui/parts3d"); await mountPart3D(el, el.dataset.part as "pico" | "hat" | "chip", i * 1.3); }
+      catch (err) { console.error("part:", err); }
+    }, { rootMargin: "300px" }).observe(el);
+  });
 
-  // The sticker leans toward the pointer, a little.
-  const sticker = main.querySelector<HTMLElement>(".sticker");
-  if (sticker && matchMedia("(hover: hover) and (prefers-reduced-motion: no-preference)").matches) {
-    addEventListener("pointermove", (e) => {
-      const x = e.clientX / innerWidth - 0.5, y = e.clientY / innerHeight - 0.5;
-      sticker.style.transform = `perspective(900px) rotateY(${x * 10}deg) rotateX(${-y * 8}deg) rotate(-3deg)`;
-    });
-  }
+  return hero;
 }
 
 // Put it together: the steps light up as you scroll, and the wedgie assembles itself beside them.

@@ -87,7 +87,7 @@ html.ready #app { opacity: 1; transition: opacity .4s .1s; }
 .brand img { filter: drop-shadow(0 3px 4px rgba(0,0,0,.18)); }
 .top nav { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 main { max-width: 1160px; margin: 0 auto; padding: 0 22px; }
-.hero { display: grid; grid-template-columns: 1.05fr 1fr; gap: 30px; align-items: center; min-height: min(78vh, 760px); padding: 40px 0 30px; }
+.hero { display: grid; grid-template-columns: .9fr 1.25fr; gap: 30px; align-items: center; min-height: min(78vh, 760px); padding: 40px 0 30px; }
 .lede { font-size: 20px; color: #3b3d3b; margin: 22px 0 30px; max-width: 34em; }
 .lede em { font-style: normal; background: linear-gradient(transparent 62%, #c9f1d6 62%); }
 .hero-art { display: grid; place-items: center; }
@@ -285,3 +285,20 @@ html, body { overflow-x: clip; }
 .btn-xs { height: 38px; padding: 0 14px; font-size: 14px; }
 .buy { flex-wrap: nowrap; gap: 6px; }
 @media (max-width: 380px) { .buy { flex-wrap: wrap; } }
+
+/* hero wedgie: big */
+.hero-art { min-height: 360px; }
+#hero-dev { width: 100%; }
+@media (min-width: 861px) { #hero-dev { margin: -30px -40px -30px 0; width: calc(100% + 40px); } }
+
+/* the delivery truck: drives in from the right, then bounces along with its speed lines */
+.truck-lane { position: relative; overflow: hidden; padding: 20px 0; }
+.truck { width: 100%; display: block; transform: translateX(120%); filter: drop-shadow(0 18px 18px rgba(0,0,0,.18)); }
+.truck-lane.go .truck { animation: drive-in 1.3s cubic-bezier(.2,.8,.25,1) forwards, bump .42s ease-in-out 1.3s infinite alternate; }
+@keyframes drive-in { 0% { transform: translateX(120%) rotate(0deg); } 80% { transform: translateX(-3%) rotate(-1.2deg); } 100% { transform: translateX(0) rotate(0deg); } }
+@keyframes bump { from { transform: translateY(0) rotate(0deg); } to { transform: translateY(-4px) rotate(-.5deg); } }
+@media (prefers-reduced-motion: reduce) { .truck { transform: none; } .truck-lane.go .truck { animation: none; } }
+.part { position: relative; }
+.part-3d { height: 190px; margin: -6px -10px 4px; }
+.part .num { position: absolute; top: 22px; left: 22px; z-index: 1; }
+.part h3 { margin-top: 0; }

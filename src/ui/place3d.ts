@@ -3,10 +3,10 @@
 import type { Wedgie3D, Wedgie3DOptions } from "./wedgie3d";
 import { deviceSvg, type Screen } from "./device";
 
-export function place3D(el: HTMLElement, opts: Wedgie3DOptions & { fallback?: Screen; demo?: string } = {}): Promise<Wedgie3D | null> {
+export function place3D(el: HTMLElement, opts: Wedgie3DOptions & { fallback?: Screen; demo?: string; boot?: boolean } = {}): Promise<Wedgie3D | null> {
   if (!el.firstChild) el.innerHTML = deviceSvg(opts.fallback || { kind: "off" });
   // demo: a clickable pretend wedgie (launcher + apps, hard-coded) instead of a still screen
-  const demo = opts.demo !== undefined ? import("./demo").then((m) => m.createDemo(opts.demo)) : null;
+  const demo = opts.demo !== undefined ? import("./demo").then((m) => m.createDemo(opts.demo, { boot: opts.boot })) : null;
   return new Promise((resolve) => {
     const io = new IntersectionObserver(async (es) => {
       if (!es.some((e) => e.isIntersecting)) return;

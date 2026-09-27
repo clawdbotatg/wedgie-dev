@@ -11,7 +11,7 @@ const SHOTS = {
   wallet: ["wallet-home", "wallet-chart", "wallet-send", "wallet-receive", "wallet-signing"].map(img),
 };
 
-export function createDemo(id = "WEDGIE") {
+export function createDemo(id = "WEDGIE", opts: { boot?: boolean } = {}) {
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = 240;
   const g = canvas.getContext("2d")!;
@@ -70,7 +70,22 @@ export function createDemo(id = "WEDGIE") {
     text("X quits", 4, 228, "#787878");
   }
 
-  const draw = () => (app ? app.draw() : drawLauncher());
+  // Boot: the device's own boot screen (splash.py's underwear, loader.py's bar filling grey, then green).
+  const logo = new Image();
+  logo.src = "/img/loader-logo.webp";
+  let bootT = opts.boot ? 0 : 1;
+  function drawBoot() {
+    g.fillStyle = "#fefefe"; g.fillRect(0, 0, 240, 240);
+    if (logo.complete) g.drawImage(logo, 72, 74, 96, 77);
+    const x = 45, y = 166, w = 150, h = 30;
+    const pill = (px: number, py: number, pw: number, ph: number, c: string | CanvasGradient) => { g.fillStyle = c; g.beginPath(); g.roundRect(px, py, pw, ph, ph / 2); g.fill(); };
+    pill(x, y, w, h, "#eceded");
+    pill(x + 11, y + 7, w - 22, h - 14, "#c9cacc");
+    const f = Math.min(1, bootT / 0.8), gr = g.createLinearGradient(0, y + 9, 0, y + 21);
+    if (bootT >= 0.85) { gr.addColorStop(0, "#46cd64"); gr.addColorStop(1, "#168c34"); } else { gr.addColorStop(0, "#7c7d7f"); gr.addColorStop(1, "#48494b"); }
+    pill(x + 13, y + 9, 12 + (w - 38) * f, h - 18, gr);
+  }
+  const draw = () => (bootT < 1 ? drawBoot() : app ? app.draw() : drawLauncher());
 
   function key(k: string, down: boolean) {
     if (down) held.add(k); else held.delete(k);
@@ -102,7 +117,18 @@ export function createDemo(id = "WEDGIE") {
   Object.values(SHOTS).flat().forEach((i) => i.addEventListener("load", draw));
   document.fonts?.ready.then(draw);
   draw();
-  tour();
+  if (bootT < 1) {
+    const BOOT = 2600;
+    const tick = () => {
+      bootT = Math.min(1, (performance.now() - (tick as any).t0) / BOOT);
+      draw();
+      if (bootT < 1) requestAnimationFrame(tick); else setTimeout(tour, 1200);
+    };
+    // start when the page is actually showing (the site loader covers it until html.ready)
+    const go = () => { const t = performance.now(); (tick as any).t0 = t; requestAnimationFrame(tick); };
+    const whenShown = () => (document.documentElement.classList.contains("ready") ? setTimeout(go, 350) : setTimeout(whenShown, 100));
+    logo.decode?.().catch(() => {}).finally(whenShown);
+  } else tour();
 
   return {
     canvas,
