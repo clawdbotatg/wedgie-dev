@@ -31,7 +31,8 @@ body { margin: 0; font-family: var(--font); color: var(--ink); font-size: 17px; 
   -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; }
 a { color: var(--mint-d); font-weight: 700; text-decoration-thickness: 2px; text-underline-offset: 3px; }
 h1, h2, h3 { font-weight: 900; letter-spacing: -.02em; line-height: 1.02; margin: 0; }
-h1 { font-size: clamp(46px, 8.2vw, 104px); }
+h1 { font-size: clamp(44px, 6.6vw, 88px); }
+.nowrap { white-space: nowrap; }
 h2 { font-size: clamp(32px, 4.6vw, 54px); }
 h3 { font-size: 23px; letter-spacing: -.01em; }
 p { margin: 0; }
@@ -87,7 +88,7 @@ html.ready #app { opacity: 1; transition: opacity .4s .1s; }
 .brand img { filter: drop-shadow(0 3px 4px rgba(0,0,0,.18)); }
 .top nav { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 main { max-width: 1160px; margin: 0 auto; padding: 0 22px; }
-.hero { display: grid; grid-template-columns: .9fr 1.25fr; gap: 30px; align-items: center; min-height: min(78vh, 760px); padding: 40px 0 30px; }
+.hero { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; align-items: center; min-height: min(78vh, 760px); padding: 40px 0 30px; }
 .lede { font-size: 20px; color: #3b3d3b; margin: 22px 0 30px; max-width: 34em; }
 .lede em { font-style: normal; background: linear-gradient(transparent 62%, #c9f1d6 62%); }
 .hero-art { display: grid; place-items: center; }
@@ -123,7 +124,7 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 22px; }
 .wedgie .arrow.done { fill: #22c452; }
 
 /* build */
-.parts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; margin-bottom: 22px; }
+.parts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; margin-bottom: 22px; }
 .part { display: flex; flex-direction: column; gap: 12px; }
 .part p { color: #474947; flex: 1; }
 .part .price { font-weight: 900; font-size: 20px; }
@@ -299,6 +300,7 @@ html, body { overflow-x: clip; }
 @keyframes bump { from { transform: translateY(0) rotate(0deg); } to { transform: translateY(-4px) rotate(-.5deg); } }
 @media (prefers-reduced-motion: reduce) { .truck { transform: none; } .truck-lane.go .truck { animation: none; } }
 .part { position: relative; }
-.part-3d { height: 190px; margin: -6px -10px 4px; }
+.part-3d { position: relative; height: 170px; margin: 0 0 4px; overflow: hidden; }
+.part-3d canvas { position: absolute; inset: 0; }   /* never sizes the card */
 .part .num { position: absolute; top: 22px; left: 22px; z-index: 1; }
 .part h3 { margin-top: 0; }

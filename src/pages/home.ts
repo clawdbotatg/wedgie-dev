@@ -8,7 +8,7 @@ export function home(main: HTMLElement): Promise<unknown> {
   main.innerHTML = `
   <section class="hero">
     <div class="hero-copy">
-      <h1>Give yourself<br>a wedgie.</h1>
+      <h1>Give<br>yourself<br><span class="nowrap">a wedgie.</span></h1>
       <p class="lede">A pocket computer from three off-the-shelf parts: a Pico, a screen hat, and a secure chip
       <em>wedged</em> in between. Make it a wallet, a game, or whatever you and your agent dream up.</p>
       <div class="row">
@@ -47,7 +47,7 @@ export function home(main: HTMLElement): Promise<unknown> {
   <section id="build" class="sec">
     <div class="sec-head">
       <span class="kicker">Build one</span>
-      <h2>Three parts. One wedge.</h2>
+      <h2>Three easy parts.</h2>
       <p>No soldering. Order the parts anywhere, from anyone. To a store it's just a dev board, a screen, and a chip.</p>
     </div>
     <div class="parts">
