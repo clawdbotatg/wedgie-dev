@@ -25,7 +25,7 @@ app.innerHTML = `
 `;
 
 // Red "Allow wedgie connection" until this site can see a plugged-in wedgie: a tap opens the browser's
-// device picker right here. Then green with how many, linking to /connect. Grey "Connect" where the
+// device picker right here; pick one and you land on /connect. Then green with how many, linking there. Grey "Connect" where the
 // browser has no Web Serial (/connect explains). Live as you plug and unplug.
 const btn = document.getElementById("connect-btn")!;
 const lbl = btn.querySelector(".lbl")!;
@@ -33,7 +33,9 @@ let seen = 0;
 btn.addEventListener("click", (e) => {
   if (seen || !supported()) return;
   e.preventDefault();
-  (onConnect ? connectNew() : allow()).catch(() => {});
+  // Picked one? Take them to /connect, where they'll use it. Cancelled the picker: stay put.
+  if (onConnect) connectNew().catch(() => {});
+  else allow().then(() => { location.href = "/connect"; }, () => {});
 });
 watchCount((n) => {
   seen = n;
