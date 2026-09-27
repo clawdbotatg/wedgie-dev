@@ -30,7 +30,8 @@ export type Wedgie3D = {
 };
 
 // Printed colors, in the site's palette: white lid, black base, green A, grey B X and joystick, red Y.
-export const COLORS: Record<string, number> = { lid: 0xf3f2ee, base: 0x1c1c1e, A: 0x2dbd57, B: 0x75767a, X: 0x75767a, Y: 0xdf342e, joystick: 0x75767a };
+// A and Y match the 1 and 3 badges (the site's green and red fills), not neon
+export const COLORS: Record<string, number> = { lid: 0xf3f2ee, base: 0x1c1c1e, A: 0x278c3c, B: 0x6c6d71, X: 0x6c6d71, Y: 0xb3302a, joystick: 0x75767a };
 const KEYS = ["A", "B", "X", "Y"];
 const STICK = { x: 13.17, y: 46.13 };          // joystick centre in case mm
 const ACTIVE = 23.4;                            // 1.3" 240x240 active area, mm
@@ -66,7 +67,7 @@ export async function mountWedgie3D(el: HTMLElement, opts: Wedgie3DOptions = {})
   renderer.setPixelRatio(Math.min(2, devicePixelRatio));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.9;
+  renderer.toneMappingExposure = 0.95;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.VSMShadowMap;
   const cv = renderer.domElement;
@@ -88,7 +89,7 @@ export async function mountWedgie3D(el: HTMLElement, opts: Wedgie3DOptions = {})
   camera.position.set(0, -20, 128);        // close: the wedgie fills its frame
   camera.lookAt(0, -1.5, 0);
 
-  const key = new THREE.DirectionalLight(0xffffff, 2.2);
+  const key = new THREE.DirectionalLight(0xffffff, 1.6);
   key.position.set(-35, 45, 160);
   key.castShadow = true;
   key.shadow.mapSize.set(1024, 1024);
@@ -97,7 +98,7 @@ export async function mountWedgie3D(el: HTMLElement, opts: Wedgie3DOptions = {})
   Object.assign(key.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60, near: 10, far: 400 });
   key.shadow.bias = -0.0005;
   scene.add(key);
-  scene.add(new THREE.HemisphereLight(0xffffff, 0xb9b9b3, 0.35));
+  scene.add(new THREE.HemisphereLight(0xffffff, 0xb9b9b3, 0.55));
 
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.ShadowMaterial({ opacity: 0.16 }));
   floor.position.z = -18;
@@ -119,7 +120,8 @@ export async function mountWedgie3D(el: HTMLElement, opts: Wedgie3DOptions = {})
   for (const p of meta.parts) {
     if (p.name === "hat" || p.name === "pico") continue;   // the boards: only the assembly shows them
     const m = new THREE.Mesh(partGeometry(p, bin), new THREE.MeshPhysicalMaterial({
-      color: COLORS[p.name] ?? 0xcccccc, roughness: p.name === "base" ? 0.55 : 0.5, clearcoat: 0.2, clearcoatRoughness: 0.5,
+      color: COLORS[p.name] ?? 0xcccccc, roughness: p.name === "base" ? 0.55 : KEYS.includes(p.name) ? 0.85 : 0.5, specularIntensity: KEYS.includes(p.name) ? 0.25 : 1,
+      clearcoat: KEYS.includes(p.name) ? 0 : 0.2, clearcoatRoughness: 0.5, envMapIntensity: KEYS.includes(p.name) ? 0.45 : 1,   // caps: matte printed PETG, no hot glare
     }));
     m.castShadow = true; m.receiveShadow = true;
     m.name = p.name;

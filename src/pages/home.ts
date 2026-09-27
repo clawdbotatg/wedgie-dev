@@ -12,37 +12,14 @@ export function home(main: HTMLElement): Promise<unknown> {
       <p class="lede">A pocket computer from three off-the-shelf parts: a Pico, a screen hat, and a secure chip
       <em>wedged</em> in between. Make it a wallet, a game, or whatever you and your agent dream up.</p>
       <div class="row">
-        <a class="btn btn-green" href="#get">Get a wedgie · $67</a>
-        <a class="btn" href="#build">Build your own</a>
+        <a class="btn btn-green" href="#build">Build your own</a>
+        <a class="btn" href="#get">Buy one · $67</a>
       </div>
     </div>
     <div class="hero-art" id="hero-dev"></div>
   </section>
 
   <div class="band" aria-hidden="true"><i></i><i></i><i></i></div>
-
-  <section id="get" class="sec">
-    <div class="sec-head">
-      <span class="kicker">Get one</span>
-      <h2>We'll give you a wedgie.</h2>
-    </div>
-    <div class="card order">
-      <div class="order-art truck-lane" aria-hidden="true"><img class="truck" src="/img/truck.webp" alt=""></div>
-      <div class="order-body">
-        <div class="order-price">$67 <span>shipped</span></div>
-        <p>One wedgie: pico, screen, chip, and case.</p>
-        <div class="seg" role="radiogroup" aria-label="who is it for">
-          <button class="on" data-for="me" role="radio" aria-checked="true">For me</button>
-          <button data-for="gift" role="radio" aria-checked="false">Give someone a wedgie</button>
-        </div>
-        <div class="row">
-          <button class="btn btn-green" data-pay="usdc" disabled>Pay with USDC</button>
-          <button class="btn" data-pay="card" disabled>Pay with card</button>
-        </div>
-        <p class="fine soon">Checkout opens soon.</p>
-      </div>
-    </div>
-  </section>
 
   <section id="build" class="sec">
     <div class="sec-head">
@@ -83,6 +60,29 @@ export function home(main: HTMLElement): Promise<unknown> {
           <a class="btn btn-sm" href="${CASE}button.stl" download>Button ×4</a>
         </div>
         <p class="fine">Source, measurements, and every iteration: <a href="https://github.com/clawdbotatg/clawd-pico-case" target="_blank" rel="noopener">clawd-pico-case</a>. Why it's called a wedgie: <a href="/lore.md" target="_blank">the lore</a>.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="get" class="sec">
+    <div class="sec-head">
+      <span class="kicker">Get one</span>
+      <h2>We'll give you a wedgie.</h2>
+    </div>
+    <div class="card order">
+      <div class="order-art truck-lane" aria-hidden="true"><img class="truck" src="/img/truck.webp" alt=""></div>
+      <div class="order-body">
+        <div class="order-price">$67 <span>shipped</span></div>
+        <p>One wedgie: pico, screen, chip, and case.</p>
+        <div class="seg" role="radiogroup" aria-label="who is it for">
+          <button class="on" data-for="me" role="radio" aria-checked="true">For me</button>
+          <button data-for="gift" role="radio" aria-checked="false">Give someone a wedgie</button>
+        </div>
+        <div class="row">
+          <button class="btn btn-green" data-pay="usdc" disabled>Pay with USDC</button>
+          <button class="btn" data-pay="card" disabled>Pay with card</button>
+        </div>
+        <p class="fine soon">Checkout opens soon.</p>
       </div>
     </div>
   </section>

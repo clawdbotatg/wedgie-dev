@@ -25,7 +25,7 @@
 }
 * { box-sizing: border-box; }
 html { background: #fefefe; scroll-behavior: smooth; }
-html.ready { background: var(--paper); transition: background .5s; }
+html.ready { background: var(--paper); }
 html.noscroll { overflow: hidden; }
 body { margin: 0; font-family: var(--font); color: var(--ink); font-size: 17px; line-height: 1.55; font-weight: 500;
   -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; }
@@ -41,7 +41,7 @@ p { margin: 0; }
 .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 .row.center { justify-content: center; }
 #app { opacity: 0; }
-html.ready #app { opacity: 1; transition: opacity .4s .1s; }
+html.ready #app { opacity: 1; }
 
 /* ---- the waistband: green, grey, red stripes on white ---- */
 .band { height: 58px; background: var(--shell); box-shadow: var(--shell-shadow); display: flex; flex-direction: column;

@@ -3,6 +3,13 @@
 import type { Wedgie3D, Wedgie3DOptions } from "./wedgie3d";
 import { deviceSvg, type Screen } from "./device";
 
+// Building a 3D scene ties up the main thread for a moment; never let that hold the page back. Wait
+// until the site is showing (the loader adds html.ready), then a frame more.
+const shown = new Promise<void>((r) => {
+  const check = () => (document.documentElement.classList.contains("ready") ? requestAnimationFrame(() => setTimeout(r, 0)) : requestAnimationFrame(check));
+  check();
+});
+
 export function place3D(el: HTMLElement, opts: Wedgie3DOptions & { fallback?: Screen; demo?: string; boot?: boolean } = {}): Promise<Wedgie3D | null> {
   if (!el.firstChild) el.innerHTML = deviceSvg(opts.fallback || { kind: "off" });
   // demo: a clickable pretend wedgie (launcher + apps, hard-coded) instead of a still screen
@@ -12,6 +19,7 @@ export function place3D(el: HTMLElement, opts: Wedgie3DOptions & { fallback?: Sc
       if (!es.some((e) => e.isIntersecting)) return;
       io.disconnect();
       try {
+        await shown;
         const { mountWedgie3D } = await import("./wedgie3d");
         const d = demo ? await demo : null;
         const holder = document.createElement("div");

@@ -33,6 +33,6 @@ watchCount((n) => {
 });
 
 const top = document.getElementById("top")!;
-// The loader holds until the page's first wedgie is up (or 6 s, whichever first).
-const up = onConnect ? (connect(top), Promise.resolve()) : home(top);
-Promise.race([up, new Promise((r) => setTimeout(r, 6000))]).then(() => (window as any).__wedgieReady?.());
+// The page is ready the moment it's rendered; 3D wedgies appear on their own when they're built.
+(onConnect ? connect : home)(top);
+(window as any).__wedgieReady?.();

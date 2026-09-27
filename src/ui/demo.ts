@@ -126,7 +126,7 @@ export function createDemo(id = "WEDGIE", opts: { boot?: boolean } = {}) {
     };
     // start when the page is actually showing (the site loader covers it until html.ready)
     const go = () => { const t = performance.now(); (tick as any).t0 = t; requestAnimationFrame(tick); };
-    const whenShown = () => (document.documentElement.classList.contains("ready") ? setTimeout(go, 350) : setTimeout(whenShown, 100));
+    const whenShown = () => (document.documentElement.classList.contains("ready") ? go() : setTimeout(whenShown, 50));
     logo.decode?.().catch(() => {}).finally(whenShown);
   } else tour();
 
