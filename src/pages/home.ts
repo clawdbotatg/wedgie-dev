@@ -28,7 +28,6 @@ export function home(main: HTMLElement) {
     <div class="card order">
       <div class="order-art" id="art-order"></div>
       <div class="order-body">
-        <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
         <div class="order-price">$67 <span>shipped</span></div>
         <p>One wedgie: pico, screen, chip, and case.</p>
         <div class="seg" role="radiogroup" aria-label="who is it for">
