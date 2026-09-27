@@ -309,3 +309,6 @@ html, body { overflow-x: clip; }
 .part-3d canvas { position: absolute; inset: 0; }   /* never sizes the card */
 .part .num { position: absolute; top: 22px; left: 22px; z-index: 1; }
 .part h3 { margin-top: 0; }
+.seg { flex-wrap: nowrap; max-width: 100%; }
+.seg button { white-space: nowrap; }
+@media (max-width: 480px) { .seg button { font-size: 13.5px; padding: 8px 11px; } }

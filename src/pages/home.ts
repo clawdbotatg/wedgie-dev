@@ -73,10 +73,11 @@ export function home(main: HTMLElement): Promise<unknown> {
       <div class="order-art truck-lane" aria-hidden="true"><img class="truck" src="/img/truck.webp" alt=""></div>
       <div class="order-body">
         <div class="order-price">$67 <span>shipped</span></div>
-        <p>One wedgie: pico, screen, chip, and case.</p>
+        <p id="order-what">One wedgie: pico, screen, chip, and case.</p>
         <div class="seg" role="radiogroup" aria-label="who is it for">
           <button class="on" data-for="me" role="radio" aria-checked="true">For me</button>
           <button data-for="gift" role="radio" aria-checked="false">Give someone a wedgie</button>
+          <button data-for="kit" role="radio" aria-checked="false">Kit</button>
         </div>
         <div class="row">
           <button class="btn btn-green" data-pay="usdc" disabled>Pay with USDC</button>
@@ -100,6 +101,9 @@ export function home(main: HTMLElement): Promise<unknown> {
 
   main.querySelectorAll<HTMLButtonElement>(".seg button").forEach((b) => (b.onclick = () => {
     main.querySelectorAll<HTMLButtonElement>(".seg button").forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-checked", String(x === b)); });
+    main.querySelector("#order-what")!.textContent = b.dataset.for === "kit"
+      ? "Every part in the mail, not put together, with instructions."
+      : "One wedgie: pico, screen, chip, and case.";
   }));
   assembly(main.querySelector<HTMLElement>("#assembly")!);
   main.querySelectorAll<HTMLElement>(".part-3d").forEach((el, i) => {
