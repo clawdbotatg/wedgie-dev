@@ -17,6 +17,8 @@ export type Wedgie3DOptions = {
   screens?: string[];
   /** Which way it swings as it scrolls past: 1 or -1. */
   side?: number;
+  /** Fly in when the page shows: tumbles at you from tiny, overshoots, sticks, wobbles back. */
+  intro?: boolean;
 };
 
 export type Wedgie3D = {
@@ -211,6 +213,9 @@ export async function mountWedgie3D(el: HTMLElement, opts: Wedgie3DOptions = {})
   io.observe(cv);
   const t0 = performance.now();
   let scroll = 0;
+  // intro: -1 = waiting for the page to show, then seconds since it did; done after INTRO seconds
+  const INTRO = 1.9;
+  let introStart = opts.intro ? -1 : 0, introT = opts.intro ? 0 : INTRO;
   function loop() {
     cancelAnimationFrame(raf);
     if (dead || !visible || document.hidden) return;
@@ -223,6 +228,18 @@ export async function mountWedgie3D(el: HTMLElement, opts: Wedgie3DOptions = {})
     scroll += (sc - scroll) * 0.12;
     tilt.rotation.y = cur.x * 0.12 + scroll * 0.22 * side + Math.sin(t * 0.6 + side) * 0.012;
     tilt.rotation.x = -0.05 + cur.y * 0.08 + scroll * 0.28 + Math.sin(t * 0.45) * 0.01;
+    tilt.rotation.z = 0;
+    if (introT < INTRO) {
+      if (introStart < 0 && document.documentElement.classList.contains("ready")) introStart = performance.now();
+      introT = introStart < 0 ? 0 : (performance.now() - introStart) / 1000;
+      const k = Math.min(1, introT / 0.95), flip = 1 - k * k * (3 - 2 * k);           // tumbling, easing to a stop
+      tilt.rotation.x += flip * Math.PI * 4;
+      tilt.rotation.y += flip * Math.PI * 1.5;
+      const w = Math.max(0, introT - 0.95);                                            // stuck: wobble back
+      tilt.rotation.z += 0.22 * Math.exp(-5 * w) * Math.sin(13 * w) * (introT > 0.95 ? 1 : 0);
+      tilt.scale.setScalar(Math.max(0.02, 1 - 0.98 * Math.exp(-4.2 * introT) * Math.cos(6.5 * introT)));   // overshoots: too close, then back
+      if (introT >= INTRO) tilt.scale.setScalar(1);
+    }
     for (const k of KEYS) {
       // a spring: snaps down ~1.8 mm when pressed, pops back up with a little overshoot
       const m = meshes.get(k)!; const want = pressed.get(k) ? -1.8 : 0;
@@ -279,6 +296,7 @@ export async function mountWedgie3D(el: HTMLElement, opts: Wedgie3DOptions = {})
   const JOY = new Set(["up", "down", "left", "right", "press"]);
   const sticks = new Map<number, { x: number; y: number; dir: string | null }>();
   cv.addEventListener("pointerdown", (e) => {
+    if (introT < INTRO) return;              // still flying in
     const k = hit(e);
     cv.focus({ preventScroll: true });
     if (!k) return;

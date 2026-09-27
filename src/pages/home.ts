@@ -92,7 +92,7 @@ export function home(main: HTMLElement): Promise<unknown> {
   </section>
 `;
 
-  const hero = place3D(main.querySelector<HTMLElement>("#hero-dev")!, { demo: "WEDGIE", boot: true, side: 1, fallback: { kind: "loading", p: 0.5 } });
+  const hero = place3D(main.querySelector<HTMLElement>("#hero-dev")!, { demo: "WEDGIE", boot: true, intro: true, eager: true, side: 1, fallback: { kind: "off" } });
 
   // The truck drives in when its section comes into view, then keeps bouncing along.
   const lane = main.querySelector<HTMLElement>(".truck-lane")!;

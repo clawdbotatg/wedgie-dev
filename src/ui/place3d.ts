@@ -10,7 +10,7 @@ export const pageShown = new Promise<void>((r) => {
   check();
 });
 
-export function place3D(el: HTMLElement, opts: Wedgie3DOptions & { fallback?: Screen; demo?: string; boot?: boolean } = {}): Promise<Wedgie3D | null> {
+export function place3D(el: HTMLElement, opts: Wedgie3DOptions & { fallback?: Screen; demo?: string; boot?: boolean; eager?: boolean } = {}): Promise<Wedgie3D | null> {
   if (!el.firstChild) el.innerHTML = deviceSvg(opts.fallback || { kind: "off" });
   // demo: a clickable pretend wedgie (launcher + apps, hard-coded) instead of a still screen
   const demo = opts.demo !== undefined ? import("./demo").then((m) => m.createDemo(opts.demo, { boot: opts.boot })) : null;
@@ -19,7 +19,7 @@ export function place3D(el: HTMLElement, opts: Wedgie3DOptions & { fallback?: Sc
       if (!es.some((e) => e.isIntersecting)) return;
       io.disconnect();
       try {
-        await pageShown;
+        if (!opts.eager) await pageShown;          // eager: the hero, built while the loader is up
         const { mountWedgie3D } = await import("./wedgie3d");
         const d = demo ? await demo : null;
         const holder = document.createElement("div");

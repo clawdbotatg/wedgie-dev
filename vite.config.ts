@@ -8,7 +8,12 @@ import { buildFirmware } from "./tools/fw.mjs";
 // device's loader.py fills its bar by each file's share of the total size. So at build time we
 // take Vite's own <script>/<link> tags out of the HTML and hand the loader a manifest instead:
 // every file the site needs up front, with its size.
-const PRELOAD_IMAGES = ["/img/sticker-wedgie-dev.webp", "/img/sticker.webp"];
+// What the first screen needs besides the entry JS/CSS/fonts: the header logo, and the hero wedgie
+// (its geometry, its boot logo, its demo's screens). Fetched by the loader so the bar is the truth.
+const PRELOAD_FILES = ["/img/sticker.webp", "/img/loader-logo.webp", "/3d/wedgie.json", "/3d/wedgie.bin",
+  ...["hello", "demo", "demo-2", "clear-sign", "wallet-home", "wallet-chart", "wallet-send", "wallet-receive", "wallet-signing"].map((n) => `/screens/${n}.png`)];
+// Lazy chunks the hero wedgie imports (three.js lives in wedgie3d): fetched up front, run later.
+const HERO_CHUNKS = /^assets\/(wedgie3d|demo)-[^/]+\.js$/;
 // Only the latin subsets are fetched up front; the others load on demand through unicode-range.
 const FONT_UP_FRONT = /(latin-wght-normal|dm-mono-latin-500-normal|silkscreen-latin-400-normal)[^/]*\.woff2$/;
 
@@ -28,7 +33,7 @@ function loaderManifest(): Plugin {
         if (!html.includes("__MANIFEST__")) return html;   // other pages (emu.html) load normally
         html = html.replace("%LOADER_LOGO%", readFileSync("src/loader-logo.txt", "utf8").trim());
         const files: { u: string; n: number; t: string }[] = [];
-        for (const u of PRELOAD_IMAGES) files.push({ u, n: statSync("public" + u).size, t: "img" });
+        for (const u of PRELOAD_FILES) files.push({ u, n: statSync("public" + u).size, t: "img" });
         if (ctx.bundle) {
           html = html.replace(/<script type="module" crossorigin src="([^"]+)"><\/script>\s*/g, (_, u) => {
             files.push({ u, n: 0, t: "js" });
@@ -44,6 +49,12 @@ function loaderManifest(): Plugin {
             const f = files.find((f) => f.u === u);
             if (f) f.n = size;
             else if (FONT_UP_FRONT.test(name)) files.push({ u, n: size, t: "font" });
+            else if (HERO_CHUNKS.test(name)) {
+              files.push({ u, n: size, t: "lazy" });
+              if (out.type === "chunk") for (const imp of out.imports) if (!files.some((f) => f.u === "/" + imp)) {
+                const o = ctx.bundle[imp]; files.push({ u: "/" + imp, n: o && o.type === "chunk" ? Buffer.byteLength(o.code) : 0, t: "lazy" });
+              }
+            }
           }
         }
         return html.replace("__MANIFEST__", JSON.stringify(files));

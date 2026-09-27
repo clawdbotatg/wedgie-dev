@@ -33,6 +33,7 @@ watchCount((n) => {
 });
 
 const top = document.getElementById("top")!;
-// The page is ready the moment it's rendered; 3D wedgies appear on their own when they're built.
-(onConnect ? connect : home)(top);
-(window as any).__wedgieReady?.();
+// Ready when the page's first screen is really there: on the home page that includes the hero wedgie
+// (its files are in the loader's byte count, and it has drawn a frame). Other 3D waits for the page.
+const up = onConnect ? (connect(top), Promise.resolve()) : home(top);
+up.then(() => (window as any).__wedgieReady?.(), () => (window as any).__wedgieReady?.());
