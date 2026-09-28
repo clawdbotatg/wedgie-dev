@@ -9,7 +9,7 @@ import { assemble } from "./pages/assemble";
 import { test } from "./pages/test";
 
 const path = location.pathname.replace(/\/+$/, "");
-const onConnect = path === "/connect";
+const onConnect = path === "/connect" || path.startsWith("/connect/");   // the list, or one wedgie (/connect/<ID>)
 const onAssemble = path === "/assemble";
 const onTest = path === "/test";
 

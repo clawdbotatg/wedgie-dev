@@ -1,9 +1,0 @@
-[
-  {"mod": "hello", "name": "Hello", "about": "A bouncing box. The smallest complete app: start here."},
-  {"mod": "keytest", "name": "Buttons", "about": "Every button on screen; each lights up as you press it."},
-  {"mod": "demo", "name": "Demo", "entry": "run", "about": "Graphics speed test: balls, a cube, plasma. A next scene, X quits."},
-  {"mod": "mock", "name": "Wallet look", "about": "Nine wallet screens to click through with the joystick. No chip needed."},
-  {"mod": "wire_demo", "name": "Clear sign", "about": "Reads a signed transaction request and shows it in plain words."},
-  {"mod": "battery", "name": "Battery", "about": "Battery level from a Waveshare Pico-UPS-B hat."},
-  {"mod": "usbwallet", "name": "Wallet", "entry": "run", "about": "The USB hardware wallet. Needs the ATECC608 chip."}
-]

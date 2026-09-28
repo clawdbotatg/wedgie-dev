@@ -88,8 +88,8 @@ Open the case at the pry notch, lift the lid (caps may fall out), lift the board
 chip out of the gap. Pull the four wires straight out of the header. Separate Pico and hat by pulling
 straight apart, rocking gently end to end, never twisting. Reassemble in reverse: Pico into hat
 (orientation above), wires by plug order (table above), chip wedged flat, into the case.
-After reassembly: `wedgie.py list` (it shows up?), then in wedgie.dev's panel run Test → Check the
-chip, Screen test, Button test.
+After reassembly: `wedgie.py list` (it shows up?), then open it at wedgie.dev/connect: Hardware says
+whether the chip works; Test the screen, Test the buttons.
 
 ### Limits
 - 3.3 V logic everywhere; GPIOs are **not 5 V tolerant**. Power comes from USB (5 V on VBUS); the
@@ -106,7 +106,7 @@ chip, Screen test, Button test.
 - **Chip not found**: wires by color instead of plug order; a data wire and the power wire swapped
   (the chip can power itself through a data pin's protection diode, the LED lights, and it looks like
   a short — it isn't; swap them); a wire in 3V3_EN; the chip board touching a Pico pin.
-- **A button does nothing**: Test → Button test lists which; a cap pressing the switch all the time
+- **A button does nothing**: Test the buttons (its page on wedgie.dev/connect) lists which; a cap pressing the switch all the time
   shows as "held from the start"; a switch that never registers is a physical switch fault.
 
 ## Your tools
@@ -116,7 +116,7 @@ Get the host tool (one file; needs `pip install pyserial`):
     curl -O https://wedgie.dev/wedgie.py
 
     python3 wedgie.py list                 every wedgie on USB: port, ID, firmware
-    python3 wedgie.py update               install/update wedgie firmware (only changed files)
+    python3 wedgie.py update               install/update wedgie firmware (only changed files; cartridges stay)
     python3 wedgie.py hello                what it is and runs (JSON)
     python3 wedgie.py shot out.png         the real screen as a 240x240 PNG. READ IT to see what you drew.
     python3 wedgie.py press A              press a button (A B X Y up down left right press) [ms]
@@ -124,10 +124,12 @@ Get the host tool (one file; needs `pip install pyserial`):
     python3 wedgie.py run app.py           run a file once (streams output; Ctrl-C stops)
     python3 wedgie.py install app.py --name "My app"    save it and add it to the launcher
     python3 wedgie.py uninstall myapp
+    python3 wedgie.py carts                the cartridges on wedgie.dev, and which are on it
+    python3 wedgie.py cart add usbwallet   put a cartridge on it (or update it);  cart remove <mod>
     python3 wedgie.py apps | ls
 
 `--port /dev/cu.usbmodemXXXX` or `--id A1B2C3` picks one when several are plugged in. Only one program
-can hold the port: if wedgie.py says busy, the wedgie.dev tab (its device panel) or mpremote has it.
+can hold the port: if wedgie.py says busy, the wedgie.dev tab (that wedgie's page) or mpremote has it.
 `mpremote` works too (`mpremote cp app.py :app.py`, `mpremote repl`); Ctrl-C stops the launcher.
 
 ## The loop
@@ -209,13 +211,25 @@ it with an entry so the launcher calls it: in apps.json `{"mod": "game", "name":
 - MicroPython, not CPython: small stdlib (`math random struct json time array binascii hashlib`),
   `time.ticks_ms()/ticks_diff()/sleep_ms()`, no real clock, no typing. WiFi only on W boards.
 
-## What's already on it
+## Firmware and cartridges
 
-apps.json lists the launcher's apps: `hello` (bouncing box, the template), `keytest` (buttons),
-`demo` (balls/cube/plasma speed test), `mock` (nine wallet screens), `wire_demo` (clear-signs a
-signed transaction request), `battery` (Waveshare Pico-UPS-B hat), `usbwallet` (the USB hardware
-wallet; needs the ATECC608). Their source is at https://wedgie.dev/fw/manifest.json -> /fw/<file> and
-in https://github.com/clawdbotatg/wedgie-dev/tree/main/firmware. Read `hello.py` and `lcd.py` first.
+The firmware is the core: boot logo, the WEDGIE USB drive, the launcher, the screen/button drivers
+(`lcd.py`) and the chip drivers (`atecc.py`, `trustm.py`). Apps are **cartridges**, put on and taken
+off one at a time (wedgie.dev/connect, or `wedgie.py cart add|remove <mod>`); a fresh wedgie's
+launcher is empty. The catalog is https://wedgie.dev/fw/manifest.json: `core` (the firmware's files),
+`carts` (each with `mod`, `name`, `files` it needs, and `v`, a hash of those files). A file two carts
+share (p256.py) goes on once and comes off with the last cart that needs it.
+
+The wedgie's `apps.json` is its own list of what's in its launcher: `{"mod", "name", "entry"?,
+"about"?, "v"}` per cart (the `v` it went on at; a different `v` in the manifest = update ready),
+plus apps you saved yourself (`wedgie.py install`), which updates and cart changes leave alone.
+
+Cartridges now: `hello` (bouncing box, the template), `keytest` (buttons), `demo` (balls/cube/plasma
+speed test), `mock` (nine wallet screens), `wire_demo` (clear-signs a signed transaction request),
+`battery` (Waveshare Pico-UPS-B hat), `usbwallet` (the USB hardware wallet; needs the chip). Source:
+/fw/<file> or https://github.com/clawdbotatg/wedgie-dev/tree/main/firmware (`carts.json` is the
+catalog). Read `hello.py` and `lcd.py` first. A new cartridge = its files in firmware/ + an entry in
+firmware/carts.json (name, files, label color, 12x12 pixel icon); push and it's on the site.
 
 ## The USB protocol (what wedgie.py speaks)
 
@@ -226,10 +240,30 @@ without interrupting anything:
     {"id":2,"type":"shot"}               -> {"id":2,"type":"shot","i":0,"n":38,"fmt":"rgb565be","data":"<base64>"} x n
     {"id":3,"type":"press","key":"A"}    -> {"id":3,"type":"ok"}
     {"id":4,"type":"launch","app":"hello"}  /  {"id":5,"type":"home"}  /  {"id":6,"type":"reboot"}
+    {"id":7,"type":"chip"}               -> the chip proven working (0.1.4+): ATECC608 hashes random bytes,
+                                            Trust M signs them with its factory key; check it yourself
+    {"id":8,"type":"apps"}               -> re-read apps.json (after you changed it)
 
-Lines that don't start with `{` are logs (an app's print()). Ctrl-C (0x03) stops the launcher and
-drops to the MicroPython REPL; raw REPL (Ctrl-A) is how files get written. A soft reset (Ctrl-D in
-the normal REPL) boots the launcher again. The Wallet app speaks its own protocol while it runs.
+hello (0.1.4+) also has `carts` ([{mod, v}]), `free` (bytes free on flash) and `running` (the app on
+screen, null = the launcher). Lines that don't start with `{` are logs (an app's print()). Ctrl-C
+(0x03) stops the launcher and drops to the MicroPython REPL; raw REPL (Ctrl-A) is how files get
+written. `exec(open("main.py").read())` starts the launcher again. Apps that own the CPU (Demo, the
+Wallet) don't answer the launcher's JSON while they run; the Wallet speaks its own protocol.
+
+### Plugging in, and resets (read this before scripting a wedgie)
+
+About a second after power-up the wedgie adds its WEDGIE USB drive (the underwear on the desktop),
+which disconnects and reconnects USB. So a wedgie you just plugged in **shows up, vanishes and shows
+up again** — as a new serial port, same board ID. Wait ~2 s after a plug-in before opening the port,
+retry an open that fails, and find a wedgie by its ID (`--id`), never by remembering the port.
+
+**Don't soft-reset a wedgie to get back to the launcher** (Ctrl-D, `machine.soft_reset()`,
+`mpremote reset`): run main.py instead, as above. 0.1.3+ marks soft resets so boot.py doesn't add the
+drive again, but the first soft reset after updating from older firmware does (the port drops), and a
+tool that reconnects and resets again loops forever (it happened: the site did it). Soft-reset only to
+boot new firmware, then expect the port to maybe drop. A hard reset (`machine.reset()`, the `reboot`
+request, unplugging) always re-adds the drive. Holding Y while plugging in skips the drive for that
+boot (for debugging; nobody needs it day to day).
 
 ## Blank board
 

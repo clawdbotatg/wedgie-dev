@@ -62,7 +62,7 @@ scope.onmessage = async (e: MessageEvent) => {
         onPin: (pin, v) => scope.postMessage({ type: "pin", pin, v }),
         onReset: () => scope.postMessage({ type: "reset" }),
       });
-      scope.postMessage({ type: "ready", version: manifest.version, apps: manifest.apps.map((a) => a.mod) });
+      scope.postMessage({ type: "ready", version: manifest.version, apps: manifest.carts.map((a) => a.mod) });
       dev.run(BOOT);
       scope.postMessage({ type: "booted" });
     } else if (m.type === "exec") {

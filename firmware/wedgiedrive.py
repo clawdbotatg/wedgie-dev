@@ -7,7 +7,9 @@
 # volume stored sparse, read sector by sector from flash. Nothing is ever written: the drive reports
 # write-protected and refuses WRITE.
 #
-# boot.py starts it. Hold Y while plugging in to skip it for that boot.
+# boot.py starts it, only at power-up (not on a soft reset). Hold Y while plugging in to skip it for
+# that boot. Adding the drive re-enumerates USB: the serial port drops and comes back about a second
+# after power-up. Read boot.py's note before changing when or how this starts.
 import struct
 from micropython import const
 import usbdev

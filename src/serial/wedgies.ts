@@ -7,6 +7,7 @@
 // MicroPython board is stopped, asked for its unique ID in the raw REPL, and soft-reset back into
 // whatever it was running.
 import { Repl } from "./repl";
+import { checkChip, type ChipCheck } from "./chipcheck";
 
 export const RPI_VID = 0x2e8a;
 
@@ -24,7 +25,11 @@ export type Wedgie = {
   kind?: "wedgie" | "wallet" | "micropython";
   version?: string;      // wedgie firmware version
   apps?: string[];
-  chip?: any;            // from probe chip()
+  carts?: { mod: string; v?: string }[];   // 0.1.4+: what's in its launcher, with the version each went on at
+  running?: string | null; // the app on its screen (null: the launcher)
+  free?: number;         // bytes free on its flash
+  chip?: any;            // what answered on I2C: { type, serial? }
+  proof?: ChipCheck & { state: "checking" | "done" | "unknown" };   // the chip proven working (once per plug-in)
   error?: string;
   log: string;
 };
@@ -104,8 +109,15 @@ try:
     w = True
 except ImportError:
     pass
+v = None
+if "wedgie.py" in os.listdir():
+    try:
+        import wedgie
+        v = wedgie.VERSION
+    except Exception:
+        pass
 import json
-print("@id", json.dumps({"uid": machine.unique_id().hex(), "machine": m, "mp": os.uname().release, "files": sorted(os.listdir()), "wifi": w}))`;
+print("@id", json.dumps({"uid": machine.unique_id().hex(), "machine": m, "mp": os.uname().release, "files": sorted(os.listdir()), "wifi": w, "wedgie": v}))`;
 
 async function identify(w: Wedgie) {
   w.state = "identifying"; w.error = undefined; emit();
@@ -127,6 +139,11 @@ async function identify(w: Wedgie) {
   emit();
 }
 
+// Plugging in: the WEDGIE drive (0.1.1+) disconnects and reconnects USB about a second after power-up,
+// so a wedgie that was just plugged in shows up, vanishes and shows up again as a new port. That's why
+// the connect listener waits before identifying, why identify retries a port that won't open yet, and
+// why nothing here soft-resets a wedgie: a soft reset used to re-add the drive, drop the port, and
+// the replug got identified again (a restart loop). See firmware/boot.py.
 function talk(w: Wedgie) {
   return withRepl(w, async (r) => {
     await new Promise((res) => setTimeout(res, 150));
@@ -134,37 +151,70 @@ function talk(w: Wedgie) {
     // falling back to the REPL, which would interrupt it.
     let h: any = null;
     for (let i = 0; i < 6 && !h; i++) h = await r.hello(700);
-    if (h) {
-      // wedgie firmware (or the wallet app): take what it says, leave it running.
-      w.firmware = `${h.name || "wedgie"} ${h.version || h.fw || ""}`.trim();
-      w.kind = String(h.fw || "").startsWith("wedgie-") ? "wedgie" : "wallet";
-      w.version = h.version;
-      w.apps = h.apps;
-      w.uid = h.uid || h.serial;
-      w.micropython = h.micropython;
-      w.cpu = h.cpu;
-      if (h.backend) w.chip = { type: h.backend === "atecc608" ? "ATECC608" : h.backend, serial: h.serial };
-      w.board = h.board || "wedgie";
-      return;
+    if (!h) {
+      let got: any = null;
+      r.onLine = (tag, v) => { if (tag === "id") got = v; };
+      await r.write("\r\x03\x03");
+      await new Promise((res) => setTimeout(res, 120));
+      await r.write("\x01");
+      await r.waitFor("raw REPL; CTRL-B to exit\r\n>", 8000).catch(() => { throw new Error("No MicroPython answered. Is it flashed?"); });
+      await r.exec(ID_PY, 5000);
+      // Back to what it was running, without a soft reset (see above).
+      await r.leave({ reset: false });
+      if (!got) throw new Error("no answer");
+      const cpu = got.machine.includes("RP2350") ? "RP2350" : got.machine.includes("RP2040") ? "RP2040" : "?";
+      w.uid = got.uid; w.cpu = cpu; w.micropython = got.mp; w.files = got.files;
+      w.board = boardName(cpu, got.wifi, got.machine);
+      if (!got.wedgie) {
+        w.firmware = got.files.includes("main.py") ? "its own main.py" : "nothing yet";
+        w.kind = "micropython";
+        return;
+      }
+      // Wedgie firmware busy in an app that owns the CPU (Demo, Wallet): we stopped it, and main.py
+      // (just run by leave) starts the launcher, which can now answer.
+      for (let i = 0; i < 8 && !h; i++) h = await r.hello(700);
+      if (!h) { w.kind = "wedgie"; w.version = got.wedgie; w.firmware = `wedgie ${got.wedgie}`; w.running = null; return; }
     }
-    let got: any = null;
-    r.onLine = (tag, v) => { if (tag === "id") got = v; };
-    await r.write("\r\x03\x03");
-    await new Promise((res) => setTimeout(res, 120));
-    await r.write("\x01");
-    await r.waitFor("raw REPL; CTRL-B to exit\r\n>", 8000).catch(() => { throw new Error("No MicroPython answered. Is it flashed?"); });
-    await r.exec(ID_PY, 5000);
-    // Back to what it was running, without a soft reset: on wedgie 0.1.1+ a reset re-adds the USB drive,
-    // drops the port, and the replug would be identified again (a restart loop).
-    await r.leave({ reset: false });
-    if (!got) throw new Error("no answer");
-    const cpu = got.machine.includes("RP2350") ? "RP2350" : got.machine.includes("RP2040") ? "RP2040" : "?";
-    w.uid = got.uid; w.cpu = cpu; w.micropython = got.mp; w.files = got.files;
-    w.board = boardName(cpu, got.wifi, got.machine);
-    w.firmware = got.files.includes("main.py") ? "its own main.py" : "nothing yet";
-    w.kind = "micropython";
+    // wedgie firmware (or the wallet app): take what it says, leave it running.
+    w.firmware = `${h.name || "wedgie"} ${h.version || h.fw || ""}`.trim();
+    w.kind = String(h.fw || "").startsWith("wedgie-") ? "wedgie" : "wallet";
+    w.version = h.version;
+    w.apps = h.apps;
+    w.carts = h.carts;
+    w.free = h.free ?? undefined;
+    w.running = w.kind === "wallet" ? "usbwallet" : h.running ?? null;
+    w.uid = h.uid || h.serial;
+    w.micropython = h.micropython;
+    w.cpu = h.cpu;
+    if (h.backend) w.chip = { type: h.backend === "atecc608" ? "ATECC608" : h.backend, serial: h.serial };
+    w.board = h.board || "wedgie";
+    if (w.kind === "wedgie" && h.carts) await prove(w, r);
+    else w.proof = { state: "unknown", pass: false, facts: [],
+      detail: w.kind === "wallet" ? "The Wallet is running; it checks the chip itself" : "Update the firmware to check the chip" };
   });
 }
+
+/** The chip proven working, once per plug-in, without stopping anything: firmware 0.1.4's launcher
+ *  does the chip work on request and the page checks the answer (chipcheck.ts). */
+async function prove(w: Wedgie, r: Repl) {
+  w.proof = { state: "checking", pass: false, detail: "checking the chip", facts: [] };
+  emit();
+  try {
+    const d = await r.request({ type: "chip" }, 15000);
+    w.chip = d.chip ? { type: d.chip, serial: d.serial, configLocked: d.configLocked } : { type: "none" };
+    if (!d.kind) {
+      w.proof = { state: "done", pass: false, facts: [], detail: d.error ? `No chip answered, but the I2C lines have power: a data wire and the power wire are probably swapped` :
+        "No chip: the I2C lines have no power, so it isn't connected" };
+      return;
+    }
+    w.proof = { state: "done", ...(await checkChip(d)) };
+  } catch (e: any) {
+    w.proof = { state: "unknown", pass: false, facts: [], detail: `Couldn't check the chip: ${e?.message || e}` };
+  }
+}
+
+/** Ask a wedgie to prove its chip again (the detail page's re-check). r: the page's open session. */
+export async function reprove(w: Wedgie, r: Repl) { await prove(w, r); emit(); }
 
 export function reidentify(w: Wedgie) { identify(w); }
 

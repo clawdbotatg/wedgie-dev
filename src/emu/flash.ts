@@ -1,8 +1,9 @@
 // What goes on the virtual wedgie's flash: every file in /fw/manifest.json (published from
-// firmware/ by tools/fw.mjs), plus the few things a real board has that the repo does not.
+// firmware/ by tools/fw.mjs) with every cartridge in its launcher, plus the few things a real board
+// has that the repo does not.
 
-export type Manifest = { version: string; files: { name: string; size: number; sha256: string }[]; apps: App[] };
-type App = { mod: string; name?: string; entry?: string; about?: string };
+export type Manifest = { version: string; files: { name: string; size: number; sha256: string }[]; carts: App[] };
+type App = { mod: string; name?: string; entry?: string; about?: string; v?: string };
 
 export async function loadFlash(base = "/fw/") {
   const manifest: Manifest = await (await fetch(base + "manifest.json", { cache: "no-cache" })).json();
@@ -12,6 +13,7 @@ export async function loadFlash(base = "/fw/") {
     if (!r.ok) throw new Error(`fw/${f.name}: HTTP ${r.status}`);
     files[f.name] = /\.(py|json)$/.test(f.name) ? await r.text() : new Uint8Array(await r.arrayBuffer());
   }));
+  files["apps.json"] = JSON.stringify(manifest.carts.map(({ mod, name, entry, about, v }) => ({ mod, name, entry, about, v })));
   emulatorOnly(files);
   return { manifest, files };
 }

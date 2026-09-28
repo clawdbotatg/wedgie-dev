@@ -67,6 +67,10 @@
       "destination": "/index.html"
     },
     {
+      "source": "/connect/:id",
+      "destination": "/index.html"
+    },
+    {
       "source": "/assemble",
       "destination": "/index.html"
     },

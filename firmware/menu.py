@@ -33,8 +33,9 @@ def draw():
     d.text(W.short(), 240 - 8 * 6 - 6, 42, MUTED)
     d.text("wedgie", 6, 42, INK)
     if not apps:
-        d.center_text("no apps yet", 110, MUTED, 2)
-        d.center_text("wedgie.dev", 140, GREEN_D)
+        d.center_text("no cartridges", 100, MUTED, 2)
+        d.center_text("pick one at", 136, MUTED)
+        d.center_text("wedgie.dev/connect", 152, GREEN_D)
     first = max(0, min(first, sel, len(apps) - VISIBLE))
     if sel >= first + VISIBLE:
         first = sel - VISIBLE + 1
@@ -115,6 +116,7 @@ def home():
 
 
 def handle(line):
+    global apps, sel
     try:
         m = json.loads(line)
     except ValueError:
@@ -124,6 +126,14 @@ def handle(line):
     mid, t = m.get("id"), m.get("type")
     if t == "hello":
         W.send(W.hello(mid, running=running[0]["mod"] if running else None))
+    elif t == "chip":
+        W.send(dict(W.chip(), id=mid))
+    elif t == "apps":                   # apps.json changed (a cartridge went on or came off): re-read it
+        apps = W.apps()
+        sel = min(sel, max(0, len(apps) - 1))
+        if not running:
+            draw()
+        W.send({"id": mid, "type": "ok", "apps": [a["mod"] for a in apps]})
     elif t == "ping":
         W.send({"id": mid, "type": "pong"})
     elif t == "press":
@@ -194,7 +204,9 @@ def step():
 
 
 def init():
-    global d, keys, apps
+    global d, keys, apps, dirty
+    home()              # a host stopped us mid-app (Ctrl-C) and runs main.py again: close that app
+    dirty = True
     d = L.LCD()
     keys = L.Keys()
     apps = W.apps()

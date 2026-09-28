@@ -138,8 +138,12 @@ export class Repl {
   }
 
   /** Stop whatever runs, raw REPL, soft reset so no app timers keep running (main.py is skipped in raw mode). */
-  // reset: false stops what runs (Ctrl-C) without a soft reset. Wedgie firmware 0.1.1+ re-adds its USB
-  // drive in boot.py, and a soft reset runs boot.py, which re-enumerates USB and drops this port.
+  // reset: false stops what runs (Ctrl-C) without a soft reset. ON A WEDGIE ALWAYS USE reset: false.
+  // Wedgie firmware adds its WEDGIE USB drive at power-up, which re-enumerates USB and drops this port;
+  // 0.1.3+ skips that on a soft reset, but 0.1.1-0.1.2 didn't, and neither does the first soft reset
+  // after updating from them (firmware/boot.py). A soft reset is only for boards without wedgie
+  // firmware, and for booting a new firmware (then the port may drop; wedgies.ts finds it by its ID).
+  // A launcher app's Timer survives Ctrl-C: close it first (install.ts takeOver).
   async enter(opts: { reset?: boolean } = {}) {
     await this.write("\r\x03\x03");
     await sleep(150);

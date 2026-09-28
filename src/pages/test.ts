@@ -10,7 +10,7 @@
 //  5. on its screen: each button alone, in order; then each again, filling the screen with its color.
 import * as W from "../serial/wedgies";
 import type { Repl } from "../serial/repl";
-import { install } from "../serial/install";
+import { installCore } from "../serial/install";
 import { checkChip } from "../serial/chipcheck";
 import { usbSupported, bootDevices, isBoot, pickBoot, flashMicroPython, BOOT_PIDS } from "../serial/picoboot";
 
@@ -183,10 +183,10 @@ export function test(main: HTMLElement) {
           set(FW, "running", "Installing");
           status("Installing the wedgie firmware…", "Don't unplug it.");
           progress(0);
-          const got = await install(r, (p) => progress(p));
+          const got = await installCore(r, (p) => progress(p), { launcher: false });   // the core; cartridges go on at /connect
           progress(null);
           set(FW, "pass", `wedgie ${got.version}`); step = CHIP;
-          await r.exec(await W.probe(), 10000);        // install restarted it: load the bench again
+          await r.exec(await W.probe(), 10000);        // load the bench again (the install ran its own code)
           await r.exec(await benchPy(), 10000);
 
           set(CHIP, "running", "Asking it over I2C");

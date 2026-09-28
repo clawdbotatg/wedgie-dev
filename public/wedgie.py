@@ -11,16 +11,24 @@
   python3 wedgie.py launch hello              open an app from its launcher;  home  goes back
   python3 wedgie.py apps                      apps in its launcher
   python3 wedgie.py run app.py                run a file once (output streams; Ctrl-C stops), then back to the launcher
-  python3 wedgie.py install app.py [--name N] save an app to it and add it to the launcher
-  python3 wedgie.py uninstall app             take an app out of the launcher (the file is removed)
-  python3 wedgie.py update                    install/update wedgie firmware from wedgie.dev (only changed files)
+  python3 wedgie.py install app.py [--name N] save your own app to it and add it to the launcher
+  python3 wedgie.py uninstall app             take your app out of the launcher (the file is removed)
+  python3 wedgie.py carts                     the cartridges on wedgie.dev, and which are on it
+  python3 wedgie.py cart add wallet           put a cartridge on it (or update it); cart remove wallet
+  python3 wedgie.py update                    install/update the wedgie firmware (only changed files; cartridges stay)
   python3 wedgie.py ls                        files on it
 
   --port /dev/cu.usbmodemXXXX  (or --id A1B2C3) picks one when several are plugged in.
 
 hello/shot/press/launch/home/apps talk to the wedgie launcher over JSON lines and never interrupt it.
-run/install/uninstall/update/ls stop it, use MicroPython's raw REPL, then soft-reset it back into the
-launcher. Only one program can hold the port: close wedgie.dev's panel (and mpremote) first.
+The rest stop it (Ctrl-C), use MicroPython's raw REPL, then start the launcher again by running main.py.
+Only update and run soft-reset it (new firmware only runs after one; run clears your code's timers).
+Only one program can hold the port: close the wedgie's page on wedgie.dev (and mpremote) first.
+
+Plugging in: the wedgie adds its WEDGIE USB drive about a second after power-up, which disconnects and
+reconnects USB, so a wedgie you just plugged in shows up, vanishes and shows up again (a new port,
+same ID). Wait a couple of seconds after plugging in; pick it by --id, not by port, in scripts. A soft
+reset doesn't re-add the drive on 0.1.3+, but the first one after updating from older firmware does.
 """
 import sys, os, time, json, base64, hashlib, zlib, struct, argparse, urllib.request
 
@@ -206,6 +214,68 @@ def png(path, rgb565be, w=240, h=240):
                 + chunk(b"IDAT", zlib.compress(bytes(rows), 9)) + chunk(b"IEND", b""))
 
 
+# ---- firmware core and cartridges (the same model as wedgie.dev: src/serial/install.ts) -----------
+# /fw/manifest.json: files (name, size, sha256), core (the firmware's own files), carts (each app's files
+# and v). apps.json on the wedgie lists what's in its launcher; it's rebuilt from what's really on the
+# flash after every change: each cart whose files are all there, with v from their real hashes, then
+# the person's own apps as they were.
+HASH_PY = """import os, json, hashlib, binascii
+def _h(n):
+    try:
+        h = hashlib.sha256()
+        with open(n, 'rb') as f:
+            while True:
+                b = f.read(1024)
+                if not b: break
+                h.update(b)
+        return binascii.hexlify(h.digest()).decode()
+    except OSError:
+        return None
+try:
+    _a = json.load(open('apps.json'))
+except Exception:
+    _a = []
+print(json.dumps({'hashes': {n: _h(n) for n in %s}, 'files': os.listdir(), 'apps': _a}))"""
+
+
+def manifest():
+    return json.load(urllib.request.urlopen(SITE + "/fw/manifest.json"))
+
+
+def cart_v(hashes):
+    return hashlib.sha256("\n".join(h or "None" for h in hashes).encode()).hexdigest()[:12]
+
+
+def look(wg, m):
+    names = sorted(set(m["core"]) | {n for c in m["carts"] for n in c["files"]})
+    return json.loads(wg.exec(HASH_PY % json.dumps(names), 60))
+
+
+def copy(wg, m, names, have):
+    todo = sorted([f for f in m["files"] if f["name"] in names and have["hashes"].get(f["name"]) != f["sha256"]], key=lambda f: f["name"] == "main.py")
+    for i, f in enumerate(todo):
+        print("[%d/%d] %s" % (i + 1, len(todo), f["name"]))
+        wg.put(f["name"], urllib.request.urlopen(SITE + "/fw/" + f["name"]).read())
+        have["hashes"][f["name"]] = f["sha256"]
+    return todo
+
+
+def write_apps(wg, m, have, drop=()):
+    known = {c["mod"] for c in m["carts"]}
+    out = []
+    for c in m["carts"]:
+        if c["mod"] in drop or not all(have["hashes"].get(n) for n in c["files"]):
+            continue
+        a = {"mod": c["mod"], "name": c["name"], "about": c.get("about", ""), "v": cart_v([have["hashes"][n] for n in c["files"]])}
+        if c.get("entry"):
+            a["entry"] = c["entry"]
+        out.append(a)
+    out += [a for a in have.get("apps", []) if a.get("mod") not in known and a.get("mod") not in drop]
+    wg.exec("import json\n_f = open('apps.json', 'w')\n_f.write(%r)\n_f.close()" % json.dumps(out))
+    wg.sync()
+    return out
+
+
 # ---- commands ------------------------------------------------------------------------------
 def need_launcher(wg):
     h = wg.hello()
@@ -291,33 +361,66 @@ def main():
             name = (args.name or mod)[:12]
             wg.enter()
             wg.put(mod + ".py", open(path, "rb").read())
-            wg.exec("import json\n_a = json.load(open('apps.json'))\n_a = [x for x in _a if x['mod'] != %r] + [{'mod': %r, 'name': %r, 'about': 'installed with wedgie.py'}]\njson.dump(_a, open('apps.json', 'w'))" % (mod, mod, name))
+            wg.exec("import json, sys\ntry:\n    _a = json.load(open('apps.json'))\nexcept Exception:\n    _a = []\n_a = [x for x in _a if x['mod'] != %r] + [{'mod': %r, 'name': %r, 'about': 'installed with wedgie.py'}]\njson.dump(_a, open('apps.json', 'w'))\nsys.modules.pop(%r, None)" % (mod, mod, name, mod))
             wg.sync()
-            wg.leave()
+            wg.leave(reset=False)
             print("installed %s as %r; it's in the launcher" % (mod, name))
         elif c == "uninstall":
             mod = args.rest[0]
             wg.enter()
             wg.exec("import json, os\n_a = json.load(open('apps.json'))\njson.dump([x for x in _a if x['mod'] != %r], open('apps.json', 'w'))\ntry:\n    os.remove(%r)\nexcept OSError:\n    pass" % (mod, mod + ".py"))
             wg.sync()
-            wg.leave()
+            wg.leave(reset=False)
             print("removed", mod)
         elif c == "update":
-            m = json.load(urllib.request.urlopen(SITE + "/fw/manifest.json"))
+            m = manifest()
             wg.enter()
+            have = look(wg, m)
             names = [f["name"] for f in m["files"]]
-            have = json.loads(wg.exec("import os, json, hashlib, binascii\ndef _h(n):\n    try:\n        h = hashlib.sha256()\n        with open(n, 'rb') as f:\n            while True:\n                b = f.read(1024)\n                if not b: break\n                h.update(b)\n        return binascii.hexlify(h.digest()).decode()\n    except OSError:\n        return None\nprint(json.dumps({n: _h(n) for n in %s}))" % json.dumps(names), 60))
-            todo = sorted([f for f in m["files"] if have.get(f["name"]) != f["sha256"]], key=lambda f: f["name"] == "main.py")
-            files = wg.exec("import os\nprint(json.dumps(os.listdir()))")
-            stale = [n[:-3] + ".mpy" for n in names if n.endswith(".py") and n[:-3] + ".mpy" in json.loads(files) and n[:-3] + ".mpy" not in names]
-            for n in stale:
-                wg.exec("os.remove(%r)" % n)
-            for i, f in enumerate(todo):
-                print("[%d/%d] %s" % (i + 1, len(todo), f["name"]))
-                wg.put(f["name"], urllib.request.urlopen(SITE + "/fw/" + f["name"]).read())
-            wg.sync()
-            wg.leave()
+            for n in [n[:-3] + ".mpy" for n in names if n.endswith(".py")]:
+                if n in have["files"] and n not in names:       # stale bytecode MicroPython would import first
+                    wg.exec("os.remove(%r)" % n)
+            todo = copy(wg, m, set(m["core"]), have)
+            write_apps(wg, m, have)
+            wg.leave()      # the new firmware only runs after a soft reset (see "Plugging in" above)
             print("wedgie %s: %s" % (m["version"], "%d files updated" % len(todo) if todo else "already up to date"))
+        elif c == "carts":
+            m = manifest()
+            wg.enter()
+            have = look(wg, m)
+            wg.leave(reset=False)
+            on = {a["mod"]: a.get("v") for a in have["apps"]}
+            for cart in m["carts"]:
+                state = ("on it" if on[cart["mod"]] == cart["v"] else "on it, update ready") if cart["mod"] in on else "%d KB" % max(1, cart["size"] // 1024)
+                print("%-10s %-12s %-20s %s" % (cart["mod"], cart["name"], state, cart.get("about", "")))
+        elif c == "cart":
+            if len(args.rest) != 2 or args.rest[0] not in ("add", "remove"):
+                sys.exit("usage: wedgie.py cart add|remove <mod>   (wedgie.py carts lists them)")
+            m = manifest()
+            cart = next((x for x in m["carts"] if x["mod"] == args.rest[1]), None)
+            if not cart:
+                sys.exit("no cartridge %r; wedgie.py carts lists them" % args.rest[1])
+            try:
+                wg.request({"type": "home"}, 1)        # close a launcher app first (its Timer would keep drawing)
+            except TimeoutError:
+                pass
+            wg.enter()
+            have = look(wg, m)
+            if args.rest[0] == "add":
+                copy(wg, m, set(cart["files"]), have)
+                wg.exec("import sys\nfor _n in %r:\n    sys.modules.pop(_n, None)" % [n[:-3] for n in cart["files"] if n.endswith(".py")])
+                write_apps(wg, m, have)
+                print("%s is on it; wedgie.py launch %s" % (cart["name"], cart["mod"]))
+            else:
+                others = [x for x in m["carts"] if x["mod"] != cart["mod"] and all(have["hashes"].get(n) for n in x["files"])]
+                keep = set(m["core"]) | {n for x in others for n in x["files"]}
+                for n in cart["files"]:
+                    if n not in keep and have["hashes"].get(n):
+                        wg.exec("import os\nos.remove(%r)" % n)
+                        have["hashes"][n] = None
+                write_apps(wg, m, have, drop=[cart["mod"]])
+                print("removed", cart["name"])
+            wg.leave(reset=False)
         else:
             sys.exit("unknown command %r; see: wedgie.py --help" % c)
     finally:

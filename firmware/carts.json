@@ -1,0 +1,23 @@
+[
+  {"mod": "hello", "name": "Hello", "about": "A bouncing box. The smallest complete app: start here.",
+   "files": ["hello.py"], "label": "#22c452",
+   "icon": ["............", ".kkkkkkkkkk.", ".k........k.", ".k.gggg...k.", ".k.gggg...k.", ".k.gggg...k.", ".k.gggg...k.", ".k........k.", ".k........k.", ".kkkkkkkkkk.", "............", "............"]},
+  {"mod": "keytest", "name": "Buttons", "about": "Every button on screen; each lights up as you press it.",
+   "files": ["keytest.py"], "label": "#8a8c8e",
+   "icon": ["............", "..kkk.......", "..kgk.......", "kkkgkkk..rr.", "kgggggk..rr.", "kkkgkkk.....", "..kgk...ss..", "..kkk...ss..", "..........gg", "..........gg", "............", "............"]},
+  {"mod": "demo", "name": "Demo", "entry": "run", "about": "Graphics speed test: balls, a cube, plasma. A next scene, X quits.",
+   "files": ["demo.py"], "label": "#7a4de0",
+   "icon": ["............", "....kkkk....", "...kwwwwk...", "..kwwbbwwk..", "..kwbbbbwk..", "..kwbbbbwk..", "..kwwbbwwk..", "...kwwwwk...", "....kkkk....", "............", "..y......r..", "............"]},
+  {"mod": "mock", "name": "Wallet look", "about": "Nine wallet screens to click through with the joystick. No chip needed.",
+   "files": ["mock.py", "mock_qr.bin"], "label": "#e0a100",
+   "icon": ["............", ".kkkkkkkkkk.", ".kyyyyyyyyk.", ".kkkkkkkkkk.", ".k........k.", ".k.....ggkk.", ".k.....gg.k.", ".k........k.", ".kkkkkkkkkk.", "............", "............", "............"]},
+  {"mod": "wire_demo", "name": "Clear sign", "about": "Reads a signed transaction request and shows it in plain words.",
+   "files": ["wire_demo.py", "wire_decode.py", "cbor.py", "rlp.py", "p256.py"], "label": "#1f8fd6",
+   "icon": ["............", ".kkkkkkk....", ".kwwwwwkk...", ".kwkkkwwkk..", ".kwwwwwwwk..", ".kwkkkkkwk..", ".kwwwwwwwk..", ".kwkkkwggg..", ".kwwwwggg...", ".kkkkkkg....", "............", "............"]},
+  {"mod": "battery", "name": "Battery", "about": "Battery level from a Waveshare Pico-UPS-B hat.",
+   "files": ["battery.py"], "label": "#16a34a",
+   "icon": ["............", "............", ".kkkkkkkkk..", ".kgggggg.kk.", ".kgggggg..k.", ".kgggggg..k.", ".kgggggg.kk.", ".kkkkkkkkk..", "............", "............", "............", "............"]},
+  {"mod": "usbwallet", "name": "Wallet", "entry": "run", "about": "The USB hardware wallet. Needs the secure chip.",
+   "files": ["usbwallet.py", "eip712.py", "keccak.py", "signer.py", "blockies.py", "p256.py"], "label": "#e3312c",
+   "icon": ["............", "..kkkkkkk...", ".kwwwwwwwk..", "kkkkkkkkkkk.", "kwwwwwwwwwk.", "kwwwwwwkkkk.", "kwwwwwwkyyk.", "kwwwwwwkkkk.", "kwwwwwwwwwk.", "kkkkkkkkkkk.", "............", "............"]}
+]
