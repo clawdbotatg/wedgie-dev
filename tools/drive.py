@@ -7,7 +7,7 @@
 #   .VolumeIcon.icns        the underwear as the drive icon on macOS          (hidden)
 #   autorun.inf + wedgie.ico  the underwear as the drive icon on Windows      (hidden)
 # Stored sparse: only the sectors that aren't all zeros.   python3 tools/drive.py [--img out.img]
-# Needs macOS (osacompile, codesign, iconutil) to build the app; the output (firmware/drive.bin) is committed.
+# Needs macOS (osacompile, codesign) and pngquant to build; the output (firmware/drive.bin) is committed.
 import io, struct, subprocess, sys, tempfile
 from pathlib import Path
 from PIL import Image
@@ -39,13 +39,26 @@ def square(n):
     s = Image.new("RGBA", (max(src.size),) * 2, (0, 0, 0, 0))
     s.paste(src, ((s.width - src.width) // 2, (s.height - src.height) // 2), src)
     return s.resize((n, n), Image.LANCZOS)
-ico = io.BytesIO(); square(256).save(ico, "ICO", sizes=[(16, 16), (32, 32), (48, 48), (64, 64), (128, 128)])
+# Every byte here is flash on every wedgie, so the icons are small: 256-color PNGs from pngquant (its
+# dithering keeps the white fabric smooth; Pillow's own palette bands it), a third of full color. The
+# drive icon goes up to 256 px (a desktop icon on a Retina Mac); the app's icon, seen in a Finder list,
+# stops at 64 px. Windows gets 16-48 px, all Explorer shows for a drive.   brew install pngquant
+def png(im):
+    b = io.BytesIO(); im.save(b, "PNG")
+    return subprocess.run(["pngquant", "--speed", "1", "--strip", "256", "-"], input=b.getvalue(), capture_output=True, check=True).stdout
+ico = io.BytesIO(); square(48).save(ico, "ICO", sizes=[(16, 16), (32, 32), (48, 48)])
+# The .icns written directly (a list of tagged PNGs): iconutil re-encodes every PNG back to full color.
+# px -> its icns types: 32 px is both 32 and 16@2x, 64 is 32@2x, 256 is 128@2x (Retina).
+ICNS_TYPES = {16: [b"icp4"], 32: [b"icp5", b"ic11"], 64: [b"ic12"], 128: [b"ic07"], 256: [b"ic13"]}
+def make_icns(sizes):
+    chunks = b""
+    for px in sizes:
+        data = png(square(px))
+        for tag in ICNS_TYPES[px]:
+            chunks += tag + struct.pack(">I", 8 + len(data)) + data
+    return b"icns" + struct.pack(">I", 8 + len(chunks)) + chunks
+icns, app_icns = make_icns((16, 32, 64, 128, 256)), make_icns((16, 32, 64))
 with tempfile.TemporaryDirectory() as t:
-    iconset = Path(t) / "w.iconset"; iconset.mkdir()
-    for n in (16, 32, 128):
-        square(n).save(iconset / f"icon_{n}x{n}.png"); square(n * 2).save(iconset / f"icon_{n}x{n}@2x.png")
-    subprocess.run(["iconutil", "-c", "icns", str(iconset), "-o", str(Path(t) / "w.icns")], check=True)
-    icns = (Path(t) / "w.icns").read_bytes()
     # The Mac opener: an AppleScript applet that prefers Chrome (Web Serial) and falls back to the default
     # browser. Its icon is the underwear; ad-hoc signed so Apple Silicon runs it.
     app = Path(t) / "Open wedgie.app"
@@ -53,7 +66,7 @@ with tempfile.TemporaryDirectory() as t:
     subprocess.run(["osacompile", "-o", str(app), "-e", script], check=True)
     res = app / "Contents/Resources"
     (res / "Assets.car").unlink(missing_ok=True)
-    (res / "applet.icns").write_bytes(icns)
+    (res / "applet.icns").write_bytes(app_icns)
     plist = app / "Contents/Info.plist"
     subprocess.run(["/usr/libexec/PlistBuddy", "-c", "Delete :CFBundleIconName", str(plist)], capture_output=True)
     subprocess.run(["/usr/libexec/PlistBuddy", "-c", "Add :CFBundleIdentifier string dev.wedgie.open", str(plist)], capture_output=True)
