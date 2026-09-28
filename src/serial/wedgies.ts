@@ -111,7 +111,10 @@ async function identify(w: Wedgie) {
 function talk(w: Wedgie) {
   return withRepl(w, async (r) => {
     await new Promise((res) => setTimeout(res, 150));
-    const h = await r.hello();
+    // A wedgie that just plugged in may still be booting (logo, loader): keep asking for ~4 s before
+    // falling back to the REPL, which would interrupt it.
+    let h: any = null;
+    for (let i = 0; i < 6 && !h; i++) h = await r.hello(700);
     if (h) {
       // wedgie firmware (or the wallet app): take what it says, leave it running.
       w.firmware = `${h.name || "wedgie"} ${h.version || h.fw || ""}`.trim();
@@ -132,7 +135,9 @@ function talk(w: Wedgie) {
     await r.write("\x01");
     await r.waitFor("raw REPL; CTRL-B to exit\r\n>", 8000).catch(() => { throw new Error("No MicroPython answered. Is it flashed?"); });
     await r.exec(ID_PY, 5000);
-    await r.leave(); // back to normal REPL + soft reset: its main.py starts again
+    // Back to what it was running, without a soft reset: on wedgie 0.1.1+ a reset re-adds the USB drive,
+    // drops the port, and the replug would be identified again (a restart loop).
+    await r.leave({ reset: false });
     if (!got) throw new Error("no answer");
     const cpu = got.machine.includes("RP2350") ? "RP2350" : got.machine.includes("RP2040") ? "RP2040" : "?";
     w.uid = got.uid; w.cpu = cpu; w.micropython = got.mp; w.files = got.files;

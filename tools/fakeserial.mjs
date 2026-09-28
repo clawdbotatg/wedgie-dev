@@ -121,7 +121,7 @@ page.on("pageerror", (e) => errs.push(e.message));
 const step = (s) => console.log("·", s);
 await page.goto(url);
 await page.waitForFunction(() => !document.getElementById("wl"));
-await page.waitForFunction(() => document.querySelectorAll(".slot .idtag").length === 2 && ![...document.querySelectorAll(".slot .idtag")].some((e) => e.textContent.includes("finding")), null, { timeout: 10000 });
+await page.waitForFunction(() => document.querySelectorAll(".slot .idtag").length === 2 && ![...document.querySelectorAll(".slot .idtag")].some((e) => e.textContent.includes("finding")), null, { timeout: 25000 }).catch(async () => { console.log("TRAY STUCK:", await page.$$eval(".slot", (els) => els.map((e) => e.textContent))); process.exit(1); });
 step("tray: " + JSON.stringify(await page.$$eval(".slot .meta", (els) => els.map((e) => e.textContent))));
 await page.screenshot({ path: `${out}/fake-tray.png` });
 
@@ -138,7 +138,7 @@ await page.waitForFunction(() => document.querySelector("#p-meter.done"), null, 
 step("install: " + (await page.textContent("#p-meter-t")) + ` (resets during the copy: ${await page.evaluate(() => window.__ports[0]._st.resets)})`);
 await page.screenshot({ path: `${out}/fake-install.png` });
 const nfiles = await page.evaluate(() => window.__ports[0]._st.files.size);
-await page.waitForFunction(() => !document.querySelector(".panel"), null, { timeout: 10000 });
+await page.waitForFunction(() => !document.querySelector(".panel"), null, { timeout: 20000 });
 await page.waitForFunction(() => [...document.querySelectorAll(".slot .meta")].some((e) => /Pico 2 W · wedgie/.test(e.textContent)), null, { timeout: 15000 });
 step(`board has ${nfiles} files; after its reboot the panel closed and it came back: ${await page.evaluate(() => [...document.querySelectorAll(".slot .meta")].map((e) => e.textContent).join(" | "))}`);
 // installing again copies nothing
@@ -149,7 +149,7 @@ step("fw tab: " + (await page.textContent(".tab[data-tab=fw] h4")));
 await page.click('[data-fw]');
 await page.waitForFunction(() => document.querySelector("#p-meter.done") && /up to date/.test(document.querySelector("#p-meter-t").textContent), null, { timeout: 30000 });
 step("reinstall: " + (await page.textContent("#p-meter-t")));
-await page.waitForFunction(() => !document.querySelector(".panel"), null, { timeout: 10000 });
+await page.waitForFunction(() => !document.querySelector(".panel"), null, { timeout: 20000 });
 
 // 2. the wedgie: live screen, open an app, press a drawn button
 await page.click(`.slot >> nth=${await slot("RP2040")}`);
