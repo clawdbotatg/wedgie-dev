@@ -392,6 +392,8 @@ body.test-mode .top, body.test-mode .foot { display: none; }
 .wd-dev { position: sticky; top: 84px; }
 .wd-hint { text-align: center; margin: 6px 0 0; }
 .wd-main { display: grid; gap: 22px; min-width: 0; }
+#d-body { display: grid; gap: 22px; min-width: 0; }
+#d-body[hidden] { display: none; }
 .wd-head { display: flex; align-items: center; }
 .wd-sec h3 { margin-bottom: 14px; }
 .wd-sec .kv { margin: 0 0 16px; }

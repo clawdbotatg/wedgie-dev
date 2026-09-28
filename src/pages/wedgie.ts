@@ -84,7 +84,6 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
           <div class="card wd-sec">
             <h3>Hardware</h3>
             <dl class="kv" id="d-hw"></dl>
-            <div class="row"><button class="btn btn-sm" data-act="screen">Test the screen</button><button class="btn btn-sm" data-act="keys">Test the buttons</button><button class="btn btn-sm" data-act="chip">Check the chip again</button></div>
             <div class="status recess" id="d-status" hidden></div>
           </div>
           <div class="card wd-sec">
@@ -92,7 +91,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
             <div id="d-fw"></div>
             <div class="meter" id="d-meter" hidden><div class="meter-track"><div class="meter-fill"></div></div><span id="d-meter-t"></span></div>
           </div>
-          <div class="wd-sec carts">
+          <div class="card wd-sec carts">
             <h3>Software</h3>
             <p class="fine" id="d-carts-note"></p>
             <h4 class="shelf-h" id="d-on-h">On this wedgie</h4><div class="shelf" id="d-on"></div>
@@ -100,6 +99,8 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
           </div>
           <details class="card wd-sec dev">
             <summary>Developer</summary>
+            <div class="row"><button class="btn btn-sm" data-act="screen">Test the screen</button><button class="btn btn-sm" data-act="keys">Test the buttons</button><button class="btn btn-sm" data-act="chip">Check the chip again</button></div>
+            <div class="status recess" id="d-tstatus" hidden></div>
             <textarea class="recess editor" spellcheck="false"></textarea>
             <div class="row">
               <button class="btn btn-sm btn-green" data-act="run">Run on it</button>
@@ -129,6 +130,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
   const wedgie = () => w?.kind === "wedgie";
   const carts = () => (w?.carts || []);
   const newCarts = () => !!w?.carts;                // firmware 0.1.4+: cartridges come and go
+  const ours = () => wedgie() || (w?.kind === "wallet" && newCarts());   // the Wallet cart running counts
 
   // ---- the 3D wedgie: the real screen (mirrored), and its buttons press the real ones ---------------
   const canvas = document.createElement("canvas");
@@ -197,7 +199,8 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
   mirror();
 
   // ---- painting --------------------------------------------------------------------------------------
-  const status = (s: string) => { const el = $("#d-status"); el.hidden = !s; el.innerHTML = s; };
+  const status = (s: string, at = "#d-status") => { const el = $(at); el.hidden = !s; el.innerHTML = s; };
+  const tstatus = (s: string) => status(s, "#d-tstatus");   // the Developer section's own line (tests, Run, Save)
   const meter = (p: number | null, t = "") => {
     const el = $("#d-meter"); el.hidden = p === null; if (p === null) return;
     el.classList.toggle("done", p >= 1);
@@ -261,9 +264,8 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     if (!m) return;
     const note = $("#d-carts-note");
     if (x.kind === "micropython") note.innerHTML = "Cartridges run on wedgie firmware. Install it above first.";
-    else if (x.kind === "wallet") note.innerHTML = "The Wallet is running. Press X on the wedgie to leave it, then pick a cartridge.";
     else if (!newCarts()) note.innerHTML = "Update the firmware above to put cartridges on and take them off.";
-    else note.innerHTML = "Tap one to play it on your wedgie. One it doesn't have goes on first.";
+    else note.innerHTML = "Tap one under Get more to put it on. Tap one it has to play it.";
     const on = new Map(carts().map((c) => [c.mod, c.v]));
     const legacy = !newCarts() ? new Set(x.apps || []) : null;      // 0.1.3: apps it has, no versions
     const has = (c: Cart) => (legacy ? legacy.has(c.mod) : on.has(c.mod));
@@ -295,18 +297,20 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
       btn.classList.toggle("playing", playing);
       btn.classList.toggle("absent", !installed);
       btn.classList.toggle("busy", p !== undefined);
-      btn.disabled = !link || !!busy || !wedgie() || (!installed && !newCarts());
+      btn.disabled = !link || !!busy || !ours() || (!installed && !newCarts());
       btn.style.setProperty("--p", String(p ?? 0));
-      slot.querySelector(".cart-state")!.innerHTML = p !== undefined ? "inserting" : playing ? "▶ playing" : outdated ? "update" : !installed ? kb(c.size) : "";
+      slot.querySelector(".cart-state")!.innerHTML = p !== undefined ? "installing" : playing ? "▶ playing" : outdated ? "update" : !installed ? kb(c.size) : "";
       slot.querySelector(".cart-state")!.className = `cart-state${playing ? " on" : outdated || !installed ? " soft" : ""}`;
       const out = slot.querySelector<HTMLButtonElement>(".cart-out")!;
-      out.hidden = !installed || !newCarts() || playing;
+      out.hidden = !installed || !newCarts();
       out.disabled = !link || !!busy;
       out.textContent = confirmOut === c.mod ? `Remove ${c.name}?` : "Remove";
       out.classList.toggle("sure", confirmOut === c.mod);
     });
   }
 
+  // Tap one it doesn't have (or an old one): it goes on, back to the menu, so the next can go on right
+  // after. Tap one it has: it plays; whatever was running is stopped first.
   async function play(c: Cart) {
     if (!link || busy || !w) return;
     const x = w, r = link;
@@ -315,8 +319,13 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     const outdated = newCarts() && carts().find((a) => a.mod === c.mod)?.v !== c.v;
     if (installed && !outdated) {
       busy = "launch"; paint();
-      try { await r.request({ type: "launch", app: c.mod }, 8000); x.running = c.mod; setScreen({ kind: "live" }); }
-      catch (e: any) { status(`<b class="bad">${esc(c.name)} didn't open:</b> ${esc(e?.message || e)}. If something that owns the screen is running (Demo, Wallet), press X on the wedgie first.`); }
+      const launch = () => r.request({ type: "launch", app: c.mod }, 8000);
+      try {
+        if (x.kind === "wallet") { await takeOver(r); await backToLauncher(r); }
+        try { await launch(); }
+        catch { await takeOver(r); await backToLauncher(r); await launch(); }   // something owned the screen
+        x.running = c.mod; setScreen({ kind: "live" });
+      } catch (e: any) { status(`<b class="bad">${esc(c.name)} didn't open:</b> ${esc(e?.message || e)}. Press X on the wedgie and try again.`); }
       busy = ""; paint(); W.touch();
       return;
     }
@@ -324,14 +333,11 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     try {
       await installCart(r, c, (p) => { inserting[c.mod] = p; paint(); });
       delete inserting[c.mod];
-      await backToLauncher(r);
-      await r.request({ type: "launch", app: c.mod }, 8000).catch(() => {});
-      x.running = c.mod;
     } catch (e: any) {
       delete inserting[c.mod];
       status(`<b class="bad">${esc(c.name)} didn't go on:</b> ${esc(e?.message || e)}`);
-      await backToLauncher(r).catch(() => {});
     }
+    await backToLauncher(r).catch(() => {});
     busy = ""; setScreen({ kind: "live" }); paint(); W.touch();
   }
 
@@ -351,7 +357,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     await r.leave({ reset: false });
     let h: any = null;
     for (let i = 0; i < 12 && !h; i++) h = await r.hello(700).catch(() => null);
-    if (h && w) { w.version = h.version; w.apps = h.apps; w.carts = h.carts; w.free = h.free ?? w.free; w.running = h.running ?? null; w.firmware = `wedgie ${h.version}`; }
+    if (h && w) { if (String(h.fw || "").startsWith("wedgie-")) w.kind = "wedgie"; w.version = h.version; w.apps = h.apps; w.carts = h.carts; w.free = h.free ?? w.free; w.running = h.running ?? null; w.firmware = `wedgie ${h.version}`; }
   }
 
   // ---- firmware ---------------------------------------------------------------------------------------
@@ -391,7 +397,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
       if (opts.probe !== false) await r.exec(await W.probe(), 10000);
       await fn(r);
     } catch (e: any) {
-      status(`<b class="bad">${esc(name)} failed:</b> ${esc(e?.message || e)}`);
+      tstatus(`<b class="bad">${esc(name)} failed:</b> ${esc(e?.message || e)}`);
     }
     if (!opts.keep) await restart(r);
   };
@@ -422,26 +428,26 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
       for (const [name, css] of [["red", "#f00"], ["green", "#0f0"], ["blue", "#00f"]]) {
         await r.exec(`screen("${name}")`, 10000);
         setScreen({ kind: "color", css });
-        status(`Its screen should be <b>${name.toUpperCase()}</b> edge to edge.`);
+        tstatus(`Its screen should be <b>${name.toUpperCase()}</b> edge to edge.`);
         await sleep(1100);
       }
-      status("Red, green, blue. If one looked wrong or patchy, reseat the screen board on the Pico.");
+      tstatus("Red, green, blue. If one looked wrong or patchy, reseat the screen board on the Pico.");
     }),
     keys: () => act("Button test", async (r) => {
       setScreen(idScreen());
       KEYS.forEach((k) => w3?.keyVisual(k, false));
       const seen = new Set<string>();
-      status(`Press every button on the wedgie: joystick up, down, left, right, push it in, then A, B, X, Y. <span id="d-left"></span>`);
+      tstatus(`Press every button on the wedgie: joystick up, down, left, right, push it in, then A, B, X, Y. <span id="d-left"></span>`);
       const left = () => { const l = KEYS.filter((k) => !seen.has(k)); const e = main.querySelector("#d-left"); if (e) e.textContent = l.length ? `Left: ${l.join(" ")}` : ""; };
       left();
       r.onLine = (t, v) => {
-        if (t === "stuck" && v.length) status(`<b class="bad">Held down from the start:</b> ${esc(v.join(", "))}`);
+        if (t === "stuck" && v.length) tstatus(`<b class="bad">Held down from the start:</b> ${esc(v.join(", "))}`);
         if (t === "key") { if (!v.down) seen.add(v.key); w3?.keyVisual(v.key, v.down); left(); }
       };
       stopFn = () => r.interrupt();
       try { await r.exec("keys(180)", 190000); } catch {}
       const miss = KEYS.filter((k) => !seen.has(k));
-      status(miss.length ? `<b class="bad">Never pressed:</b> ${esc(miss.join(" "))}` : `<b class="good">All nine buttons work.</b>`);
+      tstatus(miss.length ? `<b class="bad">Never pressed:</b> ${esc(miss.join(" "))}` : `<b class="good">All nine buttons work.</b>`);
     }),
     run: () => act("Run", async (r) => {
       out.textContent = "";

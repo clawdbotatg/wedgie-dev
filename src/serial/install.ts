@@ -171,7 +171,7 @@ export async function installCart(r: Repl, cart: Cart, onProgress: (p: number, w
   else await takeOver(r);
   const have = await look(r, allNames(m));
   const need = cart.files.reduce((n, f) => n + (have.hashes[f] ? 0 : m.files.find((x) => x.name === f)!.size), 0);
-  const screen = await deviceScreen(r, "inserting", cart.name);
+  const screen = await deviceScreen(r, "installing", cart.name);
   const free = await r.exec(`import os\n_s = os.statvfs("/")\nprint(_s[0] * _s[3])`).then((s) => parseInt(s.trim())).catch(() => NaN);
   if (free < need + 8192) throw new Error(`not enough room: it needs ${Math.ceil(need / 1024)} KB, ${Math.floor(free / 1024)} KB free. Remove a cartridge first.`);
   const todo = await copy(r, fileInfo(m, cart.files), have, onProgress, screen);

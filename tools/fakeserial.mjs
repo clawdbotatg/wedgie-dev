@@ -61,27 +61,31 @@ check(/ATECC608 working/.test(await page.textContent("#d-hw")), "detail: hardwar
 check(/Up to date/.test(await page.textContent("#d-fw")), "detail: firmware up to date");
 await page.screenshot({ path: `${out}/connect-wedgie${phone ? "-phone" : ""}.png`, fullPage: true });
 
-// tap a cart it doesn't have: it goes in (files + apps.json, the wedgie's screen says so), then plays
+// tap a cart it doesn't have: it goes in (files + apps.json, the wedgie's screen says so), back to the menu
+const onShelf = (mod) => `document.querySelector('#d-on .cart-slot[data-mod="${mod}"] .cart:not(:disabled)')`;
 await page.click('#d-more .cart-slot[data-mod="hello"] .cart');
-await wait(() => window.__ports[2]._st.launched === "hello", null, 20000, "hello inserted and launched");
+await wait(new Function(`return ${onShelf("hello")}`), null, 20000, "hello inserted, on the shelf");
 check((await files(2)).includes("hello.py"), "hello.py is on it");
 const a1 = await appsOn(2);
 check(a1?.length === 1 && a1[0].mod === "hello" && /^[0-9a-f]{12}$/.test(a1[0].v), "apps.json lists hello with its version: " + JSON.stringify(a1));
 check((await st(2, "inserting")) >= 2, "its screen showed the cart going in");
 check((await st(2, "resets")) === 0, "no soft reset (the port stays)");
-await wait(() => document.querySelector('#d-on .cart-slot[data-mod="hello"] .cart.playing'), null, 5000, "hello on the shelf, playing");
+check(!(await st(2, "launched")), "installing doesn't play it");
 
-// a cart with shared files: wire_demo (cbor, rlp, p256), then the wallet (shares p256)
+// more in a row, one with shared files: wire_demo (cbor, rlp, p256), then the wallet (shares p256)
 await page.click('#d-more .cart-slot[data-mod="wire_demo"] .cart');
-await wait(() => window.__ports[2]._st.launched === "wire_demo", null, 30000, "wire_demo in");
+await wait(new Function(`return ${onShelf("wire_demo")}`), null, 30000, "wire_demo in");
 await page.click('#d-more .cart-slot[data-mod="usbwallet"] .cart');
-await wait(() => window.__ports[2]._st.launched === "usbwallet", null, 30000, "wallet in");
-check(JSON.stringify((await appsOn(2)).map((a) => a.mod)) === '["hello","wire_demo","usbwallet"]', "three carts in catalog order");
+await wait(new Function(`return ${onShelf("usbwallet")}`), null, 30000, "wallet in");
+check(JSON.stringify((await appsOn(2)).map((a) => a.mod)) === '["hello","wire_demo","usbwallet"]', "three carts in a row, catalog order");
+check(!(await st(2, "launched")), "none of them started playing");
 
 // play one it has: instant, nothing copied
 const writesBefore = await st(2, "interrupts");
 await page.click('#d-on .cart-slot[data-mod="hello"] .cart');
-await wait(() => window.__ports[2]._st.launched === "hello", null, 5000, "hello again");
+await wait(() => window.__ports[2]._st.launched === "hello", null, 5000, "hello plays");
+await wait(() => document.querySelector('#d-on .cart-slot[data-mod="hello"] .cart.playing'), null, 5000, "hello shown playing");
+check(!(await page.isHidden('#d-on .cart-slot[data-mod="hello"] .cart-out')), "a playing cart can still be removed");
 check((await st(2, "interrupts")) === writesBefore, "a cart it has plays without stopping anything");
 
 // take wire_demo out: its own files go, the one it shares with the wallet (p256) stays
