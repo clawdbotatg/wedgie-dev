@@ -1,5 +1,5 @@
 // /connect: every wedgie plugged into this computer, one row each: its hardware (chip proven working?),
-// its firmware (update ready?), what it's playing. Tap a row for that wedgie's own page,
+// its firmware (update ready?), its software (what it has, what it plays). Tap a row for that wedgie's own page,
 // /connect/<ID> (pages/wedgie.ts): hardware, firmware update, cartridges. Both are one page app, so
 // going between them never reloads (a reload would close every port and identify every wedgie again).
 import { esc } from "../ui/device";
@@ -75,7 +75,7 @@ function list(main: HTMLElement, go: (path: string) => void) {
           el.dataset.key = String(w.key);
           el.innerHTML = `<div class="wrow-dev"></div>
             <div class="wrow-body"><div class="wrow-head"><span class="light"></span><span class="idtag"></span></div>
-            <dl class="facts"><dt>Hardware</dt><dd data-f="hw"></dd><dt>Firmware</dt><dd data-f="fw"></dd><dt>Playing</dt><dd data-f="pl"></dd></dl></div>
+            <dl class="facts"><dt>Hardware</dt><dd data-f="hw"></dd><dt>Firmware</dt><dd data-f="fw"></dd><dt>Software</dt><dd data-f="pl"></dd></dl></div>
             <span class="chev" aria-hidden="true">›</span>`;
           el.addEventListener("click", (e) => { if (e.metaKey || e.ctrlKey || e.shiftKey || !el!.dataset.id) return; e.preventDefault(); go(el!.getAttribute("href")!); });
           rows.appendChild(el);

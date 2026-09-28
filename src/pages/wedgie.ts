@@ -93,7 +93,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
             <div class="meter" id="d-meter" hidden><div class="meter-track"><div class="meter-fill"></div></div><span id="d-meter-t"></span></div>
           </div>
           <div class="wd-sec carts">
-            <h3>Cartridges</h3>
+            <h3>Software</h3>
             <p class="fine" id="d-carts-note"></p>
             <h4 class="shelf-h" id="d-on-h">On this wedgie</h4><div class="shelf" id="d-on"></div>
             <h4 class="shelf-h" id="d-more-h">Get more</h4><div class="shelf" id="d-more"></div>

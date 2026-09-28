@@ -31,7 +31,7 @@ export function cartHtml(c: Cart) {
     <span class="cart-state"></span></span>`;
 }
 
-/** A small cart for a one-line summary ("Playing: [cart] Wallet"). */
+/** A small cart for a one-line summary ("Software: [cart] Wallet playing"). */
 export function miniCart(c: Pick<Cart, "mod" | "icon" | "label">) {
   return `<span class="mini-cart" style="--label:${esc(c.label || "#8a8c8e")}"><img src="${iconUrl(c)}" alt="" width="12" height="12"></span>`;
 }

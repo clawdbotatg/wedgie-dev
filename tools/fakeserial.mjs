@@ -100,7 +100,7 @@ await page.screenshot({ path: `${out}/connect-carts${phone ? "-phone" : ""}.png`
 // ---- back to the list (no reload), then the 0.1.3 wedgie: update keeps its apps ------------------------
 await page.click(".back");
 await wait(() => location.pathname === "/connect" && document.querySelectorAll(".wrow[data-id]").length === 3, null, 5000, "back on the list");
-check(/Playing\s*the menu · 2 cartridges/.test(await rowText(NEW)), "the list: back at its menu (a cart coming out restarts it), 2 cartridges");
+check(/Software\s*the menu · 2 cartridges/.test(await rowText(NEW)), "the list: back at its menu (a cart coming out restarts it), 2 cartridges");
 await page.click(`.wrow[data-id="${OLD}"]`);
 await wait(() => document.querySelector("[data-fw]") && !document.querySelector("[data-fw]").disabled, null, 10000, "0.1.3 page, Update enabled");
 check(/Update the firmware/.test(await page.textContent("#d-carts-note")), "0.1.3: cartridges ask for the update");

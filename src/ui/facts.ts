@@ -1,5 +1,5 @@
 // The three things you want to know about a wedgie, in plain words: its hardware (and whether the chip
-// is proven working), its firmware (and whether an update is ready), and what it's playing. The list
+// is proven working), its firmware (and whether an update is ready), and its software (what's playing). The list
 // on /connect shows them one line each; the wedgie's own page shows them at the top of each section.
 import { esc } from "./device";
 import { miniCart } from "./cart";
@@ -39,8 +39,8 @@ export function playing(w: W.Wedgie, m?: Manifest): Fact {
   if (w.state !== "ready") return { html: "", tone: "wait" };
   if (w.kind === "micropython") return { html: w.firmware === "its own main.py" ? "its own main.py" : "nothing", tone: "warn" };
   const c = m?.carts.find((x) => x.mod === w.running);
-  if (c) return { html: `${miniCart(c)} ${esc(c.name)}`, tone: "ok" };
-  if (w.running) return { html: esc(w.running), tone: "ok" };
+  if (c) return { html: `${miniCart(c)} ${esc(c.name)} <span class="fine">playing</span>`, tone: "ok" };
+  if (w.running) return { html: `${esc(w.running)} <span class="fine">playing</span>`, tone: "ok" };
   const n = (w.carts || w.apps || []).length;
   return { html: n ? `the menu · ${n} cartridge${n > 1 ? "s" : ""}` : "the menu · no cartridges yet", tone: "ok" };
 }
