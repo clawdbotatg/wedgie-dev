@@ -87,18 +87,43 @@ def board():
 
 
 # --- the screen ------------------------------------------------------------
+# Drawn with one reused 11 KB stripe buffer and a line at a time, never a whole-screen allocation:
+# with the firmware loaded an RP2040 has ~25 KB free, and a draw that has to hunt for memory stalls
+# long enough to miss a quick button tap.
+_row = None
+
+
+def _fill(c):
+    global _row
+    if _row is None:
+        _row = bytearray(240 * 24 * 2)
+    framebuf.FrameBuffer(_row, 240, 24, framebuf.RGB565).fill(c)
+    for y in range(0, 240, 24):
+        _lcd.blit(0, y, 240, 24, _row)
+
+
+def _text(s, scale, y, f, b):
+    w = 8 * len(s)
+    mono = bytearray((w + 7) // 8 * 8)
+    m = framebuf.FrameBuffer(mono, w, 8, framebuf.MONO_HLSB)
+    m.text(s, 0, 0, 1)
+    fg, bg = bytes((f & 0xFF, f >> 8)) * scale, bytes((b & 0xFF, b >> 8)) * scale
+    x0 = (240 - w * scale) // 2
+    for r in range(8):
+        line = b"".join(fg if m.pixel(x, r) else bg for x in range(w))
+        _lcd.blit(x0, y + r * scale, w * scale, scale, line * scale)
+
+
 def _say(big, small="", bg=_PAPER, fg=_INK):
     global _lcd
     if _lcd is None:
         _lcd = _LCD()
     b, f = col(*bg), col(*fg)
-    _lcd.fill(b)
-    w, h, buf = _big(big, 5 if len(big) <= 5 else 3 if len(big) <= 9 else 2, f, b)
-    _lcd.blit((240 - w) // 2, 84, w, h, buf)
+    _fill(b)
+    _text(big, 5 if len(big) <= 5 else 3 if len(big) <= 9 else 2, 84, f, b)
     if small:
         small = small[:28]
-        w, h, buf = _big(small, 2 if len(small) <= 14 else 1, f, b)
-        _lcd.blit((240 - w) // 2, 160, w, h, buf)
+        _text(small, 2 if len(small) <= 14 else 1, 160, f, b)
 
 
 def _ink_on(c):
@@ -106,51 +131,72 @@ def _ink_on(c):
 
 
 # --- the buttons -----------------------------------------------------------
+# Every edge on every button pin is caught by an interrupt, so a tap made while the screen is still
+# drawing counts. A press is everything touched between all-released and all-released again (40 ms
+# calm): exactly the target = counts; the target with anything else = not clean; else the wrong key.
+_edges = []
+
+
+def _arm(pins):
+    for k, p in pins.items():
+        p.irq(lambda _p, k=k: _edges.append(k), Pin.IRQ_FALLING | Pin.IRQ_RISING)
+
+
 def _down(pins):
-    a = [k for k, p in pins.items() if not p.value()]
-    time.sleep_ms(4)
-    return {k for k in a if not pins[k].value()}      # debounced: down on both reads
+    return {k for k, p in pins.items() if not p.value()}
 
 
-def _press(target, pins, phase):
-    """Wait for one clean press of target: down and up with nothing else down at any moment.
-    Other presses are reported and don't count."""
-    held = _down(pins)
-    if held:
-        t = time.ticks_ms()
-        while _down(pins):
-            if time.ticks_diff(time.ticks_ms(), t) > 2000:
-                out("stuck", sorted(held))
-                _say("LET GO", " ".join(_NAME[k] for k in sorted(held)), _RED, _PAPER)
-                while _down(pins):
-                    time.sleep_ms(20)
-                break
-            time.sleep_ms(20)
-        _prompt(target, phase)
-    first, extra = None, set()
+def _released(pins, target, phase):
+    """Until nothing is down for 30 ms. Held 2 s: say which, and wait for it."""
+    t, calm, warned = time.ticks_ms(), None, False
     while True:
         now = _down(pins)
         if now:
-            if first is None:
-                first = target if target in now else sorted(now)[0]
-            extra |= now - {first}
+            calm = None
+            if not warned and time.ticks_diff(time.ticks_ms(), t) > 2000:
+                warned = True
+                out("stuck", sorted(now))
+                _say("LET GO", " ".join(_NAME[k] for k in sorted(now)), _RED, _PAPER)
+        elif calm is None:
+            calm = time.ticks_ms()
+        elif time.ticks_diff(time.ticks_ms(), calm) >= 30:
+            break
+        time.sleep_ms(3)
+    if warned:
+        _prompt(target, phase)
+
+
+def _press(target, pins, phase):
+    _released(pins, target, phase)
+    while True:
+        del _edges[:]
+        seen, calm = set(), None
+        while True:
+            now = _down(pins)
+            while _edges:
+                seen.add(_edges.pop())
+            seen |= now
+            if seen and not now:
+                if calm is None:
+                    calm = time.ticks_ms()
+                elif time.ticks_diff(time.ticks_ms(), calm) >= 40:
+                    break
+            else:
+                calm = None
             time.sleep_ms(2)
-            continue
-        if first is None:
-            time.sleep_ms(3)
-            continue
-        if first == target and not extra:
+        if seen == {target}:
             out("ok", {"phase": phase, "key": target})
             return
-        if first == target:
-            out("combo", {"phase": phase, "key": target, "with": sorted(extra)})
-            _say("NOT CLEAN", _NAME[target] + " + " + " ".join(_NAME[k] for k in sorted(extra)), _RED, _PAPER)
+        others = sorted(seen - {target})
+        if target in seen:
+            out("combo", {"phase": phase, "key": target, "with": others})
+            _say("NOT CLEAN", _NAME[target] + " + " + " ".join(_NAME[k] for k in others), _RED, _PAPER)
         else:
-            out("wrong", {"phase": phase, "want": target, "got": first})
-            _say("THAT WAS " + _NAME[first], "PRESS " + _NAME[target], _RED, _PAPER)
+            out("wrong", {"phase": phase, "want": target, "got": others[0]})
+            _say("THAT WAS " + _NAME[others[0]], "PRESS " + _NAME[target], _RED, _PAPER)
         time.sleep_ms(900)
         _prompt(target, phase)
-        first, extra = None, set()
+        _released(pins, target, phase)
 
 
 _bg = (200, 200, 200)   # in the color pass: the last button's color, which stays up behind the next prompt
@@ -169,6 +215,7 @@ def bench(chip_ok, chip_line):
     """Chip result, then every button alone in order, then every button again filling the screen with
     its own color, then the verdict. Runs until done; unplugging ends it."""
     pins = {k: Pin(p, Pin.IN, Pin.PULL_UP) for k, p in KEYS.items()}
+    _arm(pins)
     time.sleep_ms(5)
     _say("CHIP OK" if chip_ok else "NO CHIP", chip_line, _GREEN if chip_ok else _RED, _PAPER)
     time.sleep_ms(1500)
@@ -181,8 +228,10 @@ def bench(chip_ok, chip_line):
         _prompt(k, 2)
         _press(k, pins, 2)
         _bg = _COLOR[k]
-    _lcd.fill(col(*_bg))
+    _fill(col(*_bg))
     time.sleep_ms(1200)
+    for p in pins.values():
+        p.irq(None)
     out("benchDone", {})
 
 
