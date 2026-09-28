@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>wedgie og card</title>
+<!-- The social card (public/img/og.png), rendered by tools/og.mjs: the real 3D wedgie showing the
+     wallet, and the brand verb. 1200x630, dev server only. -->
+<style>
+  html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; background: #f4f4f1; }
+  body { font-family: "Nunito Variable", sans-serif; color: #1a1b1a; position: relative; }
+  .copy { position: absolute; left: 76px; top: 0; bottom: 0; width: 470px; display: flex; flex-direction: column; justify-content: center; }
+  h1 { margin: 0; font-weight: 900; font-size: 104px; line-height: .93; letter-spacing: -.03em; }
+  p { margin: 26px 0 0; font-weight: 700; font-size: 27px; line-height: 1.3; color: #6b6e6b; }
+  .tag { margin-top: 30px; align-self: flex-start; display: flex; align-items: center; gap: 14px;
+    background: #fff; border-radius: 14px; padding: 9px 20px 9px 12px; font-weight: 800; font-size: 30px;
+    box-shadow: inset 0 -2px 0 #e7e7e3, 0 3px 10px rgba(0,0,0,.1); }
+  .tag img { width: 56px; height: 43px; }
+  #dev { position: absolute; left: 500px; top: 88px; width: 690px; }
+  .stripes { position: absolute; left: 0; right: 0; bottom: 0; height: 26px; background: #fff;
+    background-image: linear-gradient(#fff 5px, #22c452 5px 11px, #fff 11px 13px, #a9aaa8 13px 17px, #fff 17px 19px, #e3312c 19px 25px, #fff 25px); }
+</style>
+</head>
+<body>
+  <div class="copy">
+    <h1>Give yourself a wedgie.</h1>
+    <p>A pocket wallet from three <span style="white-space:nowrap">off-the-shelf</span> parts. MIT everything.</p>
+    <div class="tag"><img src="/img/sticker.webp" alt="">wedgie.dev</div>
+  </div>
+  <div id="dev"></div>
+  <div class="stripes"></div>
+  <script type="module">
+    import "@fontsource-variable/nunito/wght.css";
+    import { mountWedgie3D } from "/src/ui/wedgie3d.ts";
+    await document.fonts.load("900 104px 'Nunito Variable'");
+    await mountWedgie3D(document.getElementById("dev"), { interactive: false, screen: "/screens/wallet-home.png", side: -1 });
+    setTimeout(() => (window.ready = true), 1500);
+  </script>
+</body>
+</html>

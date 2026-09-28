@@ -79,10 +79,4 @@ t.paste(s, (15, 15), s)
 t.convert("RGB").save(out / "apple-touch-icon.png")
 print("favicon.png, apple-touch-icon.png")
 
-# social card: the tagged sticker on white, 1200x630
-og = Image.new("RGB", (1200, 630), (254, 254, 254))
-st = Image.open(out / "sticker-wedgie-dev.webp").convert("RGBA")
-st.thumbnail((720, 540), Image.LANCZOS)
-og.paste(st, ((1200 - st.width) // 2, (630 - st.height) // 2), st)
-og.save(out / "og.png", optimize=True)
-print("og.png")
+# social card: rendered from the 3D wedgie by tools/og.mjs (not here)
