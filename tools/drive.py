@@ -24,13 +24,7 @@ URL = "https://wedgie.dev/connect"
 url_win = f"[InternetShortcut]\r\nURL={URL}\r\n".encode()
 readme = b"""This is a wedgie.
 
-Open "Open wedgie" (Mac) or "Open wedgie (Windows)", or go to https://wedgie.dev/connect in Chrome
-or Edge, to see it, install apps, test it, and give it to your agent.
-
-This drive is read-only and tiny; it's just the front door. The wedgie itself talks to wedgie.dev
-over USB serial. Hold Y while plugging in to start without this drive.
-
-MIT. https://github.com/clawdbotatg/wedgie-dev
+Double-click "Open wedgie", or go to https://wedgie.dev/connect in Chrome or Edge.
 """
 autorun = b"[autorun]\r\nicon=wedgie.ico\r\nlabel=wedgie\r\n"
 
@@ -39,25 +33,29 @@ def square(n):
     s = Image.new("RGBA", (max(src.size),) * 2, (0, 0, 0, 0))
     s.paste(src, ((s.width - src.width) // 2, (s.height - src.height) // 2), src)
     return s.resize((n, n), Image.LANCZOS)
-# Every byte here is flash on every wedgie, so the icons are small: 256-color PNGs from pngquant (its
-# dithering keeps the white fabric smooth; Pillow's own palette bands it), a third of full color. The
-# drive icon goes up to 256 px (a desktop icon on a Retina Mac); the app's icon, seen in a Finder list,
-# stops at 64 px. Windows gets 16-48 px, all Explorer shows for a drive.   brew install pngquant
-def png(im):
-    b = io.BytesIO(); im.save(b, "PNG")
-    return subprocess.run(["pngquant", "--speed", "1", "--strip", "256", "-"], input=b.getvalue(), capture_output=True, check=True).stdout
-ico = io.BytesIO(); square(48).save(ico, "ICO", sizes=[(16, 16), (32, 32), (48, 48)])
-# The .icns written directly (a list of tagged PNGs): iconutil re-encodes every PNG back to full color.
-# px -> its icns types: 32 px is both 32 and 16@2x, 64 is 32@2x, 256 is 128@2x (Retina).
-ICNS_TYPES = {16: [b"icp4"], 32: [b"icp5", b"ic11"], 64: [b"ic12"], 128: [b"ic07"], 256: [b"ic13"]}
+# Every byte here is flash on every wedgie, so the icons are tiny: 64-color PNGs from pngquant (its
+# dithering keeps the white fabric smooth where Pillow's own palette bands it; fewer colors get grainy).
+# The drive icon stops at 128 px, what a Mac desktop shows at its default icon size on Retina; the app's
+# icon, seen in a Finder list, at 64. Smaller sizes are scaled down from these.   brew install pngquant
+def png(px):
+    b = io.BytesIO(); square(px).save(b, "PNG")
+    return subprocess.run(["pngquant", "--speed", "1", "--strip", "64", "-"], input=b.getvalue(), capture_output=True, check=True).stdout
+# .icns and .ico written directly, each a list of those PNGs (iconutil re-encodes them to full color).
+ICNS_TYPES = {32: [b"icp5", b"ic11"], 64: [b"ic12"], 128: [b"ic07"]}   # 32 is also 16@2x, 64 is 32@2x
 def make_icns(sizes):
     chunks = b""
     for px in sizes:
-        data = png(square(px))
+        data = png(px)
         for tag in ICNS_TYPES[px]:
             chunks += tag + struct.pack(">I", 8 + len(data)) + data
     return b"icns" + struct.pack(">I", 8 + len(chunks)) + chunks
-icns, app_icns = make_icns((16, 32, 64, 128, 256)), make_icns((16, 32, 64))
+def make_ico(sizes):
+    pngs = [png(px) for px in sizes]
+    head, off = struct.pack("<HHH", 0, 1, len(sizes)), 6 + 16 * len(sizes)
+    for px, data in zip(sizes, pngs):
+        head += struct.pack("<BBBBHHII", px, px, 0, 0, 1, 32, len(data), off); off += len(data)
+    return head + b"".join(pngs)
+icns, app_icns, ico = make_icns((32, 64, 128)), make_icns((32, 64)), make_ico((16, 32, 48))
 with tempfile.TemporaryDirectory() as t:
     # The Mac opener: an AppleScript applet that prefers Chrome (Web Serial) and falls back to the default
     # browser. Its icon is the underwear; ad-hoc signed so Apple Silicon runs it.
@@ -84,7 +82,7 @@ appledouble = (root / "art/volume-appledouble.bin").read_bytes()   # macOS's own
 HIDDEN, READONLY, ARCHIVE, VOLUME = 0x02, 0x01, 0x20, 0x08
 files = [("Open wedgie.app", app_tree, READONLY), ("Open wedgie (Windows).url", url_win, READONLY), ("README.txt", readme, READONLY),
          (".VolumeIcon.icns", icns, READONLY | HIDDEN), ("autorun.inf", autorun, READONLY | HIDDEN),
-         ("wedgie.ico", ico.getvalue(), READONLY | HIDDEN), ("._.", appledouble, READONLY | HIDDEN)]
+         ("wedgie.ico", ico, READONLY | HIDDEN), ("._.", appledouble, READONLY | HIDDEN)]
 
 # ---- FAT12 ------------------------------------------------------------------------------------------
 img = bytearray(TOTAL * SECTOR)
