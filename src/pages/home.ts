@@ -39,7 +39,7 @@ export function home(main: HTMLElement): Promise<unknown> {
           <h3>Put it together</h3>
           <ol>
             <li class="step on" data-n="1"><b>Wedge the wires in.</b> <span>The chip's cable plug runs GND, 3.3 V, SDA, SCL from one end; trust that order, not the colors. With the hat's back up and its USB end at the top, push the bare wires into the header beside the Pico's pins: GND right 3rd, 3.3 V right 5th (never the 4th), SDA left 6th, SCL left 7th.</span></li>
-            <li class="step" data-n="2"><b>Wedge the chip in between.</b> <span>Tuck the chip into the gap, then plug the Pico into the hat's header: parts toward the screen, USB at the joystick end. The chip ends up sandwiched between the two boards.</span></li>
+            <li class="step" data-n="2"><b>Wedge the chip in between.</b> <span>Tuck the chip into the gap, then plug the Pico into the hat's header: its chips facing you (away from the screen), USB at the joystick end. The chip ends up sandwiched between the two boards.</span></li>
             <li class="step" data-n="3"><b>Snap the case on.</b> <span>Boards into the base, USB first. Caps on, lid down until it clicks.</span></li>
             <li class="step" data-n="4"><b>Plug it in.</b> <span>USB-C, then press <b>Allow wedgie connection</b> at the top and pick it. It boots to the underwear.</span></li>
           </ol>

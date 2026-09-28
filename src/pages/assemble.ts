@@ -51,7 +51,7 @@ const STEPS: Step[] = [
     p: `Once all four are in, lay a strip of tape across the header to hold them in place. Then pop a hole through the tape over each hole with a breadboard pin, so the Pico's pins can go straight through. The tape keeps the wires from pulling out while you do the rest.`,
     shot: "tape" },
   { t: "Plug the Pico in",
-    p: `Press the Pico into the hat's header: <b>Pico parts toward the screen, the Pico's USB at the joystick end</b>. Push straight, never at an angle. Every pin goes in, none outside the socket. Then tug each wire lightly: none should come out.`,
+    p: `Press the Pico into the hat's header: <b>the Pico's chips and BOOTSEL button facing you, away from the screen, and its USB at the joystick end</b>. Push straight, never at an angle. Every pin goes in, none outside the socket. Then tug each wire lightly: none should come out.`,
     shot: "pico" },
   { t: "Wedge the chip in",
     p: `Slide the chip board flat into the gap between the Pico and the hat, wires lying flat, so nothing presses on the back of the screen and the chip touches no Pico pin. That's the wedgie.`,

@@ -35,7 +35,7 @@ exact; a wire in the wrong hole is the most common failure.
 - A data USB cable (not charge-only), and optionally the printed case (below).
 
 ### How the sandwich goes
-The Pico plugs into the hat's female header: Pico components facing the screen board, the Pico's USB
+The Pico plugs into the hat's female header: Pico components facing AWAY from the screen board (its RP2040 and BOOTSEL button stay visible from the back), the Pico's USB
 at the same end as the joystick. Held as a wedgie (landscape, screen facing you): USB on the left,
 joystick left of the screen, A B X Y in a column on the right, A at the top. Push straight, no force
 at an angle; the pins must all go in, none outside the socket.
