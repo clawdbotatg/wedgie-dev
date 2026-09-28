@@ -331,6 +331,7 @@ export function test(main: HTMLElement) {
   }
   navigator.usb.addEventListener("connect", (e) => { if (isBoot((e as USBConnectionEvent).device)) setTimeout(pick, 300); });
   W.onChange(pick);
+  W.arm(); // the bench is for people with a board in hand
   W.start();
   idle();
   pick();

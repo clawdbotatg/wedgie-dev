@@ -14,6 +14,7 @@ const shell = readdirSync(cache).filter((d) => d.startsWith("chromium_headless_s
 const browser = await chromium.launch({ executablePath: `${cache}/${shell}/chrome-headless-shell-mac-arm64/chrome-headless-shell`, args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
 const ctx = await browser.newContext({ viewport: { width: 1360, height: 900 }, deviceScaleFactor: 2 });
 await ctx.addInitScript(() => {
+  localStorage.setItem("wedgie.serial", "1"); // this browser tapped Connect before (see btprobe.mjs for a new one)
   const enc = new TextEncoder(), dec = new TextDecoder();
   const hex = (b) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
   const sha = async (u8) => hex(await crypto.subtle.digest("SHA-256", u8));

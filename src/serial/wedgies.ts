@@ -1,5 +1,8 @@
 // Every wedgie on this computer's USB. The browser only shows us ports the person granted once
 // (requestPort); after that getPorts() and the connect/disconnect events keep the list live.
+// Nothing here touches navigator.serial until this browser has asked for a wedgie once (armed): on a
+// Mac, Chrome's first look for serial ports (getPorts included) also looks for Bluetooth ones, and
+// macOS pops "Chrome would like to use Bluetooth" at a visitor who only came to read.
 // Identify: a running wedgie firmware answers {"type":"hello"} without being interrupted; any other
 // MicroPython board is stopped, asked for its unique ID in the raw REPL, and soft-reset back into
 // whatever it was running.
@@ -34,6 +37,22 @@ const listeners = new Set<Listener>();
 let probeSrc: Promise<string> | null = null;
 
 export const supported = () => "serial" in navigator;
+
+const ARM = "wedgie.serial";
+let armedNow = false;
+try { armedNow = localStorage.getItem(ARM) === "1"; } catch {}
+const onArm: (() => void)[] = [];
+/** This browser has asked for a wedgie here before, so looking at its serial ports prompts nothing new. */
+export const armed = () => armedNow;
+/** Start looking at serial ports: a deliberate act (a Connect tap, the /test bench). */
+export function arm() {
+  if (armedNow) return;
+  armedNow = true;
+  try { localStorage.setItem(ARM, "1"); } catch {}
+  onArm.splice(0).forEach((fn) => fn());
+}
+const whenArmed = (fn: () => void) => (armedNow ? fn() : onArm.push(fn));
+const isMac = () => /Mac/.test(navigator.platform || navigator.userAgent);
 export const wedgies = () => list.filter((w) => w.state !== "gone");
 export function onChange(fn: Listener) { listeners.add(fn); return () => listeners.delete(fn); }
 const emit = () => listeners.forEach((fn) => fn());
@@ -152,9 +171,31 @@ export function reidentify(w: Wedgie) { identify(w); }
 // A new grant fires no connect event, so the header's count is told directly.
 const granted = new Set<() => void>();
 
+// Before the first picker on a Mac: say why the computer is about to ask about Bluetooth.
+function explain() {
+  return new Promise<boolean>((done) => {
+    const el = document.createElement("div");
+    el.className = "panel-wrap";
+    el.innerHTML = `<div class="card bt-ask" role="dialog" aria-label="Bluetooth access">
+      <h3>Your Mac will ask about Bluetooth</h3>
+      <p>To find your wedgie, Chrome looks at this computer's serial ports, and macOS counts that as Bluetooth. When it asks, press <b>Allow</b>. wedgie.dev only talks to wedgies plugged into USB.</p>
+      <div class="row"><button class="btn btn-green" id="bt-go">OK, find my wedgie</button><button class="btn" id="bt-no">Not now</button></div>
+    </div>`;
+    const close = (go: boolean) => { el.remove(); done(go); };
+    el.addEventListener("click", (e) => { if (e.target === el) close(false); });
+    el.querySelector<HTMLElement>("#bt-go")!.onclick = () => close(true);
+    el.querySelector<HTMLElement>("#bt-no")!.onclick = () => close(false);
+    document.body.appendChild(el);
+    el.querySelector<HTMLElement>("#bt-go")!.focus();
+  });
+}
+
 /** The browser's device picker. Grants this site the port; talks to nothing. */
 export async function allow() {
-  const port = await navigator.serial.requestPort({ filters: [{ usbVendorId: RPI_VID }] });
+  if (!armedNow && isMac() && !(await explain())) throw new DOMException("not now", "AbortError");
+  const pick = navigator.serial.requestPort({ filters: [{ usbVendorId: RPI_VID }] });
+  arm(); // picked or cancelled, the Mac has asked by now
+  const port = await pick;
   granted.forEach((fn) => fn());
   return port;
 }
@@ -167,6 +208,10 @@ export async function connectNew() {
  *  Only ports this site was granted once are visible; opening none of them interrupts nothing. */
 export function watchCount(cb: (n: number) => void) {
   if (!supported()) { cb(0); return; }
+  if (!armedNow) cb(0);
+  whenArmed(() => watchPorts(cb));
+}
+function watchPorts(cb: (n: number) => void) {
   const count = async () => cb((await navigator.serial.getPorts()).filter((p) => p.getInfo().usbVendorId === RPI_VID && (p as any).connected !== false).length);
   count();
   granted.add(count);
@@ -174,8 +219,10 @@ export function watchCount(cb: (n: number) => void) {
   navigator.serial.addEventListener("disconnect", () => setTimeout(count, 300));
 }
 
-export async function start() {
-  if (!supported()) return;
+export function start() {
+  if (supported()) whenArmed(startPorts);
+}
+async function startPorts() {
   for (const p of await navigator.serial.getPorts()) if (p.getInfo().usbVendorId === RPI_VID) add(p);
   navigator.serial.addEventListener("connect", (e: Event) => {
     const port = ((e as any).port || e.target) as SerialPort;

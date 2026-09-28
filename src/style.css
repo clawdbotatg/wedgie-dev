@@ -363,3 +363,7 @@ body.test-mode .top, body.test-mode .foot { display: none; }
   .test-status { padding: 24px; }
   .status-text { font-size: 36px; }
 }
+/* first Connect on a Mac: why the Bluetooth prompt is coming */
+.bt-ask { width: min(460px, 100%); display: grid; gap: 12px; }
+.bt-ask h3 { margin: 0; font-size: 22px; }
+.bt-ask p { margin: 0; }
