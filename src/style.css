@@ -445,3 +445,18 @@ body.test-mode .top, body.test-mode .foot { display: none; }
 .cart-out { -webkit-appearance: none; appearance: none; border: 0; background: none; font: 800 13px var(--font); color: var(--muted); padding: 4px 2px; cursor: pointer; align-self: flex-start; text-decoration: underline; text-underline-offset: 3px; }
 .cart-out.sure { color: #c22621; }
 .cart-out[hidden] { display: none; }
+
+/* ---- /update: the update bench, a card per wedgie ---- */
+.upd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; width: min(100%, 980px); }
+.upd-grid:empty { display: none; }
+.upd-card { background: var(--shell); box-shadow: var(--shell-shadow); border-radius: 22px; padding: 16px 18px; text-align: left; display: grid; gap: 6px; }
+.upd-card.done, .upd-card.fresh { box-shadow: var(--shell-shadow), 0 0 0 4px var(--mint); }
+.upd-card.fail { box-shadow: var(--shell-shadow), 0 0 0 4px var(--coral); }
+.upd-card.gone { opacity: .55; }
+.upd-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.upd-state { font-weight: 900; }
+.upd-card.done .upd-state, .upd-card.fresh .upd-state { color: var(--mint-d); }
+.upd-card.fail .upd-state { color: var(--coral); }
+.upd-line { font-weight: 700; }
+.upd-card .meter { margin-top: 4px; }
+.upd-card .meter-track { height: 22px; padding: 4px; }

@@ -31,6 +31,19 @@ function boardName(b: any) {
   return `${b.cpu} board (not a Raspberry Pi Pico)`;
 }
 
+/** The one-time Chrome setup both benches need (/test, /update): the profile that lets wedgie.dev use
+ *  every Pico without asking, so a bench runs hands-off. */
+export function benchSetup() {
+  return `<div class="test-setup card">
+      <h3>First time on this computer?</h3>
+      <p>Chrome asks before a page can use each new Pico. The test-bench profile tells it wedgie.dev may, so the bench runs hands-off.</p>
+      <p><b>Linux</b> (Omarchy, Arch, Ubuntu): run this once, then restart the browser.</p>
+      <pre class="recess test-cmd">curl -fsSL https://wedgie.dev/bench-linux.sh | sudo sh</pre>
+      <p><b>Mac:</b> <a href="/wedgie-test.mobileconfig" download>get the profile</a>, open it, then System Settings → Privacy &amp; Security → Profiles → Install. Restart Chrome.</p>
+      <p class="fine">Check it worked: chrome://policy lists <span class="mono">WebUsbAllowDevicesForUrls</span>.</p>
+    </div>`;
+}
+
 export function test(main: HTMLElement) {
   main.innerHTML = `
   <section class="test-page">
@@ -46,14 +59,7 @@ export function test(main: HTMLElement) {
     <div class="test-id" id="t-id"></div>
     <dl class="kv test-facts" id="t-facts" hidden></dl>
     <p class="fine">Anything plugged in here gets wiped and set up fresh.</p>
-    <div class="test-setup card">
-      <h3>First time on this computer?</h3>
-      <p>Chrome asks before a page can use each new Pico. The test-bench profile tells it wedgie.dev may, so the bench runs hands-off.</p>
-      <p><b>Linux</b> (Omarchy, Arch, Ubuntu): run this once, then restart the browser.</p>
-      <pre class="recess test-cmd">curl -fsSL https://wedgie.dev/bench-linux.sh | sudo sh</pre>
-      <p><b>Mac:</b> <a href="/wedgie-test.mobileconfig" download>get the profile</a>, open it, then System Settings → Privacy &amp; Security → Profiles → Install. Restart Chrome.</p>
-      <p class="fine">Check it worked: chrome://policy lists <span class="mono">WebUsbAllowDevicesForUrls</span>.</p>
-    </div>
+    ${benchSetup()}
   </section>`;
   const $ = (id: string) => document.getElementById(id)!;
   const text = $("t-text"), detail = $("t-detail"), grid = $("t-grid"), actions = $("t-actions"), facts = $("t-facts"), idEl = $("t-id");

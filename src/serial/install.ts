@@ -120,7 +120,7 @@ const fileInfo = (m: Manifest, names: string[]) => names.map((n) => m.files.find
 
 /** Install or update the firmware core (not the carts; the ones already on it stay). Leaves the board in
  *  raw REPL; the caller reboots it (the new core only runs after one). */
-export async function installCore(r: Repl, onProgress: (p: number, what: string) => void, opts: { launcher?: boolean } = {}) {
+export async function installCore(r: Repl, onProgress: (p: number, what: string) => void, opts: { launcher?: boolean; screen?: boolean } = {}) {
   const m = await firmwareManifest();
   onProgress(0, "stopping what it runs");
   if (opts.launcher === false) await r.enter({ reset: false });   // a board already in the raw REPL (/test's bench)
@@ -130,40 +130,48 @@ export async function installCore(r: Repl, onProgress: (p: number, what: string)
   const stale = m.files.filter((f) => f.name.endsWith(".py")).map((f) => f.name.replace(/\.py$/, ".mpy"))
     .filter((n) => have.files.includes(n) && !m.files.some((f) => f.name === n));
   if (stale.length) await r.exec(`import os\nfor n in ${JSON.stringify(stale)}:\n    os.remove(n)`);
-  const todo = await copy(r, fileInfo(m, m.core), have, (p, w) => onProgress(0.05 + 0.9 * p, w));
-  await writeApps(r, m, have);
+  const screen = opts.screen ? await deviceScreen(r, "updating", `wedgie ${m.version}`) : undefined;
+  const todo = await copy(r, fileInfo(m, m.core), have, (p, w) => onProgress(0.05 + 0.9 * p, w), screen);
+  const apps = await writeApps(r, m, have);
   onProgress(1, todo.length ? `${todo.length} files updated` : "already up to date");
-  return { version: m.version, written: todo.length };
+  const outdated = m.carts.filter((c) => apps.some((a) => a.mod === c.mod && a.v !== c.v));
+  return { version: m.version, written: todo.length, outdated };
 }
 
-// The wedgie's own screen while a cart goes in: the waistband, the cart's name, a bar.
+// The wedgie's own screen while software goes on: the waistband, what's happening, a bar.
 const INSERT_PY = `import lcd as _L
 _d = _L.LCD()
-def _ins(name, p):
+def _ins(title, name, p):
     W, I, M = _L.color(254, 254, 254), _L.color(26, 27, 26), _L.color(120, 123, 120)
     _d.fill(W)
     for y, c in ((10, _L.color(34, 196, 82)), (19, _L.color(169, 170, 171)), (28, _L.color(227, 49, 44))):
         _d.fill_rect(0, y, 240, 5, c)
-    _d.center_text("inserting", 92, M, 2)
+    _d.center_text(title, 92, M, 2)
     _d.center_text(name, 120, I, 2)
     _d.rect(30, 160, 180, 14, _L.color(200, 200, 196))
     _d.fill_rect(32, 162, int(176 * p), 10, _L.color(34, 196, 82))
     _d.show()`;
 
-/** Put a cart on (or update it): its files that differ, then apps.json. The launcher comes back
- *  and opens it (the caller: leave, then launch). Stale copies of its modules are dropped from memory. */
-export async function installCart(r: Repl, cart: Cart, onProgress: (p: number, what: string) => void) {
-  const m = await firmwareManifest();
-  onProgress(0, "opening the slot");
-  await takeOver(r);
-  const have = await look(r, allNames(m));
-  const need = cart.files.reduce((n, f) => n + (have.hashes[f] ? 0 : m.files.find((x) => x.name === f)!.size), 0);
-  let screen: ((p: number) => Promise<void>) | undefined;
+/** Draw on the wedgie's own screen while we work (needs its lcd.py; a board without one shows nothing). */
+async function deviceScreen(r: Repl, title: string, name: string) {
   try {
     await r.exec(INSERT_PY, 8000);
-    screen = async (p) => { await r.exec(`_ins(${JSON.stringify(cart.name.slice(0, 14))}, ${p.toFixed(2)})`, 8000).catch(() => {}); };
-    await screen(0);
-  } catch {}
+    const draw = async (p: number) => { await r.exec(`_ins(${JSON.stringify(title)}, ${JSON.stringify(name.slice(0, 14))}, ${p.toFixed(2)})`, 8000).catch(() => {}); };
+    await draw(0);
+    return draw;
+  } catch { return undefined; }
+}
+
+/** Put a cart on (or update it): its files that differ, then apps.json. The launcher comes back
+ *  and opens it (the caller: leave, then launch). Stale copies of its modules are dropped from memory. */
+export async function installCart(r: Repl, cart: Cart, onProgress: (p: number, what: string) => void, opts: { launcher?: boolean } = {}) {
+  const m = await firmwareManifest();
+  onProgress(0, "opening the slot");
+  if (opts.launcher === false) await r.enter({ reset: false });
+  else await takeOver(r);
+  const have = await look(r, allNames(m));
+  const need = cart.files.reduce((n, f) => n + (have.hashes[f] ? 0 : m.files.find((x) => x.name === f)!.size), 0);
+  const screen = await deviceScreen(r, "inserting", cart.name);
   const free = await r.exec(`import os\n_s = os.statvfs("/")\nprint(_s[0] * _s[3])`).then((s) => parseInt(s.trim())).catch(() => NaN);
   if (free < need + 8192) throw new Error(`not enough room: it needs ${Math.ceil(need / 1024)} KB, ${Math.floor(free / 1024)} KB free. Remove a cartridge first.`);
   const todo = await copy(r, fileInfo(m, cart.files), have, onProgress, screen);

@@ -18,7 +18,7 @@ except Exception as e:
 # src/serial/repl.ts leave). The first soft reset after an update from firmware older than 0.1.3 has
 # no mark yet and drops the port too. A host that reconnects and soft-resets again loops forever
 # (wedgie.dev did, 2026-09-27: e6ea8c1). Hosts that handle this: src/serial/wedgies.ts, install.ts,
-# pages/wedgie.ts, public/wedgie.py; tools/fakeserial.mjs plays both cases.
+# pages/wedgie.ts, pages/update.ts, public/wedgie.py; tools/fakewedgies.mjs plays both cases.
 try:
     import lcd  # noqa: F401  grab the 115 KB screen buffer first, while the heap is fresh (RP2040)
     import sys, machine

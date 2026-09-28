@@ -77,6 +77,10 @@
     {
       "source": "/test",
       "destination": "/index.html"
+    },
+    {
+      "source": "/update",
+      "destination": "/index.html"
     }
   ],
   "trailingSlash": false

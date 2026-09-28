@@ -11,7 +11,8 @@ one, plug it in and put software on it, hand it to your agent.
   cartridges (apps) listed in `firmware/carts.json`. Published to `/fw/` by `tools/fw.mjs`.
 - `src/serial/` — WebSerial: every plugged-in wedgie, identified by its board ID (`wedgies.ts`),
   over MicroPython's raw REPL (`repl.ts`, from picowallet `factory/`); `install.ts` puts the core and
-  cartridges on. `src/pages/connect.ts` is the list at /connect, `src/pages/wedgie.ts` one wedgie.
+  cartridges on. `src/pages/connect.ts` is the list at /connect, `src/pages/wedgie.ts` one wedgie,
+  `src/pages/test.ts` the assembly-line test bench (/test), `src/pages/update.ts` the update bench (/update).
 
 **Heads-up for anyone who talks to a wedgie over USB:** about a second after it's plugged in, the
 wedgie adds its WEDGIE drive, and its serial port disappears and comes back as a new port. Find it by

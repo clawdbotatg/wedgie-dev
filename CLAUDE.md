@@ -13,7 +13,7 @@ what agents outside this repo read (keep it true when the firmware or the USB pr
    marks soft resets so the drive isn't re-added, but the first soft reset after an update from older
    firmware does drop the port, and a host that reconnects and resets again loops forever (it did:
    e6ea8c1). The only sanctioned soft reset is booting new firmware. Full note: `firmware/boot.py`.
-   `tools/fakeserial.mjs` plays both the dropping and the surviving case — extend it, don't bypass it.
+   `tools/fakewedgies.mjs` (used by fakeserial.mjs and updateprobe.mjs) plays both the dropping and the surviving case — extend it, don't bypass it.
 2. **Firmware = core + cartridges.** `tools/fw.mjs` publishes `firmware/` to `/fw/` with a manifest:
    `core` (every file no cart claims) and `carts` (`firmware/carts.json`: each app's files, label,
    12x12 icon; `v` = hash of its files, so there is no version to bump). The core ships no apps and
@@ -36,6 +36,7 @@ npm run build && npx vite preview --port 4173
 node tools/fakeserial.mjs http://localhost:4173 <outdir>   # /connect end to end with fake wedgies
 node tools/btprobe.mjs http://localhost:4173/               # no Bluetooth prompt for visitors
 node tools/testprobe.mjs http://localhost:4173/ <outdir>    # /test, the assembly-line bench
+node tools/updateprobe.mjs http://localhost:4173 <outdir>   # /update, plug-in-and-update bench
 node tools/emuprobe.mjs <outdir>                            # the virtual wedgie
 python3 tools/test_drive.py                                 # the WEDGIE drive's SCSI answers
 python3 tools/fakedevice.py                                 # a pty wedgie for public/wedgie.py

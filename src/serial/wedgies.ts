@@ -31,6 +31,7 @@ export type Wedgie = {
   chip?: any;            // what answered on I2C: { type, serial? }
   proof?: ChipCheck & { state: "checking" | "done" | "unknown" };   // the chip proven working (once per plug-in)
   error?: string;
+  readyAt?: number;      // when identify last finished (the update bench: "it came back after its restart")
   log: string;
 };
 
@@ -131,6 +132,7 @@ async function identify(w: Wedgie) {
     }
     w.short = w.uid ? shortId(w.uid) : "??????";
     w.state = "ready";
+    w.readyAt = Date.now();
   } catch (e: any) {
     w.state = "error";
     w.error = e?.message || String(e);
