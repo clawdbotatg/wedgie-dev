@@ -58,7 +58,100 @@ const CHIPS: Chip[] = [
     buy: [["https://www.adafruit.com/product/4314", "Adafruit"], ["https://www.amazon.com/s?k=adafruit+4314+ATECC608", "Amazon"], ["https://www.digikey.com/en/products/detail/adafruit-industries-llc/4314/10419053", "DigiKey"]] },
   { key: "trustm", chip: "OPTIGA Trust M", name: "Trust M", group: "Secure chip", about: "Adafruit Infineon OPTIGA Trust M breakout (4351). Keeps keys.", addr: [0x30],
     buy: [["https://www.adafruit.com/product/4351", "Adafruit"]] },
+  ...board("Motion", `
+    lis3dh    LIS3DH accelerometer        A 2809      18     3-axis, tap detection
+    msa311    MSA311 accelerometer        A 5309      62     the cheapest 3-axis
+    adxl343   ADXL343 accelerometer       A 4097      53     3-axis, tap and free-fall
+    adxl375   ADXL375 high-g accelerometer A 5374     53     up to 200 g
+    lis331    LIS331 accelerometer        A 4626      18     up to 24 g
+    lsm6ds3   LSM6DS3TR-C IMU             A 4503      6a     accelerometer + gyro
+    mpu6050   MPU-6050 IMU                A 3886      68     accelerometer + gyro
+    icm20948  ICM-20948 9-DoF             A 4554      69     accelerometer + gyro + compass
+    sox9dof   LSM6DSOX + LIS3MDL 9-DoF    A 4517      6a,1c  accelerometer + gyro + compass
+    ds39dof   LSM6DS3TR-C + LIS3MDL 9-DoF A 5543      6a,1c  accelerometer + gyro + compass
+    lsm303    LSM303AGR                   A 4413      19,1e  accelerometer + compass
+    lis3mdl   LIS3MDL magnetometer        A 4479      1c     3-axis magnetic field
+    lis2mdl   LIS2MDL magnetometer        A 4488      1e     3-axis magnetic field
+    mmc5603   MMC5603 magnetometer        A 5579      30     3-axis magnetic field
+    qmc5883   QMC5883P compass            A 6388      2c     a cheap compass
+    tlv493d   TLV493D magnetometer        A 4366      5e     3D magnetic field
+    mlx90393  MLX90393 magnetometer       A 4022      18     wide-range magnetic field
+    tmag5273  TMAG5273 Hall sensor        A 6489      35     3D magnet position
+    as5600    AS5600 angle sensor         A 6357      36     the angle of a magnet
+    ism330    ISM330DHCX IMU (Micro)      S SEN-20176 6b     industrial accelerometer + gyro
+    lsm6dsv   LSM6DSV16X IMU (Micro)      S SEN-21336 6b     accelerometer + gyro, sensor fusion
+    bmi270    BMI270 IMU (Micro)          S SEN-22398 68     low-power accelerometer + gyro, gestures
+    bma400    BMA400 accelerometer (Micro) S SEN-21207 14    ultra-low-power 3-axis
+    mmc5983   MMC5983MA magnetometer (Micro) S SEN-19921 30  precision magnetic field`),
+  ...board("Air and temperature", `
+    sht40     SHT40 temp + humidity       A 4885      44     temperature and humidity
+    sht45     SHT45 temp + humidity       A 5665      44     precision temperature and humidity
+    sht31     SHT31-D temp + humidity     A 2857      44     temperature and humidity
+    shtc3     SHTC3 temp + humidity       A 4636      70     cheap temperature and humidity
+    aht20     AHT20 temp + humidity       A 4566      38     cheap temperature and humidity
+    htu31     HTU31 temp + humidity       A 4832      40     temperature and humidity, with a heater
+    hts221    HTS221 temp + humidity      A 4535      5f     temperature and humidity
+    bme280    BME280                      A 2652      77     temperature, humidity, pressure
+    bme688    BME688                      A 5046      77     temperature, humidity, pressure, gas
+    bme680    BME680                      A 3660      77     temperature, humidity, pressure, gas
+    bmp388    BMP388 barometer            A 3966      77     precision pressure and altitude
+    bmp580    BMP580 barometer            A 6411      47     pressure and altitude
+    bmp581    BMP581 barometer            A 6407      47     precision pressure and altitude
+    spa06     SPA06-003 barometer         A 6420      77     cheap pressure and temperature
+    lps22     LPS22 barometer             A 4633      5d     pressure
+    lps25     LPS25 barometer             A 4530      5d     pressure
+    lps28     LPS28DFW barometer          A 6067      5c     water-resistant pressure
+    ms8607    MS8607                      A 4716      76,40  pressure, humidity, temperature
+    mcp9808   MCP9808 thermometer         A 5027      18     temperature to 0.25 °C
+    tmp117    TMP117 thermometer          A 4821      48     temperature to 0.1 °C
+    tmp119    TMP119 thermometer          A 6482      48     temperature to 0.03 °C
+    pct2075   PCT2075 thermometer         A 4369      37     cheap temperature
+    mlx90632  MLX90632 IR thermometer     A 6403      3a     temperature of what it points at
+    sgp30     SGP30 air quality           A 3709      58     VOC and eCO2
+    sgp40     SGP40 air quality           A 4829      59     VOC index
+    sgp41     SGP41 air quality           A 6455      59     VOC and NOx index
+    ens160    ENS160 air quality          A 5606      53     air quality (gas)
+    stcc4     STCC4 CO2 + SHT41           A 6478      64,44  real CO2, temperature, humidity
+    stts22h   STTS22H thermometer (Micro) S SEN-21273 3c     precise temperature`),
+  ...board("Light and distance", `
+    veml7700  VEML7700 light              A 4162      10     brightness (lux)
+    bh1750    BH1750 light                A 4681      23     brightness (lux)
+    ltr329    LTR-329 light               A 5591      29     brightness (lux)
+    ltr390    LTR390 UV + light           A 4831      53     UV and brightness
+    tsl2591   TSL2591 light               A 1980      29,28  high-range brightness
+    max44009  MAX44009 light              A 6498      4a     brightness up to 188k lux
+    tsl2585   TSL2585 UV + light          A 6524      39     UVA and brightness
+    as7341    AS7341 color                A 4698      39     10-channel color
+    as7343    AS7343 color                A 6477      39     14-channel color
+    tcs3448   TCS3448 color               A 6525      59     14-channel color
+    tcs3430   TCS3430 color               A 6479      39     XYZ color
+    opt4048   OPT4048 color               A 6335      44     XYZ color and lux
+    apds9960  APDS9960 gesture            A 3595      39     gesture, proximity, color
+    apds9999  APDS9999 proximity          A 6461      52     proximity, lux, color
+    vcnl4040  VCNL4040 proximity          A 4161      60     proximity and lux
+    vcnl4020  VCNL4020 proximity          A 5810      13     proximity and light
+    vcnl4200  VCNL4200 proximity          A 6064      51     long-range proximity
+    vl53l0x   VL53L0X laser distance      A 3317      29     distance to 1 m
+    vl53l1x   VL53L1X laser distance      A 3967      29     distance to 4 m
+    vl53l4cd  VL53L4CD laser distance     A 5396      29     distance to 1.3 m
+    vl53l4cx  VL53L4CX laser distance     A 5425      29     distance to 6 m
+    vl6180x   VL6180X laser distance      A 3316      29     short distance and lux
+    tmf8801   TMF8801 laser distance      A 6522      41     distance to 2.5 m
+    sths34    STHS34PF80 presence         A 6426      5a     a person nearby (IR)
+    vl53l5cx  VL53L5CX 8x8 distance (Mini) S SEN-19013 52    an 8x8 grid of distances`),
+  ...board("Other", `
+    eeprom    24LC32 EEPROM               A 5146      50     4 KB of memory
+    drv2605   DRV2605L haptic driver      A 2305      5a     buzzes a small vibration motor
+    ads1115   ADS1115 ADC                 A 1085      48     reads 4 voltages, 16-bit`),
 ];
+// One board per line: key, name, A(dafruit)/S(parkFun) + its product number, hex I2C addresses, what it does.
+function board(group: string, rows: string): Chip[] {
+  return rows.trim().split("\n").map((l) => {
+    const [, key, name, shop, id, addr, does] = l.trim().match(/^(\S+)\s+(.+?)\s+([AS]) (\S+)\s+([0-9a-f,]+)\s+(.+)$/)!;
+    const [maker, url] = shop === "A" ? ["Adafruit", `https://www.adafruit.com/product/${id}`] : ["SparkFun", `https://www.sparkfun.com/catalogsearch/result/?q=${id}`];
+    return { key, name, group, about: `${maker} ${name} (${id}): ${does}.`, addr: addr.split(",").map((a) => parseInt(a, 16)), buy: [[url, maker]] };
+  });
+}
 const GROUPS = [...new Set(CHIPS.map((c) => c.group))];
 const chipOf = (key: string) => CHIPS.find((c) => c.key === key);
 // What each app looks like on the preview's screen.
@@ -121,7 +214,7 @@ export async function build(main: HTMLElement) {
       </div>
       <div class="bld-pick">
         <div class="card"><h3>Software</h3><p class="fine">The one app it boots into. You can swap it any time from Connect.</p><div class="bld-apps" id="bld-apps"><p class="fine">Loading apps…</p></div></div>
-        <div class="card"><h3>Chips</h3><p class="fine">Up to two little I2C boards wedged between the Pico and the screen: a secure chip for keys, a sensor, or both.</p>
+        <div class="card"><h3>Chips</h3><p class="fine">Up to two little I2C boards wedged between the Pico and the screen: a secure chip for keys, a sensor, or both. Only the secure chips have drivers built in so far; for a sensor, your app brings its own.</p>
           <div class="bld-slots" id="bld-chip">${[0, 1].map((i) => `<label class="bld-slot"><span class="bld-part">${i ? "Second" : "First"}</span>
             <select data-slot="${i}"><option value="none">Nothing</option>${GROUPS.map((g) => `<optgroup label="${g}">${
               CHIPS.filter((c) => c.group === g).map((c) => `<option value="${c.key}">${c.name}</option>`).join("")}</optgroup>`).join("")}</select></label>`).join("")}

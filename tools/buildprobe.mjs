@@ -36,6 +36,12 @@ for (const vp of [{ width: 1360, height: 900, name: "desktop" }, { width: 390, h
   const two = await page.locator("#bld-steps").innerText();
   check(q().chip === "trustm" && q().chip2 === "atecc" && two.includes("Trust M") && two.includes("ATECC608") && two.includes("50 mm"), `${vp.name}: two boards picked, both on the build list with the chaining cable`);
   check(await page.evaluate(() => document.querySelector('#bld-chip [data-slot="1"] option[value="trustm"]').disabled), `${vp.name}: the same board (same I2C address) can't go in both slots`);
+  const opts = await page.evaluate(() => [...document.querySelectorAll('#bld-chip [data-slot="0"] option')].map((o) => o.value));
+  check(opts.length > 80 && new Set(opts).size === opts.length, `${vp.name}: ${opts.length} boards in the dropdown, no duplicates`);
+  await slot(0).selectOption("atecc");
+  await slot(1).selectOption("lis3dh");
+  check(q().chip2 === "lis3dh" && (await page.locator("#bld-steps").innerText()).includes("LIS3DH") && await page.evaluate(() => document.querySelector('#bld-chip [data-slot="1"] option[value="vcnl4040"]').disabled),
+    `${vp.name}: a sensor in the second slot; VCNL4040 (0x60, like the ATECC608) can't go with it`);
   await slot(0).selectOption("none");
   await slot(1).selectOption("none");
   await tap('.sw[data-part="a"][data-color="blue"]');
