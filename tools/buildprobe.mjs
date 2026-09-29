@@ -39,7 +39,9 @@ for (const vp of [{ width: 1360, height: 900, name: "desktop" }, { width: 390, h
   await p2.goto(url);
   await p2.waitForSelector("[data-app]");
   check(p2.url() === url, `${vp.name}: the same link opens the same wedgie`);
-  check(await p2.locator('[data-app="demo"]').getAttribute("aria-pressed") === "true" && await p2.locator('.sw[data-part="base"][data-color="orange"]').getAttribute("aria-pressed") === "true", `${vp.name}: its choices show as picked`);
+  // (evaluate, not locators: with two WebGL tabs open, a locator on the second one can stall)
+  const picked = await p2.evaluate(() => [...document.querySelectorAll('[aria-pressed="true"]')].map((e) => e.dataset.app || e.dataset.part + "=" + e.dataset.color));
+  check(["demo", "base=orange", "a=blue", "lid=pink"].every((x) => picked.includes(x)), `${vp.name}: its choices show as picked`);
   await p2.close();
 
   const wide = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);

@@ -12,7 +12,8 @@ one, plug it in and put software on it, hand it to your agent.
 - `src/serial/` — WebSerial: every plugged-in wedgie, identified by its board ID (`wedgies.ts`),
   over MicroPython's raw REPL (`repl.ts`, from picowallet `factory/`); `install.ts` puts the core and
   its one app on, `files.ts` reads and writes its files and saves. `src/pages/connect.ts` is the list at /connect, `src/pages/wedgie.ts` one wedgie,
-  `src/pages/format.ts` the wipe-and-test bench (/format, was /test), `src/pages/update.ts` the update bench (/update).
+  `src/pages/format.ts` the wipe-and-test bench (/format, was /test), `src/pages/update.ts` the update bench (/update),
+  `src/pages/build.ts` the build-your-own page (/build: app, chip, colors; every choice is in the URL, so a link is a wedgie).
 
 **Heads-up for anyone who talks to a wedgie over USB:** about a second after it's plugged in, the
 wedgie adds its WEDGIE drive, and its serial port disappears and comes back as a new port. Find it by
