@@ -47,6 +47,7 @@ export async function cartV(hashes: (string | null)[]) {
   return [...new Uint8Array(d)].map((x) => x.toString(16).padStart(2, "0")).join("").slice(0, 12);
 }
 
+const hex = (d: ArrayBuffer) => [...new Uint8Array(d)].map((x) => x.toString(16).padStart(2, "0")).join("");
 const b64 = (u8: Uint8Array) => {
   let s = "";
   for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode(...u8.subarray(i, i + 0x8000));
@@ -150,6 +151,8 @@ async function copy(r: Repl, files: FileInfo[], have: Have, onProgress: (p: numb
     const res = await fetch(f.url || "/fw/" + f.name, { cache: "no-cache" });
     if (!res.ok) throw new Error(`${f.name}: couldn't fetch it (${res.status})`);
     const buf = new Uint8Array(await res.arrayBuffer());
+    // A deploy since this page loaded: the manifest it read is older than the files it gets now.
+    if (!f.url && hex(await crypto.subtle.digest("SHA-256", buf)) !== f.sha256) throw new Error("wedgie.dev was updated since this page opened. Reload the page, then try again");
     const tmp = "_wedgie.tmp";
     await r.exec(`import binascii\n_f = open(${JSON.stringify(tmp)}, "wb")`);
     for (let i = 0; i < buf.length; i += CHUNK) {

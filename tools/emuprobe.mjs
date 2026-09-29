@@ -147,6 +147,16 @@ try {
   check(late === "1", "a tick that isn't back to back runs even before USB's turn (no choppy apps)");
   check(kb === "True", "a Ctrl-C inside a tick reaches the main loop");
 
+  // the lock (main.py seals a real board; here it's switched on by hand): "let this computer in?" asks
+  // on the screen, Y says no, and the app's screen comes back as it was (an app that doesn't redraw by
+  // itself must not sit under the question)
+  const asked = page.evaluate(() => window.vw.exec("import wedgie, slot, lcd\nwedgie.SEALED = True\nslot.stop()\nlcd._BUF[0] = 0x12\nlcd._BUF[1] = 0x34\nok = slot.let_in()\nprint('let in:', ok, lcd._BUF[0], lcd._BUF[1])\nwedgie.SEALED = False"));
+  await page.waitForTimeout(2500);
+  await page.locator(".vw").screenshot({ path: `${out}/emu-ask.png` });
+  await page.evaluate(() => window.vw.press("Y", 150));
+  const al = await asked;
+  check(/let in: False 18 52/.test(al), `lock: Y says no, the app's screen comes back (${al.trim()})`);
+
   // the Wallet (no chip: software key) must not crash; it has USB to itself
   await page.evaluate(() => window.vw.reboot("usbwallet"));
   await page.waitForTimeout(3000);

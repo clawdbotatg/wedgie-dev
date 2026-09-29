@@ -260,8 +260,8 @@ def ask():
     d.center_text("LET THIS", 48, INK, 2)
     d.center_text("COMPUTER IN?", 72, INK, 2)
     y = 108
-    for s in ("It can change anything on", "this wedgie" + (", and use its" if wallet else ","),
-              ("wallet key, " if wallet else "") + "until you unplug it.", "", "Didn't ask for this? Y."):
+    lines = ["It can change anything", "on this wedgie,"] + (["and use its wallet key,"] if wallet else [])
+    for s in lines + ["until you unplug it.", "", "Didn't ask for this? Y."]:
         d.center_text(s, y, INK)
         y += 14
     d.fill_rect(0, 184, 240, 26, GREEN)
@@ -286,6 +286,7 @@ def let_in():
         W.set_open()
         return True
     _paused = True
+    kept = _keep()
     try:
         ok = ask()
     finally:
@@ -293,11 +294,43 @@ def let_in():
     if ok:
         W.set_open()
         _band("computer in", [("unplug it to lock it", MUTED)])
-    elif state == "empty":
+    elif kept:
+        _unkeep()                       # the app's screen as it was: an app that doesn't redraw by
+    elif state == "empty":              # itself would otherwise sit under the question forever
         empty()
     elif state in ("ended", "error"):
         _ended()
+    _gone(KEEP)
     return ok
+
+
+KEEP = "_screen.bin"    # the app's screen while the question is up (no RAM for a second 115 KB copy)
+
+
+def _keep():
+    try:
+        with open(KEEP, "wb") as f:
+            f.write(L._BUF)
+        return True
+    except Exception:
+        return False
+
+
+def _unkeep():
+    try:
+        with open(KEEP, "rb") as f:
+            f.readinto(L._BUF)
+        d.show()
+    except Exception:
+        pass
+
+
+def _gone(p):
+    try:
+        import os
+        os.remove(p)
+    except OSError:
+        pass
 
 
 def serve(_=None):
