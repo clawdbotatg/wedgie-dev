@@ -83,8 +83,8 @@ for (const vp of [{ width: 1360, height: 900, name: "desktop" }, { width: 390, h
 {
   const page = await browser.newPage();
   await page.goto(base + "/");
-  await page.waitForSelector("#custom", { state: "attached" });
-  check(await page.locator('#custom a[href="/build"]').count() === 1, "front page: Customize one → /build");
+  await page.waitForSelector("#agents", { state: "attached" });
+  check(await page.locator('#agents a[href="/build"]').count() === 1, "front page: Customize → /build");
 }
 await browser.close();
 process.exit(fail ? 1 : 0);

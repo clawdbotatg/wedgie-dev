@@ -90,19 +90,10 @@ export function home(main: HTMLElement): Promise<unknown> {
     </div>
   </section>
 
-  <section id="custom" class="sec">
-    <div class="card custom">
-      <div>
-        <h3>Build a custom wedgie</h3>
-        <p>Pick its app, its chip, and the color of every part. You get a link to that exact wedgie: buy it, build it, or send it to a friend.</p>
-      </div>
-      <a class="btn btn-green" href="/build">Customize one</a>
-    </div>
-  </section>
-
   <section id="agents" class="sec agents">
     <a class="btn btn-lg" href="/skill.md" target="_blank"><span class="bot" aria-hidden="true">🤖</span> skill.md</a>
-    <a class="btn btn-lg" href="/code">Make apps for it</a>
+    <a class="btn btn-lg" href="/code">Software</a>
+    <a class="btn btn-lg" href="/build">Customize</a>
   </section>
 `;
 
