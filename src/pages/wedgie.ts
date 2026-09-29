@@ -596,6 +596,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
       // port survives a soft reset; if it doesn't, the disconnect marks it gone and the replug is a new one.
       W.reidentify(x);
       release?.(); release = null; link = null;
+      setTimeout(() => { status(""); meter(null); }, 8000);
     } catch (e: any) {
       meter(null);
       status(`<b class="bad">Update failed:</b> ${esc(e?.message || e)}. It's safe to try again.`);
