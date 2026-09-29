@@ -60,7 +60,7 @@ try {
   check(before !== await page.evaluate(() => window.__codeVw.screenshotPNG()), "D on the keyboard moves the ship (the screen changes)");
 
   // Saves: play until the rocks win; Dodge saves its best; the page keeps it; edit it and run again.
-  await page.waitForFunction(() => !!localStorage.getItem("wedgie.emu.saves.dodge"), null, { timeout: 60000 }).catch(() => {});
+  await page.waitForFunction(() => !!localStorage.getItem("wedgie.emu.saves.dodge"), null, { timeout: 150000 }).catch(() => {});   // rocks are random: a game over can take a while
   const saved = await page.evaluate(() => localStorage.getItem("wedgie.emu.saves.dodge"));
   check(!!saved && saved.includes('"best"'), `a game over's save.store reaches the page: ${saved}`);
   await page.locator("#c-vw").screenshot({ path: `${out}/code-dodge-over.png` });

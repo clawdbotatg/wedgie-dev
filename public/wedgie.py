@@ -542,7 +542,7 @@ def main():
             gone = others(m, have, cart["mod"])
             need = sum(size[n] for n in cart["files"] if not have["hashes"].get(n))
             free = int(wg.exec("import os\n_s = os.statvfs('/')\nprint(_s[0] * _s[3])").strip())
-            if free + sum(size[n] for n in gone) < need + FLOOR:
+            if free + sum(size.get(n, 0) for n in gone) < need + FLOOR:     # 0: an old repo app's file (not in the manifest)
                 wg.leave(reset=False)
                 sys.exit("not enough room: %s needs %d KB. Delete some saves or files first." % (cart["name"], need // 1024))
             remove_files(wg, have, gone)
