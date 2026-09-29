@@ -26,13 +26,18 @@ for (const vp of [{ width: 1360, height: 900, name: "desktop" }, { width: 390, h
   await page.goto(base + "/build?app=usbwallet&chip=none&lid=pink");
   await page.waitForSelector("[data-app]");
   check(q().app === "usbwallet" && q().chip === "atecc" && q().lid === "pink" && q().base === "black", `${vp.name}: link read, wallet forces the chip, defaults filled in (${new URL(page.url()).search})`);
-  check(await page.locator('#bld-chip [data-chip="none"]').isDisabled() && await page.locator('#bld-chip [data-chip="trustm"]').isDisabled(), `${vp.name}: "No chip" and Trust M off for the wallet (it needs the ATECC608)`);
+  check(await page.locator('#bld-chip [data-slot="0"]').isDisabled() && q().chip2 === "none", `${vp.name}: the wallet locks the ATECC608 into the first slot; the second is free`);
   check((await page.locator("#bld-steps").innerText()).includes("ATECC608"), `${vp.name}: build list has the chip`);
 
   await tap('[data-app="demo"]');
-  await tap('#bld-chip [data-chip="trustm"]');
-  check(q().chip === "trustm" && (await page.locator("#bld-steps").innerText()).includes("Trust M"), `${vp.name}: Trust M picked, on the build list`);
-  await tap('#bld-chip [data-chip="none"]');
+  const slot = (i) => page.locator(`#bld-chip [data-slot="${i}"]`);
+  await slot(0).selectOption("trustm");
+  await slot(1).selectOption("atecc");
+  const two = await page.locator("#bld-steps").innerText();
+  check(q().chip === "trustm" && q().chip2 === "atecc" && two.includes("Trust M") && two.includes("ATECC608") && two.includes("50 mm"), `${vp.name}: two boards picked, both on the build list with the chaining cable`);
+  check(await page.evaluate(() => document.querySelector('#bld-chip [data-slot="1"] option[value="trustm"]').disabled), `${vp.name}: the same board (same I2C address) can't go in both slots`);
+  await slot(0).selectOption("none");
+  await slot(1).selectOption("none");
   await tap('.sw[data-part="a"][data-color="blue"]');
   await tap('.sw[data-part="base"][data-color="orange"]');
   check(q().app === "demo" && q().chip === "none" && q().a === "blue" && q().base === "orange", `${vp.name}: taps land in the URL`);

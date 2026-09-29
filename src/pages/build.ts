@@ -1,5 +1,5 @@
-// /build: pick a wedgie — its app, its secure chip (or none), the color of every printed part —
-// and the URL becomes that wedgie (/build?app=usbwallet&chip=atecc&lid=white&...). Anyone with the link
+// /build: pick a wedgie — its app, up to two I2C boards wedged inside, the color of every printed part —
+// and the URL becomes that wedgie (/build?app=usbwallet&chip=atecc&chip2=none&chip2=none&lid=white&...). Anyone with the link
 // sees the same one and can buy it or build it from the list below. Firmware is always the latest.
 import "./build.css";
 import { esc } from "../ui/device";
@@ -49,13 +49,17 @@ const PARTS = [
 ] as const;
 const fits = (p: { case: boolean }, c: Color) => !!c.petg || (!p.case && !!c.pla);
 const DEF_APP = "hello";
-// Secure chips: URL key, the name carts.json's "chip" uses, what to buy. The core has a driver for each.
-const CHIPS = [
-  { key: "atecc", chip: "ATECC608", name: "ATECC608", about: "Adafruit ATECC608 breakout",
-    buy: [["https://www.amazon.com/s?k=ATECC608&i=electronics", "Amazon"], ["https://www.adafruit.com/product/4314", "Adafruit"], ["https://www.digikey.com/en/products/detail/adafruit-industries-llc/4314/10419053", "DigiKey"]] },
-  { key: "trustm", chip: "OPTIGA Trust M", name: "Trust M", about: "Adafruit Infineon OPTIGA Trust M breakout",
+// Boards that fit the wedge: I2C, no bigger than the ATECC608 breakout (25.4 x 17.8 mm; a millimetre more
+// and it won't go between the Pico and the hat). Two can chain (each has a spare STEMMA QT port).
+// key: in the URL. chip: the name carts.json's "chip" uses. addr: its I2C addresses (two on one bus can't share).
+type Chip = { key: string; name: string; group: string; about: string; addr: number[]; buy: string[][]; chip?: string };
+const CHIPS: Chip[] = [
+  { key: "atecc", chip: "ATECC608", name: "ATECC608", group: "Secure chip", about: "Adafruit ATECC608 breakout (4314). Keeps keys; the Wallet uses it.", addr: [0x60],
+    buy: [["https://www.adafruit.com/product/4314", "Adafruit"], ["https://www.amazon.com/s?k=adafruit+4314+ATECC608", "Amazon"], ["https://www.digikey.com/en/products/detail/adafruit-industries-llc/4314/10419053", "DigiKey"]] },
+  { key: "trustm", chip: "OPTIGA Trust M", name: "Trust M", group: "Secure chip", about: "Adafruit Infineon OPTIGA Trust M breakout (4351). Keeps keys.", addr: [0x30],
     buy: [["https://www.adafruit.com/product/4351", "Adafruit"]] },
 ];
+const GROUPS = [...new Set(CHIPS.map((c) => c.group))];
 const chipOf = (key: string) => CHIPS.find((c) => c.key === key);
 // What each app looks like on the preview's screen.
 const SCREENS: Record<string, string[]> = {
@@ -64,12 +68,12 @@ const SCREENS: Record<string, string[]> = {
 };
 // Ready-made wedgies: each is just a /build link, like any shared one.
 const PRESETS = [
-  { name: "Wallet", q: "app=usbwallet&chip=atecc&lid=white&base=black&a=green&b=darkgrey&x=darkgrey&y=red&stick=darkgrey" },
-  { name: "Game", q: "app=demo&chip=none&lid=purple&base=black&a=yellow&b=skyblue&x=mint&y=magenta&stick=yellow" },
-  { name: "Plain", q: "app=hello&chip=none&lid=white&base=black&a=green&b=darkgrey&x=darkgrey&y=red&stick=darkgrey" },
+  { name: "Wallet", q: "app=usbwallet&chip=atecc&chip2=none&lid=white&base=black&a=green&b=darkgrey&x=darkgrey&y=red&stick=darkgrey" },
+  { name: "Game", q: "app=demo&chip=none&chip2=none&lid=purple&base=black&a=yellow&b=skyblue&x=mint&y=magenta&stick=yellow" },
+  { name: "Plain", q: "app=hello&chip=none&chip2=none&lid=white&base=black&a=green&b=darkgrey&x=darkgrey&y=red&stick=darkgrey" },
 ];
 
-type Build = { app: string; chip: string; colors: Record<string, string> };   // chip: a CHIPS key or "none"
+type Build = { app: string; chips: string[]; colors: Record<string, string> };   // chips: two CHIPS keys or "none"
 
 function read(carts: Cart[]): Build {
   const q = new URLSearchParams(location.search);
@@ -77,16 +81,21 @@ function read(carts: Cart[]): Build {
   const app = a && (!carts.length || carts.some((c) => c.mod === a)) ? a : DEF_APP;
   const colors: Record<string, string> = {};
   for (const p of PARTS) { const c = COLORS[q.get(p.key) || ""]; colors[p.key] = c && fits(p, c) ? q.get(p.key)! : p.def; }
-  return { app, chip: fitChip(carts, app, q.get("chip") || ""), colors };
+  return { app, chips: fitChips(carts, app, [q.get("chip") ?? "atecc", q.get("chip2") ?? "none"]), colors };
 }
-// The app's chip if it needs one; else the one asked for (an unknown one: the ATECC608).
-function fitChip(carts: Cart[], app: string, want: string) {
-  const need = CHIPS.find((c) => c.chip === carts.find((x) => x.mod === app)?.chip);
-  return need ? need.key : want === "none" || chipOf(want) ? want : "atecc";
+// The app's chip goes in (first slot) if it needs one. Unknown boards, or one whose I2C address the
+// other board already uses, come out.
+const clash = (x: string, y: string) => !!chipOf(x)?.addr.some((a) => chipOf(y)?.addr.includes(a));
+function fitChips(carts: Cart[], app: string, want: string[]) {
+  let [one, two] = want.map((k) => (chipOf(k) ? k : "none"));
+  const need = CHIPS.find((c) => c.chip && c.chip === carts.find((x) => x.mod === app)?.chip)?.key;
+  if (need && one !== need && two !== need) one = need;
+  if (clash(one, two)) two = "none";
+  return [one, two];
 }
 // Every choice goes in the URL, defaults too, so a link means the same wedgie if the defaults change.
 function query(b: Build) {
-  const q = new URLSearchParams({ app: b.app, chip: b.chip });
+  const q = new URLSearchParams({ app: b.app, chip: b.chips[0], chip2: b.chips[1] });
   for (const p of PARTS) q.set(p.key, b.colors[p.key]);
   return q.toString();
 }
@@ -99,7 +108,7 @@ export async function build(main: HTMLElement) {
     <div class="sec-head">
       <span class="kicker">Build a wedgie</span>
       <h2>Make it yours.</h2>
-      <p>Pick its app, its chip, and the color of every part. The link is this exact wedgie: share it, and anyone can buy one or build one.</p>
+      <p>Pick its app, the chips inside, and the color of every part. The link is this exact wedgie: share it, and anyone can buy one or build one.</p>
       <div class="row bld-presets"><span class="fine">Start from</span>${PRESETS.map((p) => `<a class="btn btn-xs" href="/build?${p.q}" data-q="${p.q}">${p.name}</a>`).join("")}</div>
     </div>
     <div class="bld-grid">
@@ -112,10 +121,10 @@ export async function build(main: HTMLElement) {
       </div>
       <div class="bld-pick">
         <div class="card"><h3>Software</h3><p class="fine">The one app it boots into. You can swap it any time from Connect.</p><div class="bld-apps" id="bld-apps"><p class="fine">Loading apps…</p></div></div>
-        <div class="card"><h3>Chip</h3><p class="fine">The secure chip keeps keys. Wallets need one; games don't.</p>
-          <div class="seg" role="radiogroup" aria-label="secure chip" id="bld-chip">
-            ${CHIPS.map((c) => `<button data-chip="${c.key}" role="radio">${c.name}</button>`).join("")}
-            <button data-chip="none" role="radio">No chip</button>
+        <div class="card"><h3>Chips</h3><p class="fine">Up to two little I2C boards wedged between the Pico and the screen: a secure chip for keys, a sensor, or both.</p>
+          <div class="bld-slots" id="bld-chip">${[0, 1].map((i) => `<label class="bld-slot"><span class="bld-part">${i ? "Second" : "First"}</span>
+            <select data-slot="${i}"><option value="none">Nothing</option>${GROUPS.map((g) => `<optgroup label="${g}">${
+              CHIPS.filter((c) => c.group === g).map((c) => `<option value="${c.key}">${c.name}</option>`).join("")}</optgroup>`).join("")}</select></label>`).join("")}
           </div><p class="fine" id="bld-chip-note"></p></div>
         <div class="card"><h3>Colors</h3><p class="fine">Colors you can get on Amazon in a couple of days. The case is PETG; buttons and joystick PETG or PLA.</p><div class="bld-colors" id="bld-colors"></div></div>
         <div class="card"><h3>Firmware</h3><p class="fine">Always the latest: <b id="bld-fw">…</b>. Every wedgie updates itself from Connect.</p></div>
@@ -167,20 +176,21 @@ export async function build(main: HTMLElement) {
         ${miniCart(c)}<span><b>${esc(c.name)}</b><span class="fine">${esc(c.about || "")}</span></span></button>`).join("");
       $("#bld-apps").querySelectorAll<HTMLButtonElement>("[data-app]").forEach((x) => (x.onclick = () => {
         const app = x.dataset.app!;
-        set({ ...b, app, chip: fitChip(m!.carts, app, b.chip) });
+        set({ ...b, app, chips: fitChips(m!.carts, app, b.chips) });
       }));
       $("#bld-fw").textContent = `wedgie ${m.version}`;
     }
-    // Chip
-    const must = cart?.chip;
-    $("#bld-chip").querySelectorAll<HTMLButtonElement>("button").forEach((x) => {
-      const on = x.dataset.chip === b.chip;
-      x.classList.toggle("on", on); x.setAttribute("aria-checked", String(on));
-      x.disabled = !!must && !on;
-      x.onclick = () => set({ ...b, chip: x.dataset.chip! });
+    // Chips: a board the other slot's board clashes with can't be picked; the app's own chip is locked in.
+    const must = CHIPS.find((c) => c.chip && c.chip === cart?.chip)?.key;
+    $("#bld-chip").querySelectorAll<HTMLSelectElement>("select").forEach((sel) => {
+      const i = +sel.dataset.slot!, other = b.chips[1 - i];
+      sel.value = b.chips[i];
+      sel.disabled = !!must && b.chips[i] === must;
+      sel.querySelectorAll("option").forEach((o) => (o.disabled = o.value !== "none" && clash(o.value, other)));
+      sel.onchange = () => { const c = [...b.chips]; c[i] = sel.value; set({ ...b, chips: fitChips(m?.carts || [], b.app, c) }); };
     });
-    $("#bld-chip-note").textContent = must ? `${cart!.name} needs the ${must}.` : "";
-    const chip = chipOf(b.chip);
+    const picked = b.chips.map(chipOf).filter((c): c is Chip => !!c);
+    $("#bld-chip-note").textContent = [must ? `${cart!.name} needs the ${chipOf(must)!.name}.` : "", ...picked.map((c) => c.about)].filter(Boolean).join(" ");
     // Colors: one row of swatches per part.
     $("#bld-colors").innerHTML = PARTS.map((p) => `<div class="bld-color"><span class="bld-part">${p.name} <span class="fine">${COLORS[b.colors[p.key]].name}</span></span><span class="bld-sw">${
       Object.entries(COLORS).filter(([, c]) => fits(p, c)).map(([k, c]) => `<button class="sw${b.colors[p.key] === k ? " on" : ""}" style="--c:#${c.hex.toString(16).padStart(6, "0")}" data-part="${p.key}" data-color="${k}" title="${c.name}" aria-label="${p.name}: ${c.name}" aria-pressed="${b.colors[p.key] === k}"></button>`).join("")
@@ -201,8 +211,9 @@ export async function build(main: HTMLElement) {
         <div class="buy">${link("https://www.amazon.com/s?k=raspberry+pi+pico+with+header&i=electronics", "Amazon")}${link("https://www.adafruit.com/product/6315", "Adafruit")}${link("https://www.microcenter.com/product/692334/raspberry-pi-pico-2w-with-header", "Micro Center")}</div></li>
       <li><b>The screen hat</b> <span>Waveshare Pico-LCD-1.3.</span>
         <div class="buy">${link("https://www.amazon.com/dp/B092VVCBQP", "Amazon")}${link("https://www.waveshare.com/pico-lcd-1.3.htm", "Waveshare")}${link("https://thepihut.com/products/1-3-ips-lcd-display-module-for-raspberry-pi-pico-240x240", "The Pi Hut")}</div></li>
-      ${chip ? `<li><b>The chip</b> <span>${chip.about}, plus a STEMMA QT / Qwiic cable with bare wire ends.</span>
-        <div class="buy">${chip.buy.map(([u, t]) => link(u, t)).join("")}</div></li>` : ""}
+      ${picked.map((c, i) => `<li><b>${esc(c.name)}</b> <span>${esc(c.about)} ${i ? "It chains off the first board's spare port: add a 50 mm STEMMA QT cable."
+          : "Plus a STEMMA QT / Qwiic cable with bare wire ends."}</span>
+        <div class="buy">${c.buy.map(([u, t]) => link(u, t)).join("")}${i ? link("https://www.adafruit.com/product/4399", "50 mm cable") : link("https://www.adafruit.com/product/4209", "Cable")}</div></li>`).join("")}
       ${b.app === "battery" ? `<li><b>A battery hat</b> <span>The Battery app reads a Waveshare Pico-UPS-B.</span>
         <div class="buy">${link("https://www.waveshare.com/pico-ups-b.htm", "Waveshare")}</div></li>` : ""}
       <li><b>Get the filament</b> <span>1.75 mm. The case in PETG; buttons and joystick in PETG or PLA.</span>
@@ -210,7 +221,7 @@ export async function build(main: HTMLElement) {
       <li><b>Print the case</b> <span>0.16 mm layers, 4 walls, no supports. Lid in ${cname("lid").toLowerCase()}, base in ${cname("base").toLowerCase()}, joystick in ${cname("stick").toLowerCase()}, buttons: ${buttons}.</span>
         <div class="buy">${[["lid.stl", `Lid · ${cname("lid")}`], ["base.stl", `Base · ${cname("base")}`], ["joystick.stl", `Joystick · ${cname("stick")}`], ["button.stl", "Button ×4"]]
           .map(([f, t]) => `<a class="btn btn-xs" href="${CASE}${f}" download>${t}</a>`).join("")}</div></li>
-      <li><b>Put it together</b> <span>${chip ? "Wedge the chip's wires in, then the chip, then the case." : "Plug the Pico into the hat, then snap the case on. Skip the chip steps."}</span>
+      <li><b>Put it together</b> <span>${picked.length ? `Wedge the wires in, then the ${picked.length > 1 ? "boards" : "board"}, then the case.` : "Plug the Pico into the hat, then snap the case on. Skip the chip steps."}</span>
         <div class="buy"><a class="btn btn-xs" href="/assemble">Assembly guide</a></div></li>
       <li><b>Put ${esc(cart?.name || b.app)} on it</b> <span>Plug it in, tap Connect at the top, open your wedgie, and tap ${esc(cart?.name || b.app)}. It gets the latest firmware too.</span>
         <div class="buy"><a class="btn btn-xs" href="/connect">Connect</a></div></li>`;

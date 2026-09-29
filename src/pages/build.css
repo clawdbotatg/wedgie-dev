@@ -39,3 +39,10 @@
   .bld-link code { flex-basis: 100%; }
 }
 
+.bld-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.bld-slot { display: grid; gap: 4px; }
+.bld-slot select { font: inherit; font-weight: 700; font-size: 15px; color: var(--ink); height: 44px; padding: 0 12px; border: 0; border-radius: 14px;
+  background: var(--recess); box-shadow: var(--recess-shadow); width: 100%; }
+.bld-slot select:disabled { opacity: .7; }
+#bld-chip-note { margin-top: 10px; }
+@media (max-width: 480px) { .bld-slots { grid-template-columns: 1fr; } }
