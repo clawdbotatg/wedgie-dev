@@ -20,6 +20,9 @@ for (const vp of [{ width: 1360, height: 900, name: "desktop" }, { width: 390, h
   const tap = async (sel) => { const el = page.locator(sel).first(); await el.scrollIntoViewIfNeeded(); vp.hasTouch ? await el.tap() : await el.click(); await page.waitForTimeout(150); };
   const q = () => Object.fromEntries(new URL(page.url()).searchParams);
 
+  await page.goto(base + "/build?app=hello&lid=mint");
+  await page.waitForSelector("[data-app]");
+  check(q().lid === "white", `${vp.name}: a link with a PLA-only lid falls back to the default`);
   await page.goto(base + "/build?app=usbwallet&chip=none&lid=pink");
   await page.waitForSelector("[data-app]");
   check(q().app === "usbwallet" && q().chip === "atecc" && q().lid === "pink" && q().base === "black", `${vp.name}: link read, wallet forces the chip, defaults filled in (${new URL(page.url()).search})`);
@@ -35,6 +38,11 @@ for (const vp of [{ width: 1360, height: 900, name: "desktop" }, { width: 390, h
   check(q().app === "demo" && q().chip === "none" && q().a === "blue" && q().base === "orange", `${vp.name}: taps land in the URL`);
   const steps = await page.locator("#bld-steps").innerText();
   check(!steps.includes("ATECC608") && steps.includes("base in orange") && steps.includes("A blue"), `${vp.name}: build list follows`);
+
+  check(await page.locator('.sw[data-part="lid"][data-color="mint"]').count() === 0, `${vp.name}: a PLA-only color isn't offered for the case`);
+  await tap('.sw[data-part="y"][data-color="mint"]');
+  const buy = await page.locator("#bld-steps").innerText();
+  check(q().y === "mint" && buy.includes("Mint PLA") && buy.includes("Orange PETG") && buy.includes("Pink PETG"), `${vp.name}: buttons take PLA; spools listed PETG/PLA`);
 
   const url = page.url();
   const p2 = await ctx.newPage();

@@ -10,23 +10,44 @@ import type { Wedgie3D } from "../ui/wedgie3d";
 
 const CASE = "https://raw.githubusercontent.com/clawdbotatg/clawd-pico-case/main/stl/current/";
 
-// Filament colors. The first few are what the site's own wedgie is printed in (wedgie3d COLORS).
-const COLORS: Record<string, { name: string; hex: number }> = {
-  white: { name: "White", hex: 0xf3f2ee }, black: { name: "Black", hex: 0x1c1c1e }, grey: { name: "Grey", hex: 0x6c6d71 },
-  green: { name: "Green", hex: 0x278c3c }, red: { name: "Red", hex: 0xb3302a }, blue: { name: "Blue", hex: 0x2560c4 },
-  yellow: { name: "Yellow", hex: 0xe2b21c }, orange: { name: "Orange", hex: 0xe06a1f }, purple: { name: "Purple", hex: 0x6b3fc9 },
-  pink: { name: "Pink", hex: 0xe57aa8 },
+// Filament you can get on Amazon in a couple of days (1.75 mm, 1 kg, from at least two of the big brands:
+// Elegoo, Sunlu, Overture, Polymaker, eSun, Jayo, Hatchbox, Amazon Basics, Creality; checked 2026-09).
+// The case is PETG only; buttons and the joystick can be PETG or PLA. hex: how the printed plastic looks.
+type Color = { name: string; hex: number; petg?: string; pla?: string };   // petg/pla: where to buy it
+const AMZ = "https://www.amazon.com/";
+const COLORS: Record<string, Color> = {
+  white: { name: "White", hex: 0xefefea, petg: AMZ + "dp/B0D24YS31F", pla: AMZ + "s?k=elegoo+pla+white+1kg" },
+  black: { name: "Black", hex: 0x1c1c1e, petg: AMZ + "dp/B0D41Y3WWZ", pla: AMZ + "dp/B09WW4Z413" },
+  grey: { name: "Grey", hex: 0x9a9da1, petg: AMZ + "dp/B07PFS4J97", pla: AMZ + "dp/B07HHFXYPS" },
+  darkgrey: { name: "Dark grey", hex: 0x4a4d52, petg: AMZ + "dp/B0CB8DRBL2" },
+  silver: { name: "Silver", hex: 0xa8abaf, pla: AMZ + "dp/B0DGQ8ZHFS" },
+  red: { name: "Red", hex: 0xc0282d, petg: AMZ + "dp/B0DQTXX4D5", pla: AMZ + "dp/B00J0GO8I0" },
+  orange: { name: "Orange", hex: 0xe86a2c, petg: AMZ + "dp/B0FS1DC7RJ", pla: AMZ + "dp/B0D421ZH2W" },
+  yellow: { name: "Yellow", hex: 0xf0c020, petg: AMZ + "dp/B0D41ZWK7V", pla: AMZ + "s?k=sunlu+pla+yellow+1kg" },
+  green: { name: "Green", hex: 0x3c8f3a, petg: AMZ + "dp/B0991YSBDG", pla: AMZ + "dp/B07D69XD89" },
+  olive: { name: "Olive", hex: 0x6b6e3a, petg: AMZ + "dp/B0DPZ3DYH1", pla: AMZ + "dp/B0991QGSPS" },
+  mint: { name: "Mint", hex: 0x9cd6be, pla: AMZ + "dp/B0B1ZVN853" },
+  skyblue: { name: "Sky blue", hex: 0x5aaedc, pla: AMZ + "dp/B0C6QD6456" },
+  blue: { name: "Blue", hex: 0x1f4e9e, petg: AMZ + "dp/B0873BC9SY", pla: AMZ + "s?k=sunlu+pla+klein+blue+1kg" },
+  darkblue: { name: "Dark blue", hex: 0x1f2a5c, pla: AMZ + "s?k=elegoo+pla+dark+blue+1kg" },
+  purple: { name: "Purple", hex: 0x633c94, petg: AMZ + "dp/B07VSVG61K", pla: AMZ + "dp/B0C6QBZ78R" },
+  pink: { name: "Pink", hex: 0xeda0bc, petg: AMZ + "dp/B0DN4PJF61", pla: AMZ + "dp/B0GTZS6MGB" },
+  magenta: { name: "Magenta", hex: 0xb8237a, pla: AMZ + "s?k=overture+pla+magenta+1kg" },
+  beige: { name: "Beige", hex: 0xd8c6a4, petg: AMZ + "dp/B0D41ZTKKD", pla: AMZ + "dp/B0FZVDPLTY" },
+  brown: { name: "Brown", hex: 0x6a4a35, petg: AMZ + "dp/B0D421TTJJ", pla: AMZ + "s?k=hatchbox+pla+brown+1kg" },
+  clear: { name: "Clear", hex: 0xdde6e8, petg: AMZ + "dp/B0D9VWZWC4" },
 };
-// Printed parts: URL key, 3D part, label, its STL.
+// Printed parts: URL key, 3D part, label, its STL. case: PETG only.
 const PARTS = [
-  { key: "lid", part: "lid", name: "Lid", stl: "lid.stl", def: "white" },
-  { key: "base", part: "base", name: "Base", stl: "base.stl", def: "black" },
-  { key: "a", part: "A", name: "A button", stl: "button.stl", def: "green" },
-  { key: "b", part: "B", name: "B button", stl: "button.stl", def: "grey" },
-  { key: "x", part: "X", name: "X button", stl: "button.stl", def: "grey" },
-  { key: "y", part: "Y", name: "Y button", stl: "button.stl", def: "red" },
-  { key: "stick", part: "joystick", name: "Joystick", stl: "joystick.stl", def: "grey" },
+  { key: "lid", part: "lid", name: "Lid", stl: "lid.stl", def: "white", case: true },
+  { key: "base", part: "base", name: "Base", stl: "base.stl", def: "black", case: true },
+  { key: "a", part: "A", name: "A button", stl: "button.stl", def: "green", case: false },
+  { key: "b", part: "B", name: "B button", stl: "button.stl", def: "darkgrey", case: false },
+  { key: "x", part: "X", name: "X button", stl: "button.stl", def: "darkgrey", case: false },
+  { key: "y", part: "Y", name: "Y button", stl: "button.stl", def: "red", case: false },
+  { key: "stick", part: "joystick", name: "Joystick", stl: "joystick.stl", def: "darkgrey", case: false },
 ] as const;
+const fits = (p: { case: boolean }, c: Color) => !!c.petg || (!p.case && !!c.pla);
 const DEF_APP = "hello";
 // Secure chips: URL key, the name carts.json's "chip" uses, what to buy. The core has a driver for each.
 const CHIPS = [
@@ -43,9 +64,9 @@ const SCREENS: Record<string, string[]> = {
 };
 // Ready-made wedgies: each is just a /build link, like any shared one.
 const PRESETS = [
-  { name: "Wallet", q: "app=usbwallet&chip=atecc&lid=white&base=black&a=green&b=grey&x=grey&y=red&stick=grey" },
-  { name: "Game", q: "app=demo&chip=none&lid=purple&base=black&a=yellow&b=blue&x=green&y=red&stick=yellow" },
-  { name: "Plain", q: "app=hello&chip=none&lid=white&base=black&a=green&b=grey&x=grey&y=red&stick=grey" },
+  { name: "Wallet", q: "app=usbwallet&chip=atecc&lid=white&base=black&a=green&b=darkgrey&x=darkgrey&y=red&stick=darkgrey" },
+  { name: "Game", q: "app=demo&chip=none&lid=purple&base=black&a=yellow&b=skyblue&x=mint&y=magenta&stick=yellow" },
+  { name: "Plain", q: "app=hello&chip=none&lid=white&base=black&a=green&b=darkgrey&x=darkgrey&y=red&stick=darkgrey" },
 ];
 
 type Build = { app: string; chip: string; colors: Record<string, string> };   // chip: a CHIPS key or "none"
@@ -55,7 +76,7 @@ function read(carts: Cart[]): Build {
   const a = q.get("app");   // before the app list is in, trust the link
   const app = a && (!carts.length || carts.some((c) => c.mod === a)) ? a : DEF_APP;
   const colors: Record<string, string> = {};
-  for (const p of PARTS) colors[p.key] = COLORS[q.get(p.key) || ""] ? q.get(p.key)! : p.def;
+  for (const p of PARTS) { const c = COLORS[q.get(p.key) || ""]; colors[p.key] = c && fits(p, c) ? q.get(p.key)! : p.def; }
   return { app, chip: fitChip(carts, app, q.get("chip") || ""), colors };
 }
 // The app's chip if it needs one; else the one asked for (an unknown one: the ATECC608).
@@ -96,7 +117,7 @@ export async function build(main: HTMLElement) {
             ${CHIPS.map((c) => `<button data-chip="${c.key}" role="radio">${c.name}</button>`).join("")}
             <button data-chip="none" role="radio">No chip</button>
           </div><p class="fine" id="bld-chip-note"></p></div>
-        <div class="card"><h3>Colors</h3><p class="fine">Every printed part, in any PETG you like.</p><div class="bld-colors" id="bld-colors"></div></div>
+        <div class="card"><h3>Colors</h3><p class="fine">Colors you can get on Amazon in a couple of days. The case is PETG; buttons and joystick PETG or PLA.</p><div class="bld-colors" id="bld-colors"></div></div>
         <div class="card"><h3>Firmware</h3><p class="fine">Always the latest: <b id="bld-fw">…</b>. Every wedgie updates itself from Connect.</p></div>
       </div>
     </div>
@@ -162,7 +183,7 @@ export async function build(main: HTMLElement) {
     const chip = chipOf(b.chip);
     // Colors: one row of swatches per part.
     $("#bld-colors").innerHTML = PARTS.map((p) => `<div class="bld-color"><span class="bld-part">${p.name} <span class="fine">${COLORS[b.colors[p.key]].name}</span></span><span class="bld-sw">${
-      Object.entries(COLORS).map(([k, c]) => `<button class="sw${b.colors[p.key] === k ? " on" : ""}" style="--c:#${c.hex.toString(16).padStart(6, "0")}" data-part="${p.key}" data-color="${k}" title="${c.name}" aria-label="${p.name}: ${c.name}" aria-pressed="${b.colors[p.key] === k}"></button>`).join("")
+      Object.entries(COLORS).filter(([, c]) => fits(p, c)).map(([k, c]) => `<button class="sw${b.colors[p.key] === k ? " on" : ""}" style="--c:#${c.hex.toString(16).padStart(6, "0")}" data-part="${p.key}" data-color="${k}" title="${c.name}" aria-label="${p.name}: ${c.name}" aria-pressed="${b.colors[p.key] === k}"></button>`).join("")
     }</span></div>`).join("");
     $("#bld-colors").querySelectorAll<HTMLButtonElement>(".sw").forEach((x) => (x.onclick = () => set({ ...b, colors: { ...b.colors, [x.dataset.part!]: x.dataset.color! } })));
     // The link
@@ -171,6 +192,9 @@ export async function build(main: HTMLElement) {
     $("#bld-buy-app").textContent = cart?.name || b.app;
     // Build it yourself: the parts this one needs, the prints in its colors, then assemble and install.
     const cname = (k: string) => COLORS[b.colors[k]].name;
+    // One spool per color: PETG when it comes in PETG (every case color does), else PLA.
+    const filament = () => [...new Set(PARTS.map((p) => b.colors[p.key]))]
+      .map((k) => { const c = COLORS[k]; return link((c.petg || c.pla)!, `${c.name} ${c.petg ? "PETG" : "PLA"}`); }).join("");
     const buttons = PARTS.filter((p) => p.stl === "button.stl").map((p) => `${p.name[0]} ${cname(p.key).toLowerCase()}`).join(", ");
     $("#bld-steps").innerHTML = `
       <li><b>A Pico</b> <span>Raspberry Pi Pico with headers (the USB-C RP2040 kind fits the case).</span>
@@ -181,7 +205,9 @@ export async function build(main: HTMLElement) {
         <div class="buy">${chip.buy.map(([u, t]) => link(u, t)).join("")}</div></li>` : ""}
       ${b.app === "battery" ? `<li><b>A battery hat</b> <span>The Battery app reads a Waveshare Pico-UPS-B.</span>
         <div class="buy">${link("https://www.waveshare.com/pico-ups-b.htm", "Waveshare")}</div></li>` : ""}
-      <li><b>Print the case</b> <span>PETG, 0.16 mm layers, 4 walls, no supports. Lid in ${cname("lid").toLowerCase()}, base in ${cname("base").toLowerCase()}, joystick in ${cname("stick").toLowerCase()}, buttons: ${buttons}.</span>
+      <li><b>Get the filament</b> <span>1.75 mm. The case in PETG; buttons and joystick in PETG or PLA.</span>
+        <div class="buy">${filament()}</div></li>
+      <li><b>Print the case</b> <span>0.16 mm layers, 4 walls, no supports. Lid in ${cname("lid").toLowerCase()}, base in ${cname("base").toLowerCase()}, joystick in ${cname("stick").toLowerCase()}, buttons: ${buttons}.</span>
         <div class="buy">${[["lid.stl", `Lid · ${cname("lid")}`], ["base.stl", `Base · ${cname("base")}`], ["joystick.stl", `Joystick · ${cname("stick")}`], ["button.stl", "Button ×4"]]
           .map(([f, t]) => `<a class="btn btn-xs" href="${CASE}${f}" download>${t}</a>`).join("")}</div></li>
       <li><b>Put it together</b> <span>${chip ? "Wedge the chip's wires in, then the chip, then the case." : "Plug the Pico into the hat, then snap the case on. Skip the chip steps."}</span>
