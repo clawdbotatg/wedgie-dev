@@ -12,7 +12,9 @@
   python3 wedgie.py use usbwallet             make that the app it runs (the old one comes off, saves stay); it restarts into it
   python3 wedgie.py off                       take its app off ("no software")
   python3 wedgie.py run app.py                run a file once (output streams; Ctrl-C stops), then back to its app
-  python3 wedgie.py install app.py [--name N] make your own file the app it runs
+  python3 wedgie.py install .                 make the app in this folder's wedgie.json the app it runs (wedgie.dev/code.md)
+                                              (several apps in it: install . snake)
+  python3 wedgie.py install app.py [--name N] make one file the app it runs
   python3 wedgie.py update                    install/update the wedgie firmware (only changed files; its app and saves stay)
   python3 wedgie.py ls                        files on it, saves included
   python3 wedgie.py saves [backup f.json | restore f.json]    its saves (/saves/<game>/), out to a file and back
@@ -238,7 +240,10 @@ try:
     _a = json.load(open('apps.json'))
 except Exception:
     _a = []
-print(json.dumps({'hashes': {n: _h(n) for n in %s}, 'files': os.listdir(), 'apps': _a}))"""
+_n = %s
+for _x in _a:
+    _n += [f for f in _x.get('files', []) if isinstance(f, str)]
+print(json.dumps({'hashes': {n: _h(n) for n in _n}, 'files': os.listdir(), 'apps': _a}))"""
 
 
 def manifest():
@@ -290,9 +295,40 @@ def active_of(m, have):
 
 
 def others(m, have, keep):
-    """Every cart file on it that neither the core nor `keep` needs."""
-    need = set(m["core"]) | set(next((x["files"] for x in m["carts"] if x["mod"] == keep), []))
-    return sorted({n for x in m["carts"] for n in x["files"]} - need - {n for n, h in have["hashes"].items() if not h})
+    """Every app file on it (a cart's, or one apps.json lists for a repo/folder app) that neither the core nor `keep` needs."""
+    listed = [a for a in have.get("apps", []) if isinstance(a.get("files"), list)]
+    keep_files = next((x["files"] for x in m["carts"] if x["mod"] == keep), None) or next((a["files"] for a in listed if a.get("mod") == keep), [])
+    need = set(m["core"]) | set(keep_files)
+    every = {n for x in m["carts"] for n in x["files"]} | {n for a in listed for n in a["files"]}
+    return sorted(every - need - {n for n, h in have["hashes"].items() if not h})
+
+
+def folder_app(path, pick, m):
+    """The app in a folder's wedgie.json (the rules: wedgie.dev/code.md): (entry for apps.json, {name: bytes})."""
+    try:
+        j = json.load(open(os.path.join(path, "wedgie.json")))
+    except (OSError, ValueError) as e:
+        sys.exit("can't read %s/wedgie.json: %s" % (path, e))
+    apps = j.get("apps") or []
+    a = next((x for x in apps if x.get("mod") == pick), None) if pick else (apps[0] if len(apps) == 1 else None)
+    if not a:
+        sys.exit("which app? wedgie.py install %s <mod>   (%s)" % (path, ", ".join(str(x.get("mod")) for x in apps)))
+    mod, core = a.get("mod", ""), set(m["core"])
+    files = {}
+    for p in a.get("files", []):
+        n = os.path.basename(p)
+        stem = n.rsplit(".", 1)[0]
+        if n in core or stem.rsplit(".", 1)[0] in {c.rsplit(".", 1)[0] for c in core} or not (stem == mod or stem.startswith(mod + "_")):
+            sys.exit("%s: every file is named %s.py or %s_something (it lands in the flash's root), and no firmware file" % (n, mod, mod))
+        files[n] = open(os.path.join(path, p), "rb").read()
+    if mod + ".py" not in files and mod + ".mpy" not in files:
+        sys.exit("wedgie.json: %s needs %s.py in its files" % (mod, mod))
+    entry = {"mod": mod, "name": str(a.get("name") or mod)[:14], "about": a.get("about", ""), "repo": "local", "files": sorted(files),
+             "v": cart_v([hashlib.sha256(files[n]).hexdigest() for n in sorted(files)])}
+    for k in ("entry", "usb"):
+        if a.get(k):
+            entry[k] = a[k]
+    return entry, files
 
 
 def remove_files(wg, have, names):
@@ -432,6 +468,21 @@ def main():
             except RuntimeError as e:
                 print("\n" + str(e))
             wg.leave()
+        elif c == "install" and (os.path.isdir(args.rest[0]) or args.rest[0].endswith("wedgie.json")):
+            path = args.rest[0][:-len("wedgie.json")] or "." if args.rest[0].endswith("wedgie.json") else args.rest[0]
+            m = manifest()
+            entry, files = folder_app(path, args.rest[1] if len(args.rest) > 1 else None, m)
+            take_over(wg)
+            have = look(wg, m)
+            remove_files(wg, have, [n for n in others(m, have, None) if n not in files])     # the old app's files
+            for n, b in sorted(files.items()):
+                if have["hashes"].get(n) != hashlib.sha256(b).hexdigest():
+                    print("  " + n)
+                    wg.put(n, b)
+            wg.exec("import json\njson.dump(%r, open('apps.json', 'w'))" % [entry])
+            wg.sync()
+            wg.leave()      # a fresh heap for it
+            print("%s is the app it runs now (saves in /saves/%s stay)" % (entry["name"], entry["mod"]))
         elif c == "install":
             path = args.rest[0]
             mod = os.path.splitext(os.path.basename(path))[0]

@@ -1,0 +1,37 @@
+/* /code: the prompt card, the emulator (a virtual wedgie beside its source, saves and output), the steps, the short graphics list. */
+.codepage .card { margin-top: 20px; }
+.codepage [hidden] { display: none !important; }
+.code-ask { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 6px; padding: 14px 16px; border-radius: 16px; margin: 10px 0 14px;
+  font: 15px/1.5 var(--mono); }
+.code-ask code { font: inherit; }
+.code-ask input { flex: 1; min-width: 160px; border: 0; background: transparent; font: inherit; color: var(--ink); outline: none;
+  border-bottom: 2px dashed var(--line); padding: 0 2px; }
+.code-ask input:focus { border-bottom-color: #22c452; }
+.code-prompt .row { gap: 10px; }
+.codepage code { font-family: var(--mono); font-size: .88em; }
+.code-emu-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 24px; align-items: start; margin-top: 10px; }
+.code-vw { min-height: 200px; display: block; }
+.code-vw > p { padding: 70px 10px; text-align: center; }
+.code-keys { margin-top: 10px; line-height: 2; }
+.codepage kbd { display: inline-block; min-width: 1.6em; padding: 0 5px; margin: 0 1px; border-radius: 6px; background: var(--card); font: 700 12px/1.6 var(--mono);
+  text-align: center; box-shadow: 0 0 0 1px var(--line), 0 2px 0 var(--line); }
+.code-side { display: grid; gap: 10px; min-width: 0; }
+.code-side .row { gap: 8px; margin: 0; }
+.code-side form { flex-wrap: nowrap; }
+.code-side input.name { flex: 1; min-width: 0; }
+.code-side .shelf { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+.code-side h4 { margin: 8px 0 4px; }
+.code-run label { display: flex; align-items: center; gap: 6px; }
+#c-save-list .btn.on { box-shadow: inset 0 0 0 2px #22c452; }
+.code-save-edit { width: 100%; min-height: 110px; margin-top: 8px; border: 0; padding: 10px; font: 13px/1.45 var(--mono); color: var(--ink); resize: vertical; outline: none; }
+.code-out { max-height: 220px; min-height: 60px; overflow: auto; margin: 0; white-space: pre-wrap; font-size: 12px; }
+.code-steps { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0 20px; }
+.code-steps .num { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--ink); color: #fff;
+  font-weight: 900; font-size: 15px; }
+.code-steps h3 { margin: 10px 0 4px; }
+.code-steps p { margin: 0; font-size: 15px; }
+.code-fast ul { padding-left: 20px; margin: 8px 0 12px; }
+.code-fast li { margin: 6px 0; font-size: 15px; }
+@media (max-width: 800px) {
+  .code-emu-grid { grid-template-columns: 1fr; }
+}

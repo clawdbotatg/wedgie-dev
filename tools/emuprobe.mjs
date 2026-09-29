@@ -62,9 +62,9 @@ try {
   const f0 = await page.evaluate(() => new Promise((res) => { let n = 0; const off = window.vw.onFrame(() => n++); setTimeout(() => { off(); res(n); }, 2000); }));
   console.log(`     fps while Hello runs: ${(f0 / 2).toFixed(1)} (frames drawn on the page per second)`);
   await page.locator(".vw").screenshot({ path: `${out}/emu-hello-device.png` });
-  // keyboard path: focus the device, press B with the real keyboard; Hello shows "key: B"
+  // keyboard path: focus the device, press B (the K key) with the real keyboard; Hello shows "key: B"
   await page.locator(".vw").focus();
-  await page.keyboard.down("b"); await page.waitForTimeout(100); await page.keyboard.up("b");
+  await page.keyboard.down("k"); await page.waitForTimeout(100); await page.keyboard.up("k");
   await page.waitForTimeout(200);
   await page.locator(".vw").screenshot({ path: `${out}/emu-hello-keyB.png` });
   // pointer path: click the drawn X button. X is Hello's own button now: it keeps running.
@@ -87,7 +87,9 @@ try {
     "print(save.game, save.load('best'), save.load('map'), save.load('nope', 7), sorted(save.names()), sorted(os.listdir('/saves/hello')))",
     "save.delete('map'); print(sorted(save.names()))",
   ].join("\n")));
-  check(/hello \{'score': 120\} b'\\x01\\x02' 7 \['best', 'map'\] \['best.json', 'map.bin'\]\s+\['best'\]/.test(sv), `saves round-trip in /saves/hello: ${sv.trim().replace(/\n/g, " | ")}`);
+  const svOut = sv.split("\n").filter((l) => !l.startsWith("@emusave ")).join("\n");   // the page's copy of each save (src/emu/flash.ts)
+  check(/hello \{'score': 120\} b'\\x01\\x02' 7 \['best', 'map'\] \['best.json', 'map.bin'\]\s+\['best'\]/.test(svOut), `saves round-trip in /saves/hello: ${svOut.trim().replace(/\n/g, " | ")}`);
+  check((sv.match(/^@emusave /gm) || []).length === 3, "every store and delete tells the page (@emusave), for /code's saves");
   const fl = await page.evaluate(() => window.vw.exec("save.FLOOR = 1 << 40\ntry:\n    save.store('big', 1)\n    print('wrote')\nexcept OSError as e:\n    print('refused', e)\nsave.FLOOR = 32 * 1024"));
   check(/refused flash full/.test(fl), `a save that would eat the floor is refused (${fl.trim()})`);
   const bad = await page.evaluate(() => window.vw.exec("try:\n    save.store('../x', 1)\nexcept ValueError:\n    print('no')"));

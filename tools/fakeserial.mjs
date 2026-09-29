@@ -8,7 +8,8 @@
 // first boot on the new firmware does, the others don't. The page must find it again either way.
 // Serve dist first (npx vite preview), then: node tools/fakeserial.mjs [url] [outdir] [phone]
 import { chromium } from "playwright-core";
-import { readdirSync } from "node:fs";
+import { readdirSync, readFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
 import { homedir } from "node:os";
 import { fakeWedgies } from "./fakewedgies.mjs";
 
@@ -24,7 +25,7 @@ await ctx.addInitScript(fakeWedgies, [
   { uid: "e66138935f5a2c29", machine: "Raspberry Pi Pico 2 W with RP2350", files: { "boot.py": 1 } },
   { uid: "de6474e3a3152a2f", machine: "Raspberry Pi Pico with RP2040", files: { "main.py": 1, "menu.py": 1, "wedgiedrive.py": 1, "wedgie.py": 'VERSION = "0.1.3"',
     "apps.json": JSON.stringify([{ mod: "hello", name: "Hello" }, { mod: "keytest", name: "Buttons" }]), "hello.py": 1, "keytest.py": 1 }, chip: "none" },
-  { uid: "aa11bb22cc3d9f01", machine: "Raspberry Pi Pico 2 W with RP2350", files: { "main.py": 1, "slot.py": 1, "wedgiedrive.py": 1, "wedgie.py": 'VERSION = "0.2.2"',
+  { uid: "aa11bb22cc3d9f01", machine: "Raspberry Pi Pico 2 W with RP2350", files: { "main.py": 1, "slot.py": 1, "wedgiedrive.py": 1, "wedgie.py": 'VERSION = "0.2.3"',
     "apps.json": "[]", "/saves/hello/best.json": '{"score": 120}', "junk.txt": "delete me" } },
 ]);
 
@@ -49,14 +50,16 @@ const [BARE, OLD, NEW] = ["5A2C29", "152A2F", "3D9F01"];
 for (const id of [BARE, OLD, NEW]) console.log("·", id, "→", await rowText(id));
 check(/Hardware.*ATECC608 ✓ working/.test(await rowText(NEW)), "0.2: chip proven working on the list");
 check(await st(2, "chips") === 1 && await st(2, "interrupts") === 0, "0.2: the chip proof ran once, over JSON, with nothing stopped");
-check(/update ready: 0\.2\.2/.test(await rowText(OLD)), "0.1.3: update ready on the list");
+const FW = JSON.parse(readFileSync(new URL("../public/fw/manifest.json", import.meta.url), "utf8")).version;
+check((await rowText(OLD)).includes("update ready: " + FW), "0.1.3: update ready on the list");
 check(/Firmware\s*none yet install/.test(await rowText(BARE)), "bare board: no firmware, install on the list");
 check(/Software\s*nothing yet pick one/.test(await rowText(NEW)), "0.2 with no app: nothing yet, pick one");
 await page.screenshot({ path: `${out}/connect-list${phone ? "-phone" : ""}.png` });
 
 // ---- one wedgie: tap its row, its page at /connect/<ID> -------------------------------------------------
 await page.click(`.wrow[data-id="${NEW}"]`);
-await wait((id) => location.pathname === `/connect/${id}` && document.querySelectorAll("#d-shelf .cart-slot").length === 7, NEW, 10000, "detail page with 7 apps to pick");
+const nCarts = JSON.parse(readFileSync(new URL("../public/fw/manifest.json", import.meta.url), "utf8")).carts.length;
+await wait(([id, n]) => location.pathname === `/connect/${id}` && document.querySelectorAll("#d-shelf .cart-slot").length === n, [NEW, nCarts], 10000, `detail page with every app (${nCarts}) to pick`);
 await page.waitForTimeout(2500);
 check((await st(2, "shots")) === 0, "the page doesn't watch its screen unless asked");
 await page.click(".dev summary");
@@ -97,6 +100,29 @@ f = await files(2);
 check(!f.includes("usbwallet.py") && !f.includes("p256.py") && f.includes("slot.py"), "its files gone, the core stays");
 await wait(() => /Nothing on it yet/.test(document.querySelector("#d-carts-note").textContent), null, 10000, "the page: nothing on it");
 
+// an app from a GitHub repo (faked from the local starter folder): on the shelf as not reviewed; on it, its
+// files named in apps.json; switching away takes them off by that list
+const starter = join(homedir(), "clawd/wedgie-starter");
+const cors = { "access-control-allow-origin": "*" };
+await ctx.route("https://api.github.com/**", (r) => r.fulfill({ status: 200, headers: cors, contentType: "application/json", body: JSON.stringify({ sha: "0123456789abcdef0123456789abcdef01234567" }) }));
+await ctx.route("https://raw.githubusercontent.com/**", (r) => {
+  const p = join(starter, r.request().url().replace(/^.*?githubusercontent\.com\/[^/]+\/[^/]+\/[^/]+\//, ""));
+  return existsSync(p) ? r.fulfill({ status: 200, headers: cors, body: readFileSync(p) }) : r.fulfill({ status: 404, headers: cors, body: "" });
+});
+await page.click("#d-repo-box summary");
+await page.fill("#d-repo", "clawdbotatg/wedgie-starter");
+await page.click("#d-repo-form button");
+await wait(() => document.querySelector('#d-shelf .cart-slot[data-mod="dodge"] .cart-from.unreviewed'), null, 15000, "Dodge on the shelf, not reviewed");
+await pickApp("dodge", "Dodge on");
+const aD = await appsOn(2);
+check((await files(2)).includes("dodge.py") && aD?.[0]?.repo === "clawdbotatg/wedgie-starter" && JSON.stringify(aD[0].files) === '["dodge.py"]', "a repo's app goes on; apps.json names its repo and files: " + JSON.stringify(aD));
+await pickApp("hello", "Hello on after Dodge");
+check(!(await files(2)).includes("dodge.py"), "switching away takes the repo app's files off");
+await page.click('#d-shelf .cart-slot[data-mod="hello"] .cart-out');
+await page.click('#d-shelf .cart-slot[data-mod="hello"] .cart-out');
+await wait(() => JSON.parse(new TextDecoder().decode(window.__ports[2]._st.files.get("apps.json"))).length === 0, null, 15000, "Hello off again");
+await wait(() => /Nothing on it yet/.test(document.querySelector("#d-carts-note").textContent) && document.querySelector('[data-sv-dl="hello"]:not(:disabled)'), null, 15000, "the page: nothing on it, saves ready");
+
 // saves: download, delete, put back
 const dl = page.waitForEvent("download");
 await page.click('[data-sv-dl="hello"]');
@@ -135,7 +161,7 @@ await page.click(`.wrow[data-id="${OLD}"]`);
 await wait(() => document.querySelector("[data-fw]") && !document.querySelector("[data-fw]").disabled, null, 10000, "0.1.3 page, Update enabled");
 check(/Update the firmware/.test(await page.textContent("#d-carts-note")), "0.1.3: Software asks for the update");
 await page.click("[data-fw]");
-await wait((id) => /Up to date/.test(document.querySelector("#d-fw")?.textContent || "") && location.pathname === `/connect/${id}`, OLD, 120000, "0.1.3 → 0.2.2, came back by its ID");
+await wait((id) => /Up to date/.test(document.querySelector("#d-fw")?.textContent || "") && location.pathname === `/connect/${id}`, OLD, 120000, "0.1.3 → 0.2.3, came back by its ID");
 check((await st(1, "resets")) === 1 && (await st(1, "drops")) === 0, "one soft reset, at the end; its port stayed (0.1.3 marks soft resets)");
 const a3 = await appsOn(1), f3 = await files(1);
 check(JSON.stringify(a3) === "[]", "no app yet (nobody picked one): " + JSON.stringify(a3));

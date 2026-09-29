@@ -1,0 +1,4 @@
+{
+  "about": "Apps from other people's repos, on wedgie.dev for everyone. Each is pinned to the commit that was reviewed. Add one: node tools/community.mjs add owner/repo, review git diff community/, commit. See wedgie.dev/code.",
+  "repos": []
+}

@@ -21,6 +21,8 @@ import { installCore, useApp, removeApp, takeOver, firmwareManifest, type Cart, 
 import * as FS from "../serial/files";
 import { cartHtml } from "../ui/cart";
 import * as F from "../ui/facts";
+import { cmpVersion } from "../apps/appjson.mjs";
+import { loadRepo, savedRepos, saveRepo, forgetRepo, withRepos, type Repo } from "../apps/repos";
 
 const APP_SAMPLE = `# A wedgie app: draw with lcd, read the buttons, tick on a Timer so USB stays free.
 # Every button is yours. "Make it its app" puts it on as the one app the wedgie boots into.
@@ -97,6 +99,14 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
             <h3>Software</h3>
             <p class="fine" id="d-carts-note"></p>
             <div class="shelf" id="d-shelf"></div>
+            <details class="repo-add" id="d-repo-box">
+              <summary>Apps from a GitHub repo</summary>
+              <p class="fine">Anyone can make apps for a wedgie (<a href="/code">how</a>). Add a repo here and its apps join the shelf, on this browser only.
+                <b>Nobody has reviewed them:</b> an app can use everything on the wedgie, its chip too. Add repos you trust.</p>
+              <form class="row" id="d-repo-form"><input id="d-repo" class="recess name" placeholder="owner/repo" autocomplete="off" spellcheck="false"><button class="btn btn-sm">Add</button></form>
+              <p class="fine" id="d-repo-note"></p>
+              <ul class="repo-list" id="d-repos"></ul>
+            </details>
           </div>
           <div class="card wd-sec saves">
             <h3>Saves</h3>
@@ -131,7 +141,56 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
   const $ = <T extends Element = HTMLElement>(s: string) => main.querySelector(s) as T;
   $<HTMLAnchorElement>(".back").onclick = (e) => { e.preventDefault(); go("/connect"); };
   let m: Manifest | undefined;
-  firmwareManifest().then((x) => { m = x; paint(); }).catch(() => {});
+  firmwareManifest().then((x) => { m = x; paint(); loadRepos(); }).catch(() => {});
+  // Repos this browser added: their apps join the shelf (view()), marked as not reviewed.
+  let repos: Repo[] = [];
+  const repoErr: Record<string, string> = {};
+  const view = () => m && withRepos(m, repos);
+  async function addRepo(spec: string, fresh = false) {
+    if (!m) return;
+    try {
+      const r = await loadRepo(spec, m, fresh);
+      repos = [...repos.filter((x) => x.repo.toLowerCase() !== r.repo.toLowerCase()), r];
+      delete repoErr[spec];
+      saveRepo(r.repo);
+      return r;
+    } catch (e: any) { repoErr[spec] = e?.message || String(e); throw e; }
+    finally { paint(); }
+  }
+  function loadRepos() {
+    const list = savedRepos();
+    if (list.length) ($("#d-repo-box") as HTMLDetailsElement).open = true;
+    for (const s of list) addRepo(s).catch(() => {});
+  }
+  function paintRepos() {
+    const ul = $("#d-repos");
+    const sig = JSON.stringify([repos.map((r) => [r.repo, r.sha, r.carts.length]), repoErr]);
+    if (ul.dataset.sig === sig) return;
+    ul.dataset.sig = sig;
+    ul.innerHTML = repos.map((r) => `<li><a href="https://github.com/${esc(r.repo)}/tree/${esc(r.sha)}" target="_blank" rel="noopener">${esc(r.repo)}</a>
+        <span class="fine">${r.carts.length} app${r.carts.length === 1 ? "" : "s"} · ${esc(r.sha.slice(0, 7))}</span>
+        <button class="btn btn-sm" data-repo-re="${esc(r.repo)}">Reload</button><button class="btn btn-sm" data-repo-rm="${esc(r.repo)}">Remove</button></li>`).join("") +
+      Object.entries(repoErr).map(([s, e]) => `<li class="bad"><b>${esc(s)}</b>: ${esc(e)} <button class="btn btn-sm" data-repo-rm="${esc(s)}">Remove</button></li>`).join("");
+    ul.querySelectorAll<HTMLButtonElement>("[data-repo-rm]").forEach((b) => (b.onclick = () => {
+      const k = b.dataset.repoRm!.toLowerCase();
+      forgetRepo(b.dataset.repoRm!);
+      repos = repos.filter((r) => r.repo.toLowerCase() !== k);
+      for (const s of Object.keys(repoErr)) if (s.toLowerCase() === k) delete repoErr[s];
+      paint();
+    }));
+    ul.querySelectorAll<HTMLButtonElement>("[data-repo-re]").forEach((b) => (b.onclick = () => { addRepo(b.dataset.repoRe!, true).catch(() => {}); }));
+  }
+  $<HTMLFormElement>("#d-repo-form").onsubmit = async (e) => {
+    e.preventDefault();
+    const inp = $<HTMLInputElement>("#d-repo"), note = $("#d-repo-note"), spec = inp.value.trim();
+    if (!spec) return;
+    note.textContent = `Reading ${spec}…`;
+    try {
+      const r = await addRepo(spec, true);
+      inp.value = "";
+      note.innerHTML = r ? `Added ${r.carts.map((c) => `<b>${esc(c.name)}</b>`).join(", ")}. Tap one on the shelf to put it on.` : "";
+    } catch (err: any) { note.innerHTML = `<b class="bad">Couldn't add it:</b> ${esc(err?.message || err)}`; }
+  };
 
   let w: W.Wedgie | null = null;   // the wedgie with this ID right now (a new object after each replug)
   let link: Repl | null = null;    // its open port, while we hold it
@@ -283,24 +342,31 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
   const chipLabel = (t: string | null) => (t === "OPTIGA Trust M" ? "a Trust M" : t === "none" || !t ? "no chip" : `an ${t}`);
   /** Why this app won't work here ("" if it will, or the chip isn't known yet). */
   const wrongChip = (c: Cart) => (c.chip && chipType() && chipType() !== c.chip ? `${c.name} needs an ${c.chip} chip. This wedgie has ${chipLabel(chipType())}.` : "");
+  const oldFw = (c: Cart) => (c.fw && w?.version && cmpVersion(w.version, c.fw) < 0 ? `${c.name} needs wedgie ${c.fw} or newer. Update the firmware above first.` : "");
   const active = () => (w?.carts || [])[0]?.mod || null;
   const slot = () => !!w?.slot;                    // 0.2+: one app, no menu
   const canPick = () => slot() || w?.kind === "wallet";   // the Wallet as its app: it stops on Ctrl-C
   function paintCarts(x: W.Wedgie) {
+    const m = view();
     if (!m) return;
+    paintRepos();
     const note = $("#d-carts-note");
     const a = m.carts.find((c) => c.mod === active());
     if (x.kind === "micropython") note.innerHTML = "Apps run on wedgie firmware. Install it above first.";
     else if (x.kind === "wedgie" && !slot()) note.innerHTML = "Update the firmware above first. From 0.2 a wedgie runs one app: it boots straight into it, and the app gets every button.";
     else note.innerHTML = a ? `It runs <b>${esc(a.name)}</b>. Tap another and it restarts into that. Saves stay.` : "Nothing on it yet. Tap one: it goes on and the wedgie restarts into it.";
     const shelf = $("#d-shelf");
+    const mods = new Set(m.carts.map((c) => c.mod));
+    shelf.querySelectorAll<HTMLElement>(".cart-slot").forEach((el) => { if (!mods.has(el.dataset.mod!)) el.remove(); });
     m.carts.forEach((c, i) => {
       let slotEl = shelf.querySelector<HTMLElement>(`.cart-slot[data-mod="${c.mod}"]`);
+      if (slotEl && slotEl.dataset.v !== c.v) { slotEl.remove(); slotEl = null; }   // a reloaded repo: a new cart
       if (!slotEl) {
         slotEl = document.createElement("div");
+        slotEl.dataset.v = c.v;
         slotEl.className = "cart-slot";
         slotEl.dataset.mod = c.mod;
-        slotEl.innerHTML = `<button class="cart" title="${esc(c.about || "")}">${cartHtml(c)}</button><p class="cart-about">${esc(c.about || "")}</p><p class="cart-needs" hidden></p><button class="cart-out" hidden></button>`;
+        slotEl.innerHTML = `<button class="cart" title="${esc(c.about || "")}">${cartHtml(c)}</button><p class="cart-about">${esc(c.about || "")}</p>${c.repo ? `<p class="cart-from${c.unreviewed ? " unreviewed" : ""}">${c.unreviewed ? "not reviewed · " : "by "}<a href="https://github.com/${esc(c.repo)}/tree/${esc(c.sha || "HEAD")}" target="_blank" rel="noopener">${esc(c.repo)}</a></p>` : ""}<p class="cart-needs" hidden></p><button class="cart-out" hidden></button>`;
         slotEl.querySelector<HTMLButtonElement>(".cart")!.onclick = () => pick(c);
         slotEl.querySelector<HTMLButtonElement>(".cart-out")!.onclick = () => eject();
       }
@@ -318,7 +384,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
       const st = slotEl.querySelector(".cart-state")!;
       st.innerHTML = p !== undefined ? "installing" : outdated ? "update" : playing ? "▶ running" : on ? "on it" : kb(c.size);
       st.className = `cart-state${on && !outdated ? " on" : outdated || !on ? " soft" : ""}`;
-      const why = wrongChip(c);
+      const why = wrongChip(c) || oldFw(c);
       slotEl.classList.toggle("nochip", !!why);
       const needs = slotEl.querySelector<HTMLElement>(".cart-needs")!;
       needs.hidden = !why;
@@ -337,12 +403,12 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     const x = w, r = link;
     confirmOut = false;
     // An app for another chip: the first tap says so; a second puts it on anyway (it's their wedgie).
-    if (wrongChip(c) && confirmChip !== c.mod) { confirmChip = c.mod; paint(); return; }
+    if ((wrongChip(c) || oldFw(c)) && confirmChip !== c.mod) { confirmChip = c.mod; paint(); return; }
     confirmChip = "";
     busy = "cart"; inserting[c.mod] = 0; paint();
     setScreen({ kind: "loading", p: 0 });
     try {
-      await useApp(r, c, (p) => { inserting[c.mod] = p; setScreen({ kind: "loading", p }); paint(); });
+      await useApp(r, c, (p) => { inserting[c.mod] = p; setScreen({ kind: "loading", p }); paint(); }, { manifest: view() });
       delete inserting[c.mod];
       status(`Restarting it into <b>${esc(c.name)}</b>…`);
       // The soft reset: a fresh heap for the new app. The port stays on 0.1.3+; attach() finds it by ID either way.
@@ -392,7 +458,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
 
   let savesList: FS.Entry[] | null = null, savesFor = "";
   let confirmSave = "";
-  const gameName = (g: string) => m?.carts.find((c) => c.mod === g)?.name || g;
+  const gameName = (g: string) => view()?.carts.find((c) => c.mod === g)?.name || g;
   async function loadSaves() {
     const got = await withFiles("Reading saves", (r, lv) => FS.ls(r, "/saves", lv));
     if (got) { savesList = got.files; savesFor = id; paintSaves(); }

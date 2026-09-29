@@ -1,7 +1,7 @@
 # Waveshare Pico-LCD-1.3: 240x240 ST7789 over SPI1, plus joystick and A/B/X/Y keys.
 # Pins from waveshare.com/wiki/Pico-LCD-1.3.
 from machine import Pin, SPI, PWM
-import framebuf, time
+import framebuf, time, sys, machine
 import splash as _s     # pins and panel setup; boot.py already used it to put the logo up
 from splash import DC, CS, SCK, MOSI, RST, BL
 KEYS = {"A": 15, "B": 17, "X": 19, "Y": 21, "up": 2, "down": 18, "left": 16, "right": 20, "press": 3}
@@ -17,6 +17,20 @@ BLACK, WHITE = color(0, 0, 0), color(255, 255, 255)
 RED, GREEN, BLUE = color(255, 0, 0), color(0, 255, 0), color(0, 0, 255)
 YELLOW, GREY, DARK = color(255, 220, 0), color(120, 120, 120), color(30, 30, 30)
 
+
+# The clock. Out of the box MicroPython runs the SPI bus off a 48 MHz clock, so the screen can't get
+# more than 24 MHz: ~46 ms a frame. With the peripherals on the CPU clock at 125 MHz the bus runs at
+# 62.5 MHz, the panel's top speed: ~18 ms (measured on an RP2040; 150 MHz is worse, its divider lands
+# on 37.5). An RP2350 gives up 150 -> 125 MHz of CPU for it. USB and I2C don't mind.
+try:
+    machine.freq(125_000_000, 125_000_000)
+except Exception:
+    pass
+RP2350 = "RP2350" in sys.implementation._machine
+_SPI1 = 0x40088000 if RP2350 else 0x40040000        # SPI1's registers, for show_start's DMA
+_dma = None         # the DMA channel show_start uses (one, shared); False: this board has none (the emulator)
+_dma_ctl = 0
+_pushing = None     # the LCD whose DMA push is still going
 
 # The one 115 KB framebuffer, allocated the moment lcd is imported. On an RP2040 board (264 KB
 # RAM) a block that big is only available on a fresh heap: after a 20 KB module like wallet.py
@@ -54,13 +68,86 @@ class LCD(framebuf.FrameBuffer):
         if data:
             self.dc(1); self.cs(0); self.spi.write(bytes(data)); self.cs(1)
 
-    def show(self):
+    def show(self, y0=0, y1=240):
+        """Push the frame to the panel (~38 ms for all of it). show(y0, y1) pushes only rows y0..y1-1:
+        full-width rows are one piece of the buffer, so nothing is copied and a 24-row band costs a
+        tenth of a frame. A game that only changes part of the screen pushes only that part."""
         if _on_show:
             _on_show()
+        if _pushing:
+            _pushing.show_wait()
+        y0, y1 = max(0, y0), min(240, y1)
+        if y0 >= y1:
+            return
+        self._cmd(0x2A, [0x00, 0x00, 0x00, 0xEF])
+        self._cmd(0x2B, [0x00, y0, 0x00, y1 - 1])
+        self._cmd(0x2C)
+        self.dc(1); self.cs(0)
+        self.spi.write(self.buffer if y0 == 0 and y1 == 240 else memoryview(self.buffer)[y0 * 480:y1 * 480])
+        self.cs(1)
+
+    def show_rect(self, x, y, w, h):
+        """Push only this box (a sprite's old and new place, a score): the panel's window is set to it
+        and its rows go one after another. Costs its own bytes plus ~20 us a row."""
+        x0, y0, x1, y1 = max(0, x), max(0, y), min(240, x + w), min(240, y + h)
+        if x0 >= x1 or y0 >= y1:
+            return
+        if x0 == 0 and x1 == 240:
+            return self.show(y0, y1)
+        if _on_show:
+            _on_show()
+        if _pushing:
+            _pushing.show_wait()
+        self._cmd(0x2A, [0x00, x0, 0x00, x1 - 1])
+        self._cmd(0x2B, [0x00, y0, 0x00, y1 - 1])
+        self._cmd(0x2C)
+        mv, n, o = memoryview(self.buffer), (x1 - x0) * 2, (y0 * 240 + x0) * 2
+        self.dc(1); self.cs(0)
+        for _ in range(y1 - y0):
+            self.spi.write(mv[o:o + n])
+            o += 480
+        self.cs(1)
+
+    def show_start(self):
+        """show() without waiting: DMA sends the frame while your code runs (18 ms of CPU back per
+        frame). Don't draw until show_wait() returns; do input, game logic, gc.collect() meanwhile.
+        Where there's no DMA (the emulator) it is a plain show()."""
+        global _dma, _dma_ctl, _pushing
+        if _on_show:
+            _on_show()
+        if _pushing:
+            _pushing.show_wait()
+        if _dma is None:
+            try:
+                import rp2
+                _dma = rp2.DMA()
+                _dma_ctl = _dma.pack_ctrl(size=0, inc_read=True, inc_write=False, treq_sel=26 if RP2350 else 18)
+            except Exception:
+                _dma = False
+        if not _dma:
+            return self.show()
         self._cmd(0x2A, [0x00, 0x00, 0x00, 0xEF])
         self._cmd(0x2B, [0x00, 0x00, 0x00, 0xEF])
         self._cmd(0x2C)
-        self.dc(1); self.cs(0); self.spi.write(self.buffer); self.cs(1)
+        self.dc(1); self.cs(0)
+        _pushing = self
+        _dma.config(read=self.buffer, write=_SPI1 + 0x08, count=len(self.buffer), ctrl=_dma_ctl, trigger=True)
+
+    def show_wait(self):
+        """Wait for show_start's frame to be on the panel. Then the buffer is yours again."""
+        global _pushing
+        if _pushing is not self:
+            return
+        from machine import mem32
+        while _dma.active():
+            pass
+        while mem32[_SPI1 + 0x0C] & 0x10:       # busy: the last bytes are still going out
+            pass
+        while mem32[_SPI1 + 0x0C] & 0x04:       # the RX FIFO filled while DMA only sent: empty it,
+            mem32[_SPI1 + 0x08]
+        mem32[_SPI1 + 0x20] = 1                 # clear its overrun, so spi.write works after
+        self.cs(1)
+        _pushing = None
 
     def big_text(self, s, x, y, c, scale=2):
         """framebuf's 8x8 font scaled up. Slow-ish, fine for a few words."""

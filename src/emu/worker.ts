@@ -51,7 +51,7 @@ scope.onmessage = async (e: MessageEvent) => {
     if (m.type === "boot") {
       keys = new Int32Array(m.keys);
       if (m.serial) { serialCtl = new Int32Array(m.serial, 0, 2); serialBuf = new Uint8Array(m.serial, 8); }
-      const [{ files, manifest }, { loadMicroPython }] = await Promise.all([loadFlash(m.fwBase, m.app), import(/* @vite-ignore */ mpUrl)]);
+      const [{ files, manifest }, { loadMicroPython }] = await Promise.all([loadFlash(m.fwBase, m.app, m.extra), import(/* @vite-ignore */ mpUrl)]);
       dev = await createDevice({
         loadMicroPython, url: wasmUrl, keys, files, uid: m.uid,
         shims: { _bootstrap: bootstrapPy, machine: machinePy, rp2: rp2Py },

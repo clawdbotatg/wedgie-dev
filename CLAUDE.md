@@ -37,7 +37,16 @@ what agents outside this repo read (keep it true when the firmware or the USB pr
    armed`): on a Mac the first look makes macOS ask about Bluetooth. `tools/btprobe.mjs` guards it.
 6. **RP2040 RAM is tight**: `import lcd` first (its 115 KB framebuffer needs a fresh heap). The chip
    drivers load only for a `chip` request and are dropped after (`wedgie.chip`).
-7. Everything is MIT — never use the CC BY-NC case STLs from picowallet/instant-wallet.
+7. **The clock is set in lcd.py: 125/125 MHz** (peripherals on the CPU clock) so the screen's SPI runs
+   at 62.5 MHz: 18 ms a frame instead of 46. MicroPython's default caps SPI at 24 MHz, and 150 MHz is
+   worse (37.5). Measured on an RP2040 with the Speed lab app (`firmware/speed.py`); rerun it before
+   changing clocks. `show_start()` pushes by DMA (SPI1 registers + DREQ differ RP2040/RP2350): nothing
+   may draw into the buffer until `show_wait()`, and every other show waits for it first.
+8. **App rules live in one place**: `src/apps/appjson.mjs` (build + site) and `folder_app` in
+   public/wedgie.py; `public/code.md` documents them for agents. Keep the three in step. Every app
+   file name starts with its mod (the flash has no folders for apps). `tools/codeprobe.mjs` covers /code
+   and the emulator (GitHub faked from local folders).
+9. Everything is MIT — never use the CC BY-NC case STLs from picowallet/instant-wallet.
 
 ## Run / check
 
@@ -49,6 +58,7 @@ node tools/btprobe.mjs http://localhost:4173/               # no Bluetooth promp
 node tools/formatprobe.mjs http://localhost:4173/ <outdir>  # /format, the wipe-and-test bench
 node tools/updateprobe.mjs http://localhost:4173 <outdir>   # /update, plug-in-and-update bench
 node tools/emuprobe.mjs <outdir>                            # the virtual wedgie
+node tools/codeprobe.mjs http://localhost:4173 <outdir> ~/clawd/wedgie-starter   # /code: emulator, saves, repos
 python3 tools/test_drive.py                                 # the WEDGIE drive's SCSI answers
 python3 tools/fakedevice.py                                 # a pty wedgie for public/wedgie.py
 ```

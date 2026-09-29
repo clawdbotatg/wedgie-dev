@@ -63,7 +63,8 @@ export function fakeWedgies(specs) {
       if (c === "") { push("OK\r\nMPY: soft reboot\r\nraw REPL; CTRL-B to exit\r\n>"); return; }
       if (c.includes('"@id"')) return answer('@id {"uid":"' + uid + '","machine":"' + machine + '","mp":"1.26.1","files":' + JSON.stringify([...st.files.keys()]) + ',"wifi":' + machine.includes("W") + ',"wedgie":' + JSON.stringify(wedgie() ? version() : null) + "}\r\n");
       if (c.includes("@hashes")) {
-        const names = JSON.parse(c.match(/for n in (\[.*?\])\}/)[1]);
+        const names = JSON.parse(c.match(/^_n = (\[.*\])$/m)[1]);
+        for (const a of apps()) if (Array.isArray(a?.files)) names.push(...a.files);   // a repo app's files, as install.ts asks
         const h = {};
         for (const n of names) h[n] = st.files.has(n) ? await sha(st.files.get(n)) : null;
         return answer("@hashes " + JSON.stringify({ hashes: h, files: [...st.files.keys()], apps: apps() }) + "\r\n");

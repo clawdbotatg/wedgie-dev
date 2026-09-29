@@ -19,12 +19,21 @@ export interface VirtualWedgieOptions {
   fwBase?: string;
   /** The app it runs (a cartridge's mod, default "hello"; "" for none). The wedgie runs one app. */
   app?: string;
+  /** An app that isn't in the manifest (one from a GitHub repo, src/apps/repos.ts): its files go on the
+   *  flash too and it's the app it runs. */
+  extra?: ExtraApp;
   /** machine.unique_id() of this virtual board as hex (default a fixed id). */
   uid?: string;
   /** Focus the device after mounting so the keyboard drives it right away (default false). */
   autofocus?: boolean;
   /** Every line the board prints on USB, from the first line of boot on (same as vw.onOutput). */
   onOutput?: (line: string) => void;
+}
+
+export interface ExtraApp {
+  app: { mod: string; name?: string; entry?: string; usb?: boolean; about?: string; v?: string };
+  /** Paths on its flash (e.g. "saves/snake/level.json" for a save) -> bytes. */
+  files: Record<string, Uint8Array>;
 }
 
 export interface FrameInfo {
@@ -45,7 +54,7 @@ export interface VirtualWedgie {
   screenshotPNG(): string;
   /** Power-cycle: a fresh interpreter, the flash reloaded from the manifest. Resolves when booted.
    *  app: switch to another app first (what picking one at wedgie.dev does to a real wedgie). */
-  reboot(app?: string): Promise<void>;
+  reboot(app?: string, extra?: ExtraApp | null): Promise<void>;
   /** Run Python in __main__ (a REPL entry: an expression echoes its repr). Resolves with the output. */
   exec(code: string): Promise<string>;
   /** Write to the board's USB stdin (the slot answers JSON lines, see /skill.md). */

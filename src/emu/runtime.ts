@@ -230,6 +230,8 @@ export async function createDevice(opts: DeviceOpts): Promise<Device> {
   // become the identity decorator from _bootstrap (same result, runs as bytecode).
   function writeFile(name: string, data: string | Uint8Array) {
     if (typeof data === "string" && name.endsWith(".py")) data = data.replace(/^(\s*)@micropython\.(viper|native)\b/gm, "$1@__emu_plain__");
+    const dirs = name.split("/").slice(0, -1);     // saves/<game>/<name>.json: its folders first
+    for (let i = 1; i <= dirs.length; i++) { try { FS.mkdir("/" + dirs.slice(0, i).join("/")); } catch { /* exists */ } }
     FS.writeFile("/" + name, data);
   }
 

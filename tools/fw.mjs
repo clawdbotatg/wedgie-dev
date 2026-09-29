@@ -7,10 +7,13 @@
 // A cart's v is a hash of its files' hashes: the site compares it with the v a wedgie recorded in its
 // apps.json when that cart went on, so there is no version number to forget to bump. A file two carts
 // share (p256.py) goes on once. apps.json is the wedgie's own list of what it has; it isn't published.
+// Then the community shelf: each repo in community.json, as copied into community/ by tools/community.mjs
+// at its reviewed commit; its carts carry repo + sha.
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, rmSync, copyFileSync, statSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { checkAppJson, parseRepo } from "../src/apps/appjson.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const sha = (buf) => createHash("sha256").update(buf).digest("hex");
@@ -37,6 +40,25 @@ export function buildFirmware() {
   });
   const inCarts = new Set(carts.flatMap((c) => c.files));
   const core = files.map((f) => f.name).filter((n) => !inCarts.has(n));
+  for (const e of JSON.parse(readFileSync(join(root, "community.json"), "utf8")).repos) {
+    const p = parseRepo(e.repo), dir = join(root, "community", p.owner, p.repo);
+    let have = "";
+    try { have = readFileSync(join(dir, ".sha"), "utf8").trim(); } catch {}
+    if (have !== e.sha) throw new Error(`community/${e.repo} isn't at ${e.sha.slice(0, 7)}: run node tools/community.mjs`);
+    const { apps, errors } = checkAppJson(JSON.parse(readFileSync(join(dir, "wedgie.json"), "utf8")), core, carts.map((c) => c.mod));
+    if (errors.length) throw new Error(`community/${e.repo}/wedgie.json:\n  ${errors.join("\n  ")}`);
+    for (const { paths, ...a } of apps.filter((a) => !e.apps || e.apps.includes(a.mod))) {
+      const hashes = [];
+      a.files.forEach((name, i) => {
+        if (byName.has(name)) throw new Error(`community/${e.repo}: ${name} is already published by another app`);
+        const buf = readFileSync(join(dir, paths[i]));
+        writeFileSync(join(out, name), buf);
+        const f = { name, size: buf.length, sha256: sha(buf) };
+        files.push(f); byName.set(name, f); hashes.push(f.sha256);
+      });
+      carts.push({ ...a, repo: e.repo, sha: e.sha, v: cartV(hashes), size: a.files.reduce((s, n) => s + byName.get(n).size, 0) });
+    }
+  }
   writeFileSync(join(out, "manifest.json"), JSON.stringify({ version, files, core, carts }, null, 1));
   copyFileSync(join(root, "LORE.md"), join(root, "public/lore.md")); // served at wedgie.dev/lore.md
   return { version, core: core.length, carts: carts.length };

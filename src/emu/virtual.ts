@@ -2,15 +2,19 @@
 // its screen, clickable/touchable buttons, keyboard while focused, and the Worker that runs the
 // firmware. Loaded only by mountVirtualWedgie() (index.ts).
 import { deviceSvg, setKey } from "../ui/device";
-import type { VirtualWedgie, VirtualWedgieOptions, FrameInfo } from "./index";
+import type { VirtualWedgie, VirtualWedgieOptions, FrameInfo, ExtraApp } from "./index";
 
 // Same order and layout as runtime.ts (see KEY_SLOTS there).
 const KEY_ORDER = ["A", "B", "X", "Y", "up", "down", "left", "right", "press"];
 const PRESSES = 16, SEEN_DOWN = 32, SEEN_UP = 48, KEY_SLOTS = 64;
-// Keyboard while the device has focus: arrows = joystick, Enter/Space = joystick press, A B X Y = buttons.
+// Keyboard while the device has focus (by key position, so any layout and caps lock work):
+// W A S D or the arrows = joystick, Space or Enter = joystick press, J K L ; = A B X Y (the column on
+// the device, top to bottom, laid flat under the right hand). Numpad 7 8 9 + also work as A B X Y.
+export const KEY_HELP = "WASD / arrows: joystick · Space: press it in · J K L ; : A B X Y";
 const KEYMAP: Record<string, string> = {
-  ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", Enter: "press", " ": "press",
-  a: "A", b: "B", x: "X", y: "Y", A: "A", B: "B", X: "X", Y: "Y",
+  KeyW: "up", KeyS: "down", KeyA: "left", KeyD: "right", ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right",
+  Space: "press", Enter: "press", NumpadEnter: "press",
+  KeyJ: "A", KeyK: "B", KeyL: "X", Semicolon: "Y", Numpad7: "A", Numpad8: "B", Numpad9: "X", NumpadAdd: "Y",
 };
 // The screen in the SVG: x=118 y=38 104x104 in viewBox "-14 -8 368 214".
 const VB = { x: -14, y: -8, w: 368, h: 214 }, SCR = { x: 118, y: 38, w: 104 };
@@ -48,7 +52,7 @@ export async function mount(el: HTMLElement, opts: VirtualWedgieOptions): Promis
   root.className = "vw";
   root.tabIndex = 0;
   root.setAttribute("role", "application");
-  root.setAttribute("aria-label", "virtual wedgie: arrows move the joystick, Enter presses it, A B X Y are the buttons");
+  root.setAttribute("aria-label", "virtual wedgie: W A S D move the joystick, Space presses it, J K L semicolon are A B X Y");
   root.innerHTML = deviceSvg({ kind: "loading", p: 0.35 });
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = 240;
@@ -119,8 +123,9 @@ export async function mount(el: HTMLElement, opts: VirtualWedgieOptions): Promis
     }
   }
 
-  function reboot(app?: string): Promise<void> {
+  function reboot(app?: string, extra?: ExtraApp | null): Promise<void> {
     if (app !== undefined) opts = { ...opts, app };
+    if (extra !== undefined) opts = { ...opts, extra: extra || undefined };
     if (destroyed) return Promise.reject(new Error("destroyed"));
     worker?.terminate();
     for (const w of waiting.values()) w.reject(new Error("rebooted"));
@@ -136,7 +141,7 @@ export async function mount(el: HTMLElement, opts: VirtualWedgieOptions): Promis
     worker.onmessage = onMsg;
     worker.onerror = (e) => { for (const cb of outCbs) cb("virtual wedgie worker: " + e.message); booted?.reject(new Error(e.message)); booted = null; };
     const p = new Promise<void>((resolve, reject) => { booted = { resolve, reject }; });
-    worker.postMessage({ type: "boot", keys: keyBuf, serial: serialSab, fwBase: opts.fwBase || "/fw/", app: opts.app ?? "hello", uid: uidBytes(opts.uid) });
+    worker.postMessage({ type: "boot", keys: keyBuf, serial: serialSab, fwBase: opts.fwBase || "/fw/", app: opts.extra ? opts.extra.app.mod : opts.app ?? "hello", extra: opts.extra, uid: uidBytes(opts.uid) });
     return p;
   }
 
@@ -200,16 +205,16 @@ export async function mount(el: HTMLElement, opts: VirtualWedgieOptions): Promis
   const kbd = new Set<string>();
   root.addEventListener("keydown", (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
-    const k = KEYMAP[e.key];
+    const k = KEYMAP[e.code];
     if (!k) return;
     e.preventDefault();
-    if (e.repeat || kbd.has(e.key)) return;
-    kbd.add(e.key);
+    if (e.repeat || kbd.has(e.code)) return;
+    kbd.add(e.code);
     hold(k, true);
   });
   root.addEventListener("keyup", (e) => {
-    const k = KEYMAP[e.key];
-    if (!k || !kbd.delete(e.key)) return;
+    const k = KEYMAP[e.code];
+    if (!k || !kbd.delete(e.code)) return;
     e.preventDefault();
     hold(k, false);
   });

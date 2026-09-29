@@ -21,6 +21,14 @@ its ID, not its port, and don't soft-reset it just to restart its app. Details: 
 - `public/device/probe.py` — board-side test code (screen, buttons, chip, `ident`), pasted into the
   raw REPL; nothing is written to flash.
 - `public/skill.md` — the agent skill file served at wedgie.dev/skill.md.
+- `/code` (`src/pages/code.ts`) — make apps: the prompt for your AI, and the emulator (open a local folder or a
+  GitHub repo, play it, it re-runs when a file changes, saves kept and editable). `public/code.md` is the
+  app-building skill at wedgie.dev/code.md (app format, fast graphics with measured numbers).
+- Apps from other repos: a repo with `wedgie.json` (rules: `src/apps/appjson.mjs`, one copy for build and
+  site). Anyone adds one on their wedgie's page (`src/apps/repos.ts`, this browser only, marked not
+  reviewed). `community.json` lists repos on everyone's shelf, each pinned to a reviewed commit;
+  `node tools/community.mjs add owner/repo` copies that commit into `community/` (review the diff), and
+  `tools/fw.mjs` publishes them as carts. Starter: github.com/clawdbotatg/wedgie-starter.
 - `art/` + `tools/art.py` — source renders and the web images made from them.
 
 ```

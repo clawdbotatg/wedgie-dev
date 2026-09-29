@@ -10,6 +10,11 @@
 // on the flash, so it can't drift. Picking another app takes the old one's files off (a wedgie holds
 // one app); /saves is never touched.
 //
+// Apps from GitHub repos (src/apps/repos.ts): the reviewed ones are carts in the manifest like any other
+// (their files are published to /fw/); one someone added themselves is a cart whose files carry a `url`,
+// passed in with `manifest`. Either way apps.json records a repo app's `repo` and `files`, so whatever
+// switches away from it (this, wedgie.py, another browser) knows which files to take off.
+//
 // USB and resets: every step here runs in MicroPython's raw REPL with NO soft reset. Wedgie firmware
 // 0.1.1+ adds its WEDGIE USB drive at power-up, which disconnects and reconnects USB; boot.py skips
 // that on a soft reset (a watchdog scratch mark), but a soft reset still runs boot.py and older
@@ -17,9 +22,11 @@
 // (it must, to run the new core), and then the wedgie comes back as a new port (wedgies.ts).
 import type { Repl } from "./repl";
 
-export type FileInfo = { name: string; size: number; sha256: string };
-/** chip: the secure chip it needs ("ATECC608" / "OPTIGA Trust M", as the chip check names them), if any. */
-export type Cart = { mod: string; name: string; entry?: string; usb?: boolean; chip?: string; about?: string; files: string[]; v: string; size: number; label: string; icon: string[] };
+/** url: where to fetch it, when it isn't /fw/<name> (an app from a repo someone added). */
+export type FileInfo = { name: string; size: number; sha256: string; url?: string };
+/** chip: the secure chip it needs ("ATECC608" / "OPTIGA Trust M", as the chip check names them), if any.
+ *  fw: the oldest wedgie firmware it runs on. repo/sha: an app from a GitHub repo, at that commit; unreviewed: added on this browser, not on the shelf. */
+export type Cart = { mod: string; name: string; entry?: string; usb?: boolean; chip?: string; fw?: string; about?: string; files: string[]; v: string; size: number; label: string; icon: string[]; repo?: string; sha?: string; unreviewed?: boolean };
 /** Core files a newer core dropped: an update deletes them (0.2.0: the menu went). */
 const RETIRED = ["menu.py", "menu.mpy"];
 /** What the firmware keeps free for saves and itself (save.py FLOOR). */
@@ -63,7 +70,10 @@ try:
     _a = json.load(open("apps.json"))
 except Exception:
     _a = []
-print("@hashes", json.dumps({"hashes": {n: _h(n) for n in ${JSON.stringify(names)}}, "files": os.listdir(), "apps": _a}))`;
+_n = ${JSON.stringify(names)}
+for _x in _a:
+    _n += [f for f in _x.get("files", []) if isinstance(f, str)]
+print("@hashes", json.dumps({"hashes": {n: _h(n) for n in _n}, "files": os.listdir(), "apps": _a}))`;
 
 async function look(r: Repl, names: string[]): Promise<Have> {
   let have: Have | null = null;
@@ -113,7 +123,9 @@ async function copy(r: Repl, files: FileInfo[], have: Have, onProgress: (p: numb
   };
   for (const f of todo) {
     await at(done / total, f.name);
-    const buf = new Uint8Array(await (await fetch("/fw/" + f.name, { cache: "no-cache" })).arrayBuffer());
+    const res = await fetch(f.url || "/fw/" + f.name, { cache: "no-cache" });
+    if (!res.ok) throw new Error(`${f.name}: couldn't fetch it (${res.status})`);
+    const buf = new Uint8Array(await res.arrayBuffer());
     const tmp = "_wedgie.tmp";
     await r.exec(`import binascii\n_f = open(${JSON.stringify(tmp)}, "wb")`);
     for (let i = 0; i < buf.length; i += CHUNK) {
@@ -138,7 +150,8 @@ async function writeApps(r: Repl, m: Manifest, have: Have, only: string | null) 
   const list: any[] = [];
   const c = m.carts.find((x) => x.mod === only);
   if (c && c.files.every((n) => have.hashes[n])) {
-    list.push({ mod: c.mod, name: c.name, ...(c.entry ? { entry: c.entry } : {}), ...(c.usb ? { usb: true } : {}), about: c.about, v: await cartV(c.files.map((n) => have.hashes[n])) });
+    list.push({ mod: c.mod, name: c.name, ...(c.entry ? { entry: c.entry } : {}), ...(c.usb ? { usb: true } : {}), about: c.about, v: await cartV(c.files.map((n) => have.hashes[n])),
+      ...(c.repo ? { repo: c.repo, files: c.files } : {}) });
   } else if (!c && only) {
     const own = (have.apps || []).find((a) => a && a.mod === only);
     if (own) list.push(own);
@@ -154,10 +167,13 @@ function activeOf(m: Manifest, have: Have): string | null {
   }
   return null;
 }
-/** Every cart file on it that neither the core nor `keep` needs. */
+/** Every app file on it (a cart's, or one apps.json lists for a repo app) that neither the core nor `keep` needs. */
 function others(m: Manifest, have: Have, keep: string | null) {
-  const need = new Set([...m.core, ...(m.carts.find((c) => c.mod === keep)?.files || [])]);
-  return [...new Set(m.carts.flatMap((c) => c.files))].filter((n) => !need.has(n) && have.hashes[n]);
+  const listed = (have.apps || []).filter((a) => Array.isArray(a?.files));
+  const filesOf = (mod: string | null) => m.carts.find((c) => c.mod === mod)?.files || listed.find((a) => a.mod === mod)?.files || [];
+  const need = new Set([...m.core, ...filesOf(keep)]);
+  return [...new Set([...m.carts.flatMap((c) => c.files), ...listed.flatMap((a) => a.files)])]
+    .filter((n) => !need.has(n) && !m.core.includes(n) && have.hashes[n]);
 }
 async function removeFiles(r: Repl, have: Have, names: string[]) {
   if (!names.length) return;
@@ -219,13 +235,13 @@ async function deviceScreen(r: Repl, title: string, name: string) {
 /** Make `cart` the app it runs: the old app's files come off, its files that differ go on, apps.json
  *  names it. Leaves the board in raw REPL; the caller restarts it (Repl.leave: a soft reset, the port
  *  stays, a fresh heap for the app). Checked for room first, so a switch that can't fit changes nothing. */
-export async function useApp(r: Repl, cart: Cart, onProgress: (p: number, what: string) => void, opts: { launcher?: boolean } = {}) {
-  const m = await firmwareManifest();
+export async function useApp(r: Repl, cart: Cart, onProgress: (p: number, what: string) => void, opts: { launcher?: boolean; manifest?: Manifest } = {}) {
+  const m = opts.manifest || await firmwareManifest();
   onProgress(0, "opening the slot");
   if (opts.launcher === false) await r.enter({ reset: false });
   else await takeOver(r);
   const have = await look(r, allNames(m));
-  const size = (n: string) => m.files.find((x) => x.name === n)!.size;
+  const size = (n: string) => m.files.find((x) => x.name === n)?.size ?? 0;   // 0: an old repo app's file (not in m); it frees its room anyway
   const need = cart.files.reduce((t, f) => t + (have.hashes[f] ? 0 : size(f)), 0);
   const gone = others(m, have, cart.mod);
   const freed = gone.reduce((t, f) => t + size(f), 0);

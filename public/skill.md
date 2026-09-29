@@ -122,7 +122,8 @@ Get the host tool (one file; needs `pip install pyserial`):
     python3 wedgie.py shot out.png         the real screen as a 240x240 PNG. READ IT to see what you drew.
     python3 wedgie.py press A              press a button (A B X Y up down left right press) [ms]
     python3 wedgie.py run app.py           run a file once (streams output; Ctrl-C stops), then back to its app
-    python3 wedgie.py install app.py --name "My app"    make your file the app it runs (it restarts into it)
+    python3 wedgie.py install .            make the app in this folder's wedgie.json the app it runs
+    python3 wedgie.py install app.py --name "My app"    make one file the app it runs (it restarts into it)
     python3 wedgie.py apps                 the apps on wedgie.dev, and which one it runs
     python3 wedgie.py use usbwallet        make that the app it runs (the old one comes off; saves stay)
     python3 wedgie.py off                  take its app off
@@ -134,6 +135,10 @@ can hold the port: if wedgie.py says busy, the wedgie.dev tab (that wedgie's pag
 `mpremote` works too (`mpremote cp app.py :app.py`, `mpremote repl`); Ctrl-C stops its app.
 
 ## The loop
+
+**Making a game or an app? Read https://wedgie.dev/code.md first**: the app format (a folder or repo
+with wedgie.json), fast graphics with measured numbers, saves, and the emulator at wedgie.dev/code
+where the person plays it while you write it. The short version for a one-file app:
 
 1. Write `myapp.py` (template below).
 2. `python3 wedgie.py install myapp.py --name "My app"`: it restarts into it.
@@ -228,7 +233,10 @@ pulled plug keeps the last good save. Save at checkpoints, not every frame (flas
 - Speed and memory: ~300 KB RAM free with the 115 KB screen buffer (less on RP2040: import `lcd`
   before big modules). Drawing primitives run in C; per-pixel Python loops are slow (~300k simple
   iterations/s) — use `@micropython.viper` for pixel work, precompute, `gc.collect()` between scenes.
-  Full-frame show ~38 ms (25 fps); `machine.freq(150_000_000, 150_000_000)` before LCD() gets ~65 fps.
+  Full-frame show 18 ms (firmware 0.2.3+ runs the chip at 125 MHz so the screen's SPI gets 62.5 MHz;
+  don't change the clock, 150 MHz is slower for the screen). `lcd.show_start()`/`show_wait()` push by
+  DMA while your code runs; `show(y0, y1)` and `show_rect` push part of it. Measured costs and the
+  rest: https://wedgie.dev/code.md
 - MicroPython, not CPython: small stdlib (`math random struct json time array binascii hashlib`),
   `time.ticks_ms()/ticks_diff()/sleep_ms()`, no real clock, no typing. WiFi only on W boards.
 
@@ -243,17 +251,21 @@ The site fades an app whose `chip` isn't the wedgie's and warns before putting i
 (a file both need, like p256.py, stays) and puts the new one's on. A fresh wedgie runs nothing and
 says so ("no software") until one is picked.
 
-The wedgie's `apps.json` names its app: `[{"mod", "name", "entry"?, "usb"?, "about"?, "v"}]` (the `v`
-it went on at; a different `v` in the manifest = update ready), or your own app (`wedgie.py install`).
+The wedgie's `apps.json` names its app: `[{"mod", "name", "entry"?, "usb"?, "about"?, "v", "repo"?, "files"?}]`
+(the `v` it went on at; a different `v` in the manifest = update ready), or your own app (`wedgie.py
+install`). An app from a repo or folder lists its `files`, so whatever switches away takes them off.
 Firmware 0.1.x had a menu and kept several; updating to 0.2 takes them off and it starts with no app.
 
 Apps now: `hello` (bouncing box, the template), `keytest` (buttons), `demo` (balls/cube/plasma speed
 test), `mock` (nine wallet screens), `wire_demo` (clear-signs a signed transaction request),
-`battery` (Waveshare Pico-UPS-B hat), `usbwallet` (the USB hardware wallet; needs an ATECC608). Source:
+`battery` (Waveshare Pico-UPS-B hat), `speed` (Speed lab: times each graphics trick on that board),
+`usbwallet` (the USB hardware wallet; needs an ATECC608). Source:
 /fw/<file> or https://github.com/clawdbotatg/wedgie-dev/tree/main/firmware (`carts.json` is the
 catalog). Read `hello.py` and `lcd.py` first. A new app = its files in firmware/ + an entry in
 firmware/carts.json (name, files, label color, 12x12 pixel icon, `chip` if it needs one); push and
-it's on the site.
+it's on the site. Anyone else's app lives in their own GitHub repo with a `wedgie.json`
+(https://wedgie.dev/code.md); people add it on their wedgie's page, and `community.json` in this repo
+lists the ones on everyone's shelf, each pinned to the commit that was read.
 
 ## The USB protocol (what wedgie.py speaks)
 

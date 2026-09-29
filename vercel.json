@@ -34,6 +34,15 @@
       ]
     },
     {
+      "source": "/code.md",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "text/markdown; charset=utf-8"
+        }
+      ]
+    },
+    {
       "source": "/wedgie.py",
       "headers": [
         {
@@ -88,6 +97,10 @@
     },
     {
       "source": "/build",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/code",
       "destination": "/index.html"
     }
   ],
