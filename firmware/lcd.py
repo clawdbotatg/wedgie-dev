@@ -182,11 +182,15 @@ def press(k, ms=80):
 
 
 class Keys:
-    def __init__(self):
+    def __init__(self, physical=False):
+        """physical=True: only real presses, never press() from USB. Anything that decides for the
+        person (sign, let a computer in) reads its keys this way, or the computer could press yes."""
         self.pins = {k: Pin(p, Pin.IN, Pin.PULL_UP) for k, p in KEYS.items()}
         self.last = {k: 1 for k in KEYS}
         self.queue = []
-        _keys.append(self)
+        self.physical = physical
+        if not physical:
+            _keys.append(self)
 
     def pressed(self):
         """Names of keys that went down since the last call."""
@@ -204,5 +208,7 @@ class Keys:
     def held(self, k):
         if self.pins[k].value() == 0:
             return True
+        if self.physical:
+            return False
         t = _hold.get(k)
         return t is not None and time.ticks_diff(t, time.ticks_ms()) > 0

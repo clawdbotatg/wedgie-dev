@@ -17,7 +17,7 @@ import { place3D, idScreen as idCanvas, colorScreen } from "../ui/place3d";
 import type { Wedgie3D } from "../ui/wedgie3d";
 import * as W from "../serial/wedgies";
 import { pyStr, type Repl } from "../serial/repl";
-import { installCore, useApp, removeApp, takeOver, firmwareManifest, type Cart, type Manifest } from "../serial/install";
+import { installCore, useApp, removeApp, takeOver, setAskHint, firmwareManifest, type Cart, type Manifest } from "../serial/install";
 import * as FS from "../serial/files";
 import { cartHtml } from "../ui/cart";
 import * as F from "../ui/facts";
@@ -274,6 +274,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
   // ---- painting --------------------------------------------------------------------------------------
   const status = (s: string, at = "#d-status") => { const el = $(at); if (!el) return; el.hidden = !s; el.innerHTML = s; };
   const tstatus = (s: string) => status(s, "#d-tstatus");   // the Developer section's own line (tests, Run, Save)
+  setAskHint((s) => status(s && `<b>${esc(s)}.</b> It asks on its screen.`));
   const meter = (p: number | null, t = "") => {
     const el = $("#d-meter"); if (!el) return; el.hidden = p === null; if (p === null) return;
     el.classList.toggle("done", p >= 1);

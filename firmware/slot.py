@@ -5,8 +5,9 @@
 # While the app runs, the slot answers one JSON line per request on USB (the protocol in
 # wedgie.dev/skill.md), so a host can identify the wedgie, mirror its screen and press its keys
 # without stopping anything. An app that talks on USB itself ("usb": true in apps.json, the Wallet)
-# gets stdin to itself. Ctrl-C stops the app and drops to the REPL, so mpremote and wedgie.dev's
-# raw-REPL tools keep working.
+# gets stdin to itself (and asks for {"type": "open"} itself: let_in). The wedgie is sealed (main.py):
+# Ctrl-C does nothing until the person lets a computer in (let_in); after that it stops the app and
+# drops to the REPL, so mpremote and wedgie.dev's raw-REPL tools keep working.
 #
 # Hold X while plugging in to start without the app (the home screen; USB always works there).
 #
@@ -114,11 +115,14 @@ _breath = True      # serve() has run since the last app tick
 _last = 0           # when the last app tick ended
 _timers = []        # every app Timer, so stop() can end them all
 _kbd = False        # a Ctrl-C landed inside an app tick: the main loop raises it
+_paused = False     # the "let this computer in?" screen is up: no app ticks draw over it
 
 
 def _guard(cb, t):
     def tick(_):
         global _breath, _kbd, _last
+        if _paused:
+            return
         if not _breath and time.ticks_diff(time.ticks_ms(), _last) < GAP:
             return                      # back to back, and USB hasn't had a turn: give it this one
         _breath = False
@@ -229,6 +233,8 @@ def handle(line):
     elif t in ("stop", "home"):         # home: what hosts for 0.1.x send before taking the REPL
         stop()
         W.send({"id": mid, "type": "ok"})
+    elif t == "open":
+        W.send({"id": mid, "type": "open" if let_in() else "refused"})
     elif t == "reboot":
         W.send({"id": mid, "type": "rebooting"})
         import machine
@@ -236,6 +242,62 @@ def handle(line):
         machine.reset()
     else:
         W.send({"id": mid, "type": "error", "error": "unknown type"})
+
+
+ASK_MS = 60000      # no answer to "let this computer in?" in a minute is a no
+
+
+def ask():
+    """Let the computer in? Only a real press answers (Keys physical: a press sent over USB can't),
+    A yes, Y no. Nothing comes off USB meanwhile, so the computer waits."""
+    import os
+    k = L.Keys(physical=True)
+    k.pressed()                             # a key already down doesn't count
+    wallet = "usbwallet.py" in os.listdir()
+    d.fill(WHITE)
+    for y, c in ((10, GREEN), (19, GREY_S), (28, RED)):
+        d.fill_rect(0, y, 240, 5, c)
+    d.center_text("LET THIS", 48, INK, 2)
+    d.center_text("COMPUTER IN?", 72, INK, 2)
+    y = 108
+    for s in ("It can change anything on", "this wedgie" + (", and use its" if wallet else ","),
+              ("wallet key, " if wallet else "") + "until you unplug it.", "", "Didn't ask for this? Y."):
+        d.center_text(s, y, INK)
+        y += 14
+    d.fill_rect(0, 184, 240, 26, GREEN)
+    d.center_text("A  let it in", 189, WHITE, 2)
+    d.fill_rect(0, 214, 240, 26, RED)
+    d.center_text("Y  no", 219, WHITE, 2)
+    d.show()
+    t0 = time.ticks_ms()
+    while time.ticks_diff(time.ticks_ms(), t0) < ASK_MS:
+        for key in k.pressed():
+            if key in ("A", "Y"):
+                return key == "A"
+        time.sleep_ms(20)
+    return False
+
+
+def let_in():
+    """{"type": "open"}: may this computer have the REPL? Asks the person, unless they already said
+    yes since power-up (or nothing is sealed: the emulator). Yes turns Ctrl-C on (wedgie.set_open)."""
+    global _paused
+    if not W.SEALED or W.is_open():
+        W.set_open()
+        return True
+    _paused = True
+    try:
+        ok = ask()
+    finally:
+        _paused = False
+    if ok:
+        W.set_open()
+        _band("computer in", [("unplug it to lock it", MUTED)])
+    elif state == "empty":
+        empty()
+    elif state in ("ended", "error"):
+        _ended()
+    return ok
 
 
 def serve(_=None):
@@ -252,6 +314,8 @@ def serve(_=None):
             line, _buf = _buf, ""
             if line.strip().startswith("{"):
                 handle(line)
+        elif ch == "\x03":              # a Ctrl-C while sealed is just a byte: start a clean line
+            _buf = ""
         elif ch != "\r":
             _buf += ch
             if len(_buf) > 4096:

@@ -4,6 +4,8 @@
 //  - a wedgie on 0.1.3 (the menu, two apps); its update takes both apps and the menu off: no app yet;
 //  - a wedgie on 0.2 with no app yet and a save: picks an app, switches, takes it off; its saves are
 //    listed, downloaded, deleted and put back; the Developer file list shows, opens, deletes, uploads.
+//    It is sealed (0.2.5+): the first thing that needs its REPL asks its pretend person (the page says
+//    to press A), nothing asks again until it's unplugged, and a no changes nothing.
 // Soft resets drop the port only where boot.py would add the WEDGIE drive (st.mark below): the bare board's
 // first boot on the new firmware does, the others don't. The page must find it again either way.
 // Serve dist first (npx vite preview), then: node tools/fakeserial.mjs [url] [outdir] [phone]
@@ -27,7 +29,7 @@ await ctx.addInitScript(fakeWedgies, [
   { uid: "de6474e3a3152a2f", machine: "Raspberry Pi Pico with RP2040", files: { "main.py": 1, "menu.py": 1, "wedgiedrive.py": 1, "wedgie.py": 'VERSION = "0.1.3"',
     "apps.json": JSON.stringify([{ mod: "hello", name: "Hello" }, { mod: "keytest", name: "Buttons" }]), "hello.py": 1, "keytest.py": 1 }, chip: "none" },
   { uid: "aa11bb22cc3d9f01", machine: "Raspberry Pi Pico 2 W with RP2350", files: { "main.py": 1, "slot.py": 1, "wedgiedrive.py": 1, "wedgie.py": `VERSION = "${CUR}"`,
-    "apps.json": "[]", "/saves/hello/best.json": '{"score": 120}', "junk.txt": "delete me" } },
+    "apps.json": "[]", "/saves/hello/best.json": '{"score": 120}', "junk.txt": "delete me" }, person: { say: "yes", ms: 1500 } },
 ]);
 
 let bad = 0;
@@ -75,7 +77,10 @@ await page.screenshot({ path: `${out}/connect-wedgie${phone ? "-phone" : ""}.png
 // pick one: it goes on (the wedgie's screen says so), the wedgie restarts into it, the page finds it again
 const shelfOn = (mod) => `document.querySelector('#d-shelf .cart-slot[data-mod="${mod}"] .cart.playing') && /on it|running/.test(document.querySelector('#d-shelf .cart-slot[data-mod="${mod}"] .cart-state').textContent) && document.querySelector('#d-shelf .cart-slot:not([data-mod="${mod}"]) .cart:not(:disabled)')`;
 const pickApp = async (mod, what) => { await page.click(`#d-shelf .cart-slot[data-mod="${mod}"] .cart`); return wait(new Function(`return ${shelfOn(mod)}`), null, 30000, what); };
-await pickApp("hello", "Hello on, running");
+await page.click(`#d-shelf .cart-slot[data-mod="hello"] .cart`);
+await wait(() => /Press A on the wedgie/.test(document.querySelector("#d-status")?.textContent || ""), null, 5000, "sealed: the page says to press A on the wedgie");
+await wait(new Function(`return ${shelfOn("hello")}`), null, 30000, "Hello on, running");
+check((await st(2, "asks")) === 1, "sealed: it asked its person once");
 check((await files(2)).includes("hello.py"), "hello.py is on it");
 const a1 = await appsOn(2);
 check(a1?.length === 1 && a1[0].mod === "hello" && /^[0-9a-f]{12}$/.test(a1[0].v), "apps.json: just hello, with its version: " + JSON.stringify(a1));
@@ -100,6 +105,20 @@ await wait(() => JSON.parse(new TextDecoder().decode(window.__ports[2]._st.files
 f = await files(2);
 check(!f.includes("usbwallet.py") && !f.includes("p256.py") && f.includes("slot.py"), "its files gone, the core stays");
 await wait(() => /Nothing on it yet/.test(document.querySelector("#d-carts-note").textContent), null, 10000, "the page: nothing on it");
+
+check((await st(2, "asks")) === 1, "sealed: once let in, nothing asks again until it's unplugged");
+
+// unplugged and back: it asks again; a no changes nothing
+await page.evaluate(() => { window.__ports[2]._st.person = { say: "no", ms: 300 }; window.__plug(2, false); });
+await page.waitForTimeout(500);
+await page.evaluate(() => window.__plug(2, true));
+await wait((id) => location.pathname === `/connect/${id}` && document.querySelector('#d-shelf .cart-slot[data-mod="hello"] .cart:not(:disabled)'), NEW, 15000, "back after the replug");
+await page.waitForTimeout(1500);
+const beforeNo = JSON.stringify(await files(2));
+await page.click(`#d-shelf .cart-slot[data-mod="hello"] .cart`);
+await wait(() => /said no/.test(document.querySelector("main")?.textContent || ""), null, 10000, "a no: the page says the wedgie said no");
+check((await st(2, "asks")) === 2 && JSON.stringify(await files(2)) === beforeNo, "replugged: it asked again, and the no changed nothing");
+await page.evaluate(() => { window.__ports[2]._st.person = { say: "yes", ms: 300 }; });
 
 // an app from a GitHub repo (faked from the local starter folder): on the shelf as not reviewed; on it, its
 // files named in apps.json; switching away takes them off by that list

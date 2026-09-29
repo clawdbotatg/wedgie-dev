@@ -3,7 +3,40 @@
 # interrupted; from the REPL they are plain calls:  import wedgie; wedgie.shot(); wedgie.press("A")
 import sys, os, json, machine
 
-VERSION = "0.2.4"
+VERSION = "0.2.5"
+
+# The lock. main.py turns Ctrl-C off before anything else and never ends by itself, so a computer
+# can only send the slot's JSON lines: it can't stop the app, reach the REPL, or make the secure chip
+# sign. {"type": "open"} asks the person on the wedgie's own screen (slot.let_in; only a real press of
+# A says yes). Yes turns Ctrl-C back on until the wedgie is unplugged: the "open" mark is watchdog
+# SCRATCH1 (boot.py's drive mark is SCRATCH0), which soft resets and machine.reset() keep and
+# power-up clears. SEALED stays False where main.py doesn't run (the emulator).
+SEALED = False
+_OPEN = 0x0BE70BE7
+
+
+def _scratch1():
+    return (0x400D8000 if "RP2350" in sys.implementation._machine else 0x40058000) + 0x10
+
+
+def is_open():
+    try:
+        return machine.mem32[_scratch1()] == _OPEN
+    except Exception:
+        return False
+
+
+def set_open():
+    """Let the computer in until the wedgie is unplugged."""
+    try:
+        machine.mem32[_scratch1()] = _OPEN
+    except Exception:
+        pass
+    try:
+        import micropython
+        micropython.kbd_intr(3)
+    except Exception:
+        pass
 
 
 def uid():
@@ -70,7 +103,8 @@ def hello(mid=None, **extra):
     d = {"type": "hello", "name": "wedgie", "fw": "wedgie-" + VERSION, "version": VERSION, "uid": uid(),
          "short": short(), "board": name, "cpu": cpu, "wifi": wifi, "machine": sys.implementation._machine,
          "micropython": os.uname().release, "apps": [x["mod"] for x in a],
-         "carts": [{"mod": x["mod"], "v": x.get("v")} for x in a], "free": free(), "chip": _chip, "slot": 1}
+         "carts": [{"mod": x["mod"], "v": x.get("v")} for x in a], "free": free(), "chip": _chip, "slot": 1,
+         "sealed": SEALED, "open": is_open()}
     if mid is not None:
         d["id"] = mid
     d.update(extra)

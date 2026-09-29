@@ -132,7 +132,8 @@ Get the host tool (one file; needs `pip install pyserial`):
 
 `--port /dev/cu.usbmodemXXXX` or `--id A1B2C3` picks one when several are plugged in. Only one program
 can hold the port: if wedgie.py says busy, the wedgie.dev tab (that wedgie's page) or mpremote has it.
-`mpremote` works too (`mpremote cp app.py :app.py`, `mpremote repl`); Ctrl-C stops its app.
+`mpremote` works too (`mpremote cp app.py :app.py`, `mpremote repl`), once the wedgie has let this
+computer in (below: a wedgie is locked). Then Ctrl-C stops its app.
 
 ## The loop
 
@@ -283,11 +284,20 @@ While its app runs, the firmware (`slot.py`) answers one JSON line per request o
     {"id":6,"type":"get","path":"/saves/hello/best.json"} -> {"type":"file","i":0,"n":N,"size":S,"data":"<base64>"} x n
     {"id":7,"type":"rm","path":"..."}    -> {"type":"ok","free":N}   (a folder goes with everything in it)
     {"id":8,"type":"stop"}  /  {"id":9,"type":"reboot"}
+    {"id":10,"type":"open"}              -> {"type":"open"} or {"type":"refused"}  (asks the person; below)
 
 `running` is the app on screen (null: none). Lines that don't start with `{` are logs (an app's
-print()). Ctrl-C (0x03) stops the app and drops to the MicroPython REPL; raw REPL (Ctrl-A) is how
-files get written. `exec(open("main.py").read())` starts the app again. An app with `"usb": true`
-(the Wallet) has the port to itself and speaks its own protocol; Ctrl-C still stops it.
+print()). Raw REPL (Ctrl-A) is how files get written. `exec(open("main.py").read())` starts the app
+again. An app with `"usb": true` (the Wallet) has the port to itself and speaks its own protocol; it
+answers `open` too.
+
+**A wedgie is locked (0.2.5+; hello says `"sealed": true`).** Ctrl-C does nothing, so no computer
+can reach its REPL (and through it, the secure chip) on its own. To get in, send `{"type":"open"}`:
+the wedgie asks on its own screen, and only a real press answers (a `press` over USB can't). A lets
+this computer in, Y or a minute with no answer says no. Allow 65 s for the reply. After a yes,
+hello says `"open": true`, Ctrl-C (0x03) stops the app and drops to the REPL as usual, and nothing
+asks again until the wedgie is unplugged. Tell your person to press A before you send it. wedgie.py
+and wedgie.dev do all this for you. Older firmware has no lock: Ctrl-C works right away.
 
 ### Plugging in, and resets (read this before scripting a wedgie)
 

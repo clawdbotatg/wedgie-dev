@@ -9,10 +9,14 @@
 //   (1 = a one-byte stand-in); window.__ports[i]._st is each board's state; window.__plug(i, false|true)
 //   pulls a board out or plugs it back in. A board with noMp: true never answers (no MicroPython);
 //   chip: "none" has no secure chip (default: an ATECC608 that proves itself).
+// 0.2.5+ is sealed: Ctrl-C is a plain byte until {"type": "open"} is answered yes by the pretend person
+// (person: { say: "yes" | "no", ms }, default yes after 300 ms; _st.asks counts the questions). Yes lasts
+// until __plug(i, false).
 export function fakeWedgies(specs) {
 
   localStorage.setItem("wedgie.serial", "1"); // this browser tapped Connect before (see btprobe.mjs for a new one)
   const enc = new TextEncoder(), dec = new TextDecoder();
+  const cmpV = (a, b) => { const x = a.split(".").map(Number), y = b.split(".").map(Number); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0); return 0; };
   const hex = (b) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
   const sha = async (u8) => hex(await crypto.subtle.digest("SHA-256", u8));
   const text = (s) => enc.encode(s);
@@ -26,6 +30,7 @@ export function fakeWedgies(specs) {
     const slot = () => st.files.has("slot.py") && st.files.has("main.py");
     const wedgie = () => st.files.has("main.py") && (st.files.has("menu.py") || st.files.has("slot.py"));
     // 0.2: the app it runs (null while stopped by Ctrl-C, or with none on it)
+    const sealed = () => slot() && cmpV(version() || "0", "0.2.5") >= 0;
     const running = () => (slot() ? (st.stopped ? null : apps()[0]?.mod ?? null) : st.launched);
     const norm = (k) => "/" + k.replace(/^\//, "");
     const lsAll = (root = "/") => {
@@ -56,6 +61,7 @@ export function fakeWedgies(specs) {
         apps: apps().map((a) => a.mod), running: running() };
       if (v >= "0.1.4") Object.assign(h, { carts: apps().map((a) => ({ mod: a.mod, v: a.v })), free: 600000, chip: null });
       if (slot()) h.slot = 1;
+      if (sealed()) Object.assign(h, { sealed: true, open: !!st.open });
       return JSON.stringify(h);
     };
     const answer = (stdout) => push("OK" + stdout + "\x04\x04>");
@@ -104,6 +110,12 @@ export function fakeWedgies(specs) {
       if (slot() && msg.type === "get") { const k = find(msg.path); return push(k ? chunks(id, st.files.get(k)) : JSON.stringify({ id, type: "error", error: "can't read it" }) + "\r\n"); }
       if (slot() && msg.type === "rm") { rmAll(msg.path); return push(JSON.stringify({ id, type: "ok", free: 600000 }) + "\r\n"); }
       if (msg.type === "press") { st.presses.push(msg.key); return ok(); }
+      if (msg.type === "open" && sealed()) {
+        if (st.open) return push(JSON.stringify({ id, type: "open" }) + "\r\n");
+        st.asks = (st.asks || 0) + 1;
+        const p = st.person || {};
+        return setTimeout(() => { st.open = p.say !== "no"; push(JSON.stringify({ id, type: st.open ? "open" : "refused" }) + "\r\n"); }, p.ms ?? 300);
+      }
       if (msg.type === "chip" && v >= "0.1.4") {
         st.chips++;
         if (st.chip === "none") return push(JSON.stringify({ id, type: "chip", kind: null, chip: null, lines: { sda: 0, scl: 0 }, msg: "00" }) + "\r\n");
@@ -135,6 +147,7 @@ export function fakeWedgies(specs) {
       const writable = new WritableStream({ write(chunk) {
         if (st.dead) return;               // no MicroPython on it: nothing ever answers
         for (const ch of dec.decode(chunk)) {
+          if (ch === "\x03" && sealed() && !st.open && !raw) { line = ""; st.sealedBytes = (st.sealedBytes || 0) + 1; continue; }
           if (ch === "\x03") { raw = false; line = ""; st.interrupts++; st.stopped = true; continue; }
           if (ch === "\x01") { raw = true; code = ""; push("raw REPL; CTRL-B to exit\r\n>"); continue; }
           if (ch === "\x02") { raw = false; continue; }
@@ -165,12 +178,13 @@ export function fakeWedgies(specs) {
     const p = board(b.uid, b.machine, new Map(Object.entries(b.files || {}).map(([k, v]) => [k, v === 1 ? new Uint8Array([1]) : text(v)])));
     if (b.noMp) p._st.dead = true;
     p._st.chip = b.chip;
+    p._st.person = b.person;
     return p;
   });
   window.__ports = ports;
   const t = new EventTarget();
   const plugged = new Set(ports);
-  window.__plug = (i, on) => { const p = ports[i]; if (on) { plugged.add(p); t.dispatchEvent(Object.assign(new Event("connect"), { port: p })); } else { plugged.delete(p); t.dispatchEvent(Object.assign(new Event("disconnect"), { port: p })); } };
+  window.__plug = (i, on) => { const p = ports[i]; if (!on) p._st.open = false; if (on) { plugged.add(p); t.dispatchEvent(Object.assign(new Event("connect"), { port: p })); } else { plugged.delete(p); t.dispatchEvent(Object.assign(new Event("disconnect"), { port: p })); } };
   for (const p of ports) p._st.resetHook = () => {
     setTimeout(() => t.dispatchEvent(Object.assign(new Event("disconnect"), { port: p })), 50);
     setTimeout(() => t.dispatchEvent(Object.assign(new Event("connect"), { port: p })), 600);

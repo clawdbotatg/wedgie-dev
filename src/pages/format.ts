@@ -13,7 +13,7 @@
 //  5. on its screen: each button alone, in order; then each again, filling the screen with its color.
 import * as W from "../serial/wedgies";
 import type { Repl } from "../serial/repl";
-import { installCore } from "../serial/install";
+import { installCore, letIn } from "../serial/install";
 import * as FS from "../serial/files";
 import { checkChip } from "../serial/chipcheck";
 import { usbSupported, bootDevices, isBoot, pickBoot, flashMicroPython, BOOT_PIDS } from "../serial/picoboot";
@@ -118,6 +118,7 @@ export function format(main: HTMLElement) {
     buttons("");
     const wipe = ($("t-wipe") as HTMLInputElement).checked;
     W.withRepl(w, async (r) => {
+      await letIn(r, (s) => s && status(s + ".", "It asks on its screen: A lets this computer wipe it."));
       await r.write("\r\x03\x03");
       await new Promise((res) => setTimeout(res, 150));
       await r.write("\x01");

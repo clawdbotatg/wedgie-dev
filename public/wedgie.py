@@ -24,6 +24,8 @@
 A wedgie (firmware 0.2+) runs one app: it boots straight into it and the app gets every button.
 hello/shot/press talk to the firmware over JSON lines while the app runs and never interrupt it.
 The rest stop it (Ctrl-C), use MicroPython's raw REPL, then start the app again by running main.py.
+Firmware 0.2.5+ is sealed: the first of those asks on the wedgie's screen and waits for you to press A
+there; then it stays open to this computer until you unplug it.
 update, use, install and run soft-reset it (a fresh heap for new firmware or a new app).
 Only one program can hold the port: close the wedgie's page on wedgie.dev (and mpremote) first.
 
@@ -121,9 +123,24 @@ class Wedgie:
                 raise TimeoutError("waiting for %r" % marker)
             data += self.s.read(4096)
 
+    def let_in(self):
+        """0.2.5+ is sealed: Ctrl-C does nothing until its person presses A on the wedgie's own screen
+        ({"type": "open"}; Y or a minute with no answer is a no). Then it stays open until unplugged."""
+        h = self.hello(1.0)
+        if not h or not h.get("sealed") or h.get("open"):
+            return
+        sys.stderr.write("press A on the wedgie to let this computer in\n")
+        try:
+            v = self.request({"type": "open"}, 65)
+        except TimeoutError:
+            sys.exit("nobody pressed A on the wedgie")
+        if v.get("type") != "open":
+            sys.exit("the wedgie said no (Y on its screen)" if v.get("type") == "refused" else "the wedgie said %s" % v)
+
     def enter(self):
         """Stop what it runs (Ctrl-C) and go to the raw REPL. No soft reset: wedgie firmware 0.1.1+ re-adds
         its USB drive at boot, which re-enumerates USB and would drop this port mid-command."""
+        self.let_in()
         self.s.write(b"\r\x03\x03")
         time.sleep(0.15)
         self.s.reset_input_buffer()
@@ -357,6 +374,7 @@ _free()"""
 def take_over(wg):
     """Stop its app and take the raw REPL, with its RAM freed: Ctrl-C leaves the app loaded, and on an
     RP2040 a copy then fails with MemoryError. lcd stays (its 115 KB framebuffer)."""
+    wg.let_in()                                 # sealed: its person says yes first
     try:
         wg.request({"type": "stop"}, 1)        # stop its app first (0.1.x: "home"; its Timer would keep drawing)
     except TimeoutError:

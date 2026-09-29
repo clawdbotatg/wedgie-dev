@@ -4,10 +4,13 @@
 # WiFi wallet; only the transport differs.
 #
 # Two ways to run it. run() is for the board: it owns stdin in a loop that never returns, so the
-# REPL cannot eat the host's bytes (Ctrl-C still drops to the REPL for development). start() is
-# for the emulator: a Timer tick, so the page and tools/emu keep working around it.
+# REPL cannot eat the host's bytes. The wedgie is sealed (main.py): a host that wants the REPL sends
+# {"type": "open"} and the person answers on the screen (slot.let_in); only then does Ctrl-C work.
+# Its keys are physical (lcd.Keys): a press sent over USB never signs. start() is for the emulator:
+# a Timer tick, so the page and tools/emu keep working around it.
 import sys, select, json, time, gc
 import lcd as L
+import wedgie as W
 import eip712
 import signer as S
 import blockies
@@ -158,6 +161,9 @@ def pump():
             if line.strip():
                 handle_line(line)
             return
+        if ch == "\x03":       # a Ctrl-C while sealed is just a byte: start a clean line
+            _buf = ""
+            continue
         _buf += ch
         if len(_buf) > MAX_LINE:
             _buf = ""
@@ -166,6 +172,7 @@ def pump():
 
 
 def handle_line(line):
+    global dirty
     try:
         m = json.loads(line)
     except ValueError:
@@ -187,6 +194,12 @@ def handle_line(line):
         on_state(mid, m)
     elif t == "provision":
         on_provision(mid, m.get("op"))
+    elif t == "open":       # the host wants the REPL: the person decides on the screen
+        if state in ("confirm", "working", "provision"):
+            send({"id": mid, "type": "busy"}); return
+        import slot
+        send({"id": mid, "type": "open" if slot.let_in() else "refused"})
+        dirty = True
     elif t == "reboot":     # a clean restart from the host; mpremote's reset can wedge the Mac's port
         send({"id": mid, "type": "rebooting"})
         time.sleep_ms(100)
@@ -202,7 +215,8 @@ def hello(mid):
     out = {"id": mid, "type": "hello", "name": NAME, "fw": FW, "backend": sig.name if sig else None,
            "uid": machine.unique_id().hex(),
            "serial": st.get("serial"), "configLocked": st.get("configLocked"),
-           "dataLocked": st.get("dataLocked"), "hasKey": bool(address)}
+           "dataLocked": st.get("dataLocked"), "hasKey": bool(address),
+           "sealed": W.SEALED, "open": W.is_open()}
     if address:
         out["qx"], out["qy"], out["address"] = qx, qy, address
     return out
@@ -582,7 +596,7 @@ def tick():
 def init():
     global d, keys, state, _poll, dirty
     d = L.LCD()
-    keys = L.Keys()
+    keys = L.Keys(physical=True)
     _poll = select.poll()
     _poll.register(sys.stdin, select.POLLIN)
     state = "home"
@@ -593,7 +607,7 @@ def init():
 
 
 def run():
-    """The board: own stdin until Ctrl-C."""
+    """The board: own stdin until Ctrl-C (which works only once the person let the computer in)."""
     init()
     while True:
         tick()

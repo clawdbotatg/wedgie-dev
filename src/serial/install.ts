@@ -105,11 +105,35 @@ _free()`;
 
 /** Stop what the wedgie runs and take its raw REPL, without a soft reset, with its RAM freed. The app is
  *  stopped properly first (on 0.1.x its Timer would otherwise keep drawing over everything; 0.2 stops
- *  it on Ctrl-C too). */
-export async function takeOver(r: Repl) {
+ *  it on Ctrl-C too). 0.2.5+ is sealed: the person lets this computer in first (letIn). */
+export async function takeOver(r: Repl, ask = askHint) {
+  await letIn(r, ask);
   await r.request({ type: "stop" }, 800).catch(() => {});
   await r.enter({ reset: false });
   await r.exec(FREE_PY, 10000).catch(() => {});
+}
+
+export const ASK_TEXT = "Press A on the wedgie to let this computer in";
+/** Where a page shows ASK_TEXT while the wedgie waits for its person ("" when they answered). */
+export let askHint: (s: string) => void = () => {};
+export function setAskHint(fn: (s: string) => void) { askHint = fn; }
+
+/** A sealed wedgie (0.2.5+: its hello says sealed) turns Ctrl-C off, so the REPL is shut until its person
+ *  presses A on its own screen ({"type": "open"}; Y or a minute with no answer is a no). Once they have,
+ *  it stays open until it's unplugged and answers at once. Anything else (older firmware, bare
+ *  MicroPython, a board already in its REPL) has no lock and is left alone. */
+export async function letIn(r: Repl, ask: (s: string) => void = askHint) {
+  const h = await r.hello(700).catch(() => null);
+  if (!h?.sealed || h.open) return;
+  ask(ASK_TEXT);
+  let v: any;
+  try { v = await r.request({ type: "open" }, 65000); }
+  catch { throw new Error("nobody pressed A on the wedgie"); }
+  finally { ask(""); }
+  if (v.type === "open") return;
+  if (v.type === "refused") throw new Error("the wedgie said no (Y on its screen)");
+  if (v.type === "busy") throw new Error("the wedgie is busy signing; try again after");
+  throw new Error(`the wedgie said ${v.error || v.type}`);
 }
 
 async function copy(r: Repl, files: FileInfo[], have: Have, onProgress: (p: number, what: string) => void, screen?: (p: number) => Promise<void>) {
@@ -189,7 +213,7 @@ export async function installCore(r: Repl, onProgress: (p: number, what: string)
   const m = await firmwareManifest();
   onProgress(0, "stopping what it runs");
   if (opts.launcher === false) await r.enter({ reset: false });   // a board already in the raw REPL (/format's bench)
-  else await takeOver(r);
+  else await takeOver(r, (s) => { askHint(s); if (s) onProgress(0, s); });
   onProgress(0.02, "checking what's on it");
   const have = await look(r, allNames(m));
   const stale = m.files.filter((f) => f.name.endsWith(".py")).map((f) => f.name.replace(/\.py$/, ".mpy"))
@@ -239,7 +263,7 @@ export async function useApp(r: Repl, cart: Cart, onProgress: (p: number, what: 
   const m = opts.manifest || await firmwareManifest();
   onProgress(0, "opening the slot");
   if (opts.launcher === false) await r.enter({ reset: false });
-  else await takeOver(r);
+  else await takeOver(r, (s) => { askHint(s); if (s) onProgress(0, s); });
   const have = await look(r, allNames(m));
   const size = (n: string) => m.files.find((x) => x.name === n)?.size ?? 0;   // 0: an old repo app's file (not in m); it frees its room anyway
   const need = cart.files.reduce((t, f) => t + (have.hashes[f] ? 0 : size(f)), 0);
