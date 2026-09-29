@@ -106,6 +106,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
           </div>
           <details class="card wd-sec dev">
             <summary>Developer</summary>
+            <div class="row"><button class="btn btn-sm" data-act="mirror">Show its screen here</button></div>
             <div class="row"><button class="btn btn-sm" data-act="screen">Test the screen</button><button class="btn btn-sm" data-act="keys">Test the buttons</button><button class="btn btn-sm" data-act="chip">Check the chip again</button></div>
             <div class="status recess" id="d-tstatus" hidden></div>
             <textarea class="recess editor" spellcheck="false"></textarea>
@@ -158,10 +159,15 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
   };
   const setScreen = (s: Screen) => { shown = s; live = s.kind === "live"; w3?.setScreen(tex(s)); };
   const idScreen = (): Screen => ({ kind: "id", id, sub: w?.board || "" });
+  // Its app runs on its own: the page shows its ID, not its screen. Mirroring the real screen (a shot
+  // every ~0.7 s, each ties the wedgie up a moment) and pressing its buttons from here are opt-in, in
+  // Developer. A wallet shouldn't feel driven by the computer it's plugged into.
+  let mirrorOn = false;
+  const home = (): Screen => (mirrorOn && wedgie() ? { kind: "live" } : idScreen());
   setScreen(idScreen());
   place3D($(".wd-3d"), {
     screen: tex(shown),
-    onKey: (k, down) => { if (down && wedgie() && link && !busy) link.request({ type: "press", key: k }).catch(() => {}); },
+    onKey: (k, down) => { if (down && mirrorOn && wedgie() && link && !busy) link.request({ type: "press", key: k }).catch(() => {}); },
   }).then((x) => { w3 = x; x?.setScreen(tex(shown)); });
 
   const cx = canvas.getContext("2d")!, img = cx.createImageData(240, 240);
@@ -198,7 +204,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     W.withRepl(x, async (r) => {
       if (x !== w) return;
       link = r;
-      setScreen(wedgie() ? { kind: "live" } : idScreen());
+      setScreen(home());
       paint();
       if (liveFs()) loadSaves();
       await held;
@@ -229,7 +235,9 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     }
     const x = w!;
     $("#d-light").className = `light ${F.overall(x, m)}`;
-    $("#d-hint").textContent = wedgie() && link ? "Its real screen. Click its buttons (or press arrows, Enter, A, B, X, Y) to press the real ones." : "";
+    $("#d-hint").textContent = mirrorOn && wedgie() && link ? "Its real screen. Click its buttons (or press arrows, Enter, A, B, X, Y) to press the real ones." : "";
+    const mb = $<HTMLButtonElement>('[data-act="mirror"]');
+    if (mb) mb.textContent = mirrorOn ? "Stop showing its screen" : "Show its screen here";
     paintHw(x); paintFw(x); paintCarts(x); paintSaves();
     main.querySelectorAll<HTMLButtonElement>("[data-act]").forEach((b) => (b.disabled = !link || (!!busy && b.dataset.act !== "stop") || (b.dataset.act === "chip" && !newCarts())));
   }
@@ -346,7 +354,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
       delete inserting[c.mod];
       status(`<b class="bad">${esc(c.name)} didn't go on:</b> ${esc(e?.message || e)}`);
       await backToApp(r).catch(() => {});
-      setScreen({ kind: "live" });
+      setScreen(home());
     }
     busy = ""; paint(); W.touch();
   }
@@ -377,7 +385,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
       tstatus("");
       $("#d-saves-note").innerHTML = `<b class="bad">${esc(what)} failed:</b> ${esc(e?.message || e)}`;
     } finally {
-      if (!lv) { await backToApp(r).catch(() => {}); setScreen({ kind: "live" }); }
+      if (!lv) { await backToApp(r).catch(() => {}); setScreen(home()); }
       busy = ""; paint(); W.touch();
     }
   }
@@ -545,7 +553,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
   };
   const restart = async (r: Repl) => {
     if (wedgie()) await backToApp(r).catch(() => {}); else await r.leave({ reset: true });
-    setScreen(wedgie() ? { kind: "live" } : idScreen());
+    setScreen(home());
     busy = ""; stopFn = null;
     paint(); W.touch();
   };
@@ -559,6 +567,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
   }, 400);
 
   const handlers: Record<string, () => void> = {
+    mirror: () => { mirrorOn = !mirrorOn; setScreen(home()); paint(); },
     chip: async () => {
       if (!link || busy || !w) return;
       busy = "chip"; paint();
@@ -595,7 +604,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
       out.textContent = "";
       r.onText = ((prev) => (s: string) => { prev?.(s); out.textContent = (out.textContent + s.replace(/[\x00-\x08]/g, "")).slice(-20000); out.scrollTop = 1e9; })(r.onText);
       stopFn = () => { r.interrupt(); restart(r); };
-      if (wedgie()) setScreen({ kind: "live" });
+      setScreen(home());
       try {
         await r.exec(editor.value, 10 * 60 * 1000);
         out.textContent += "\n[returned; timers keep running until Stop]";

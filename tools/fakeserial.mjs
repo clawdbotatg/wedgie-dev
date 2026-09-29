@@ -24,7 +24,7 @@ await ctx.addInitScript(fakeWedgies, [
   { uid: "e66138935f5a2c29", machine: "Raspberry Pi Pico 2 W with RP2350", files: { "boot.py": 1 } },
   { uid: "de6474e3a3152a2f", machine: "Raspberry Pi Pico with RP2040", files: { "main.py": 1, "menu.py": 1, "wedgiedrive.py": 1, "wedgie.py": 'VERSION = "0.1.3"',
     "apps.json": JSON.stringify([{ mod: "hello", name: "Hello" }, { mod: "keytest", name: "Buttons" }]), "hello.py": 1, "keytest.py": 1 }, chip: "none" },
-  { uid: "aa11bb22cc3d9f01", machine: "Raspberry Pi Pico 2 W with RP2350", files: { "main.py": 1, "slot.py": 1, "wedgiedrive.py": 1, "wedgie.py": 'VERSION = "0.2.1"',
+  { uid: "aa11bb22cc3d9f01", machine: "Raspberry Pi Pico 2 W with RP2350", files: { "main.py": 1, "slot.py": 1, "wedgiedrive.py": 1, "wedgie.py": 'VERSION = "0.2.2"',
     "apps.json": "[]", "/saves/hello/best.json": '{"score": 120}', "junk.txt": "delete me" } },
 ]);
 
@@ -49,7 +49,7 @@ const [BARE, OLD, NEW] = ["5A2C29", "152A2F", "3D9F01"];
 for (const id of [BARE, OLD, NEW]) console.log("·", id, "→", await rowText(id));
 check(/Hardware.*ATECC608 ✓ working/.test(await rowText(NEW)), "0.2: chip proven working on the list");
 check(await st(2, "chips") === 1 && await st(2, "interrupts") === 0, "0.2: the chip proof ran once, over JSON, with nothing stopped");
-check(/update ready: 0\.2\.1/.test(await rowText(OLD)), "0.1.3: update ready on the list");
+check(/update ready: 0\.2\.2/.test(await rowText(OLD)), "0.1.3: update ready on the list");
 check(/Firmware\s*none yet install/.test(await rowText(BARE)), "bare board: no firmware, install on the list");
 check(/Software\s*nothing yet pick one/.test(await rowText(NEW)), "0.2 with no app: nothing yet, pick one");
 await page.screenshot({ path: `${out}/connect-list${phone ? "-phone" : ""}.png` });
@@ -57,7 +57,11 @@ await page.screenshot({ path: `${out}/connect-list${phone ? "-phone" : ""}.png` 
 // ---- one wedgie: tap its row, its page at /connect/<ID> -------------------------------------------------
 await page.click(`.wrow[data-id="${NEW}"]`);
 await wait((id) => location.pathname === `/connect/${id}` && document.querySelectorAll("#d-shelf .cart-slot").length === 7, NEW, 10000, "detail page with 7 apps to pick");
-await wait(() => window.__ports[2]._st.shots >= 2, null, 10000, "live screen mirrored");
+await page.waitForTimeout(2500);
+check((await st(2, "shots")) === 0, "the page doesn't watch its screen unless asked");
+await page.click(".dev summary");
+await page.click('[data-act="mirror"]');
+await wait(() => window.__ports[2]._st.shots >= 2, null, 10000, "Show its screen here: mirrored");
 check(/ATECC608 working/.test(await page.textContent("#d-hw")), "detail: hardware says the chip works");
 check(/Up to date/.test(await page.textContent("#d-fw")), "detail: firmware up to date");
 await wait(() => /Hello/.test(document.querySelector("#d-saves")?.textContent || ""), null, 10000, "its saves listed");
@@ -110,7 +114,6 @@ await wait(() => window.__ports[2]._st.files.has("/saves/hello/best.json") && ne
 await wait(() => /1 save file put back/.test(document.querySelector("#d-saves-note").textContent), null, 10000, "the page says it put them back");
 
 // Developer: the files
-await page.click(".dev summary");
 await page.click('[data-fs="refresh"]');
 await wait(() => document.querySelector('[data-fs-open="/junk.txt"]') && document.querySelector('[data-fs-open="/saves/hello/best.json"]'), null, 10000, "file list, saves folder included");
 await page.click('[data-fs-open="/junk.txt"]');
@@ -132,7 +135,7 @@ await page.click(`.wrow[data-id="${OLD}"]`);
 await wait(() => document.querySelector("[data-fw]") && !document.querySelector("[data-fw]").disabled, null, 10000, "0.1.3 page, Update enabled");
 check(/Update the firmware/.test(await page.textContent("#d-carts-note")), "0.1.3: Software asks for the update");
 await page.click("[data-fw]");
-await wait((id) => /Up to date/.test(document.querySelector("#d-fw")?.textContent || "") && location.pathname === `/connect/${id}`, OLD, 120000, "0.1.3 → 0.2.1, came back by its ID");
+await wait((id) => /Up to date/.test(document.querySelector("#d-fw")?.textContent || "") && location.pathname === `/connect/${id}`, OLD, 120000, "0.1.3 → 0.2.2, came back by its ID");
 check((await st(1, "resets")) === 1 && (await st(1, "drops")) === 0, "one soft reset, at the end; its port stayed (0.1.3 marks soft resets)");
 const a3 = await appsOn(1), f3 = await files(1);
 check(JSON.stringify(a3) === "[]", "no app yet (nobody picked one): " + JSON.stringify(a3));

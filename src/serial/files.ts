@@ -57,7 +57,7 @@ export async function put(r: Repl, path: string, bytes: Uint8Array) {
   const dirs = path.split("/").slice(1, -1).map((_, i, a) => "/" + a.slice(0, i + 1).join("/"));
   const tmp = path + ".tmp";
   await r.exec(`import os, binascii\nfor _d in ${JSON.stringify(dirs)}:\n    try:\n        os.mkdir(_d)\n    except OSError:\n        pass\n_f = open(${JSON.stringify(tmp)}, "wb")`);
-  for (let i = 0; i < bytes.length; i += 2048) await r.exec(`_f.write(binascii.a2b_base64(${JSON.stringify(b64(bytes.subarray(i, i + 2048)))}))`);
+  for (let i = 0; i < bytes.length; i += 1024) await r.exec(`_f.write(binascii.a2b_base64(${JSON.stringify(b64(bytes.subarray(i, i + 1024)))}))`);
   await r.exec(`_f.close()\ntry:\n    os.remove(${JSON.stringify(path)})\nexcept OSError:\n    pass\nos.rename(${JSON.stringify(tmp)}, ${JSON.stringify(path)})\ntry:\n    os.sync()\nexcept AttributeError:\n    pass`);
 }
 

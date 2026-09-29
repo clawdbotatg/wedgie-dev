@@ -168,8 +168,8 @@ class Wedgie:
     def put(self, name, data):
         tmp = "_wedgie.tmp"
         self.exec("import binascii, os, hashlib\n_f = open(%r, 'wb')" % tmp)
-        for i in range(0, len(data), 2048):
-            self.exec("_f.write(binascii.a2b_base64(%r))" % base64.b64encode(data[i:i + 2048]).decode())
+        for i in range(0, len(data), 1024):          # small writes: little RAM in one piece (RP2040)
+            self.exec("_f.write(binascii.a2b_base64(%r))" % base64.b64encode(data[i:i + 1024]).decode())
         self.exec("_f.close()")
         got = self.exec("h = hashlib.sha256()\nwith open(%r, 'rb') as f:\n    while True:\n        b = f.read(1024)\n        if not b: break\n        h.update(b)\nprint(binascii.hexlify(h.digest()).decode())" % tmp).strip()
         if got != hashlib.sha256(data).hexdigest():
@@ -301,12 +301,35 @@ def remove_files(wg, have, names):
         have["hashes"][n] = None
 
 
+FREE_PY = """def _free():
+    import gc, sys
+    for n in list(sys.modules):
+        if n not in ("lcd", "splash", "micropython") and n[0] != "_":   # _: the host's own (the emulator's _emu)
+            del sys.modules[n]
+    l = sys.modules.get("lcd")
+    if l:
+        del l._keys[:]          # every Keys() the app and the slot made
+        l._on_show = None       # the loader's hook
+    g = globals()
+    for n in list(g):
+        if not n.startswith("__"):
+            del g[n]
+    gc.collect()
+_free()"""
+
+
 def take_over(wg):
+    """Stop its app and take the raw REPL, with its RAM freed: Ctrl-C leaves the app loaded, and on an
+    RP2040 a copy then fails with MemoryError. lcd stays (its 115 KB framebuffer)."""
     try:
         wg.request({"type": "stop"}, 1)        # stop its app first (0.1.x: "home"; its Timer would keep drawing)
     except TimeoutError:
         pass
     wg.enter()
+    try:
+        wg.exec(FREE_PY)
+    except RuntimeError:
+        pass
 
 
 # ---- commands ------------------------------------------------------------------------------

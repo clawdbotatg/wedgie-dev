@@ -130,17 +130,19 @@ try {
   await page.waitForTimeout(600);
   const logic = await page.evaluate(() => window.vw.exec([
     "g = slot._guard(cb, t)",
-    "slot._breath = False; a = n[0]; g(None); b = n[0]",
+    "slot._breath = False; slot._last = time.ticks_ms(); a = n[0]; g(None); b = n[0]",
     "slot._breath = True; g(None); c = n[0]; br = slot._breath",
+    "slot._breath = False; slot._last = time.ticks_add(time.ticks_ms(), -50); g(None); d = n[0] - c",
     "def boom(_):\n    raise KeyboardInterrupt",
     "k = slot._guard(boom, t); slot._breath = True; k(None); kb = slot._kbd; slot._kbd = False",
     "ticks = n[0]",
     "slot.stop()",
-    "print(ticks, b - a, c - b, br, kb, len(slot._timers))",
+    "print(ticks, b - a, c - b, br, kb, d)",
   ].join("\n")));
-  const [ticks, skipped, ran, br, kb] = logic.trim().split(" ");
+  const [ticks, skipped, ran, br, kb, late] = logic.trim().split(" ");
   check(/_Timer True/.test(wr) && +ticks > 5, `app Timers are wrapped and tick (${wr.trim()}, ${ticks} ticks)`);
-  check(skipped === "0" && ran === "1" && br === "False", `a tick waits until USB has had a turn (${logic.trim()})`);
+  check(skipped === "0" && ran === "1" && br === "False", `a back-to-back tick waits until USB has had a turn (${logic.trim()})`);
+  check(late === "1", "a tick that isn't back to back runs even before USB's turn (no choppy apps)");
   check(kb === "True", "a Ctrl-C inside a tick reaches the main loop");
 
   // the Wallet (no chip: software key) must not crash; it has USB to itself
@@ -149,6 +151,12 @@ try {
   const wl = await page.evaluate(() => window.vw.exec("import slot; slot.app['mod'], slot.state, slot._own_usb()"));
   check(/usbwallet', 'running', True/.test(wl), `Wallet runs, USB its own (${wl.trim()})`);
   await page.locator(".vw").screenshot({ path: `${out}/emu-wallet.png` });
+
+  // installs free the RAM an app left behind first (install.ts FREE_PY): only lcd stays, and code after it
+  // imports what it needs
+  const freePy = (await import("node:fs")).readFileSync(join(root, "src/serial/install.ts"), "utf8").match(/const FREE_PY = `([\s\S]*?)`;/)[1];
+  const fr = await page.evaluate((code) => window.vw.exec(code + "\nimport sys, gc\nprint(sorted(k for k in sys.modules if k[0] != '_' and k != 'micropython'), len([k for k in globals() if not k.startswith('__')]))\nimport wedgie\nprint(wedgie.VERSION)"), freePy);
+  check(/\['lcd', 'splash'\] 2\s+0\.2/.test(fr), `freeing RAM before an install: ${fr.trim().replace(/\n/g, " | ")}`);
 
   // Demo: an entry (demo.run) that owns the CPU. Frames must still reach the page, and X is its own
   // (the scene before), not a way out.

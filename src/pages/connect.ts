@@ -93,7 +93,8 @@ function list(main: HTMLElement, go: (path: string) => void) {
         el.querySelector('[data-f="pl"]')!.innerHTML = pl.html;
       }
     }
-    actions.innerHTML = `<button class="btn ${ws.length ? "" : "btn-green"}" id="connect">${ws.length ? "Connect another" : "Connect a wedgie"}</button>`;
+    actions.innerHTML = `<button class="btn ${ws.length ? "" : "btn-green"}" id="connect">${ws.length ? "Connect another" : "Connect a wedgie"}</button>` +
+      (ws.length ? `<p class="fine unplug-tip">If your wedgie is acting weird, unplug it and plug it back in.</p>` : "");
     document.getElementById("connect")!.onclick = () => W.connectNew().catch(() => {});
   }
 

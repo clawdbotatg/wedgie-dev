@@ -27,6 +27,8 @@ what agents outside this repo read (keep it true when the firmware or the USB pr
    **App Timers are wrapped on the board** (`slot.py _Timer`): an app whose tick takes as long as its
    period (hello) otherwise starves the USB code and the site hangs on "finding it". The emulator
    can't show this (its Timers are JavaScript's); only a real board can.
+   **The page never watches or drives a wedgie by default** (it moves money: its app decides on its
+   own). The live screen mirror and pressing its buttons from the page are opt-in, in Developer.
 3. **Bump `VERSION` in firmware/wedgie.py** when the core changes, or no wedgie is told to update.
 4. **Saves (`/saves/<app>/`, `firmware/save.py`) are never touched** by an install, a switch or an
    update, and `/format` copies them into the browser before its wipe and puts them back after

@@ -24,6 +24,8 @@ export type Cart = { mod: string; name: string; entry?: string; usb?: boolean; c
 const RETIRED = ["menu.py", "menu.mpy"];
 /** What the firmware keeps free for saves and itself (save.py FLOOR). */
 const FLOOR = 32 * 1024;
+/** Bytes per write while copying: small, so each needs little RAM in one piece (RP2040). */
+const CHUNK = 1024;
 export type Manifest = { version: string; files: FileInfo[]; core: string[]; carts: Cart[] };
 
 let manifest: Promise<Manifest> | null = null;
@@ -71,11 +73,33 @@ async function look(r: Repl, names: string[]): Promise<Have> {
   return have;
 }
 
-/** Stop what the wedgie runs and take its raw REPL, without a soft reset. The app is stopped properly
- *  first (on 0.1.x its Timer would otherwise keep drawing over everything; 0.2 stops it on Ctrl-C too). */
+// Ctrl-C stops the app but leaves everything it loaded in RAM (the app, the slot, their data). On an
+// RP2040 that leaves too little room in one piece for a copy's chunk ("MemoryError: allocating 2733
+// bytes"). So everything but the screen driver comes out of memory (lcd keeps the 115 KB framebuffer,
+// which can't be allocated again on a used heap), then a collect. Code run after this imports what it needs.
+const FREE_PY = `def _free():
+    import gc, sys
+    for n in list(sys.modules):
+        if n not in ("lcd", "splash", "micropython") and n[0] != "_":   # _: the host's own (the emulator's _emu)
+            del sys.modules[n]
+    l = sys.modules.get("lcd")
+    if l:
+        del l._keys[:]          # every Keys() the app and the slot made
+        l._on_show = None       # the loader's hook
+    g = globals()
+    for n in list(g):
+        if not n.startswith("__"):
+            del g[n]
+    gc.collect()
+_free()`;
+
+/** Stop what the wedgie runs and take its raw REPL, without a soft reset, with its RAM freed. The app is
+ *  stopped properly first (on 0.1.x its Timer would otherwise keep drawing over everything; 0.2 stops
+ *  it on Ctrl-C too). */
 export async function takeOver(r: Repl) {
-  await r.request({ type: "home" }, 800).catch(() => {});
+  await r.request({ type: "stop" }, 800).catch(() => {});
   await r.enter({ reset: false });
+  await r.exec(FREE_PY, 10000).catch(() => {});
 }
 
 async function copy(r: Repl, files: FileInfo[], have: Have, onProgress: (p: number, what: string) => void, screen?: (p: number) => Promise<void>) {
@@ -92,9 +116,9 @@ async function copy(r: Repl, files: FileInfo[], have: Have, onProgress: (p: numb
     const buf = new Uint8Array(await (await fetch("/fw/" + f.name, { cache: "no-cache" })).arrayBuffer());
     const tmp = "_wedgie.tmp";
     await r.exec(`import binascii\n_f = open(${JSON.stringify(tmp)}, "wb")`);
-    for (let i = 0; i < buf.length; i += 2048) {
-      await r.exec(`_f.write(binascii.a2b_base64(${JSON.stringify(b64(buf.subarray(i, i + 2048)))}))`);
-      await at((done + Math.min(buf.length, i + 2048)) / total, f.name);
+    for (let i = 0; i < buf.length; i += CHUNK) {
+      await r.exec(`_f.write(binascii.a2b_base64(${JSON.stringify(b64(buf.subarray(i, i + CHUNK)))}))`);
+      await at((done + Math.min(buf.length, i + CHUNK)) / total, f.name);
     }
     await r.exec("_f.close()");
     let check: string | null = null;

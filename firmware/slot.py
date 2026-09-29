@@ -17,9 +17,10 @@
 # one that takes about as long as its period (hello draws a full frame, ~38 ms, every 40 ms) is
 # queued again before it ends, so the main loop never gets a turn: USB goes unanswered and the site
 # hangs on "finding it". A Ctrl-C then lands inside the callback, where it's swallowed. So on the
-# board every app's Timer is wrapped (_Timer): a tick that comes before the USB code (serve) has
-# had a turn since the last one is skipped, so serve runs in that gap; an app that isn't starving
-# anything keeps every tick. A Ctrl-C inside a tick stops the app and reaches the main loop. The emulator's Timers are JavaScript's and don't starve anything.
+# board every app's Timer is wrapped (_Timer): a tick that comes right on the heels of the last one
+# (under GAP ms after it ended) before the USB code (serve) has had a turn is skipped, so serve runs
+# in that gap. Only an app that overruns its period loses ticks; one that keeps up, or one busy while
+# a long USB request runs (a screen shot), keeps them all. A Ctrl-C inside a tick stops the app and reaches the main loop. The emulator's Timers are JavaScript's and don't starve anything.
 import sys, select, json, time, gc, struct
 import lcd as L
 import wedgie as W
@@ -108,22 +109,26 @@ def open_app():
 
 
 # ---- app Timers that can't starve USB (see the top) -----------------------------------------------
+GAP = 10            # ms: a tick this soon after the last one ended, with no serve() between, is skipped
 _breath = True      # serve() has run since the last app tick
+_last = 0           # when the last app tick ended
 _timers = []        # every app Timer, so stop() can end them all
 _kbd = False        # a Ctrl-C landed inside an app tick: the main loop raises it
 
 
 def _guard(cb, t):
     def tick(_):
-        global _breath, _kbd
-        if not _breath:
-            return                      # USB hasn't had a turn since the last tick: give it this one
+        global _breath, _kbd, _last
+        if not _breath and time.ticks_diff(time.ticks_ms(), _last) < GAP:
+            return                      # back to back, and USB hasn't had a turn: give it this one
         _breath = False
         try:
             cb(t)
         except KeyboardInterrupt:
             _kbd = True
             t.deinit()
+        finally:
+            _last = time.ticks_ms()
     return tick
 
 

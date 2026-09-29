@@ -487,3 +487,4 @@ body.test-mode .top, body.test-mode .foot { display: none; }
 .upd-line { font-weight: 700; }
 .upd-card .meter { margin-top: 4px; }
 .upd-card .meter-track { height: 22px; padding: 4px; }
+.unplug-tip { flex-basis: 100%; text-align: center; margin: 4px 0 0; }
