@@ -6,7 +6,9 @@ What stops a bad computer (or a thief) from using a wedgie's key. Status as of 2
 
 - Ctrl-C does nothing, so a computer can't get into the REPL by itself.
 - `{"type":"open"}` asks on the wedgie's screen. Only a real press answers: A yes, Y no.
-- A yes lasts until the wedgie is unplugged. Details: `firmware/main.py`, `slot.let_in`, `wedgie.py`.
+- A yes is for one job: the wedgie locks again when its app restarts. (0.2.5 kept it open until
+  unplugged; on a real wedgie that lasted far longer than the job, so 0.2.7 dropped it.)
+- Details: `firmware/main.py`, `slot.let_in`, `wedgie.py`.
 
 ## Next: one question per job
 

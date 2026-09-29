@@ -3,7 +3,7 @@
 # and this file never ends by itself, so a computer can't stop the app and land in the REPL, where it
 # could run anything and make the secure chip sign anything. A computer gets the REPL only after the
 # person presses A on the wedgie ({"type": "open"}, slot.let_in); then Ctrl-C works as it always did
-# (mpremote, wedgie.dev's raw-REPL tools) until the wedgie is unplugged. The lock is in wedgie.py.
+# (mpremote, wedgie.dev's raw-REPL tools) until this file runs again, which locks it. The lock is in wedgie.py.
 import micropython
 micropython.kbd_intr(-1)
 import sys, time
@@ -51,8 +51,7 @@ try:
     import lcd          # first: grabs the framebuffer while the heap is fresh (RP2040 boards need this)
     import wedgie
     wedgie.SEALED = True
-    if wedgie.is_open():                # let in since power-up: Ctrl-C works
-        micropython.kbd_intr(3)
+    wedgie._open = False                # a yes was for one job; this is a fresh start
     import loader
     _a = wedgie.active()
     loader.load(_a["mod"] if _a else "slot")    # its files load one by one under the boot logo's bar

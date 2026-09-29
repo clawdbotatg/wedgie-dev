@@ -4,8 +4,8 @@
 //  - a wedgie on 0.1.3 (the menu, two apps); its update takes both apps and the menu off: no app yet;
 //  - a wedgie on 0.2 with no app yet and a save: picks an app, switches, takes it off; its saves are
 //    listed, downloaded, deleted and put back; the Developer file list shows, opens, deletes, uploads.
-//    It is sealed (0.2.5+): the first thing that needs its REPL asks its pretend person (the page says
-//    to press A), nothing asks again until it's unplugged, and a no changes nothing.
+//    It is sealed (0.2.5+): every job that needs its REPL asks its pretend person (the page says to
+//    press A; a yes is for that job only), and a no changes nothing.
 // Soft resets drop the port only where boot.py would add the WEDGIE drive (st.mark below): the bare board's
 // first boot on the new firmware does, the others don't. The page must find it again either way.
 // Serve dist first (npx vite preview), then: node tools/fakeserial.mjs [url] [outdir] [phone]
@@ -106,18 +106,15 @@ f = await files(2);
 check(!f.includes("usbwallet.py") && !f.includes("p256.py") && f.includes("slot.py"), "its files gone, the core stays");
 await wait(() => /Nothing on it yet/.test(document.querySelector("#d-carts-note").textContent), null, 10000, "the page: nothing on it");
 
-check((await st(2, "asks")) === 1, "sealed: once let in, nothing asks again until it's unplugged");
+const asks = await st(2, "asks");
+check(asks === 4 && !(await st(2, "open")), `sealed: every job asked (hello, Clear sign, Wallet, taking it off: ${asks}), locked again after each`);
 
-// unplugged and back: it asks again; a no changes nothing
-await page.evaluate(() => { window.__ports[2]._st.person = { say: "no", ms: 300 }; window.__plug(2, false); });
-await page.waitForTimeout(500);
-await page.evaluate(() => window.__plug(2, true));
-await wait((id) => location.pathname === `/connect/${id}` && document.querySelector('#d-shelf .cart-slot[data-mod="hello"] .cart:not(:disabled)'), NEW, 15000, "back after the replug");
-await page.waitForTimeout(1500);
+// a no changes nothing
+await page.evaluate(() => { window.__ports[2]._st.person = { say: "no", ms: 300 }; });
 const beforeNo = JSON.stringify(await files(2));
 await page.click(`#d-shelf .cart-slot[data-mod="hello"] .cart`);
 await wait(() => /said no/.test(document.querySelector("main")?.textContent || ""), null, 10000, "a no: the page says the wedgie said no");
-check((await st(2, "asks")) === 2 && JSON.stringify(await files(2)) === beforeNo, "replugged: it asked again, and the no changed nothing");
+check((await st(2, "asks")) === asks + 1 && JSON.stringify(await files(2)) === beforeNo, "a no changes nothing");
 await page.evaluate(() => { window.__ports[2]._st.person = { say: "yes", ms: 300 }; });
 
 // an app from a GitHub repo (faked from the local starter folder): on the shelf as not reviewed; on it, its

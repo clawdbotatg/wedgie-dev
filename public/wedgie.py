@@ -25,7 +25,7 @@ A wedgie (firmware 0.2+) runs one app: it boots straight into it and the app get
 hello/shot/press talk to the firmware over JSON lines while the app runs and never interrupt it.
 The rest stop it (Ctrl-C), use MicroPython's raw REPL, then start the app again by running main.py.
 Firmware 0.2.5+ is sealed: the first of those asks on the wedgie's screen and waits for you to press A
-there; then it stays open to this computer until you unplug it.
+there. A yes is for that one command: the next one asks again.
 update, use, install and run soft-reset it (a fresh heap for new firmware or a new app).
 Only one program can hold the port: close the wedgie's page on wedgie.dev (and mpremote) first.
 
@@ -125,7 +125,7 @@ class Wedgie:
 
     def let_in(self):
         """0.2.5+ is sealed: Ctrl-C does nothing until its person presses A on the wedgie's own screen
-        ({"type": "open"}; Y or a minute with no answer is a no). Then it stays open until unplugged."""
+        ({"type": "open"}; Y or a minute with no answer is a no). A yes lasts until its app starts again."""
         h = self.hello(1.0)
         if not h or not h.get("sealed") or h.get("open"):
             return

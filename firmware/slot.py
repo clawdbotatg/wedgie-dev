@@ -261,7 +261,7 @@ def ask():
     d.center_text("COMPUTER IN?", 72, INK, 2)
     y = 108
     lines = ["It can change anything", "on this wedgie,"] + (["and use its wallet key,"] if wallet else [])
-    for s in lines + ["until you unplug it.", "", "Didn't ask for this? Y."]:
+    for s in lines + ["for this one job.", "", "Didn't ask for this? Y."]:
         d.center_text(s, y, INK)
         y += 14
     d.fill_rect(0, 184, 240, 26, GREEN)
@@ -280,7 +280,8 @@ def ask():
 
 def let_in():
     """{"type": "open"}: may this computer have the REPL? Asks the person, unless they already said
-    yes since power-up (or nothing is sealed: the emulator). Yes turns Ctrl-C on (wedgie.set_open)."""
+    yes for this job (or nothing is sealed: the emulator). Yes turns Ctrl-C on (wedgie.set_open) until
+    main.py starts again."""
     global _paused
     if not W.SEALED or W.is_open():
         W.set_open()
@@ -293,7 +294,7 @@ def let_in():
         _paused = False
     if ok:
         W.set_open()
-        _band("computer in", [("unplug it to lock it", MUTED)])
+        _band("computer in", [("it locks again when done", MUTED)])
     elif kept:
         _unkeep()                       # the app's screen as it was: an app that doesn't redraw by
     elif state == "empty":              # itself would otherwise sit under the question forever

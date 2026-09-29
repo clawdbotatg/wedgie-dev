@@ -121,7 +121,7 @@ export function setAskHint(fn: (s: string) => void) { askHint = fn; }
 
 /** A sealed wedgie (0.2.5+: its hello says sealed) turns Ctrl-C off, so the REPL is shut until its person
  *  presses A on its own screen ({"type": "open"}; Y or a minute with no answer is a no). Once they have,
- *  it stays open until it's unplugged and answers at once. Anything else (older firmware, bare
+ *  it stays open until its app starts again (the end of this job) and answers at once. Anything else (older firmware, bare
  *  MicroPython, a board already in its REPL) has no lock and is left alone. */
 export async function letIn(r: Repl, ask: (s: string) => void = askHint) {
   const h = await r.hello(700).catch(() => null);

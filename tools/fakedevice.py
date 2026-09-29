@@ -67,7 +67,7 @@ while True:
         if c == b"\x02": state["raw"] = False; continue
         if not state["raw"]:
             if c == b"\x04":
-                g.clear()
+                g.clear(); state["open"] = False
                 if wedgie(): out(hello(None, "ready"))
                 continue
             if c == b"\n":

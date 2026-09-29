@@ -48,7 +48,7 @@ what agents outside this repo read (keep it true when the firmware or the USB pr
    and the emulator (GitHub faked from local folders).
 9. **A wedgie is locked (0.2.5+).** main.py turns Ctrl-C off first and never ends by itself; a host gets
    the REPL only after `{"type":"open"}` and a real A press on the wedgie (`slot.let_in`, keys read with
-   `Keys(physical=True)`). Yes lasts until unplugged (watchdog SCRATCH1). Every REPL path on a host goes
+   `Keys(physical=True)`). A yes is for one job: main.py locks it again when it next starts. Every REPL path on a host goes
    through `letIn` (install.ts takeOver, format.ts) or `let_in` (public/wedgie.py enter). Never add a
    way in that skips the press, and never let a USB `press` answer it.
 10. Everything is MIT — never use the CC BY-NC case STLs from picowallet/instant-wallet.

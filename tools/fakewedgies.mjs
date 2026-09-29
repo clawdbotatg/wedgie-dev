@@ -10,8 +10,8 @@
 //   pulls a board out or plugs it back in. A board with noMp: true never answers (no MicroPython);
 //   chip: "none" has no secure chip (default: an ATECC608 that proves itself).
 // 0.2.5+ is sealed: Ctrl-C is a plain byte until {"type": "open"} is answered yes by the pretend person
-// (person: { say: "yes" | "no", ms }, default yes after 300 ms; _st.asks counts the questions). Yes lasts
-// until __plug(i, false).
+// (person: { say: "yes" | "no", ms }, default yes after 300 ms; _st.asks counts the questions). A yes lasts
+// until main.py starts again (a soft reset or exec(main.py)): one job.
 export function fakeWedgies(specs) {
 
   localStorage.setItem("wedgie.serial", "1"); // this browser tapped Connect before (see btprobe.mjs for a new one)
@@ -153,13 +153,13 @@ export function fakeWedgies(specs) {
           if (ch === "\x02") { raw = false; continue; }
           if (!raw) {
             if (ch === "\x04") {
-              st.resets++; st.launched = null; st.stopped = false;
+              st.resets++; st.launched = null; st.stopped = false; st.open = false;
               if (st.files.has("wedgiedrive.py") && !st.mark && st.resetHook) { st.mark = true; st.drops++; st.resetHook(); continue; }
               if (wedgie()) setTimeout(() => push(hello(null, "ready") + "\r\n"), 300);
               continue;
             }
             // Repl.leave({ reset: false }) types exec(open("main.py").read()) + CR: the launcher starts again, home
-            if (ch === "\r") { if (line.startsWith("exec(open(")) { line = ""; st.launched = null; st.stopped = false; st.relaunches = (st.relaunches || 0) + 1; } continue; }
+            if (ch === "\r") { if (line.startsWith("exec(open(")) { line = ""; st.launched = null; st.stopped = false; st.open = false; st.relaunches = (st.relaunches || 0) + 1; } continue; }
             if (ch === "\n") { const l = line; line = ""; if (l.startsWith("{")) { try { onJson(JSON.parse(l)); } catch {} } continue; }
             line += ch; continue;
           }
@@ -184,7 +184,7 @@ export function fakeWedgies(specs) {
   window.__ports = ports;
   const t = new EventTarget();
   const plugged = new Set(ports);
-  window.__plug = (i, on) => { const p = ports[i]; if (!on) p._st.open = false; if (on) { plugged.add(p); t.dispatchEvent(Object.assign(new Event("connect"), { port: p })); } else { plugged.delete(p); t.dispatchEvent(Object.assign(new Event("disconnect"), { port: p })); } };
+  window.__plug = (i, on) => { const p = ports[i]; if (on) { plugged.add(p); t.dispatchEvent(Object.assign(new Event("connect"), { port: p })); } else { plugged.delete(p); t.dispatchEvent(Object.assign(new Event("disconnect"), { port: p })); } };
   for (const p of ports) p._st.resetHook = () => {
     setTimeout(() => t.dispatchEvent(Object.assign(new Event("disconnect"), { port: p })), 50);
     setTimeout(() => t.dispatchEvent(Object.assign(new Event("connect"), { port: p })), 600);

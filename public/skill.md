@@ -295,8 +295,8 @@ answers `open` too.
 can reach its REPL (and through it, the secure chip) on its own. To get in, send `{"type":"open"}`:
 the wedgie asks on its own screen, and only a real press answers (a `press` over USB can't). A lets
 this computer in, Y or a minute with no answer says no. Allow 65 s for the reply. After a yes,
-hello says `"open": true`, Ctrl-C (0x03) stops the app and drops to the REPL as usual, and nothing
-asks again until the wedgie is unplugged. Tell your person to press A before you send it. wedgie.py
+hello says `"open": true` and Ctrl-C (0x03) stops the app and drops to the REPL as usual, for that
+one job: once the app starts again (`exec(open("main.py").read())` or a soft reset) it's locked. Tell your person to press A before you send it. wedgie.py
 and wedgie.dev do all this for you. Older firmware has no lock: Ctrl-C works right away.
 
 ### Plugging in, and resets (read this before scripting a wedgie)

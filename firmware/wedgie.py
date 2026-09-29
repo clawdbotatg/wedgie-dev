@@ -3,35 +3,27 @@
 # interrupted; from the REPL they are plain calls:  import wedgie; wedgie.shot(); wedgie.press("A")
 import sys, os, json, machine
 
-VERSION = "0.2.6"
+VERSION = "0.2.7"
 
 # The lock. main.py turns Ctrl-C off before anything else and never ends by itself, so a computer
 # can only send the slot's JSON lines: it can't stop the app, reach the REPL, or make the secure chip
 # sign. {"type": "open"} asks the person on the wedgie's own screen (slot.let_in; only a real press of
-# A says yes). Yes turns Ctrl-C back on until the wedgie is unplugged: the "open" mark is watchdog
-# SCRATCH1 (boot.py's drive mark is SCRATCH0), which soft resets and machine.reset() keep and
-# power-up clears. SEALED stays False where main.py doesn't run (the emulator).
+# A says yes). Yes turns Ctrl-C back on for ONE job: the next time main.py starts (the soft reset or
+# exec(main.py) every host does when it's done) it's locked again. Nothing is kept across a restart
+# on purpose: "until unplugged" (a watchdog scratch register, 0.2.5-0.2.6) stayed open on a real
+# wedgie long after the job. SEALED stays False where main.py doesn't run (the emulator).
 SEALED = False
-_OPEN = 0x0BE70BE7
-
-
-def _scratch1():
-    return (0x400D8000 if "RP2350" in sys.implementation._machine else 0x40058000) + 0x10
+_open = False
 
 
 def is_open():
-    try:
-        return machine.mem32[_scratch1()] == _OPEN
-    except Exception:
-        return False
+    return _open
 
 
 def set_open():
-    """Let the computer in until the wedgie is unplugged."""
-    try:
-        machine.mem32[_scratch1()] = _OPEN
-    except Exception:
-        pass
+    """Let the computer in, until main.py starts again."""
+    global _open
+    _open = True
     try:
         import micropython
         micropython.kbd_intr(3)
