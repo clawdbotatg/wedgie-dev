@@ -451,7 +451,7 @@ def main():
             on = {a["mod"]: a.get("v") for a in have["apps"]}
             for cart in m["carts"]:
                 state = ("runs it" if on.get(cart["mod"]) == cart["v"] else "runs it, update ready") if cart["mod"] == act else "%d KB" % max(1, cart["size"] // 1024)
-                print("%-10s %-12s %-20s %s" % (cart["mod"], cart["name"], state, cart.get("about", "")))
+                print("%-10s %-12s %-20s %s%s" % (cart["mod"], cart["name"], state, cart.get("about", ""), "  [needs an %s chip]" % cart["chip"] if cart.get("chip") else ""))
             if act and not any(x["mod"] == act for x in m["carts"]):
                 print("%-10s %-12s %-20s" % (act, "(yours)", "runs it"))
         elif c in ("use", "cart"):

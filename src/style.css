@@ -464,6 +464,11 @@ body.test-mode .top, body.test-mode .foot { display: none; }
 .cart.busy .cart-meter { display: block; }
 .cart-meter i { display: block; height: 100%; width: calc(var(--p, 0) * 100%); background: #fff; border-radius: 999px; transition: width .2s; }
 .cart-about { font-size: 13px; line-height: 1.35; color: var(--muted); margin: 10px 2px 0; font-weight: 600; }
+.cart-slot.nochip .cart, .cart-slot.nochip .cart-about { opacity: .4; }
+.cart-slot.nochip .cart:hover:not(:disabled) { opacity: .7; }
+.cart-needs { font-size: 13px; line-height: 1.35; color: #b0231f; margin: 6px 2px 0; font-weight: 700; }
+.cart-needs b { font-weight: 900; }
+.cart-needs[hidden] { display: none; }
 .cart-out { -webkit-appearance: none; appearance: none; border: 0; background: none; font: 800 13px var(--font); color: var(--muted); padding: 4px 2px; cursor: pointer; align-self: flex-start; text-decoration: underline; text-underline-offset: 3px; }
 .cart-out.sure { color: #c22621; }
 .cart-out[hidden] { display: none; }

@@ -238,7 +238,8 @@ The firmware is the core: boot logo, the WEDGIE USB drive, the slot that runs th
 saves (`save.py`), the screen/button drivers (`lcd.py`) and the chip drivers (`atecc.py`,
 `trustm.py`). Apps come as **cartridges** from the catalog, https://wedgie.dev/fw/manifest.json:
 `core` (the firmware's files), `carts` (each with `mod`, `name`, `files` it needs, `entry`?, `usb`?,
-and `v`, a hash of those files). A wedgie holds one: picking another takes the old one's files off
+`chip`? (the secure chip it needs: `ATECC608` or `OPTIGA Trust M`), and `v`, a hash of those files).
+The site fades an app whose `chip` isn't the wedgie's and warns before putting it on. A wedgie holds one: picking another takes the old one's files off
 (a file both need, like p256.py, stays) and puts the new one's on. A fresh wedgie runs nothing and
 says so ("no software") until one is picked.
 
@@ -248,10 +249,11 @@ Firmware 0.1.x had a menu and kept several; updating to 0.2 takes them off and i
 
 Apps now: `hello` (bouncing box, the template), `keytest` (buttons), `demo` (balls/cube/plasma speed
 test), `mock` (nine wallet screens), `wire_demo` (clear-signs a signed transaction request),
-`battery` (Waveshare Pico-UPS-B hat), `usbwallet` (the USB hardware wallet; needs the chip). Source:
+`battery` (Waveshare Pico-UPS-B hat), `usbwallet` (the USB hardware wallet; needs an ATECC608). Source:
 /fw/<file> or https://github.com/clawdbotatg/wedgie-dev/tree/main/firmware (`carts.json` is the
 catalog). Read `hello.py` and `lcd.py` first. A new app = its files in firmware/ + an entry in
-firmware/carts.json (name, files, label color, 12x12 pixel icon); push and it's on the site.
+firmware/carts.json (name, files, label color, 12x12 pixel icon, `chip` if it needs one); push and
+it's on the site.
 
 ## The USB protocol (what wedgie.py speaks)
 

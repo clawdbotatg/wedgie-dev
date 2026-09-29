@@ -207,14 +207,15 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
   }
 
   // ---- painting --------------------------------------------------------------------------------------
-  const status = (s: string, at = "#d-status") => { const el = $(at); el.hidden = !s; el.innerHTML = s; };
+  const status = (s: string, at = "#d-status") => { const el = $(at); if (!el) return; el.hidden = !s; el.innerHTML = s; };
   const tstatus = (s: string) => status(s, "#d-tstatus");   // the Developer section's own line (tests, Run, Save)
   const meter = (p: number | null, t = "") => {
-    const el = $("#d-meter"); el.hidden = p === null; if (p === null) return;
+    const el = $("#d-meter"); if (!el) return; el.hidden = p === null; if (p === null) return;
     el.classList.toggle("done", p >= 1);
     $<HTMLElement>(".meter-fill").style.width = `${8 + 92 * p}%`; $("#d-meter-t").textContent = t;
   };
   function paint() {
+    if (!alive) return;                 // left the page while something was still finishing
     const here = !!w && w.state !== "gone";
     $("#d-missing").hidden = here && w!.state !== "error";
     $("#d-body").hidden = !here || w!.state === "error";
@@ -268,6 +269,12 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
   // ---- software: the one app it runs ------------------------------------------------------------------
   const inserting: Record<string, number> = {};   // mod -> progress while it goes on
   let confirmOut = false;                          // Remove was tapped once
+  let confirmChip = "";                            // an app for another chip, tapped once
+  // The chip this wedgie has, once known ("ATECC608", "OPTIGA Trust M", "none"); null: not checked yet.
+  const chipType = () => (w?.chip?.type as string | undefined) || null;
+  const chipLabel = (t: string | null) => (t === "OPTIGA Trust M" ? "a Trust M" : t === "none" || !t ? "no chip" : `an ${t}`);
+  /** Why this app won't work here ("" if it will, or the chip isn't known yet). */
+  const wrongChip = (c: Cart) => (c.chip && chipType() && chipType() !== c.chip ? `${c.name} needs an ${c.chip} chip. This wedgie has ${chipLabel(chipType())}.` : "");
   const active = () => (w?.carts || [])[0]?.mod || null;
   const slot = () => !!w?.slot;                    // 0.2+: one app, no menu
   const canPick = () => slot() || w?.kind === "wallet";   // the Wallet as its app: it stops on Ctrl-C
@@ -285,7 +292,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
         slotEl = document.createElement("div");
         slotEl.className = "cart-slot";
         slotEl.dataset.mod = c.mod;
-        slotEl.innerHTML = `<button class="cart" title="${esc(c.about || "")}">${cartHtml(c)}</button><p class="cart-about">${esc(c.about || "")}</p><button class="cart-out" hidden></button>`;
+        slotEl.innerHTML = `<button class="cart" title="${esc(c.about || "")}">${cartHtml(c)}</button><p class="cart-about">${esc(c.about || "")}</p><p class="cart-needs" hidden></p><button class="cart-out" hidden></button>`;
         slotEl.querySelector<HTMLButtonElement>(".cart")!.onclick = () => pick(c);
         slotEl.querySelector<HTMLButtonElement>(".cart-out")!.onclick = () => eject();
       }
@@ -303,6 +310,11 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
       const st = slotEl.querySelector(".cart-state")!;
       st.innerHTML = p !== undefined ? "installing" : outdated ? "update" : playing ? "▶ running" : on ? "on it" : kb(c.size);
       st.className = `cart-state${on && !outdated ? " on" : outdated || !on ? " soft" : ""}`;
+      const why = wrongChip(c);
+      slotEl.classList.toggle("nochip", !!why);
+      const needs = slotEl.querySelector<HTMLElement>(".cart-needs")!;
+      needs.hidden = !why;
+      needs.innerHTML = why ? (confirmChip === c.mod ? `<b>${esc(why)}</b> Tap it again to put it on anyway.` : esc(why)) : "";
       const out = slotEl.querySelector<HTMLButtonElement>(".cart-out")!;
       out.hidden = !on || !slot();
       out.disabled = !link || !!busy;
@@ -316,6 +328,9 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     if (!link || busy || !w) return;
     const x = w, r = link;
     confirmOut = false;
+    // An app for another chip: the first tap says so; a second puts it on anyway (it's their wedgie).
+    if (wrongChip(c) && confirmChip !== c.mod) { confirmChip = c.mod; paint(); return; }
+    confirmChip = "";
     busy = "cart"; inserting[c.mod] = 0; paint();
     setScreen({ kind: "loading", p: 0 });
     try {

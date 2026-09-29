@@ -23,7 +23,7 @@ const ctx = await browser.newContext(phone ? { viewport: { width: 390, height: 8
 await ctx.addInitScript(fakeWedgies, [
   { uid: "e66138935f5a2c29", machine: "Raspberry Pi Pico 2 W with RP2350", files: { "boot.py": 1 } },
   { uid: "de6474e3a3152a2f", machine: "Raspberry Pi Pico with RP2040", files: { "main.py": 1, "menu.py": 1, "wedgiedrive.py": 1, "wedgie.py": 'VERSION = "0.1.3"',
-    "apps.json": JSON.stringify([{ mod: "hello", name: "Hello" }, { mod: "keytest", name: "Buttons" }]), "hello.py": 1, "keytest.py": 1 } },
+    "apps.json": JSON.stringify([{ mod: "hello", name: "Hello" }, { mod: "keytest", name: "Buttons" }]), "hello.py": 1, "keytest.py": 1 }, chip: "none" },
   { uid: "aa11bb22cc3d9f01", machine: "Raspberry Pi Pico 2 W with RP2350", files: { "main.py": 1, "slot.py": 1, "wedgiedrive.py": 1, "wedgie.py": 'VERSION = "0.2.1"',
     "apps.json": "[]", "/saves/hello/best.json": '{"score": 120}', "junk.txt": "delete me" } },
 ]);
@@ -138,7 +138,18 @@ const a3 = await appsOn(1), f3 = await files(1);
 check(JSON.stringify(a3) === "[]", "no app yet (nobody picked one): " + JSON.stringify(a3));
 check(!f3.includes("hello.py") && !f3.includes("keytest.py") && !f3.includes("menu.py") && f3.includes("slot.py"), "its old apps and the menu gone, the slot on");
 await wait(() => /Nothing on it yet/.test(document.querySelector("#d-carts-note")?.textContent || ""), null, 10000, "the page: nothing on it yet");
-check(await st(1, "chips") >= 1, "after the update the chip is proven too");
+check(await st(1, "chips") >= 1, "after the update the chip is checked too");
+
+// an app for a chip it hasn't got: faded, says why, the first tap only warns, a second puts it on anyway
+const wl = '#d-shelf .cart-slot[data-mod="usbwallet"]';
+await wait((s) => document.querySelector(s)?.classList.contains("nochip"), wl, 10000, "no chip: the Wallet is faded");
+check(/Wallet needs an ATECC608 chip\. This wedgie has no chip\./.test(await page.textContent(`${wl} .cart-needs`)), "it says why");
+check(!(await page.evaluate(() => document.querySelector('#d-shelf .cart-slot[data-mod="hello"]').classList.contains("nochip"))), "an app with no chip needs isn't faded");
+await page.click(`${wl} .cart`);
+await page.waitForTimeout(800);
+check(/Tap it again to put it on anyway/.test(await page.textContent(`${wl} .cart-needs`)) && !(await files(1)).includes("usbwallet.py"), "first tap: a warning, nothing installed");
+await page.click(`${wl} .cart`);
+await wait(() => window.__ports[1]._st.files.has("usbwallet.py") && JSON.parse(new TextDecoder().decode(window.__ports[1]._st.files.get("apps.json")))[0]?.mod === "usbwallet", null, 30000, "second tap: on anyway");
 
 // ---- the bare board: install the core, it comes back a wedgie with no app yet ---------------------------
 await page.click(".back");

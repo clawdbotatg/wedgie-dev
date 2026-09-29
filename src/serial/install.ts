@@ -18,7 +18,8 @@
 import type { Repl } from "./repl";
 
 export type FileInfo = { name: string; size: number; sha256: string };
-export type Cart = { mod: string; name: string; entry?: string; usb?: boolean; about?: string; files: string[]; v: string; size: number; label: string; icon: string[] };
+/** chip: the secure chip it needs ("ATECC608" / "OPTIGA Trust M", as the chip check names them), if any. */
+export type Cart = { mod: string; name: string; entry?: string; usb?: boolean; chip?: string; about?: string; files: string[]; v: string; size: number; label: string; icon: string[] };
 /** Core files a newer core dropped: an update deletes them (0.2.0: the menu went). */
 const RETIRED = ["menu.py", "menu.mpy"];
 /** What the firmware keeps free for saves and itself (save.py FLOOR). */

@@ -7,7 +7,8 @@
 // thing (firmware/boot.py). Saves are files named "/saves/<game>/<name>".
 // Use: await ctx.addInitScript(fakeWedgies, [{ uid, machine, files: { "name": "text" | 1 } }, ...])
 //   (1 = a one-byte stand-in); window.__ports[i]._st is each board's state; window.__plug(i, false|true)
-//   pulls a board out or plugs it back in. A board with noMp: true never answers (no MicroPython).
+//   pulls a board out or plugs it back in. A board with noMp: true never answers (no MicroPython);
+//   chip: "none" has no secure chip (default: an ATECC608 that proves itself).
 export function fakeWedgies(specs) {
 
   localStorage.setItem("wedgie.serial", "1"); // this browser tapped Connect before (see btprobe.mjs for a new one)
@@ -104,6 +105,7 @@ export function fakeWedgies(specs) {
       if (msg.type === "press") { st.presses.push(msg.key); return ok(); }
       if (msg.type === "chip" && v >= "0.1.4") {
         st.chips++;
+        if (st.chip === "none") return push(JSON.stringify({ id, type: "chip", kind: null, chip: null, lines: { sda: 0, scl: 0 }, msg: "00" }) + "\r\n");
         const m = crypto.getRandomValues(new Uint8Array(100));
         return push(JSON.stringify({ id, type: "chip", kind: "atecc", chip: "ATECC608", msg: hex(m), sha: await sha(m), random: ["ffff0000".repeat(8), "ffff0000".repeat(8)],
           serial: "0123abcd4455667788", configLocked: false, dataLocked: false, lines: { sda: 1, scl: 1 } }) + "\r\n");
@@ -161,6 +163,7 @@ export function fakeWedgies(specs) {
   const ports = specs.map((b) => {
     const p = board(b.uid, b.machine, new Map(Object.entries(b.files || {}).map(([k, v]) => [k, v === 1 ? new Uint8Array([1]) : text(v)])));
     if (b.noMp) p._st.dead = true;
+    p._st.chip = b.chip;
     return p;
   });
   window.__ports = ports;
