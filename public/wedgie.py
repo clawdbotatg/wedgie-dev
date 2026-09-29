@@ -432,11 +432,12 @@ def main():
             take_over(wg)
             have = look(wg, m)
             names = [f["name"] for f in m["files"]]
+            from_menu = any(n in have["files"] for n in RETIRED)     # 0.1.x: it starts with no app
             for n in [n[:-3] + ".mpy" for n in names if n.endswith(".py")] + RETIRED:
                 if n in have["files"] and n not in names:       # stale bytecode MicroPython would import first; retired core files
                     wg.exec("import os\nos.remove(%r)" % n)
             todo = copy(wg, m, set(m["core"]), have)
-            act = active_of(m, have)                            # one app from 0.2 on: the one it ran first stays
+            act = None if from_menu else active_of(m, have)     # one app from 0.2 on: it keeps its app
             remove_files(wg, have, others(m, have, act))
             write_apps(wg, m, have, act)
             wg.leave()      # the new firmware only runs after a soft reset (see "Plugging in" above)

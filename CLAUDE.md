@@ -19,11 +19,14 @@ what agents outside this repo read (keep it true when the firmware or the USB pr
    `/fw/` with a manifest: `core` (every file no cart claims) and `carts` (`firmware/carts.json`: each
    app's files, label, 12x12 icon, `entry`/`usb`; `v` = hash of its files, so there is no version to
    bump). Picking an app takes the old one's files off and soft-resets into the new one; a core update
-   keeps the first app and drops the rest (0.1.x kept several). `apps.json` is rebuilt from what's
+   keeps it, but one from 0.1.x (the menu, several apps) starts with none. `apps.json` is rebuilt from what's
    really on the flash after every change (`install.ts writeApps`/`useApp`, `wedgie.py write_apps`/`use`
    — keep the two in step, and `cartV` in fw.mjs / install.ts / wedgie.py identical). A new app = its
    files + a carts.json entry. A module the core imports at boot must not be claimed by a cart.
    Removed core files go in `RETIRED` (install.ts, wedgie.py) so an update deletes them.
+   **App Timers are wrapped on the board** (`slot.py _Timer`): an app whose tick takes as long as its
+   period (hello) otherwise starves the USB code and the site hangs on "finding it". The emulator
+   can't show this (its Timers are JavaScript's); only a real board can.
 3. **Bump `VERSION` in firmware/wedgie.py** when the core changes, or no wedgie is told to update.
 4. **Saves (`/saves/<app>/`, `firmware/save.py`) are never touched** by an install, a switch or an
    update, and `/format` copies them into the browser before its wipe and puts them back after

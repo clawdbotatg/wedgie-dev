@@ -135,6 +135,10 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 22px; }
 .case p { margin: 12px 0 18px; color: #474947; max-width: 50em; }
 .case .fine { margin: 16px 0 0; }
 
+/* the front page's way here */
+.custom { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+.custom p { color: #474947; margin-top: 8px; }
+
 /* order */
 .order { display: grid; grid-template-columns: 1.3fr 1fr; gap: 34px; align-items: center; padding: 34px; }
 .order-price { font-weight: 900; font-size: 64px; letter-spacing: -.03em; line-height: 1; }

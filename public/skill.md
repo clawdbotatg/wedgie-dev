@@ -244,7 +244,7 @@ says so ("no software") until one is picked.
 
 The wedgie's `apps.json` names its app: `[{"mod", "name", "entry"?, "usb"?, "about"?, "v"}]` (the `v`
 it went on at; a different `v` in the manifest = update ready), or your own app (`wedgie.py install`).
-Firmware 0.1.x had a menu and kept several; updating to 0.2 keeps the first and takes the rest off.
+Firmware 0.1.x had a menu and kept several; updating to 0.2 takes them off and it starts with no app.
 
 Apps now: `hello` (bouncing box, the template), `keytest` (buttons), `demo` (balls/cube/plasma speed
 test), `mock` (nine wallet screens), `wire_demo` (clear-signs a signed transaction request),
@@ -286,7 +286,8 @@ drive again, but the first soft reset after updating from older firmware does (t
 tool that reconnects and resets again loops forever (it happened: the site did it). Soft-reset only to
 boot new firmware or a newly picked app (a fresh heap for it), then expect the port to maybe drop. A hard reset (`machine.reset()`, the `reboot`
 request, unplugging) always re-adds the drive. Holding Y while plugging in skips the drive for that
-boot (for debugging; nobody needs it day to day).
+boot (for debugging; nobody needs it day to day). Holding X while plugging in starts it without its
+app (its home screen), a way back in when an app keeps USB from answering.
 
 ## Blank board
 

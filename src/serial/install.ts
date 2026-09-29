@@ -156,9 +156,10 @@ export async function installCore(r: Repl, onProgress: (p: number, what: string)
   const retired = RETIRED.filter((n) => have.files.includes(n));
   if (stale.length || retired.length) await r.exec(`import os\nfor n in ${JSON.stringify([...stale, ...retired])}:\n    os.remove(n)`);
   const screen = opts.screen ? await deviceScreen(r, "updating", `wedgie ${m.version}`) : undefined;
+  const fromMenu = retired.length > 0;          // 0.1.x (the menu): it starts with no app, the person picks one
   const todo = await copy(r, fileInfo(m, m.core), have, (p, w) => onProgress(0.05 + 0.9 * p, w), screen);
-  // One app from 0.2 on: the one it ran first stays, the others' files go (never its saves).
-  const act = activeOf(m, have);
+  // One app from 0.2 on: it keeps its app; the other carts' files go (never its saves).
+  const act = fromMenu ? null : activeOf(m, have);
   await removeFiles(r, have, others(m, have, act));
   const apps = await writeApps(r, m, have, act);
   onProgress(1, todo.length ? `${todo.length} files updated` : "already up to date");

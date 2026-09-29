@@ -1,7 +1,7 @@
 // Drives /connect with fake WebSerial boards so the USB paths run without hardware. Real clicks.
 //  - a bare MicroPython board (raw REPL; a little filesystem, so the installer's hash / write / verify /
 //    rename steps really run), which becomes a wedgie 0.2 after a firmware install;
-//  - a wedgie on 0.1.3 (the menu, two apps); its update keeps the first app, drops the other and the menu;
+//  - a wedgie on 0.1.3 (the menu, two apps); its update takes both apps and the menu off: no app yet;
 //  - a wedgie on 0.2 with no app yet and a save: picks an app, switches, takes it off; its saves are
 //    listed, downloaded, deleted and put back; the Developer file list shows, opens, deletes, uploads.
 // Soft resets drop the port only where boot.py would add the WEDGIE drive (st.mark below): the bare board's
@@ -24,7 +24,7 @@ await ctx.addInitScript(fakeWedgies, [
   { uid: "e66138935f5a2c29", machine: "Raspberry Pi Pico 2 W with RP2350", files: { "boot.py": 1 } },
   { uid: "de6474e3a3152a2f", machine: "Raspberry Pi Pico with RP2040", files: { "main.py": 1, "menu.py": 1, "wedgiedrive.py": 1, "wedgie.py": 'VERSION = "0.1.3"',
     "apps.json": JSON.stringify([{ mod: "hello", name: "Hello" }, { mod: "keytest", name: "Buttons" }]), "hello.py": 1, "keytest.py": 1 } },
-  { uid: "aa11bb22cc3d9f01", machine: "Raspberry Pi Pico 2 W with RP2350", files: { "main.py": 1, "slot.py": 1, "wedgiedrive.py": 1, "wedgie.py": 'VERSION = "0.2.0"',
+  { uid: "aa11bb22cc3d9f01", machine: "Raspberry Pi Pico 2 W with RP2350", files: { "main.py": 1, "slot.py": 1, "wedgiedrive.py": 1, "wedgie.py": 'VERSION = "0.2.1"',
     "apps.json": "[]", "/saves/hello/best.json": '{"score": 120}', "junk.txt": "delete me" } },
 ]);
 
@@ -49,7 +49,7 @@ const [BARE, OLD, NEW] = ["5A2C29", "152A2F", "3D9F01"];
 for (const id of [BARE, OLD, NEW]) console.log("·", id, "→", await rowText(id));
 check(/Hardware.*ATECC608 ✓ working/.test(await rowText(NEW)), "0.2: chip proven working on the list");
 check(await st(2, "chips") === 1 && await st(2, "interrupts") === 0, "0.2: the chip proof ran once, over JSON, with nothing stopped");
-check(/update ready: 0\.2\.0/.test(await rowText(OLD)), "0.1.3: update ready on the list");
+check(/update ready: 0\.2\.1/.test(await rowText(OLD)), "0.1.3: update ready on the list");
 check(/Firmware\s*none yet install/.test(await rowText(BARE)), "bare board: no firmware, install on the list");
 check(/Software\s*nothing yet pick one/.test(await rowText(NEW)), "0.2 with no app: nothing yet, pick one");
 await page.screenshot({ path: `${out}/connect-list${phone ? "-phone" : ""}.png` });
@@ -132,12 +132,12 @@ await page.click(`.wrow[data-id="${OLD}"]`);
 await wait(() => document.querySelector("[data-fw]") && !document.querySelector("[data-fw]").disabled, null, 10000, "0.1.3 page, Update enabled");
 check(/Update the firmware/.test(await page.textContent("#d-carts-note")), "0.1.3: Software asks for the update");
 await page.click("[data-fw]");
-await wait((id) => /Up to date/.test(document.querySelector("#d-fw")?.textContent || "") && location.pathname === `/connect/${id}`, OLD, 120000, "0.1.3 → 0.2.0, came back by its ID");
+await wait((id) => /Up to date/.test(document.querySelector("#d-fw")?.textContent || "") && location.pathname === `/connect/${id}`, OLD, 120000, "0.1.3 → 0.2.1, came back by its ID");
 check((await st(1, "resets")) === 1 && (await st(1, "drops")) === 0, "one soft reset, at the end; its port stayed (0.1.3 marks soft resets)");
 const a3 = await appsOn(1), f3 = await files(1);
-check(JSON.stringify(a3?.map((a) => a.mod)) === '["hello"]' && a3[0].v, "its first app kept, with a version: " + JSON.stringify(a3?.map((a) => a.mod)));
-check(!f3.includes("keytest.py") && !f3.includes("menu.py") && f3.includes("slot.py"), "the other app and the menu gone, the slot on");
-await wait(() => /update/.test(document.querySelector('#d-shelf .cart-slot[data-mod="hello"] .cart-state')?.textContent || ""), null, 10000, "its old Hello shows as an update");
+check(JSON.stringify(a3) === "[]", "no app yet (nobody picked one): " + JSON.stringify(a3));
+check(!f3.includes("hello.py") && !f3.includes("keytest.py") && !f3.includes("menu.py") && f3.includes("slot.py"), "its old apps and the menu gone, the slot on");
+await wait(() => /Nothing on it yet/.test(document.querySelector("#d-carts-note")?.textContent || ""), null, 10000, "the page: nothing on it yet");
 check(await st(1, "chips") >= 1, "after the update the chip is proven too");
 
 // ---- the bare board: install the core, it comes back a wedgie with no app yet ---------------------------

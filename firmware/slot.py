@@ -8,9 +8,19 @@
 # gets stdin to itself. Ctrl-C stops the app and drops to the REPL, so mpremote and wedgie.dev's
 # raw-REPL tools keep working.
 #
+# Hold X while plugging in to start without the app (the home screen; USB always works there).
+#
 # App forms: a Timer app starts itself at import (hello); an app with an `entry` is called and owns
 # the CPU (demo.run). If an entry returns, the screen says so and A starts it again.
-import sys, select, json, time, gc
+#
+# READ THIS before touching how apps run: a soft Timer callback runs in MicroPython's scheduler, and
+# one that takes about as long as its period (hello draws a full frame, ~38 ms, every 40 ms) is
+# queued again before it ends, so the main loop never gets a turn: USB goes unanswered and the site
+# hangs on "finding it". A Ctrl-C then lands inside the callback, where it's swallowed. So on the
+# board every app's Timer is wrapped (_Timer): a tick that comes before the USB code (serve) has
+# had a turn since the last one is skipped, so serve runs in that gap; an app that isn't starving
+# anything keeps every tick. A Ctrl-C inside a tick stops the app and reaches the main loop. The emulator's Timers are JavaScript's and don't starve anything.
+import sys, select, json, time, gc, struct
 import lcd as L
 import wedgie as W
 import save
@@ -45,7 +55,25 @@ def _band(title, lines):
 
 
 def empty():
-    _band("no software", [("pick what it runs at", MUTED), ("wedgie.dev/connect", GREEN_D)])
+    """The wedgie's own home: the boot logo, and where to pick what it runs."""
+    try:
+        with open("logo.bin", "rb") as f:
+            x, y, w, h = struct.unpack(">4H", f.read(8))
+            bg = f.read(2)
+            d.fill(bg[0] | bg[1] << 8)          # the framebuffer keeps pixels as the panel's bytes
+            b = memoryview(L._BUF)
+            for r in range(h):
+                o = ((y + r) * 240 + x) * 2
+                f.readinto(b[o:o + w * 2])
+        top = y + h + 16
+    except (OSError, ValueError):
+        d.fill(WHITE)
+        top = 110
+    d.center_text("no software", top, INK, 2)
+    d.center_text("pick what it runs at", top + 28, MUTED)
+    d.center_text("wedgie.dev/connect", top + 44, GREEN_D)
+    d.text(W.short(), 240 - 8 * 6 - 6, 6, MUTED)
+    d.show()
 
 
 def _ended(why=None):
@@ -79,13 +107,78 @@ def open_app():
         _ended("%s" % e)
 
 
+# ---- app Timers that can't starve USB (see the top) -----------------------------------------------
+_breath = True      # serve() has run since the last app tick
+_timers = []        # every app Timer, so stop() can end them all
+_kbd = False        # a Ctrl-C landed inside an app tick: the main loop raises it
+
+
+def _guard(cb, t):
+    def tick(_):
+        global _breath, _kbd
+        if not _breath:
+            return                      # USB hasn't had a turn since the last tick: give it this one
+        _breath = False
+        try:
+            cb(t)
+        except KeyboardInterrupt:
+            _kbd = True
+            t.deinit()
+    return tick
+
+
+class _Timer:
+    """machine.Timer for apps: the same calls, with every soft callback run through _guard."""
+    def __init__(self, id=-1, **kw):
+        self._t = _RealTimer(id)
+        _timers.append(self)
+        if kw:
+            self.init(**kw)
+
+    def init(self, **kw):
+        if kw.get("callback") and not kw.get("hard"):
+            kw["callback"] = _guard(kw["callback"], self)
+        self._t.init(**kw)
+
+    def deinit(self):
+        self._t.deinit()
+
+
+_RealTimer = None
+
+
+def _wrap_timers():
+    """Give apps _Timer: a stand-in machine module (the builtin one is read-only) in sys.modules."""
+    global _RealTimer
+    import machine
+    if _RealTimer:
+        return
+    _RealTimer = machine.Timer
+    for k in ("PERIODIC", "ONE_SHOT"):
+        setattr(_Timer, k, getattr(machine.Timer, k))
+
+    class _M:
+        pass
+    m = _M()
+    for k in dir(machine):
+        if not k.startswith("__"):
+            setattr(m, k, getattr(machine, k))
+    m.Timer = _Timer
+    sys.modules["machine"] = m
+
+
 def stop():
-    """Stop the app (its Timer, if it has one) and the background USB timer. Ctrl-C and the host's
-    stop request both end up here, so nothing keeps drawing over the REPL."""
+    """Stop the app (its Timers, and its stop() if it has one) and the background USB timer. Ctrl-C and
+    the host's stop request both end up here, so nothing keeps drawing over the REPL."""
     global _serve_t
     if _serve_t:
         _serve_t.deinit()
         _serve_t = None
+    for t in _timers:
+        try:
+            t.deinit()
+        except Exception:
+            pass
     if mod and hasattr(mod, "stop"):
         try:
             mod.stop()
@@ -142,7 +235,8 @@ def handle(line):
 
 def serve(_=None):
     """Read what the host sent; handle each full line. Never blocks."""
-    global _buf
+    global _buf, _breath
+    _breath = True
     for _ in range(4096):
         if not _poll.poll(0):
             return
@@ -164,13 +258,16 @@ def _own_usb():
 
 
 def step(board=True):
-    global state, _serve_t
+    global state, _serve_t, _breath
+    if _kbd:
+        raise KeyboardInterrupt
+    _breath = True
     if not _own_usb():
         serve()
     if state == "entry":
         if board and not _own_usb():
-            from machine import Timer
-            _serve_t = Timer(period=60, mode=Timer.PERIODIC, callback=serve)
+            T = _RealTimer or __import__("machine").Timer     # not an app Timer: never skipped
+            _serve_t = T(-1, period=60, mode=T.PERIODIC, callback=serve)
         try:
             getattr(mod, app["entry"])()     # owns the CPU until it returns
             state = "ended"
@@ -198,6 +295,9 @@ def init():
     _poll = select.poll()
     _poll.register(sys.stdin, select.POLLIN)
     app = W.active()
+    if app and keys.pins["X"].value() == 0:    # X held while plugging in: start without the app (a way
+        app = None                              # back in when an app won't let USB work)
+        print("slot: X held, app skipped")
     if not _own_usb():
         W.send(W.hello(None, type="ready", running=app and app["mod"]))
     if app:
@@ -210,6 +310,7 @@ def init():
 def run():
     """The board: run the active app, answer USB, until Ctrl-C."""
     try:
+        _wrap_timers()
         init()
         while True:
             step()

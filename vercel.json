@@ -85,6 +85,10 @@
     {
       "source": "/update",
       "destination": "/index.html"
+    },
+    {
+      "source": "/build",
+      "destination": "/index.html"
     }
   ],
   "trailingSlash": false

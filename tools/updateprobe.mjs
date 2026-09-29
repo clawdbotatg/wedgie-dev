@@ -1,7 +1,7 @@
 // /update, the update bench, with four fake wedgies plugged in at once (tools/fakewedgies.mjs):
 //  0 bare MicroPython: gets the core; its first boot adds the WEDGIE drive (the port drops, comes back)
-//  1 wedgie 0.1.3 with an old Hello cart first: core + Hello updated; 0.2 runs one app, so Buttons'
-//    files go (the person's own mine.py stays on the flash) and the menu goes; its port stays
+//  1 wedgie 0.1.3 with an old Hello cart first: core updated; coming from the menu it starts with no
+//    app, so the carts' files go (the person's own mine.py stays on the flash), and the menu; its port stays
 //  2 wedgie 0.1.4 whose core files differ: updated
 //  3 no MicroPython: told to go through /format
 // Then 2 is unplugged and plugged back in: already up to date, nothing copied, no restart.
@@ -44,9 +44,8 @@ await page.screenshot({ path: `${out}/update-bench.png` });
 check(/ done/.test(await card("5A2C29")) && /Updated ✓/.test(await card("5A2C29")), "bare board: updated, green");
 check((await st(0, "drops")) === 1, "bare board: its port dropped at its first boot and it was found again by its ID");
 check(/ done/.test(await card("152A2F")) && (await st(1, "drops")) === 0 && (await st(1, "resets")) === 1, "0.1.3: updated with one soft reset, port kept");
-const f1 = await page.evaluate(() => { const f = window.__ports[1]._st.files; return { hello: f.get("hello.py")?.length, keytest: f.has("keytest.py"), mine: f.has("mine.py"), menu: f.has("menu.py"), slot: f.has("slot.py"), apps: JSON.parse(new TextDecoder().decode(f.get("apps.json"))).map((a) => a.mod) }; });
-check(f1.hello > 1, "0.1.3: its out-of-date first app was updated too");
-check(JSON.stringify(f1.apps) === '["hello"]' && !f1.keytest && f1.mine && !f1.menu && f1.slot, "0.1.3 → 0.2: runs its first app; Buttons and the menu gone, the person's own file kept: " + JSON.stringify(f1));
+const f1 = await page.evaluate(() => { const f = window.__ports[1]._st.files; return { hello: f.has("hello.py"), keytest: f.has("keytest.py"), mine: f.has("mine.py"), menu: f.has("menu.py"), slot: f.has("slot.py"), apps: JSON.parse(new TextDecoder().decode(f.get("apps.json"))).map((a) => a.mod) }; });
+check(JSON.stringify(f1.apps) === "[]" && !f1.hello && !f1.keytest && f1.mine && !f1.menu && f1.slot, "0.1.3 → 0.2: no app yet; the carts and the menu gone, the person's own file kept: " + JSON.stringify(f1));
 check((await st(1, "inserting")) >= 2, "its own screen showed the update");
 check(/ done/.test(await card("3D9F01")), "0.1.4 with different files: updated");
 check(/ fail/.test(await card("no ID")) && /wedgie\.dev\/format/.test(await card("no ID")), "no MicroPython: failed, pointed at /format");

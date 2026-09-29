@@ -121,12 +121,17 @@ if "wedgie.py" in os.listdir():
 import json
 print("@id", json.dumps({"uid": machine.unique_id().hex(), "machine": m, "mp": os.uname().release, "files": sorted(os.listdir()), "wifi": w, "wedgie": v}))`;
 
+const STUCK = "It isn't answering. Unplug it, then hold X on the wedgie while you plug it back in (that skips its app), or hold the Pico's BOOTSEL button while plugging in and use wedgie.dev/format.";
+
 async function identify(w: Wedgie) {
   w.state = "identifying"; w.error = undefined; emit();
   try {
     // A board that just rebooted or re-plugged its USB can't be opened for a moment: retry that.
+    // A board whose app never lets its USB code run (firmware 0.2.0 with Hello did) answers nothing and
+    // may not even take our bytes: say so after a while instead of "finding it" forever.
+    const stuck = new Promise<never>((_, rej) => setTimeout(() => rej(new Error(STUCK)), 30000));
     for (let tries = 0; ; tries++) {
-      try { await talk(w); break; } catch (e: any) {
+      try { await Promise.race([talk(w), stuck]); break; } catch (e: any) {
         if (tries >= 5 || !/failed to open|busy|access denied|already open/i.test(e?.message || "")) throw e;
         await new Promise((res) => setTimeout(res, 700));
       }

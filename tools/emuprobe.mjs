@@ -109,8 +109,39 @@ try {
 
   // no app: the "no software yet" screen
   await page.evaluate(() => window.vw.reboot(""));
-  check(await waitFor(isBand, 15000), "no app: the no-software screen");
+  // the wedgie's own home: the boot logo's background, its green ID, the title in ink
+  const isHome = async () => near(await px(3, 120), [254, 254, 254], 12) && !near(await px(120, 30), [227, 49, 44]);
+  await page.waitForTimeout(1500);
+  check(await isHome(), "no app: the wedgie's home screen");
   await page.locator(".vw").screenshot({ path: `${out}/emu-empty-device.png` });
+
+  // the board's app Timers (slot._Timer): an app runs on them as usual, a tick is skipped until USB has
+  // had a turn, and a Ctrl-C inside a tick reaches the main loop. (Only a real board shows the
+  // starving itself; this checks the wrapper's logic.)
+  const wr = await page.evaluate(() => window.vw.exec([
+    "import slot, sys, time",
+    "slot._wrap_timers()",
+    "from machine import Timer",
+    "n = [0]",
+    "def cb(t):\n    n[0] += 1",
+    "t = Timer(period=20, mode=Timer.PERIODIC, callback=cb)",
+    "print(type(t).__name__, sys.modules['machine'].Timer is slot._Timer)",
+  ].join("\n")));
+  await page.waitForTimeout(600);
+  const logic = await page.evaluate(() => window.vw.exec([
+    "g = slot._guard(cb, t)",
+    "slot._breath = False; a = n[0]; g(None); b = n[0]",
+    "slot._breath = True; g(None); c = n[0]; br = slot._breath",
+    "def boom(_):\n    raise KeyboardInterrupt",
+    "k = slot._guard(boom, t); slot._breath = True; k(None); kb = slot._kbd; slot._kbd = False",
+    "ticks = n[0]",
+    "slot.stop()",
+    "print(ticks, b - a, c - b, br, kb, len(slot._timers))",
+  ].join("\n")));
+  const [ticks, skipped, ran, br, kb] = logic.trim().split(" ");
+  check(/_Timer True/.test(wr) && +ticks > 5, `app Timers are wrapped and tick (${wr.trim()}, ${ticks} ticks)`);
+  check(skipped === "0" && ran === "1" && br === "False", `a tick waits until USB has had a turn (${logic.trim()})`);
+  check(kb === "True", "a Ctrl-C inside a tick reaches the main loop");
 
   // the Wallet (no chip: software key) must not crash; it has USB to itself
   await page.evaluate(() => window.vw.reboot("usbwallet"));

@@ -28,6 +28,8 @@ export type Wedgie3D = {
   setScreens(urls: string[], ms?: number): void;
   setBacklight(v: number): void;
   keyVisual(key: string, down: boolean): void;
+  /** Reprint a part in another color: lid, base, A, B, X, Y, joystick. */
+  setColor(part: string, color: number): void;
   destroy(): void;
 };
 
@@ -345,6 +347,7 @@ export async function mountWedgie3D(el: HTMLElement, opts: Wedgie3DOptions = {})
     setScreens: useScreens,
     setBacklight(v) { backlight = v; },
     keyVisual: visual,
+    setColor(part, color) { const m = meshes.get(part); if (m) (m.material as THREE.MeshPhysicalMaterial).color.setHex(color); },
     destroy() {
       dead = true; cancelAnimationFrame(raf); clearInterval(cycle); ro.disconnect(); io.disconnect();
       removeEventListener("pointermove", onMove); document.removeEventListener("visibilitychange", loop);

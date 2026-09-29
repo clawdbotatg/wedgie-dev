@@ -19,7 +19,7 @@ def out(b): os.write(master, b if isinstance(b, bytes) else b.encode())
 def wedgie(): return (os.path.exists("slot.py") or os.path.exists("menu.py")) and os.path.exists("main.py")
 
 def hello(mid, t="hello"):
-    return json.dumps({"id": mid, "type": t, "name": "wedgie", "fw": "wedgie-0.2.0", "version": "0.2.0", "slot": 1, "uid": "e66138935f5a2c29",
+    return json.dumps({"id": mid, "type": t, "name": "wedgie", "fw": "wedgie-0.2.1", "version": "0.2.1", "slot": 1, "uid": "e66138935f5a2c29",
                        "board": "Pico 2 W", "apps": ["hello"], "running": state["launched"]}) + "\r\n"
 
 def run(code):
