@@ -41,8 +41,11 @@ export function playing(w: W.Wedgie, m?: Manifest): Fact {
   const c = m?.carts.find((x) => x.mod === w.running);
   if (c) return { html: `${miniCart(c)} ${esc(c.name)} <span class="fine">playing</span>`, tone: "ok" };
   if (w.running) return { html: `${esc(w.running)} <span class="fine">playing</span>`, tone: "ok" };
-  const n = (w.carts || w.apps || []).length;
-  return { html: n ? `the menu · ${n} cartridge${n > 1 ? "s" : ""}` : "the menu · no cartridges yet", tone: "ok" };
+  const a = (w.carts || [])[0]?.mod || (w.apps || [])[0];
+  const ca = m?.carts.find((x) => x.mod === a);
+  if (!w.slot) return { html: `the menu · ${a ? (w.carts || w.apps || []).length + " on it" : "nothing on it"}`, tone: "ok" };   // 0.1.x
+  if (ca) return { html: `${miniCart(ca)} ${esc(ca.name)} <span class="fine">stopped</span>`, tone: "ok" };
+  return a ? { html: `${esc(a)} <span class="fine">stopped</span>`, tone: "ok" } : { html: "nothing yet <span class=\"badge\">pick one</span>", tone: "warn" };
 }
 
 /** The worst of the three: the row's status light. */

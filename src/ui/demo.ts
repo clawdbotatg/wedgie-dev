@@ -1,6 +1,7 @@
-// A pretend wedgie for the 3D models around the site: the launcher and a few apps, hard-coded, on a
-// 240x240 canvas the model shows as its screen. Joystick up/down picks, A (or joystick press) opens,
-// X goes back, like firmware/menu.py. Left alone it drives itself; any press takes over.
+// A pretend wedgie for the 3D models around the site: a few apps, hard-coded, on a 240x240 canvas the
+// model shows as its screen. Like the real one (firmware/slot.py) it runs one app and every button is
+// the app's. Left alone it drives itself, and now and then restarts into the next app (what picking
+// another at wedgie.dev/connect does); any press takes over.
 import type { Wedgie3D } from "./wedgie3d";
 
 type App = { name: string; draw: () => void; key?: (k: string) => void };
@@ -16,7 +17,7 @@ export function createDemo(id = "WEDGIE", opts: { boot?: boolean } = {}) {
   canvas.width = canvas.height = 240;
   const g = canvas.getContext("2d")!;
   const held = new Set<string>(), seen = new Set<string>();
-  let sel = 0, app: App | null = null, demoScene = 0, walletPage = 0;
+  let cur = 0, demoScene = 0, walletPage = 0;
   let w3d: Wedgie3D | null = null;
 
   const pic = (i: HTMLImageElement) => { g.fillStyle = "#000"; g.fillRect(0, 0, 240, 240); if (i.complete) g.drawImage(i, 0, 0); };
@@ -37,20 +38,6 @@ export function createDemo(id = "WEDGIE", opts: { boot?: boolean } = {}) {
     { name: "Clear sign", draw: () => pic(SHOTS.clear) },
   ];
 
-  function drawLauncher() {                  // menu.py's draw()
-    g.fillStyle = "#fefefe"; g.fillRect(0, 0, 240, 240);
-    [["#22c452", 10], ["#a9aaab", 19], ["#e3312c", 28]].forEach(([c, y]) => { g.fillStyle = c as string; g.fillRect(0, y as number, 240, 5); });
-    text("wedgie", 6, 42, "#1a1b1a"); text(id.slice(-6), 234, 42, "#787b78", 8, "right");
-    const first = Math.max(0, Math.min(sel - 3, apps.length - 4));
-    for (let r = 0; r < 4; r++) {
-      const i = first + r, y = 58 + r * 40;
-      if (!apps[i]) break;
-      if (i === sel) { g.fillStyle = "#22c452"; g.fillRect(9, y, 222, 36); g.fillStyle = "#168c34"; g.fillRect(9, y + 32, 222, 4); text(apps[i].name, 22, y + 10, "#fefefe", 16); }
-      else { g.strokeStyle = "#e2e2dd"; g.lineWidth = 1; g.strokeRect(9.5, y + 0.5, 221, 35); text(apps[i].name, 22, y + 10, "#1a1b1a", 16); }
-    }
-    text("A open", 8, 226, "#787b78"); text(`${sel + 1}/${apps.length}`, 234, 226, "#787b78", 8, "right");
-  }
-
   function drawButtons() {                   // keytest.py, roughly: every key, lit while held
     g.fillStyle = "#000"; g.fillRect(0, 0, 240, 240);
     text("KEY TEST", 4, 4, "#ffdc00");
@@ -67,7 +54,6 @@ export function createDemo(id = "WEDGIE", opts: { boot?: boolean } = {}) {
       text(l, x + w / 2, y + h / 2 - 4, on ? "#000" : "#fff", 8, "center");
     }
     text(`${seen.size}/9 keys seen`, 4, 216, seen.size === 9 ? "#00ff00" : "#fff");
-    text("X quits", 4, 228, "#787878");
   }
 
   // Boot: the device's own boot screen (splash.py's underwear, loader.py's bar filling grey, then green).
@@ -85,47 +71,56 @@ export function createDemo(id = "WEDGIE", opts: { boot?: boolean } = {}) {
     if (bootT >= 0.85) { gr.addColorStop(0, "#46cd64"); gr.addColorStop(1, "#168c34"); } else { gr.addColorStop(0, "#7c7d7f"); gr.addColorStop(1, "#48494b"); }
     pill(x + 13, y + 9, 12 + (w - 38) * f, h - 18, gr);
   }
-  const draw = () => (bootT < 1 ? drawBoot() : app ? app.draw() : drawLauncher());
+  const draw = () => (bootT < 1 ? drawBoot() : apps[cur].draw());
 
   function key(k: string, down: boolean) {
     if (down) held.add(k); else held.delete(k);
-    if (down) {
-      if (app) {
-        if (k === "X") app = null;
-        else app.key?.(k);
-      } else if (k === "up") sel = (sel + apps.length - 1) % apps.length;
-      else if (k === "down") sel = (sel + 1) % apps.length;
-      else if (k === "A" || k === "press") { app = apps[sel]; demoScene = 0; walletPage = 0; seen.clear(); }
-    }
+    if (down && bootT >= 1) apps[cur].key?.(k);
     draw();
   }
 
-  // Left alone, it shows itself off: down, down, A, look around, X... Any real press pauses it a while.
-  const TOUR: [string, number][] = [["down", 900], ["down", 900], ["down", 900], ["A", 1800], ["right", 1400], ["right", 1400],
-    ["A", 2200], ["X", 1200], ["up", 900], ["up", 900], ["A", 1800], ["A", 1800], ["X", 1200], ["up", 900], ["A", 2000], ["X", 1400]];
+  // Left alone, it shows itself off: a few presses in each app ("" = a restart into the next one,
+  // boot screen and all). Any real press pauses it a while.
+  const TOUR: [string, number][] = [
+    ["right", 1400], ["right", 1400], ["A", 2200], ["Y", 1600], ["", 1400],     // Wallet look, then restart
+    ["", 3200],                                                                  // Clear sign
+    ["", 2600],                                                                  // Hello
+    ["up", 900], ["A", 600], ["X", 600], ["Y", 600], ["press", 600], ["", 1600], // Buttons
+    ["A", 2000], ["A", 1800], ["", 1800]];                                      // Demo, back to Wallet look
+  const START = 3;                    // Wallet look first: the showiest
+  cur = START;
   let step = 0, timer = 0, idleUntil = 0;
+  function restart() {                // the next app, like picking it at wedgie.dev: the wedgie reboots into it
+    cur = (cur + 1) % apps.length; demoScene = 0; walletPage = 0; seen.clear();
+    boot(() => {});
+  }
   function tour() {
     timer = window.setTimeout(() => {
       if (performance.now() < idleUntil) { tour(); return; }
       const [k] = TOUR[step % TOUR.length];
-      key(k, true); w3d?.keyVisual(k, true);
-      setTimeout(() => { key(k, false); w3d?.keyVisual(k, false); }, 160);
+      if (!k) restart();
+      else { key(k, true); w3d?.keyVisual(k, true); setTimeout(() => { key(k, false); w3d?.keyVisual(k, false); }, 160); }
       step++;
       tour();
     }, TOUR[step % TOUR.length][1]);
+  }
+  function boot(then: () => void) {
+    const BOOT = 1200;           // green (0.85) at ~1.0 s: right as the fly-in lands (wedgie3d GROW)
+    const t0 = performance.now();
+    bootT = 0;
+    const tick = () => {
+      bootT = Math.min(1, (performance.now() - t0) / BOOT);
+      draw();
+      if (bootT < 1) requestAnimationFrame(tick); else then();
+    };
+    requestAnimationFrame(tick);
   }
   Object.values(SHOTS).flat().forEach((i) => i.addEventListener("load", draw));
   document.fonts?.ready.then(draw);
   draw();
   if (bootT < 1) {
-    const BOOT = 1200;           // green (0.85) at ~1.0 s: right as the fly-in lands (wedgie3d GROW)
-    const tick = () => {
-      bootT = Math.min(1, (performance.now() - (tick as any).t0) / BOOT);
-      draw();
-      if (bootT < 1) requestAnimationFrame(tick); else setTimeout(tour, 1200);
-    };
     // start when the page is actually showing (the site loader covers it until html.ready)
-    const go = () => { const t = performance.now(); (tick as any).t0 = t; requestAnimationFrame(tick); };
+    const go = () => boot(() => setTimeout(tour, 1200));
     const whenShown = () => (document.documentElement.classList.contains("ready") ? go() : setTimeout(whenShown, 50));
     logo.decode?.().catch(() => {}).finally(whenShown);
   } else tour();

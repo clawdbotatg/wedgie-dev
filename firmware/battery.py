@@ -1,7 +1,7 @@
 # battery: battery screen for the Waveshare Pico-UPS-B hat. Its INA219 sits on I2C1 (GP6 SDA, GP7 SCL)
 # at 0x43 and measures the battery: voltage, and current (+ = charging, - = running on battery).
 # USB power is read from VBUS: GP24 on a Pico, WL_GPIO2 on a Pico W / Pico 2 W.
-# Emulator: tools/emu run battery (no hat there, so it says so). X stops it.
+# Emulator: tools/emu run battery (no hat there, so it says so).
 from machine import I2C, Pin, Timer
 from lcd import LCD, Keys, color, BLACK, WHITE, GREEN, RED, YELLOW, GREY, DARK
 
@@ -60,15 +60,11 @@ def draw(hat):
         else:
             state = "full" if usb else "idle"
         lcd.center_text(state, 176, c, 2)
-    lcd.center_text("X quits", 228, GREY)
     lcd.show()
 
 
 def tick(_):
-    for k in keys.pressed():
-        if k == "X":
-            stop()
-            return
+    keys.pressed()
     draw(hat)
 
 
@@ -79,7 +75,7 @@ def start():
     global timer
     draw(hat)
     timer = Timer(period=1000, mode=Timer.PERIODIC, callback=tick)
-    print("battery running; X stops it")
+    print("battery running")
 
 
 def stop():

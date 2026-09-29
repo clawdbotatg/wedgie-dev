@@ -1,9 +1,9 @@
 # wedgie: who this board is, and the few things a host (wedgie.dev, an agent, mpremote) can ask of it.
-# The launcher (menu.py) answers these as JSON lines on USB while it runs, so nothing gets
+# The slot (slot.py) answers these as JSON lines on USB while the app runs, so nothing gets
 # interrupted; from the REPL they are plain calls:  import wedgie; wedgie.shot(); wedgie.press("A")
 import sys, os, json, machine
 
-VERSION = "0.1.4"
+VERSION = "0.2.0"
 
 
 def uid():
@@ -27,14 +27,29 @@ def board():
 
 
 def apps():
-    """What's in the launcher: apps.json, the wedgie's own list of the cartridges wedgie.dev put on it
-    ({"mod", "name", "entry"?, "about"?, "v"}) plus any app saved with wedgie.py or the site's editor.
-    The firmware ships none: a fresh wedgie has an empty launcher until a cartridge goes on."""
+    """apps.json: the app wedgie.dev (or wedgie.py, or the site's editor) put on it, as a one-item list
+    ({"mod", "name", "entry"?, "usb"?, "about"?, "v"}). The firmware ships none: a fresh wedgie says
+    "no software yet" until one goes on. Firmware 0.1.x kept several; the first is the one that runs."""
     try:
         with open("apps.json") as f:
             return json.load(f)
     except (OSError, ValueError):
         return []
+
+
+def active():
+    """The app it runs: the first in apps.json whose file is on the flash, or None."""
+    for a in apps():
+        try:
+            os.stat(a["mod"] + ".py")
+            return a
+        except (OSError, KeyError, TypeError):
+            try:
+                os.stat(a["mod"] + ".mpy")
+                return a
+            except (OSError, KeyError, TypeError):
+                pass
+    return None
 
 
 def free():
@@ -55,7 +70,7 @@ def hello(mid=None, **extra):
     d = {"type": "hello", "name": "wedgie", "fw": "wedgie-" + VERSION, "version": VERSION, "uid": uid(),
          "short": short(), "board": name, "cpu": cpu, "wifi": wifi, "machine": sys.implementation._machine,
          "micropython": os.uname().release, "apps": [x["mod"] for x in a],
-         "carts": [{"mod": x["mod"], "v": x.get("v")} for x in a], "free": free(), "chip": _chip}
+         "carts": [{"mod": x["mod"], "v": x.get("v")} for x in a], "free": free(), "chip": _chip, "slot": 1}
     if mid is not None:
         d["id"] = mid
     d.update(extra)
@@ -141,6 +156,54 @@ def shot(mid=None):
         if mid is not None:
             d["id"] = mid
         print(json.dumps(d))
+
+
+def ls(path="/"):
+    """Every file under path, [[path, bytes], ...]; a folder is [path + "/", 0], then its files."""
+    out = []
+    base = path.rstrip("/")
+    try:
+        names = sorted(os.listdir(path))
+    except OSError:
+        return out
+    for n in names:
+        p = base + "/" + n
+        try:
+            st = os.stat(p)
+        except OSError:
+            continue
+        if st[0] & 0x4000:
+            out.append([p + "/", 0])
+            out += ls(p)
+        else:
+            out.append([p, st[6]])
+    return out
+
+
+def get(path, mid=None):
+    """A file as JSON lines, like shot(): {"type":"file","i":0,"n":N,"size":S,"data":"<base64>"}."""
+    import binascii
+    size = os.stat(path)[6]
+    step = 3072
+    n = max(1, (size + step - 1) // step)
+    with open(path, "rb") as f:
+        for i in range(n):
+            d = {"type": "file", "i": i, "n": n, "size": size, "data": binascii.b2a_base64(f.read(step)).decode().strip()}
+            if mid is not None:
+                d["id"] = mid
+            print(json.dumps(d))
+
+
+def rm(path):
+    """Delete a file, or a folder and everything in it."""
+    try:
+        names = os.listdir(path)
+    except OSError:
+        os.remove(path)
+        return
+    for n in names:
+        rm(path.rstrip("/") + "/" + n)
+    os.rmdir(path)
 
 
 def press(k, ms=80):

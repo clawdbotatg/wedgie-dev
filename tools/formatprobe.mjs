@@ -1,9 +1,11 @@
-// Drives /test end to end with fakes, hands off: Chrome as if the test-bench profile were installed
+// Drives /format end to end with fakes: Chrome as if the test-bench profile were installed
 // (every Pico is visible without a picker) unless a scenario says noProfile. The fake Pico is strict
 // about PICOBOOT (command blocks, tokens, ack phases, flash only clearing bits), reboots into bare
 // MicroPython (raw REPL, a real little filesystem for the firmware install), answers board()/chip()/
 // bench() like bench.py and probe.py, and re-plugs its USB when it boots the wedgie firmware.
-// Serve dist first (npx vite preview), then: node tools/testprobe.mjs [url] [outdir]
+// Nothing may happen to a unit until Format is pressed; a used wedgie's saves must survive the wipe
+// (or not, with "wipe its saves too" ticked).
+// Serve dist first (npx vite preview), then: node tools/formatprobe.mjs [url] [outdir]
 import { chromium } from "playwright-core";
 import { readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -32,18 +34,20 @@ const ALLPASS = ["pass", "pass", "pass", "pass", "pass"];
 const scenarios = [
   { name: "new-pico", pid: 3, found: [ATECC], want: ["PASS", ALLPASS], uf2: "RPI_PICO" },
   { name: "new-pico-w", pid: 3, wifi: true, found: [ATECC], want: ["PASS", ALLPASS], uf2: "RPI_PICO_W", flashes: 2 },
-  { name: "new-pico2-w", pid: 15, wifi: true, found: [TM], want: ["PASS", ALLPASS], uf2: "RPI_PICO2_W", flashes: 2 },
+  { name: "new-pico2-w", pid: 15, wifi: true, found: [ATECC], want: ["PASS", ALLPASS], uf2: "RPI_PICO2_W", flashes: 2 },
   { name: "used-wedgie", pid: 3, used: true, found: [ATECC], want: ["PASS", ALLPASS], uf2: "RPI_PICO" },
+  { name: "used-saves", pid: 3, used: true, saves: true, found: [ATECC], want: ["PASS", ALLPASS], uf2: "RPI_PICO" },
+  { name: "used-wipe", pid: 3, used: true, saves: true, wipe: true, found: [ATECC], want: ["PASS", ALLPASS], uf2: "RPI_PICO" },
   { name: "sticky-joy", pid: 3, combo: true, found: [ATECC], want: ["PASS", ALLPASS], uf2: "RPI_PICO" },
-  { name: "no-chip", pid: 3, found: [], lines: { sda: 0, scl: 0 }, want: ["FAIL", ["pass", "fail", "pass", "pass", "pass"]], uf2: "RPI_PICO" },
+  { name: "no-chip", pid: 3, found: [], lines: { sda: 0, scl: 0 }, want: ["FAIL", ["pass", "pass", "fail", "pass", "pass"]], uf2: "RPI_PICO" },
   { name: "unplugged", pid: 3, found: [ATECC], unplugAt: "down", want: ["FAIL", ["pass", "pass", "pass", "fail", "skip"]], uf2: "RPI_PICO" },
   { name: "no-profile", pid: 3, noProfile: true, found: [ATECC], want: ["PASS", ALLPASS], uf2: "RPI_PICO" },
 ];
 
 let bad = 0;
-for (const sc of scenarios) {
+for (const sc of scenarios.filter((x) => !process.env.ONLY || x.name === process.env.ONLY)) {
   const ctx = await browser.newContext({ viewport: { width: 1100, height: 1000 } });
-  await ctx.addInitScript(({ sc }) => {
+  await ctx.addInitScript(({ sc, ATECC_SERIAL }) => {
     const ORDER = ["up", "down", "left", "right", "press", "A", "B", "X", "Y"];
     const enc = new TextEncoder(), dec = new TextDecoder();
     const hex = (b) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
@@ -56,15 +60,19 @@ for (const sc of scenarios) {
     const two = sc.pid === 15;
     const build = () => (st.maxWrite > 0x100a0000 ? "w" : "plain");
 
-    // ---- serial: MicroPython, a wedgie once main.py + menu.py are on it ----
+    // ---- serial: MicroPython, a wedgie once main.py + slot.py (0.2; menu.py before) are on it ----
     const files = new Map([["boot.py", new Uint8Array([1])]]);
     if (sc.used) for (const n of ["main.py", "menu.py", "wedgiedrive.py"]) files.set(n, new Uint8Array([7]));
-    const wedgie = () => files.has("menu.py") && files.has("main.py");
+    if (sc.saves) { files.set("/saves/hello/best.json", enc.encode('{"score": 120}')); files.set("/saves/demo/x.bin", new Uint8Array([1, 2, 3])); }
+    st.files = files;
+    const wedgie = () => (files.has("menu.py") || files.has("slot.py")) && files.has("main.py");
     let push = () => {}, raw = false, code = "", line = "", cur = null, curName = "", live = true;
     const answer = (stdout, err = "") => push("OK" + stdout + "\x04" + err + "\x04>");
     let port;
+    let ctl = null;
     function unplug() {
       live = false;
+      try { ctl?.error(new Error("device lost")); } catch {}   // a real unplug ends the port's read
       const i = granted.indexOf(port); if (i >= 0) granted.splice(i, 1);
       serialT.dispatchEvent(Object.assign(new Event("disconnect"), { port }));
     }
@@ -105,6 +113,12 @@ for (const sc of scenarios) {
         return;
       }
       if (c.startsWith("verdict(")) { st.verdict = c; return answer(""); }
+      // the chip used, not locked (bench.py chipwork): ATECC608 hashes the page's random bytes. (Trust M's
+      // answer needs a certificate chaining to Infineon, which a fake can't sign, so no scenario uses it here.)
+      if (c.startsWith("chipwork(")) {
+        const m = crypto.getRandomValues(new Uint8Array(100));
+        return answer("@chipwork " + JSON.stringify({ kind: "atecc", msg: hex(m), sha: await sha(m), random: ["ffff0000".repeat(8), "ffff0000".repeat(8)], serial: ATECC_SERIAL, configLocked: true, dataLocked: true }) + "\r\n");
+      }
       if (c.includes("@hashes")) {
         const names = JSON.parse(c.match(/for n in (\[.*?\])\}/)[1]), h = {};
         for (const n of names) h[n] = files.has(n) ? await sha(files.get(n)) : null;
@@ -113,7 +127,16 @@ for (const sc of scenarios) {
       let m;
       if ((m = c.match(/_f = open\("([^"]+)", "wb"\)/))) { cur = []; curName = m[1]; return answer(""); }
       if ((m = c.match(/_f\.write\(binascii\.a2b_base64\("([^"]*)"\)\)/))) { cur.push(Uint8Array.from(atob(m[1]), (x) => x.charCodeAt(0))); return answer(""); }
-      if (c === "_f.close()") { const u = new Uint8Array(cur.reduce((a, b) => a + b.length, 0)); let o = 0; for (const b of cur) { u.set(b, o); o += b.length; } files.set(curName, u); return answer(""); }
+      if (c.startsWith("_f.close()") && cur) {
+        const u = new Uint8Array(cur.reduce((a, b) => a + b.length, 0)); let o = 0; for (const b of cur) { u.set(b, o); o += b.length; } files.set(curName, u); cur = null;
+        if ((m = c.match(/os\.rename\("([^"]+)", "([^"]+)"\)/))) { files.set(m[2], files.get(m[1])); files.delete(m[1]); }
+        return answer("");
+      }
+      if ((m = c.match(/"files": wedgie\.ls\("([^"]*)"\)/))) {
+        const ls = [...files.keys()].filter((k) => k.startsWith(m[1] + "/")).map((k) => [k, files.get(k).length]);
+        return answer("@ls " + JSON.stringify({ files: ls, free: 600000 }) + "\r\n");
+      }
+      if ((m = c.match(/with open\("([^"]+)", "rb"\) as _f:/))) { let s = ""; for (const b of files.get(m[1])) s += String.fromCharCode(b); return answer("@b " + JSON.stringify(btoa(s)) + "\r\n"); }
       if ((m = c.match(/@sha", json\.dumps\(_h\("([^"]+)"\)\)/))) return answer("@sha " + JSON.stringify(await sha(files.get(m[1]))) + "\r\n");
       if ((m = c.match(/os\.rename\("([^"]+)", "([^"]+)"\)/))) { files.set(m[2], files.get(m[1])); files.delete(m[1]); if (wedgie()) st.installed = true; return answer(""); }
       answer("");
@@ -121,7 +144,7 @@ for (const sc of scenarios) {
     const hello = (id) => JSON.stringify({ id, type: "hello", name: "wedgie", fw: "wedgie-0.1.1", version: "0.1.1", uid, board: "wedgie", cpu: two ? "RP2350" : "RP2040", micropython: "1.29.0", apps: [] });
     function replug() { unplug(); setTimeout(() => { live = true; granted.push(port); serialT.dispatchEvent(Object.assign(new Event("connect"), { port })); }, 400); }
     const streams = () => ({
-      readable: new ReadableStream({ start(c) { push = (s) => { try { c.enqueue(enc.encode(s)); } catch {} }; } }),
+      readable: new ReadableStream({ start(c) { ctl = c; push = (s) => { try { c.enqueue(enc.encode(s)); } catch {} }; } }),
       writable: new WritableStream({ write(chunk) {
         if (!live) throw new Error("device lost");
         for (const ch of dec.decode(chunk)) {
@@ -214,17 +237,27 @@ for (const sc of scenarios) {
       getDevices: async () => devs.filter((d) => !sc.noProfile || visible.has(d)),
       requestDevice: async () => { st.picks++; for (let i = 0; i < 50 && !devs.length; i++) await new Promise((r) => setTimeout(r, 100)); if (!devs.length) throw new DOMException("none", "NotFoundError"); visible.add(devs[0]); return devs[0]; },
     }) });
-  }, { sc });
+  }, { sc, ATECC_SERIAL: ATECC.serial });
 
   const page = await ctx.newPage();
   const errs = [];
   page.on("pageerror", (e) => errs.push(e.message));
-  await page.goto(base + "test");
+  await page.goto(base + "test");     // the old name: it lands on /format
   const notes = [];
+  if (sc.wipe) await page.check("#t-wipe");
+  if (!sc.noProfile) {
+    await page.waitForSelector("#t-go", { timeout: 20000 });
+    await page.waitForTimeout(1500);
+    const before = await page.evaluate(() => ({ path: location.pathname, flashes: window.__st.flashes, wiped: !!window.__st.wiped, maxWrite: window.__st.maxWrite, execs: window.__st.execs }));
+    if (before.flashes || before.wiped || before.maxWrite || before.execs) notes.push("STARTED BEFORE FORMAT " + JSON.stringify(before));
+    if (before.path !== "/format") notes.push("not on /format: " + before.path);
+    await page.click("#t-go");
+  }
   if (sc.noProfile) {   // tap whatever the page asks for, and count the taps
     for (let i = 0; i < 6; i++) {
       const sel = await Promise.race([
         page.waitForSelector("#t-pick", { timeout: 30000 }).then(() => "#t-pick", () => null),
+        page.waitForSelector("#t-go", { timeout: 30000 }).then(() => "#t-go", () => null),
         i ? new Promise(() => {}) : page.waitForSelector("#t-new", { timeout: 30000 }).then(() => "#t-new", () => null),
         page.waitForFunction(() => /^(PASS|FAIL)$/.test(document.getElementById("t-text")?.textContent || ""), null, { timeout: 30000 }).then(() => "done", () => null),
       ]);
@@ -236,7 +269,7 @@ for (const sc of scenarios) {
   await page.waitForFunction(() => /^(PASS|FAIL)$/.test(document.getElementById("t-text")?.textContent || ""), null, { timeout: 90000 });
   const execs = await page.evaluate(() => window.__st.execs);
   await page.waitForTimeout(3000);   // the finished unit re-plugs its USB: nothing may start again
-  await page.screenshot({ path: `${out}/test-${sc.name}.png`, fullPage: true });
+  await page.screenshot({ path: `${out}/format-${sc.name}.png`, fullPage: true });
   const got = await page.evaluate(() => ({
     status: document.getElementById("t-text").textContent,
     cards: [...document.querySelectorAll(".test-card")].map((c) => c.className.replace("test-card ", "")),
@@ -245,7 +278,14 @@ for (const sc of scenarios) {
     st: { ...window.__st, flash: undefined },
     flash: [...window.__st.flash].filter(([a, v]) => v !== 0xff && a < 0x10100000),
   }));
-  let ok = got.status === sc.want[0] && JSON.stringify(got.cards) === JSON.stringify(sc.want[1]) && !errs.length;
+  let ok = got.status === sc.want[0] && JSON.stringify(got.cards) === JSON.stringify(sc.want[1]) && !errs.length && !notes.some((n) => /BEFORE|not on/.test(n));
+  if (sc.saves) {
+    const sv = await page.evaluate(() => [...window.__st.files.keys()].filter((k) => k.startsWith("/saves/")).sort().join(","));
+    const kept = await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("wedgie.saves.")).length);
+    const want = sc.wipe ? "" : "/saves/demo/x.bin,/saves/hello/best.json";
+    if (sv !== want || kept) { ok = false; notes.push(`saves after: [${sv}], ${kept} left in the browser`); }
+    else notes.push(sc.wipe ? "saves wiped" : "saves kept");
+  }
   if (got.st.execs !== execs) { ok = false; notes.push("RAN AGAIN after re-plug"); }
   if (sc.want[0] === "PASS" && !got.st.installed) { ok = false; notes.push("firmware not installed"); }
   if (!sc.unplugAt && !String(got.st.verdict).includes(sc.want[0] === "PASS" ? "True" : "False")) { ok = false; notes.push("screen verdict " + got.st.verdict); }

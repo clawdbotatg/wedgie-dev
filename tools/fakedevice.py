@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """A pretend wedgie on a pseudo-terminal, for testing public/wedgie.py without hardware.
 Raw-REPL code runs in real CPython inside a temp dir (so file writes, hashes, renames are real);
-JSON lines get launcher answers (hello, shot, press, launch, home) once menu.py + main.py exist.
+JSON lines get the firmware's answers (hello, shot, press, stop) once main.py + slot.py (0.1.x: menu.py) exist.
   python3 tools/fakedevice.py        prints the pty path, then serves until killed"""
 import os, sys, pty, json, io, tempfile, contextlib, base64, select
 
@@ -16,10 +16,10 @@ g = {}
 
 def out(b): os.write(master, b if isinstance(b, bytes) else b.encode())
 
-def wedgie(): return os.path.exists("menu.py") and os.path.exists("main.py")
+def wedgie(): return (os.path.exists("slot.py") or os.path.exists("menu.py")) and os.path.exists("main.py")
 
 def hello(mid, t="hello"):
-    return json.dumps({"id": mid, "type": t, "name": "wedgie", "fw": "wedgie-0.1.0", "version": "0.1.0", "uid": "e66138935f5a2c29",
+    return json.dumps({"id": mid, "type": t, "name": "wedgie", "fw": "wedgie-0.2.0", "version": "0.2.0", "slot": 1, "uid": "e66138935f5a2c29",
                        "board": "Pico 2 W", "apps": ["hello"], "running": state["launched"]}) + "\r\n"
 
 def run(code):
@@ -44,7 +44,7 @@ def js(line):
         n = (len(px) + 3071) // 3072
         for i in range(n):
             out(json.dumps({"id": mid, "type": "shot", "i": i, "n": n, "w": 240, "h": 240, "fmt": "rgb565be", "data": base64.b64encode(px[i * 3072:(i + 1) * 3072]).decode()}) + "\r\n")
-    elif t in ("press", "launch", "home"):
+    elif t in ("press", "launch", "home", "stop"):
         state["presses" if t == "press" else "launched"] = (state["presses"] + [m.get("key")]) if t == "press" else m.get("app")
         out(json.dumps({"id": mid, "type": "ok"}) + "\r\n")
 

@@ -8,7 +8,8 @@ description: Write, install and debug apps on a wedgie (Raspberry Pi Pico + Wave
 A wedgie is a pocket computer made from three off-the-shelf parts: a Raspberry Pi Pico (RP2040 or
 RP2350), a Waveshare Pico-LCD-1.3 hat (240x240 screen, 5-way joystick, A/B/X/Y), and a secure chip
 (ATECC608 or Infineon Trust M) wedged between the boards on I2C. It runs MicroPython plus wedgie
-firmware: a boot logo, a launcher menu of apps, and a USB protocol. Everything is MIT: https://wedgie.dev
+firmware: a boot logo, one app it boots straight into, saves that outlast apps, and a USB protocol.
+Everything is MIT: https://wedgie.dev
 
 ## Why "wedgie" (read this, it explains the build)
 
@@ -116,36 +117,38 @@ Get the host tool (one file; needs `pip install pyserial`):
     curl -O https://wedgie.dev/wedgie.py
 
     python3 wedgie.py list                 every wedgie on USB: port, ID, firmware
-    python3 wedgie.py update               install/update wedgie firmware (only changed files; cartridges stay)
+    python3 wedgie.py update               install/update wedgie firmware (only changed files; its app and saves stay)
     python3 wedgie.py hello                what it is and runs (JSON)
     python3 wedgie.py shot out.png         the real screen as a 240x240 PNG. READ IT to see what you drew.
     python3 wedgie.py press A              press a button (A B X Y up down left right press) [ms]
-    python3 wedgie.py launch myapp         open an app;  home  goes back to the launcher
-    python3 wedgie.py run app.py           run a file once (streams output; Ctrl-C stops)
-    python3 wedgie.py install app.py --name "My app"    save it and add it to the launcher
-    python3 wedgie.py uninstall myapp
-    python3 wedgie.py carts                the cartridges on wedgie.dev, and which are on it
-    python3 wedgie.py cart add usbwallet   put a cartridge on it (or update it);  cart remove <mod>
-    python3 wedgie.py apps | ls
+    python3 wedgie.py run app.py           run a file once (streams output; Ctrl-C stops), then back to its app
+    python3 wedgie.py install app.py --name "My app"    make your file the app it runs (it restarts into it)
+    python3 wedgie.py apps                 the apps on wedgie.dev, and which one it runs
+    python3 wedgie.py use usbwallet        make that the app it runs (the old one comes off; saves stay)
+    python3 wedgie.py off                  take its app off
+    python3 wedgie.py ls                   every file, saves included
+    python3 wedgie.py saves [backup f.json | restore f.json]
 
 `--port /dev/cu.usbmodemXXXX` or `--id A1B2C3` picks one when several are plugged in. Only one program
 can hold the port: if wedgie.py says busy, the wedgie.dev tab (that wedgie's page) or mpremote has it.
-`mpremote` works too (`mpremote cp app.py :app.py`, `mpremote repl`); Ctrl-C stops the launcher.
+`mpremote` works too (`mpremote cp app.py :app.py`, `mpremote repl`); Ctrl-C stops its app.
 
 ## The loop
 
 1. Write `myapp.py` (template below).
-2. `python3 wedgie.py install myapp.py --name "My app"` then `python3 wedgie.py launch myapp`.
+2. `python3 wedgie.py install myapp.py --name "My app"`: it restarts into it.
 3. `python3 wedgie.py shot s.png` and read the PNG. `python3 wedgie.py press A` (and others) to drive it,
    shot again. Text is the 8x8 font: check it is readable and inside the 240x240 edges.
-4. If it crashed: `python3 wedgie.py run myapp.py` shows the traceback. A launcher error screen also
-   shows the message on the device.
+4. If it crashed: `python3 wedgie.py run myapp.py` shows the traceback. The wedgie's own screen also
+   shows the message (A tries again).
 5. Iterate. The person can also see and click their wedgie at https://wedgie.dev (Chrome/Edge).
 
 ## An app
 
-One module that starts itself when imported, draws with `lcd`, reads `Keys`, ticks on a `Timer`
-(so USB stays responsive), quits on X, and offers `stop()`. The launcher imports it; X returns home.
+A wedgie runs one app. It boots straight into it and the app gets every button: there is no menu and
+no button that leaves it (to run something else, pick it at wedgie.dev/connect or `wedgie.py use`).
+An app is one module that starts itself when imported, draws with `lcd`, reads `Keys`, ticks on a
+`Timer` (so USB stays responsive), and offers `stop()` (Ctrl-C and the site call it).
 
 ```python
 from machine import Timer
@@ -160,8 +163,6 @@ timer = None
 def tick(_):
     global x, dx
     for k in keys.pressed():          # names that went down since the last call
-        if k == "X":
-            return stop()
         if k == "A":
             dx = -dx
     x += dx
@@ -182,9 +183,29 @@ def stop():
 start()
 ```
 
-A game can use a `while` loop with `time.sleep_ms()` instead, if it polls X and returns. Register
-it with an entry so the launcher calls it: in apps.json `{"mod": "game", "name": "Game", "entry": "run"}`
-(`wedgie.py install` registers timer-style apps; add `entry` by hand for loop-style ones).
+A game can use a `while` loop with `time.sleep_ms()` instead: give it an entry the firmware calls, in
+apps.json `{"mod": "game", "name": "Game", "entry": "run"}` (`wedgie.py install` writes timer-style
+apps; add `entry` by hand for loop-style ones). The firmware still answers USB while it loops. If the
+entry returns, the screen says it ended and A starts it again. An app that talks on USB itself (the
+Wallet) says `"usb": true`, and the firmware leaves stdin to it.
+
+### Saves
+
+`import save` keeps what a game needs between plug-ins, in its own folder (`/saves/<app>/`, picked by
+the firmware, so games never see each other's). Switching apps, updating the firmware and
+wedgie.dev/format (which backs them up and puts them back) leave saves alone.
+
+```python
+import save
+save.store("best", {"score": 120})      # anything json can write; bytes are kept as they are
+best = save.load("best", {"score": 0})  # the default when there is none yet
+save.delete("best");  save.names()
+```
+
+No size limit per game, but a write that would leave under 32 KB free raises OSError (so the firmware
+can always boot and the site can always switch apps). Split a big save into several names: the
+older Pico has ~100 KB of RAM for a game. A write goes to a temp file and is renamed into place, so a
+pulled plug keeps the last good save. Save at checkpoints, not every frame (flash wears).
 
 ## The hardware, from Python
 
@@ -195,7 +216,7 @@ it with an entry so the launcher calls it: in apps.json `{"mod": "game", "name":
   RGB565); ready-made `BLACK WHITE RED GREEN BLUE YELLOW GREY DARK`.
 - `lcd.Keys()`: `pressed()` -> list of key names since the last call; `held(k)`. Names:
   `A B X Y up down left right press`. Layout seen from the screen: joystick left, A B X Y down the right
-  edge (A top, green cap; Y bottom, red cap). Convention: A = yes, Y = no/back, X = quit.
+  edge (A top, green cap; Y bottom, red cap). Convention: A = yes, Y = no/back. All nine are the app's.
   `wedgie.py press` reaches every Keys() the way a finger would (apps reading Pins directly won't see it).
 - Pins, if you need them: screen SPI1 DC=8 CS=9 SCK=10 MOSI=11 RST=12 BL=13; buttons (active low,
   pull-up) A=15 B=17 X=19 Y=21 up=2 down=18 left=16 right=20 press=3. Free GPIOs: 0 1 6 7 14 22 26 27 28.
@@ -211,44 +232,46 @@ it with an entry so the launcher calls it: in apps.json `{"mod": "game", "name":
 - MicroPython, not CPython: small stdlib (`math random struct json time array binascii hashlib`),
   `time.ticks_ms()/ticks_diff()/sleep_ms()`, no real clock, no typing. WiFi only on W boards.
 
-## Firmware and cartridges
+## Firmware and apps
 
-The firmware is the core: boot logo, the WEDGIE USB drive, the launcher, the screen/button drivers
-(`lcd.py`) and the chip drivers (`atecc.py`, `trustm.py`). Apps are **cartridges**, put on and taken
-off one at a time (wedgie.dev/connect, or `wedgie.py cart add|remove <mod>`); a fresh wedgie's
-launcher is empty. The catalog is https://wedgie.dev/fw/manifest.json: `core` (the firmware's files),
-`carts` (each with `mod`, `name`, `files` it needs, and `v`, a hash of those files). A file two carts
-share (p256.py) goes on once and comes off with the last cart that needs it.
+The firmware is the core: boot logo, the WEDGIE USB drive, the slot that runs the app (`slot.py`),
+saves (`save.py`), the screen/button drivers (`lcd.py`) and the chip drivers (`atecc.py`,
+`trustm.py`). Apps come as **cartridges** from the catalog, https://wedgie.dev/fw/manifest.json:
+`core` (the firmware's files), `carts` (each with `mod`, `name`, `files` it needs, `entry`?, `usb`?,
+and `v`, a hash of those files). A wedgie holds one: picking another takes the old one's files off
+(a file both need, like p256.py, stays) and puts the new one's on. A fresh wedgie runs nothing and
+says so ("no software") until one is picked.
 
-The wedgie's `apps.json` is its own list of what's in its launcher: `{"mod", "name", "entry"?,
-"about"?, "v"}` per cart (the `v` it went on at; a different `v` in the manifest = update ready),
-plus apps you saved yourself (`wedgie.py install`), which updates and cart changes leave alone.
+The wedgie's `apps.json` names its app: `[{"mod", "name", "entry"?, "usb"?, "about"?, "v"}]` (the `v`
+it went on at; a different `v` in the manifest = update ready), or your own app (`wedgie.py install`).
+Firmware 0.1.x had a menu and kept several; updating to 0.2 keeps the first and takes the rest off.
 
-Cartridges now: `hello` (bouncing box, the template), `keytest` (buttons), `demo` (balls/cube/plasma
-speed test), `mock` (nine wallet screens), `wire_demo` (clear-signs a signed transaction request),
+Apps now: `hello` (bouncing box, the template), `keytest` (buttons), `demo` (balls/cube/plasma speed
+test), `mock` (nine wallet screens), `wire_demo` (clear-signs a signed transaction request),
 `battery` (Waveshare Pico-UPS-B hat), `usbwallet` (the USB hardware wallet; needs the chip). Source:
 /fw/<file> or https://github.com/clawdbotatg/wedgie-dev/tree/main/firmware (`carts.json` is the
-catalog). Read `hello.py` and `lcd.py` first. A new cartridge = its files in firmware/ + an entry in
+catalog). Read `hello.py` and `lcd.py` first. A new app = its files in firmware/ + an entry in
 firmware/carts.json (name, files, label color, 12x12 pixel icon); push and it's on the site.
 
 ## The USB protocol (what wedgie.py speaks)
 
-The launcher owns the USB serial port (vendor 0x2e8a, 115200) and answers one JSON line per request,
-without interrupting anything:
+While its app runs, the firmware (`slot.py`) answers one JSON line per request on the USB serial port
+(vendor 0x2e8a, 115200), without interrupting anything:
 
-    {"id":1,"type":"hello"}              -> {"id":1,"type":"hello","fw":"wedgie-0.1.0","uid":...,"board":...,"apps":[...],"running":...}
+    {"id":1,"type":"hello"}              -> {"id":1,"type":"hello","fw":"wedgie-0.2.0","slot":1,"uid":...,"board":...,"carts":[{mod,v}],"running":...,"free":...}
     {"id":2,"type":"shot"}               -> {"id":2,"type":"shot","i":0,"n":38,"fmt":"rgb565be","data":"<base64>"} x n
     {"id":3,"type":"press","key":"A"}    -> {"id":3,"type":"ok"}
-    {"id":4,"type":"launch","app":"hello"}  /  {"id":5,"type":"home"}  /  {"id":6,"type":"reboot"}
-    {"id":7,"type":"chip"}               -> the chip proven working (0.1.4+): ATECC608 hashes random bytes,
+    {"id":4,"type":"chip"}               -> the chip proven working: ATECC608 hashes random bytes,
                                             Trust M signs them with its factory key; check it yourself
-    {"id":8,"type":"apps"}               -> re-read apps.json (after you changed it)
+    {"id":5,"type":"ls","path":"/saves"} -> {"type":"ls","files":[[path, bytes], ...],"free":N}  (folders end in /)
+    {"id":6,"type":"get","path":"/saves/hello/best.json"} -> {"type":"file","i":0,"n":N,"size":S,"data":"<base64>"} x n
+    {"id":7,"type":"rm","path":"..."}    -> {"type":"ok","free":N}   (a folder goes with everything in it)
+    {"id":8,"type":"stop"}  /  {"id":9,"type":"reboot"}
 
-hello (0.1.4+) also has `carts` ([{mod, v}]), `free` (bytes free on flash) and `running` (the app on
-screen, null = the launcher). Lines that don't start with `{` are logs (an app's print()). Ctrl-C
-(0x03) stops the launcher and drops to the MicroPython REPL; raw REPL (Ctrl-A) is how files get
-written. `exec(open("main.py").read())` starts the launcher again. Apps that own the CPU (Demo, the
-Wallet) don't answer the launcher's JSON while they run; the Wallet speaks its own protocol.
+`running` is the app on screen (null: none). Lines that don't start with `{` are logs (an app's
+print()). Ctrl-C (0x03) stops the app and drops to the MicroPython REPL; raw REPL (Ctrl-A) is how
+files get written. `exec(open("main.py").read())` starts the app again. An app with `"usb": true`
+(the Wallet) has the port to itself and speaks its own protocol; Ctrl-C still stops it.
 
 ### Plugging in, and resets (read this before scripting a wedgie)
 
@@ -257,11 +280,11 @@ which disconnects and reconnects USB. So a wedgie you just plugged in **shows up
 up again** — as a new serial port, same board ID. Wait ~2 s after a plug-in before opening the port,
 retry an open that fails, and find a wedgie by its ID (`--id`), never by remembering the port.
 
-**Don't soft-reset a wedgie to get back to the launcher** (Ctrl-D, `machine.soft_reset()`,
+**Don't soft-reset a wedgie just to restart its app** (Ctrl-D, `machine.soft_reset()`,
 `mpremote reset`): run main.py instead, as above. 0.1.3+ marks soft resets so boot.py doesn't add the
 drive again, but the first soft reset after updating from older firmware does (the port drops), and a
 tool that reconnects and resets again loops forever (it happened: the site did it). Soft-reset only to
-boot new firmware, then expect the port to maybe drop. A hard reset (`machine.reset()`, the `reboot`
+boot new firmware or a newly picked app (a fresh heap for it), then expect the port to maybe drop. A hard reset (`machine.reset()`, the `reboot`
 request, unplugging) always re-adds the drive. Holding Y while plugging in skips the drive for that
 boot (for debugging; nobody needs it day to day).
 

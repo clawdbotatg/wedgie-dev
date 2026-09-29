@@ -1,7 +1,7 @@
 // Publishes firmware/ to public/fw/ with a manifest the site (installer, virtual wedgie) and agents
 // read. Run by vite at dev start and build.
 //   { version, files: [{ name, size, sha256 }], core: [names], carts: [cart] }
-// core = the firmware proper (boot logo, WEDGIE drive, launcher, screen/button and chip drivers);
+// core = the firmware proper (boot logo, WEDGIE drive, the slot that runs the app, saves, screen/button and chip drivers);
 // every other file belongs to one or more cartridges (firmware/carts.json: what each app needs).
 // A cart's v is a hash of its files' hashes: the site compares it with the v a wedgie recorded in its
 // apps.json when that cart went on, so there is no version number to forget to bump. A file two carts

@@ -119,7 +119,8 @@ export async function mount(el: HTMLElement, opts: VirtualWedgieOptions): Promis
     }
   }
 
-  function reboot(): Promise<void> {
+  function reboot(app?: string): Promise<void> {
+    if (app !== undefined) opts = { ...opts, app };
     if (destroyed) return Promise.reject(new Error("destroyed"));
     worker?.terminate();
     for (const w of waiting.values()) w.reject(new Error("rebooted"));
@@ -135,7 +136,7 @@ export async function mount(el: HTMLElement, opts: VirtualWedgieOptions): Promis
     worker.onmessage = onMsg;
     worker.onerror = (e) => { for (const cb of outCbs) cb("virtual wedgie worker: " + e.message); booted?.reject(new Error(e.message)); booted = null; };
     const p = new Promise<void>((resolve, reject) => { booted = { resolve, reject }; });
-    worker.postMessage({ type: "boot", keys: keyBuf, serial: serialSab, fwBase: opts.fwBase || "/fw/", uid: uidBytes(opts.uid) });
+    worker.postMessage({ type: "boot", keys: keyBuf, serial: serialSab, fwBase: opts.fwBase || "/fw/", app: opts.app ?? "hello", uid: uidBytes(opts.uid) });
     return p;
   }
 

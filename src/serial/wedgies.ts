@@ -25,8 +25,9 @@ export type Wedgie = {
   kind?: "wedgie" | "wallet" | "micropython";
   version?: string;      // wedgie firmware version
   apps?: string[];
-  carts?: { mod: string; v?: string }[];   // 0.1.4+: what's in its launcher, with the version each went on at
-  running?: string | null; // the app on its screen (null: the launcher)
+  carts?: { mod: string; v?: string }[];   // 0.1.4+: its apps.json, with the version each went on at (0.2+: its one app)
+  running?: string | null; // the app on its screen (null: none, or 0.1.x's menu)
+  slot?: boolean;        // 0.2+: runs one app, no menu (slot.py)
   free?: number;         // bytes free on its flash
   chip?: any;            // what answered on I2C: { type, serial? }
   proof?: ChipCheck & { state: "checking" | "done" | "unknown" };   // the chip proven working (once per plug-in)
@@ -50,7 +51,7 @@ try { armedNow = localStorage.getItem(ARM) === "1"; } catch {}
 const onArm: (() => void)[] = [];
 /** This browser has asked for a wedgie here before, so looking at its serial ports prompts nothing new. */
 export const armed = () => armedNow;
-/** Start looking at serial ports: a deliberate act (a Connect tap, the /test bench). */
+/** Start looking at serial ports: a deliberate act (a Connect tap, the /format bench). */
 export function arm() {
   if (armedNow) return;
   armedNow = true;
@@ -172,8 +173,8 @@ function talk(w: Wedgie) {
         w.kind = "micropython";
         return;
       }
-      // Wedgie firmware busy in an app that owns the CPU (Demo, Wallet): we stopped it, and main.py
-      // (just run by leave) starts the launcher, which can now answer.
+      // Wedgie firmware busy in an app that owns the CPU and USB (the Wallet): we stopped it, and main.py
+      // (just run by leave) starts it again; the slot (or 0.1.x's menu) may answer now.
       for (let i = 0; i < 8 && !h; i++) h = await r.hello(700);
       if (!h) { w.kind = "wedgie"; w.version = got.wedgie; w.firmware = `wedgie ${got.wedgie}`; w.running = null; return; }
     }
@@ -185,6 +186,7 @@ function talk(w: Wedgie) {
     w.carts = h.carts;
     w.free = h.free ?? undefined;
     w.running = w.kind === "wallet" ? "usbwallet" : h.running ?? null;
+    w.slot = !!h.slot;
     w.uid = h.uid || h.serial;
     w.micropython = h.micropython;
     w.cpu = h.cpu;
@@ -196,7 +198,7 @@ function talk(w: Wedgie) {
   });
 }
 
-/** The chip proven working, once per plug-in, without stopping anything: firmware 0.1.4's launcher
+/** The chip proven working, once per plug-in, without stopping anything: firmware 0.1.4+
  *  does the chip work on request and the page checks the answer (chipcheck.ts). */
 async function prove(w: Wedgie, r: Repl) {
   w.proof = { state: "checking", pass: false, detail: "checking the chip", facts: [] };

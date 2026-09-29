@@ -100,7 +100,7 @@ export class Repl {
   private nextId = 100;
   private pending = new Map<number, { parts: any[]; res: (v: any) => void; rej: (e: Error) => void; t: number }>();
 
-  /** One JSON request to the wedgie launcher (menu.py). Shots arrive in parts; they're joined. */
+  /** One JSON request to the wedgie firmware (slot.py). Shots and files arrive in parts; they're joined. */
   request(msg: Record<string, unknown>, ms = 5000): Promise<any> {
     const id = this.nextId++;
     return new Promise((res, rej) => {
@@ -113,10 +113,13 @@ export class Repl {
   private json(v: any) {
     const p = v && typeof v.id === "number" ? this.pending.get(v.id) : undefined;
     if (!p) { this.onJson?.(v); return; }
-    if (v.type === "shot") {
-      p.parts[v.i] = v.data;
+    if (v.type === "shot" || v.type === "file") {
+      p.parts[v.i] = v.type === "file" ? atob(v.data) : v.data;
+      clearTimeout(p.t);                 // a big file takes a while: each part buys it time
+      p.t = window.setTimeout(() => { this.pending.delete(v.id); p.rej(new Error("wedgie did not answer")); }, 5000);
       if (p.parts.filter((x) => x !== undefined).length < v.n) return;
-      v = { id: v.id, type: "shot", w: v.w, h: v.h, fmt: v.fmt, data: p.parts.join("") };
+      v = v.type === "shot" ? { id: v.id, type: "shot", w: v.w, h: v.h, fmt: v.fmt, data: p.parts.join("") }
+        : { id: v.id, type: "file", size: v.size, bytes: Uint8Array.from(p.parts.join(""), (c: string) => c.charCodeAt(0)) };
     }
     clearTimeout(p.t);
     this.pending.delete(v.id);
@@ -143,7 +146,7 @@ export class Repl {
   // 0.1.3+ skips that on a soft reset, but 0.1.1-0.1.2 didn't, and neither does the first soft reset
   // after updating from them (firmware/boot.py). A soft reset is only for boards without wedgie
   // firmware, and for booting a new firmware (then the port may drop; wedgies.ts finds it by its ID).
-  // A launcher app's Timer survives Ctrl-C: close it first (install.ts takeOver).
+  // On 0.1.x a launcher app's Timer survived Ctrl-C: install.ts takeOver asks it to stop first.
   async enter(opts: { reset?: boolean } = {}) {
     await this.write("\r\x03\x03");
     await sleep(150);
@@ -172,8 +175,8 @@ export class Repl {
   interrupt() { return this.write("\x03"); }
 
   /** Leave raw mode and soft reset: the wedgie's main.py runs again. */
-  // reset: false goes back to the launcher by running main.py again, with no soft reset (so the port
-  // stays up); use it after tests. A reset is needed to boot new firmware after an install.
+  // reset: false starts the wedgie's app again by running main.py, with no soft reset (so the port
+  // stays up); use it after tests. A reset boots new firmware, or a newly picked app, with a fresh heap.
   async leave(opts: { reset?: boolean } = {}) {
     try {
       await this.write("\x02"); await sleep(50);

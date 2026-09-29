@@ -1,6 +1,6 @@
 // /connect: every wedgie plugged into this computer, one row each: its hardware (chip proven working?),
 // its firmware (update ready?), its software (what it has, what it plays). Tap a row for that wedgie's own page,
-// /connect/<ID> (pages/wedgie.ts): hardware, firmware update, cartridges. Both are one page app, so
+// /connect/<ID> (pages/wedgie.ts): hardware, firmware update, its app, saves. Both are one page app, so
 // going between them never reloads (a reload would close every port and identify every wedgie again).
 import { esc } from "../ui/device";
 import { place3D, idScreen } from "../ui/place3d";

@@ -1,14 +1,14 @@
 // /update: the update bench. Plug wedgies in, as many at once as there are ports; each gets the latest
-// firmware core by itself, and any cartridge on it that's out of date. Its cartridges stay. A card per
+// firmware core by itself, and its app if that's out of date. Its app and its saves stay. A card per
 // wedgie here, and a bar on its own screen; when it has restarted on the new firmware its card goes
-// green. Hands-off once the computer has the test-bench profile (same as /test).
+// green. Hands-off once the computer has the test-bench profile (same as /format).
 //
 // USB and resets: the update's one soft reset boots the new core. A wedgie that powered up on firmware
 // older than 0.1.3 then adds its WEDGIE drive, so its port drops and comes back as a new one; 0.1.3+
 // keeps the port. Either way it's matched by its board ID and re-identified (firmware/boot.py).
 import * as W from "../serial/wedgies";
-import { installCore, installCart, firmwareManifest, type Manifest } from "../serial/install";
-import { benchSetup } from "./test";
+import { installCore, useApp, firmwareManifest, type Manifest } from "../serial/install";
+import { benchSetup } from "./format";
 import * as F from "../ui/facts";
 
 type Job = { uid: string; key: number; state: "waiting" | "updating" | "restarting" | "done" | "fresh" | "fail"; from: string; board: string;
@@ -37,7 +37,7 @@ export function update(main: HTMLElement) {
 
   firmwareManifest().then((x) => {
     m = x;
-    $("u-fine").textContent = `Everything plugged in here gets wedgie ${x.version}. The cartridges on it stay, and out-of-date ones are updated.`;
+    $("u-fine").textContent = `Everything plugged in here gets wedgie ${x.version}. Its app and saves stay; an out-of-date app is updated.`;
     tick();
   });
 
@@ -69,7 +69,7 @@ export function update(main: HTMLElement) {
     try {
       await W.withRepl(w, async (r) => {
         const res = await installCore(r, (p, what) => { j.p = p * (0.9); j.what = what; paint(); }, { screen: true });
-        for (const c of res.outdated) await installCart(r, c, (p) => { j.p = 0.9 + 0.1 * p; paint(); }, { launcher: false });
+        for (const c of res.outdated) await useApp(r, c, (p) => { j.p = 0.9 + 0.1 * p; paint(); }, { launcher: false });
         if (res.written || w.kind !== "wedgie") {
           await r.leave();          // the one soft reset: boots the new core (the port may drop and come back)
           restarting = true;
@@ -105,7 +105,7 @@ export function update(main: HTMLElement) {
       if (w.state === "error") {
         const j = w.uid ? jobs.get(w.uid) : undefined;
         if (!jobs.has("key" + w.key) && !j) jobs.set("key" + w.key, { uid: "key" + w.key, key: w.key, state: "fail", from: "", board: "", p: 0, what: "", at: Date.now(),
-          error: /No MicroPython/.test(w.error || "") ? "No MicroPython on it: set it up at wedgie.dev/test first" : w.error });
+          error: /No MicroPython/.test(w.error || "") ? "No MicroPython on it: set it up at wedgie.dev/format first" : w.error });
         continue;
       }
       if (w.state !== "ready" || !w.uid || running.has(w.key)) continue;

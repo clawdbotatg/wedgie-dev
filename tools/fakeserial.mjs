@@ -1,11 +1,11 @@
 // Drives /connect with fake WebSerial boards so the USB paths run without hardware. Real clicks.
 //  - a bare MicroPython board (raw REPL; a little filesystem, so the installer's hash / write / verify /
-//    rename steps really run), which becomes a wedgie 0.1.4 after a firmware install;
-//  - a wedgie on 0.1.3: no cartridges protocol, two apps with stale files; its update keeps them;
-//  - a wedgie on 0.1.4: answers hello / shot / launch / press / home / apps / chip (a real SHA-256 the
-//    page checks) as JSON lines, and takes cartridges in and out through the raw REPL.
+//    rename steps really run), which becomes a wedgie 0.2 after a firmware install;
+//  - a wedgie on 0.1.3 (the menu, two apps); its update keeps the first app, drops the other and the menu;
+//  - a wedgie on 0.2 with no app yet and a save: picks an app, switches, takes it off; its saves are
+//    listed, downloaded, deleted and put back; the Developer file list shows, opens, deletes, uploads.
 // Soft resets drop the port only where boot.py would add the WEDGIE drive (st.mark below): the bare board's
-// first boot on the new firmware does, the 0.1.3 wedgie's doesn't. The page must find it again either way.
+// first boot on the new firmware does, the others don't. The page must find it again either way.
 // Serve dist first (npx vite preview), then: node tools/fakeserial.mjs [url] [outdir] [phone]
 import { chromium } from "playwright-core";
 import { readdirSync } from "node:fs";
@@ -24,7 +24,8 @@ await ctx.addInitScript(fakeWedgies, [
   { uid: "e66138935f5a2c29", machine: "Raspberry Pi Pico 2 W with RP2350", files: { "boot.py": 1 } },
   { uid: "de6474e3a3152a2f", machine: "Raspberry Pi Pico with RP2040", files: { "main.py": 1, "menu.py": 1, "wedgiedrive.py": 1, "wedgie.py": 'VERSION = "0.1.3"',
     "apps.json": JSON.stringify([{ mod: "hello", name: "Hello" }, { mod: "keytest", name: "Buttons" }]), "hello.py": 1, "keytest.py": 1 } },
-  { uid: "aa11bb22cc3d9f01", machine: "Raspberry Pi Pico 2 W with RP2350", files: { "main.py": 1, "menu.py": 1, "wedgie.py": 'VERSION = "0.1.4"' } },
+  { uid: "aa11bb22cc3d9f01", machine: "Raspberry Pi Pico 2 W with RP2350", files: { "main.py": 1, "slot.py": 1, "wedgiedrive.py": 1, "wedgie.py": 'VERSION = "0.2.0"',
+    "apps.json": "[]", "/saves/hello/best.json": '{"score": 120}', "junk.txt": "delete me" } },
 ]);
 
 let bad = 0;
@@ -42,89 +43,112 @@ const wait = (fn, arg, ms, what) => waitFor(fn, arg, ms, what).then((ok) => { if
 await page.goto(base + "/connect");
 await page.waitForFunction(() => !document.getElementById("wl"));
 
-// ---- the list: every wedgie, its hardware / firmware / what it plays, in plain words --------------------
+// ---- the list: every wedgie, its hardware / firmware / what it runs, in plain words ---------------------
 await wait(() => document.querySelectorAll(".wrow[data-id]").length === 3 && !document.querySelector(".light.wait"), null, 25000, "three rows, settled");
 const [BARE, OLD, NEW] = ["5A2C29", "152A2F", "3D9F01"];
 for (const id of [BARE, OLD, NEW]) console.log("·", id, "→", await rowText(id));
-check(/Hardware.*ATECC608 ✓ working/.test(await rowText(NEW)), "0.1.4: chip proven working on the list");
-check(await st(2, "chips") === 1 && await st(2, "interrupts") === 0, "0.1.4: the chip proof ran once, over JSON, with nothing stopped");
-check(/update ready: 0\.1\.4/.test(await rowText(OLD)), "0.1.3: update ready on the list");
+check(/Hardware.*ATECC608 ✓ working/.test(await rowText(NEW)), "0.2: chip proven working on the list");
+check(await st(2, "chips") === 1 && await st(2, "interrupts") === 0, "0.2: the chip proof ran once, over JSON, with nothing stopped");
+check(/update ready: 0\.2\.0/.test(await rowText(OLD)), "0.1.3: update ready on the list");
 check(/Firmware\s*none yet install/.test(await rowText(BARE)), "bare board: no firmware, install on the list");
-check(/the menu · no cartridges yet/.test(await rowText(NEW)), "0.1.4: playing: the menu, no cartridges");
+check(/Software\s*nothing yet pick one/.test(await rowText(NEW)), "0.2 with no app: nothing yet, pick one");
 await page.screenshot({ path: `${out}/connect-list${phone ? "-phone" : ""}.png` });
 
 // ---- one wedgie: tap its row, its page at /connect/<ID> -------------------------------------------------
 await page.click(`.wrow[data-id="${NEW}"]`);
-await wait((id) => location.pathname === `/connect/${id}` && document.querySelectorAll("#d-more .cart-slot").length === 7, NEW, 10000, "detail page with 7 carts to get");
+await wait((id) => location.pathname === `/connect/${id}` && document.querySelectorAll("#d-shelf .cart-slot").length === 7, NEW, 10000, "detail page with 7 apps to pick");
 await wait(() => window.__ports[2]._st.shots >= 2, null, 10000, "live screen mirrored");
 check(/ATECC608 working/.test(await page.textContent("#d-hw")), "detail: hardware says the chip works");
 check(/Up to date/.test(await page.textContent("#d-fw")), "detail: firmware up to date");
+await wait(() => /Hello/.test(document.querySelector("#d-saves")?.textContent || ""), null, 10000, "its saves listed");
+check(/1 file · 1 KB/.test(await page.textContent("#d-saves")) && (await st(2, "interrupts")) === 0, "saves: Hello's, read live (nothing stopped)");
 await page.screenshot({ path: `${out}/connect-wedgie${phone ? "-phone" : ""}.png`, fullPage: true });
 
-// tap a cart it doesn't have: it goes in (files + apps.json, the wedgie's screen says so), back to the menu
-const onShelf = (mod) => `document.querySelector('#d-on .cart-slot[data-mod="${mod}"] .cart:not(:disabled)')`;
-await page.click('#d-more .cart-slot[data-mod="hello"] .cart');
-await wait(new Function(`return ${onShelf("hello")}`), null, 20000, "hello inserted, on the shelf");
+// pick one: it goes on (the wedgie's screen says so), the wedgie restarts into it, the page finds it again
+const shelfOn = (mod) => `document.querySelector('#d-shelf .cart-slot[data-mod="${mod}"] .cart.playing') && /on it|running/.test(document.querySelector('#d-shelf .cart-slot[data-mod="${mod}"] .cart-state').textContent) && document.querySelector('#d-shelf .cart-slot:not([data-mod="${mod}"]) .cart:not(:disabled)')`;
+const pickApp = async (mod, what) => { await page.click(`#d-shelf .cart-slot[data-mod="${mod}"] .cart`); return wait(new Function(`return ${shelfOn(mod)}`), null, 30000, what); };
+await pickApp("hello", "Hello on, running");
 check((await files(2)).includes("hello.py"), "hello.py is on it");
 const a1 = await appsOn(2);
-check(a1?.length === 1 && a1[0].mod === "hello" && /^[0-9a-f]{12}$/.test(a1[0].v), "apps.json lists hello with its version: " + JSON.stringify(a1));
-check((await st(2, "inserting")) >= 2, "its screen showed the cart going in");
-check((await st(2, "resets")) === 0, "no soft reset (the port stays)");
-check(!(await st(2, "launched")), "installing doesn't play it");
+check(a1?.length === 1 && a1[0].mod === "hello" && /^[0-9a-f]{12}$/.test(a1[0].v), "apps.json: just hello, with its version: " + JSON.stringify(a1));
+check((await st(2, "inserting")) >= 2, "its screen showed it going on");
+check((await st(2, "resets")) === 1 && (await st(2, "drops")) === 0, "one soft reset into it; the port stayed");
 
-// more in a row, one with shared files: wire_demo (cbor, rlp, p256), then the wallet (shares p256)
-await page.click('#d-more .cart-slot[data-mod="wire_demo"] .cart');
-await wait(new Function(`return ${onShelf("wire_demo")}`), null, 30000, "wire_demo in");
-await page.click('#d-more .cart-slot[data-mod="usbwallet"] .cart');
-await wait(new Function(`return ${onShelf("usbwallet")}`), null, 30000, "wallet in");
-check(JSON.stringify((await appsOn(2)).map((a) => a.mod)) === '["hello","wire_demo","usbwallet"]', "three carts in a row, catalog order");
-check(!(await st(2, "launched")), "none of them started playing");
+// switch: the old app's files come off; a shared file stays only while something needs it
+await pickApp("wire_demo", "Clear sign on");
+let f = await files(2);
+check(!f.includes("hello.py") && f.includes("wire_demo.py") && f.includes("p256.py"), "switched: hello.py gone, wire_demo on");
+await pickApp("usbwallet", "Wallet on");
+f = await files(2);
+check(!f.includes("wire_demo.py") && !f.includes("cbor.py") && f.includes("p256.py") && f.includes("usbwallet.py"), "switched again: its own files gone, shared p256.py kept");
+check(JSON.stringify((await appsOn(2)).map((a) => [a.mod, a.usb])) === '[["usbwallet",true]]', "apps.json: the Wallet, which has USB to itself");
+check((await files(2)).includes("/saves/hello/best.json"), "switching apps never touched the saves");
 
-// play one it has: instant, nothing copied
-const writesBefore = await st(2, "interrupts");
-await page.click('#d-on .cart-slot[data-mod="hello"] .cart');
-await wait(() => window.__ports[2]._st.launched === "hello", null, 5000, "hello plays");
-await wait(() => document.querySelector('#d-on .cart-slot[data-mod="hello"] .cart.playing'), null, 5000, "hello shown playing");
-check(!(await page.isHidden('#d-on .cart-slot[data-mod="hello"] .cart-out')), "a playing cart can still be removed");
-check((await st(2, "interrupts")) === writesBefore, "a cart it has plays without stopping anything");
+// take it off
+await page.click('#d-shelf .cart-slot[data-mod="usbwallet"] .cart-out');
+check(/Take Wallet off\?/.test(await page.textContent('#d-shelf .cart-slot[data-mod="usbwallet"] .cart-out')), "Take it off asks once");
+await page.click('#d-shelf .cart-slot[data-mod="usbwallet"] .cart-out');
+await wait(() => JSON.parse(new TextDecoder().decode(window.__ports[2]._st.files.get("apps.json"))).length === 0, null, 15000, "Wallet off");
+f = await files(2);
+check(!f.includes("usbwallet.py") && !f.includes("p256.py") && f.includes("slot.py"), "its files gone, the core stays");
+await wait(() => /Nothing on it yet/.test(document.querySelector("#d-carts-note").textContent), null, 10000, "the page: nothing on it");
 
-// take wire_demo out: its own files go, the one it shares with the wallet (p256) stays
-await page.click('#d-on .cart-slot[data-mod="wire_demo"] .cart-out');
-check(/Remove Clear sign\?/.test(await page.textContent('#d-on .cart-slot[data-mod="wire_demo"] .cart-out')), "Remove asks once");
-await page.click('#d-on .cart-slot[data-mod="wire_demo"] .cart-out');
-await wait(() => !JSON.parse(new TextDecoder().decode(window.__ports[2]._st.files.get("apps.json"))).some((a) => a.mod === "wire_demo"), null, 15000, "wire_demo out");
-const f2 = await files(2);
-check(!f2.includes("wire_demo.py") && !f2.includes("cbor.py") && !f2.includes("rlp.py") && f2.includes("p256.py") && f2.includes("usbwallet.py"), "its files gone, shared p256.py kept: " + f2.join(" "));
-await wait(() => document.querySelector('#d-more .cart-slot[data-mod="wire_demo"]'), null, 5000, "wire_demo back on Get more");
+// saves: download, delete, put back
+const dl = page.waitForEvent("download");
+await page.click('[data-sv-dl="hello"]');
+const bundlePath = `${out}/saves-bundle.json`;
+await (await dl).saveAs(bundlePath);
+const bundle = JSON.parse((await import("node:fs")).readFileSync(bundlePath, "utf8"));
+check(bundle["wedgie-saves"] === 1 && atob(bundle.files["/saves/hello/best.json"]) === '{"score": 120}', "saves download: a bundle with Hello's save");
+await page.click('[data-sv-rm="hello"]');
+check(/Delete them\?/.test(await page.textContent('[data-sv-rm="hello"]')), "Delete saves asks once");
+await page.click('[data-sv-rm="hello"]');
+await wait(() => ![...window.__ports[2]._st.files.keys()].some((k) => k.startsWith("/saves/hello")), null, 10000, "saves deleted");
+await wait(() => /No saves yet/.test(document.querySelector("#d-saves-note").textContent), null, 10000, "the page: no saves yet");
+await page.setInputFiles("#d-saves-in", bundlePath);
+await wait(() => window.__ports[2]._st.files.has("/saves/hello/best.json") && new TextDecoder().decode(window.__ports[2]._st.files.get("/saves/hello/best.json")) === '{"score": 120}', null, 15000, "saves put back");
+await wait(() => /1 save file put back/.test(document.querySelector("#d-saves-note").textContent), null, 10000, "the page says it put them back");
+
+// Developer: the files
+await page.click(".dev summary");
+await page.click('[data-fs="refresh"]');
+await wait(() => document.querySelector('[data-fs-open="/junk.txt"]') && document.querySelector('[data-fs-open="/saves/hello/best.json"]'), null, 10000, "file list, saves folder included");
+await page.click('[data-fs-open="/junk.txt"]');
+await wait(() => /delete me/.test(document.querySelector("#d-fs-view")?.textContent || ""), null, 10000, "a text file opens");
+await page.click('[data-fs-rm="/junk.txt"]');
+await page.click('[data-fs-rm="/junk.txt"]');
+await wait(() => !window.__ports[2]._st.files.has("junk.txt") && !document.querySelector('[data-fs-open="/junk.txt"]'), null, 10000, "a file deleted");
+await page.setInputFiles("#d-fs-in", { name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("hi from the page") });
+await wait(() => window.__ports[2]._st.files.has("/notes.txt") && document.querySelector('[data-fs-open="/notes.txt"]'), null, 15000, "a file uploaded");
 await page.focus(".wd-3d canvas.w3d").catch(() => {});
 await page.keyboard.press("a");
 await wait(() => window.__ports[2]._st.presses.includes("A"), null, 5000, "A on the 3D wedgie pressed the real A");
 await page.screenshot({ path: `${out}/connect-carts${phone ? "-phone" : ""}.png`, fullPage: true });
 
-// ---- back to the list (no reload), then the 0.1.3 wedgie: update keeps its apps ------------------------
+// ---- back to the list (no reload), then the 0.1.3 wedgie: its update keeps its first app ---------------
 await page.click(".back");
-await wait(() => location.pathname === "/connect" && document.querySelectorAll(".wrow[data-id]").length === 3, null, 5000, "back on the list");
-check(/Software\s*the menu · 2 cartridges/.test(await rowText(NEW)), "the list: back at its menu (a cart coming out restarts it), 2 cartridges");
+await wait(() => location.pathname === "/connect" && document.querySelectorAll(".wrow[data-id]").length === 3, null, 15000, "back on the list");
 await page.click(`.wrow[data-id="${OLD}"]`);
 await wait(() => document.querySelector("[data-fw]") && !document.querySelector("[data-fw]").disabled, null, 10000, "0.1.3 page, Update enabled");
-check(/Update the firmware/.test(await page.textContent("#d-carts-note")), "0.1.3: cartridges ask for the update");
+check(/Update the firmware/.test(await page.textContent("#d-carts-note")), "0.1.3: Software asks for the update");
 await page.click("[data-fw]");
-await wait((id) => /Up to date/.test(document.querySelector("#d-fw")?.textContent || "") && location.pathname === `/connect/${id}`, OLD, 120000, "0.1.3 → 0.1.4, came back by its ID");
+await wait((id) => /Up to date/.test(document.querySelector("#d-fw")?.textContent || "") && location.pathname === `/connect/${id}`, OLD, 120000, "0.1.3 → 0.2.0, came back by its ID");
 check((await st(1, "resets")) === 1 && (await st(1, "drops")) === 0, "one soft reset, at the end; its port stayed (0.1.3 marks soft resets)");
-const a3 = await appsOn(1);
-check(JSON.stringify(a3?.map((a) => a.mod)) === '["hello","keytest"]' && a3.every((a) => a.v), "its two apps kept, with versions: " + JSON.stringify(a3?.map((a) => a.mod)));
-await wait(() => document.querySelectorAll('#d-on .cart-state.soft').length === 2, null, 10000, "its old apps show as updates");
+const a3 = await appsOn(1), f3 = await files(1);
+check(JSON.stringify(a3?.map((a) => a.mod)) === '["hello"]' && a3[0].v, "its first app kept, with a version: " + JSON.stringify(a3?.map((a) => a.mod)));
+check(!f3.includes("keytest.py") && !f3.includes("menu.py") && f3.includes("slot.py"), "the other app and the menu gone, the slot on");
+await wait(() => /update/.test(document.querySelector('#d-shelf .cart-slot[data-mod="hello"] .cart-state')?.textContent || ""), null, 10000, "its old Hello shows as an update");
 check(await st(1, "chips") >= 1, "after the update the chip is proven too");
 
-// ---- the bare board: install the core, it comes back a wedgie with an empty launcher --------------------
+// ---- the bare board: install the core, it comes back a wedgie with no app yet ---------------------------
 await page.click(".back");
 await page.click(`.wrow[data-id="${BARE}"]`);
 await wait(() => document.querySelector("[data-fw]") && !document.querySelector("[data-fw]").disabled, null, 10000, "bare page, Install enabled");
 await page.click("[data-fw]");
 await wait(() => /Up to date/.test(document.querySelector("#d-fw")?.textContent || ""), null, 120000, "bare board installed");
 const f0 = await files(0);
-check(f0.includes("menu.py") && !f0.includes("hello.py") && !f0.includes("usbwallet.py"), "the core only, no carts: " + f0.length + " files");
-check(JSON.stringify(await appsOn(0)) === "[]", "an empty launcher");
+check(f0.includes("slot.py") && f0.includes("save.py") && !f0.includes("menu.py") && !f0.includes("hello.py"), "the core only, no apps: " + f0.length + " files");
+check(JSON.stringify(await appsOn(0)) === "[]", "no app yet");
 check((await st(0, "drops")) === 1, "its first boot added the WEDGIE drive (port dropped, came back, found by its ID)");
 check(errs.length === 0, errs.length ? "page errors: " + errs.join(" | ") : "no page errors");
 await browser.close();

@@ -1,5 +1,5 @@
 # Graphics speed test for the Pico + LCD hat. Four scenes, each prints its fps.
-# demo.run()          cycle scenes with A, quit with X
+# demo.run()          A next scene, X the one before; never returns (the wedgie runs one app)
 # demo.bench(4)       run each scene 4 s, print fps, exit
 import time, math
 import micropython
@@ -32,6 +32,8 @@ def _scene(name, step, seconds):
         if seconds and time.ticks_diff(now, t0) > seconds * 1000:
             return "time", fps
         if btn["X"].value() == 0:
+            while btn["X"].value() == 0:
+                pass
             return "quit", fps
         if btn["A"].value() == 0:
             while btn["A"].value() == 0:
@@ -118,6 +120,4 @@ def run():
         name, fn = SCENES[i % len(SCENES)]
         why, fps = _scene(name, fn, 0)
         print("%-8s %3d fps" % (name, fps))
-        if why == "quit":
-            return
-        i += 1
+        i += -1 if why == "quit" else 1

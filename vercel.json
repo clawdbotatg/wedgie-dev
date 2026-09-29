@@ -75,6 +75,10 @@
       "destination": "/index.html"
     },
     {
+      "source": "/format",
+      "destination": "/index.html"
+    },
+    {
       "source": "/test",
       "destination": "/index.html"
     },

@@ -17,6 +17,8 @@ export type WedgieKey = "A" | "B" | "X" | "Y" | "up" | "down" | "left" | "right"
 export interface VirtualWedgieOptions {
   /** Where the firmware manifest lives (default "/fw/", from tools/fw.mjs). */
   fwBase?: string;
+  /** The app it runs (a cartridge's mod, default "hello"; "" for none). The wedgie runs one app. */
+  app?: string;
   /** machine.unique_id() of this virtual board as hex (default a fixed id). */
   uid?: string;
   /** Focus the device after mounting so the keyboard drives it right away (default false). */
@@ -41,11 +43,12 @@ export interface VirtualWedgie {
   hold(key: WedgieKey | string, down: boolean): void;
   /** The screen as it is now: a 240x240 PNG data URL. */
   screenshotPNG(): string;
-  /** Power-cycle: a fresh interpreter, the flash reloaded from the manifest. Resolves when booted. */
-  reboot(): Promise<void>;
+  /** Power-cycle: a fresh interpreter, the flash reloaded from the manifest. Resolves when booted.
+   *  app: switch to another app first (what picking one at wedgie.dev does to a real wedgie). */
+  reboot(app?: string): Promise<void>;
   /** Run Python in __main__ (a REPL entry: an expression echoes its repr). Resolves with the output. */
   exec(code: string): Promise<string>;
-  /** Write to the board's USB stdin (the launcher answers JSON lines, see /skill.md). */
+  /** Write to the board's USB stdin (the slot answers JSON lines, see /skill.md). */
   write(text: string): void;
   /** Every line the board prints on USB. Returns an unsubscribe function. */
   onOutput(cb: (line: string) => void): () => void;

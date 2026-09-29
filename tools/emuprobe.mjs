@@ -1,7 +1,8 @@
 // The virtual wedgie end to end in headless Chromium: builds the site with its test page
 // (WEDGIE_EMU_TEST=1, into node_modules/.cache/emutest), serves it with `vite preview` (which sends
-// COOP/COEP), mounts the device, waits for the launcher, opens Hello with down + A, quits with X,
-// and checks the launcher is back; then the Wallet, Demo (a busy loop), exec, reboot, and the
+// COOP/COEP), mounts the device and checks it boots straight into its one app (Hello) and that X is
+// the app's own button; saves (save.py) round-trip in the app's own folder; the USB hello says the
+// slot runs it; then no app (the "no software yet" screen), the Wallet, Demo (a busy loop), and the
 // postMessage fallback without cross-origin isolation. Screenshots go to shots/emu-*.png.
 //   node tools/emuprobe.mjs [--no-build | --dev] [outdir]      (--dev: the `vite` dev server instead)
 import { chromium } from "playwright-core";
@@ -51,21 +52,13 @@ try {
     im.src = window.vw.screenshotPNG();
   }), [x, y]);
   const near = (a, b, tol = 24) => a.every((v, i) => Math.abs(v - b[i]) <= tol);
-  // The launcher: white, the green/grey/red stripes at y 10/19/28 (menu.py).
-  const isLauncher = async () => near(await px(120, 12), [34, 196, 82]) && near(await px(120, 30), [227, 49, 44]) && near(await px(3, 120), [254, 254, 254]);
+  // The slot's own screens (no software yet, ended): white, the green/grey/red stripes at y 10/19/28.
+  const isBand = async () => near(await px(120, 12), [34, 196, 82]) && near(await px(120, 30), [227, 49, 44]) && near(await px(3, 120), [254, 254, 254]);
   const waitFor = async (fn, ms = 8000) => { const end = Date.now() + ms; while (Date.now() < end) { if (await fn()) return true; await page.waitForTimeout(100); } return false; };
-
-  check(await waitFor(isLauncher, 15000), `launcher drawn (${Date.now() - t0} ms after navigation)`);
-  await page.waitForTimeout(300);
-  await page.screenshot({ path: `${out}/emu-launcher.png` });
-  await page.locator(".vw").screenshot({ path: `${out}/emu-launcher-device.png` });
-  // Hello is the first app; move down to Buttons and back up so the joystick path is exercised,
-  // then open with A.
-  await page.evaluate(async () => { await window.vw.press("down"); await window.vw.press("up"); await window.vw.press("A"); });
   // hello.py: black screen, a DARK title bar, "hello pico" in yellow.
   const isHello = async () => near(await px(120, 100), [0, 0, 0], 8) || near(await px(3, 60), [0, 0, 0], 8);
-  check(await waitFor(isHello), "Hello app opened (down, up, A)");
-  // fps while Hello bounces
+
+  check(await waitFor(isHello, 15000), `boots straight into Hello, no menu (${Date.now() - t0} ms after navigation)`);
   const f0 = await page.evaluate(() => new Promise((res) => { let n = 0; const off = window.vw.onFrame(() => n++); setTimeout(() => { off(); res(n); }, 2000); }));
   console.log(`     fps while Hello runs: ${(f0 / 2).toFixed(1)} (frames drawn on the page per second)`);
   await page.locator(".vw").screenshot({ path: `${out}/emu-hello-device.png` });
@@ -74,48 +67,73 @@ try {
   await page.keyboard.down("b"); await page.waitForTimeout(100); await page.keyboard.up("b");
   await page.waitForTimeout(200);
   await page.locator(".vw").screenshot({ path: `${out}/emu-hello-keyB.png` });
-  // pointer path: click the drawn X button
+  // pointer path: click the drawn X button. X is Hello's own button now: it keeps running.
   const box = await page.locator('.vw [data-k="X"] .cap').boundingBox();
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down(); await page.waitForTimeout(120); await page.mouse.up();
-  check(await waitFor(isLauncher), "X (clicked on the drawn button) returned to the launcher");
-  await page.locator(".vw").screenshot({ path: `${out}/emu-back.png` });
+  await page.waitForTimeout(600);
+  check(await isHello() && !(await isBand()), "X doesn't leave the app");
+  check((await page.evaluate(() => window.vw.exec("import slot; slot.state"))).trim() === "'running'", "the slot says Hello is running");
 
-  // exec + the Wallet app (no chip: software key) must not crash
   const ex = await page.evaluate(() => window.vw.exec("1 + 1"));
   check(ex.trim() === "2", `exec("1 + 1") -> ${JSON.stringify(ex)}`);
-  const hello = await page.evaluate(() => window.vw.exec("import wedgie; wedgie.hello()['fw']"));
-  check(/wedgie-/.test(hello), `wedgie.hello() -> ${hello.trim()}`);
-  const apps = await page.evaluate(() => window.vw.exec("import menu; [a['mod'] for a in menu.apps]"));
-  const n = JSON.parse(apps.replace(/'/g, '"')).indexOf("usbwallet");
-  await page.evaluate(async (n) => { for (let i = 0; i < n; i++) await window.vw.press("down"); await window.vw.press("A"); }, n);
-  await page.waitForTimeout(2500);
-  const running = await page.evaluate(() => window.vw.exec("menu.running and menu.running[0]['mod']"));
-  check(/usbwallet/.test(running), `Wallet app running (${running.trim()})`);
-  await page.locator(".vw").screenshot({ path: `${out}/emu-wallet.png` });
-  await page.evaluate(() => window.vw.press("X"));
-  check(await waitFor(isLauncher), "X returned from the Wallet app");
+  const fw = await page.evaluate(() => window.vw.exec("import wedgie; wedgie.hello()['fw'], wedgie.hello()['slot'], wedgie.active()['mod']"));
+  check(/wedgie-0\.2.*1, 'hello'/.test(fw), `wedgie.hello(): ${fw.trim()}`);
 
-  // Demo: an app whose entry (demo.run) owns the CPU until X. Frames must still reach the page, and
-  // X (read straight from the pin inside its loop) must come back.
-  const di = JSON.parse(apps.replace(/'/g, '"')).indexOf("demo");
-  // Back to back, no pause: press() waits until the firmware has read each press, so the A cannot
-  // overtake the last up while the launcher is busy redrawing. (exec waits while Demo owns the CPU,
-  // so the launcher position is checked after X.)
-  await page.evaluate(async (n) => { for (let i = 0; i < n; i++) await window.vw.press("up"); await window.vw.press("A"); }, n - di);
-  await page.waitForTimeout(1500);
+  // saves: the app's own folder, JSON and bytes, the last good one kept, names(), delete
+  const sv = await page.evaluate(() => window.vw.exec([
+    "import save, os",
+    "save.store('best', {'score': 120}); save.store('map', b'\\x01\\x02')",
+    "print(save.game, save.load('best'), save.load('map'), save.load('nope', 7), sorted(save.names()), sorted(os.listdir('/saves/hello')))",
+    "save.delete('map'); print(sorted(save.names()))",
+  ].join("\n")));
+  check(/hello \{'score': 120\} b'\\x01\\x02' 7 \['best', 'map'\] \['best.json', 'map.bin'\]\s+\['best'\]/.test(sv), `saves round-trip in /saves/hello: ${sv.trim().replace(/\n/g, " | ")}`);
+  const fl = await page.evaluate(() => window.vw.exec("save.FLOOR = 1 << 40\ntry:\n    save.store('big', 1)\n    print('wrote')\nexcept OSError as e:\n    print('refused', e)\nsave.FLOOR = 32 * 1024"));
+  check(/refused flash full/.test(fl), `a save that would eat the floor is refused (${fl.trim()})`);
+  const bad = await page.evaluate(() => window.vw.exec("try:\n    save.store('../x', 1)\nexcept ValueError:\n    print('no')"));
+  check(bad.trim() === "no", "a save name can't leave the game's folder");
+
+  // USB: the slot answers JSON lines while the app runs
+  const line = await page.evaluate(() => new Promise((res) => { const off = window.vw.onOutput((l) => { if (l.includes('"id": 42')) { off(); res(l); } }); window.vw.write('{"id":42,"type":"hello"}\n'); setTimeout(() => res(""), 4000); }));
+  check(/"slot": 1/.test(line) && /"running": "hello"/.test(line), "USB hello while Hello runs: slot 1, running hello");
+
+  // files over USB while the app runs: ls, get (base64 parts), rm
+  const ask = (msg, n = 1) => page.evaluate(([msg, n]) => new Promise((res) => { const got = []; const off = window.vw.onOutput((l) => { if (l.includes(`"id": ${msg.id}`)) { got.push(JSON.parse(l)); if (got.length >= n || got[0].n === got.length) { off(); res(got); } } }); window.vw.write(JSON.stringify(msg) + "\n"); setTimeout(() => res(got), 4000); }), [msg, n]);
+  const ls = await ask({ id: 51, type: "ls", path: "/saves" });
+  check(JSON.stringify(ls[0]?.files) === '[["/saves/hello/",0],["/saves/hello/best.json",14]]' && ls[0].free > 0, `USB ls /saves: ${JSON.stringify(ls[0]?.files)}`);
+  const got = await ask({ id: 52, type: "get", path: "/saves/hello/best.json" });
+  check(got.length === 1 && atob(got[0].data) === '{"score": 120}', `USB get: ${got[0] && atob(got[0].data)}`);
+  const rmv = await ask({ id: 53, type: "rm", path: "/saves/hello" });
+  const after = await ask({ id: 54, type: "ls", path: "/saves" });
+  check(rmv[0]?.type === "ok" && JSON.stringify(after[0]?.files) === "[]", "USB rm: the game's saves folder gone");
+
+  // no app: the "no software yet" screen
+  await page.evaluate(() => window.vw.reboot(""));
+  check(await waitFor(isBand, 15000), "no app: the no-software screen");
+  await page.locator(".vw").screenshot({ path: `${out}/emu-empty-device.png` });
+
+  // the Wallet (no chip: software key) must not crash; it has USB to itself
+  await page.evaluate(() => window.vw.reboot("usbwallet"));
+  await page.waitForTimeout(3000);
+  const wl = await page.evaluate(() => window.vw.exec("import slot; slot.app['mod'], slot.state, slot._own_usb()"));
+  check(/usbwallet', 'running', True/.test(wl), `Wallet runs, USB its own (${wl.trim()})`);
+  await page.locator(".vw").screenshot({ path: `${out}/emu-wallet.png` });
+
+  // Demo: an entry (demo.run) that owns the CPU. Frames must still reach the page, and X is its own
+  // (the scene before), not a way out.
+  await page.evaluate(() => window.vw.reboot("demo"));
+  await page.waitForTimeout(2500);
   const fd = await page.evaluate(() => new Promise((res) => { let k = 0; const off = window.vw.onFrame(() => k++); setTimeout(() => { off(); res(k); }, 2000); }));
   console.log(`     fps while Demo (busy loop) runs: ${(fd / 2).toFixed(1)}`);
   check(fd > 4, "Demo (busy loop) keeps drawing");
-  await page.locator(".vw").screenshot({ path: `${out}/emu-demo.png` });
   await page.evaluate(() => window.vw.press("X", 150));
-  check(await waitFor(isLauncher), "X returned from Demo");
-  const dm = await page.evaluate(() => window.vw.exec("menu.sel"));
-  check(+dm === di, `${n - di} x up then A, back to back, opened Demo (launcher at ${dm.trim()}, Demo is ${di})`);
+  await page.waitForTimeout(800);
+  const fx = await page.evaluate(() => new Promise((res) => { let k = 0; const off = window.vw.onFrame(() => k++); setTimeout(() => { off(); res(k); }, 1000); }));
+  check(fx > 2 && !(await isBand()), "X in Demo: still Demo");
+  await page.locator(".vw").screenshot({ path: `${out}/emu-demo.png` });
 
-  // reboot comes back to the launcher
-  await page.evaluate(() => window.vw.reboot());
-  check(await waitFor(isLauncher, 15000), "reboot() comes back to the launcher");
+  await page.evaluate(() => window.vw.reboot("hello"));
+  check(await waitFor(isHello, 15000), "reboot back into Hello");
   const log = await page.locator("#log").textContent();
   check(!/Traceback/.test(log), "no Python tracebacks on the console" + (/Traceback/.test(log) ? ":\n" + log : ""));
   check(errs.length === 0, "no page errors" + (errs.length ? ": " + errs.join(" | ") : ""));
@@ -135,8 +153,8 @@ try {
   await p2.waitForTimeout(500);
   await p2.evaluate(async () => { await window.vw.press("A", 150); });
   await p2.waitForTimeout(800);
-  const fb = await p2.evaluate(() => window.vw.exec("import menu; menu.running and menu.running[0]['mod']"));
-  check(/hello/.test(fb), `fallback (postMessage keys): A opened Hello (${fb.trim()})`);
+  const fb = await p2.evaluate(() => window.vw.exec("import hello; hello.last"));
+  check(/'A'/.test(fb), `fallback (postMessage keys): Hello saw A (${fb.trim()})`);
   await ctx2.close();
 } finally {
   await browser.close();

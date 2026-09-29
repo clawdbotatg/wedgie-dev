@@ -12,7 +12,7 @@ export const pageShown = new Promise<void>((r) => {
 
 export function place3D(el: HTMLElement, opts: Wedgie3DOptions & { fallback?: Screen; demo?: string; boot?: boolean; eager?: boolean } = {}): Promise<Wedgie3D | null> {
   if (!el.firstChild) el.innerHTML = deviceSvg(opts.fallback || { kind: "off" });
-  // demo: a clickable pretend wedgie (launcher + apps, hard-coded) instead of a still screen
+  // demo: a clickable pretend wedgie (a few apps, hard-coded) instead of a still screen
   const demo = opts.demo !== undefined ? import("./demo").then((m) => m.createDemo(opts.demo, { boot: opts.boot })) : null;
   return new Promise((resolve) => {
     const io = new IntersectionObserver(async (es) => {
@@ -60,6 +60,6 @@ export function colorScreen(css: string, canvas = document.createElement("canvas
 }
 
 export const SCREENS = {
-  apps: ["/screens/launcher.png", "/screens/hello.png", "/screens/demo.png", "/screens/buttons.png", "/screens/demo-2.png"],
+  apps: ["/screens/hello.png", "/screens/demo.png", "/screens/buttons.png", "/screens/demo-2.png"],
   wallet: ["/screens/wallet-home.png", "/screens/wallet-chart.png", "/screens/wallet-send.png", "/screens/wallet-signing.png", "/screens/wallet-receive.png", "/screens/clear-sign.png"],
 };

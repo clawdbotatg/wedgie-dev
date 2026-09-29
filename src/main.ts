@@ -6,13 +6,14 @@ import { watchCount, supported, allow, connectNew } from "./serial/wedgies";
 import { home } from "./pages/home";
 import { connect } from "./pages/connect";
 import { assemble } from "./pages/assemble";
-import { test } from "./pages/test";
+import { format } from "./pages/format";
 import { update } from "./pages/update";
 
 const path = location.pathname.replace(/\/+$/, "");
 const onConnect = path === "/connect" || path.startsWith("/connect/");   // the list, or one wedgie (/connect/<ID>)
 const onAssemble = path === "/assemble";
-const onTest = path === "/test";
+const onFormat = path === "/format" || path === "/test";   // /test: its old name
+if (path === "/test") history.replaceState(null, "", "/format");
 const onUpdate = path === "/update";
 
 const app = document.getElementById("app")!;
@@ -58,6 +59,6 @@ watchCount((n) => {
 const top = document.getElementById("top")!;
 // Ready when the page's first screen is really there: on the home page that includes the hero wedgie
 // (its files are in the loader's byte count, and it has drawn a frame). Other 3D waits for the page.
-if (onTest || onUpdate) document.body.classList.add("test-mode");
-const up = onTest ? (test(top), Promise.resolve()) : onUpdate ? (update(top), Promise.resolve()) : onConnect ? (connect(top), Promise.resolve()) : onAssemble ? (assemble(top), Promise.resolve()) : home(top);
+if (onFormat || onUpdate) document.body.classList.add("test-mode");
+const up = onFormat ? (format(top), Promise.resolve()) : onUpdate ? (update(top), Promise.resolve()) : onConnect ? (connect(top), Promise.resolve()) : onAssemble ? (assemble(top), Promise.resolve()) : home(top);
 up.then(() => (window as any).__wedgieReady?.(), () => (window as any).__wedgieReady?.());

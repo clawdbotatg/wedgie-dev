@@ -8,21 +8,21 @@
   python3 wedgie.py hello                     what it is and runs (JSON)
   python3 wedgie.py shot [out.png]            the real screen, as a PNG you can look at
   python3 wedgie.py press A [ms]              press a button: A B X Y up down left right press
-  python3 wedgie.py launch hello              open an app from its launcher;  home  goes back
-  python3 wedgie.py apps                      apps in its launcher
-  python3 wedgie.py run app.py                run a file once (output streams; Ctrl-C stops), then back to the launcher
-  python3 wedgie.py install app.py [--name N] save your own app to it and add it to the launcher
-  python3 wedgie.py uninstall app             take your app out of the launcher (the file is removed)
-  python3 wedgie.py carts                     the cartridges on wedgie.dev, and which are on it
-  python3 wedgie.py cart add wallet           put a cartridge on it (or update it); cart remove wallet
-  python3 wedgie.py update                    install/update the wedgie firmware (only changed files; cartridges stay)
-  python3 wedgie.py ls                        files on it
+  python3 wedgie.py apps                      the apps on wedgie.dev, and which one it runs
+  python3 wedgie.py use usbwallet             make that the app it runs (the old one comes off, saves stay); it restarts into it
+  python3 wedgie.py off                       take its app off ("no software")
+  python3 wedgie.py run app.py                run a file once (output streams; Ctrl-C stops), then back to its app
+  python3 wedgie.py install app.py [--name N] make your own file the app it runs
+  python3 wedgie.py update                    install/update the wedgie firmware (only changed files; its app and saves stay)
+  python3 wedgie.py ls                        files on it, saves included
+  python3 wedgie.py saves [backup f.json | restore f.json]    its saves (/saves/<game>/), out to a file and back
 
   --port /dev/cu.usbmodemXXXX  (or --id A1B2C3) picks one when several are plugged in.
 
-hello/shot/press/launch/home/apps talk to the wedgie launcher over JSON lines and never interrupt it.
-The rest stop it (Ctrl-C), use MicroPython's raw REPL, then start the launcher again by running main.py.
-Only update and run soft-reset it (new firmware only runs after one; run clears your code's timers).
+A wedgie (firmware 0.2+) runs one app: it boots straight into it and the app gets every button.
+hello/shot/press talk to the firmware over JSON lines while the app runs and never interrupt it.
+The rest stop it (Ctrl-C), use MicroPython's raw REPL, then start the app again by running main.py.
+update, use, install and run soft-reset it (a fresh heap for new firmware or a new app).
 Only one program can hold the port: close the wedgie's page on wedgie.dev (and mpremote) first.
 
 Plugging in: the wedgie adds its WEDGIE USB drive about a second after power-up, which disconnects and
@@ -158,8 +158,9 @@ class Wedgie:
         return None if echo else return_out
 
     def leave(self, reset=True):
-        """Out of raw mode and back to the launcher. reset=True soft-resets (needed after writing firmware;
-        on 0.1.1+ the port drops and comes back); False just runs main.py again, port stays up."""
+        """Out of raw mode and back to its app. reset=True soft-resets (after writing firmware or a new app;
+        the port stays on 0.1.3+, but the first soft reset after updating from older firmware drops it);
+        False just runs main.py again, port stays up."""
         self.s.write(b"\x02")
         time.sleep(0.05)
         self.s.write(b"\x04" if reset else b'exec(open("main.py").read())\r')
@@ -214,11 +215,13 @@ def png(path, rgb565be, w=240, h=240):
                 + chunk(b"IDAT", zlib.compress(bytes(rows), 9)) + chunk(b"IEND", b""))
 
 
-# ---- firmware core and cartridges (the same model as wedgie.dev: src/serial/install.ts) -----------
+# ---- firmware core and its app (the same model as wedgie.dev: src/serial/install.ts) -----------------
 # /fw/manifest.json: files (name, size, sha256), core (the firmware's own files), carts (each app's files
-# and v). apps.json on the wedgie lists what's in its launcher; it's rebuilt from what's really on the
-# flash after every change: each cart whose files are all there, with v from their real hashes, then
-# the person's own apps as they were.
+# and v). apps.json on the wedgie names the one app it runs; it's rebuilt from what's really on the
+# flash after every change: that cart if its files are all there, with v from their real hashes, or the
+# person's own app as it was. Another app going on takes the old one's files off; /saves is never touched.
+RETIRED = ["menu.py", "menu.mpy"]       # core files a newer core dropped (0.2.0: the menu)
+FLOOR = 32 * 1024                       # what the firmware keeps free (save.py FLOOR)
 HASH_PY = """import os, json, hashlib, binascii
 def _h(n):
     try:
@@ -260,27 +263,57 @@ def copy(wg, m, names, have):
     return todo
 
 
-def write_apps(wg, m, have, drop=()):
-    known = {c["mod"] for c in m["carts"]}
+def write_apps(wg, m, have, only):
     out = []
-    for c in m["carts"]:
-        if c["mod"] in drop or not all(have["hashes"].get(n) for n in c["files"]):
-            continue
+    c = next((x for x in m["carts"] if x["mod"] == only), None)
+    if c and all(have["hashes"].get(n) for n in c["files"]):
         a = {"mod": c["mod"], "name": c["name"], "about": c.get("about", ""), "v": cart_v([have["hashes"][n] for n in c["files"]])}
         if c.get("entry"):
             a["entry"] = c["entry"]
+        if c.get("usb"):
+            a["usb"] = True
         out.append(a)
-    out += [a for a in have.get("apps", []) if a.get("mod") not in known and a.get("mod") not in drop]
+    elif not c and only:
+        out += [a for a in have.get("apps", []) if a.get("mod") == only][:1]
     wg.exec("import json\n_f = open('apps.json', 'w')\n_f.write(%r)\n_f.close()" % json.dumps(out))
     wg.sync()
     return out
 
 
+def active_of(m, have):
+    """The app it runs now: the first in apps.json whose files are there (0.1.x kept several)."""
+    for a in have.get("apps", []):
+        c = next((x for x in m["carts"] if x["mod"] == a.get("mod")), None)
+        if (all(have["hashes"].get(n) for n in c["files"]) if c else (a.get("mod", "") + ".py") in have["files"]):
+            return a["mod"]
+    return None
+
+
+def others(m, have, keep):
+    """Every cart file on it that neither the core nor `keep` needs."""
+    need = set(m["core"]) | set(next((x["files"] for x in m["carts"] if x["mod"] == keep), []))
+    return sorted({n for x in m["carts"] for n in x["files"]} - need - {n for n, h in have["hashes"].items() if not h})
+
+
+def remove_files(wg, have, names):
+    for n in names:
+        wg.exec("import os, sys\ntry:\n    os.remove(%r)\nexcept OSError:\n    pass\nsys.modules.pop(%r, None)" % (n, n.rsplit(".", 1)[0]))
+        have["hashes"][n] = None
+
+
+def take_over(wg):
+    try:
+        wg.request({"type": "stop"}, 1)        # stop its app first (0.1.x: "home"; its Timer would keep drawing)
+    except TimeoutError:
+        pass
+    wg.enter()
+
+
 # ---- commands ------------------------------------------------------------------------------
-def need_launcher(wg):
+def need_firmware(wg):
     h = wg.hello()
     if not h or not str(h.get("fw", "")).startswith("wedgie-"):
-        sys.exit("that board isn't running the wedgie launcher. Install it:  wedgie.py update")
+        sys.exit("that board isn't answering as wedgie firmware (not installed, or its app has USB to itself, like the Wallet).\nInstall or update:  wedgie.py update")
     return h
 
 
@@ -317,35 +350,56 @@ def main():
             h = wg.hello(2)
             print(json.dumps(h, indent=1) if h else "no answer: not running wedgie firmware (try: wedgie.py update)")
         elif c == "shot":
-            need_launcher(wg)
+            need_firmware(wg)
             v = wg.request({"type": "shot"}, 10)
             out = args.rest[0] if args.rest else "wedgie-shot.png"
             png(out, base64.b64decode(v["data"]))
             print(out)
         elif c == "press":
-            need_launcher(wg)
+            need_firmware(wg)
             k = args.rest[0] if args.rest else ""
             if k not in KEYS:
                 sys.exit("key must be one of: " + " ".join(KEYS))
             print(json.dumps(wg.request({"type": "press", "key": k, "ms": int(args.rest[1]) if len(args.rest) > 1 else 80})))
         elif c in ("launch", "home"):
-            need_launcher(wg)
-            msg = {"type": "launch", "app": args.rest[0]} if c == "launch" else {"type": "home"}
-            print(json.dumps(wg.request(msg, 10)))
-        elif c == "apps":
-            wg.enter()
-            print(wg.exec("print(open('apps.json').read())").strip())
-            wg.leave(reset=False)
+            sys.exit("a wedgie runs one app now (firmware 0.2+):  wedgie.py use <app>   (wedgie.py apps lists them)")
         elif c == "ls":
-            wg.enter()
-            print(wg.exec("import os\nfor n in sorted(os.listdir()):\n    print('%7d  %s' % (os.stat(n)[6], n))"))
+            take_over(wg)
+            print(wg.exec("import os\ndef _w(d):\n    for n in sorted(os.listdir(d)):\n        p = d.rstrip('/') + '/' + n\n        s = os.stat(p)\n        if s[0] & 0x4000:\n            print('%7s  %s/' % ('', p)); _w(p)\n        else:\n            print('%7d  %s' % (s[6], p))\n_w('/')\n_s = os.statvfs('/')\nprint('%7d  free' % (_s[0] * _s[3]))"))
+            wg.leave(reset=False)
+        elif c == "saves":
+            take_over(wg)
+            got = json.loads(wg.exec("import os, json, binascii\n_o = {}\ntry:\n    _gs = os.listdir('/saves')\nexcept OSError:\n    _gs = []\nfor _g in _gs:\n    for _n in os.listdir('/saves/' + _g):\n        with open('/saves/%s/%s' % (_g, _n), 'rb') as _f:\n            _o['/saves/%s/%s' % (_g, _n)] = binascii.b2a_base64(_f.read()).decode().strip()\nprint(json.dumps(_o))", 60))
+            sub = args.rest[0] if args.rest else ""
+            if sub == "backup" and len(args.rest) == 2:
+                json.dump({"wedgie-saves": 1, "files": got}, open(args.rest[1], "w"))
+                print("%d save files -> %s" % (len(got), args.rest[1]))
+            elif sub == "restore" and len(args.rest) == 2:
+                b = json.load(open(args.rest[1]))
+                n = 0
+                for p, data in b.get("files", {}).items():
+                    parts = p.split("/")
+                    if len(parts) != 4 or parts[1] != "saves" or ".." in parts:
+                        continue
+                    wg.exec("import os\nfor _d in ('/saves', '/saves/%s'):\n    try:\n        os.mkdir(_d)\n    except OSError:\n        pass" % parts[2])
+                    wg.put(p, base64.b64decode(data))
+                    n += 1
+                wg.sync()
+                print("%d save files put back" % n)
+            elif sub:
+                sys.exit("usage: wedgie.py saves [backup f.json | restore f.json]")
+            else:
+                for p in sorted(got):
+                    print("%7d  %s" % (len(base64.b64decode(got[p])), p))
+                if not got:
+                    print("no saves")
             wg.leave(reset=False)
         elif c == "run":
             src = open(args.rest[0]).read()
             wg.enter()
             try:
                 wg.exec(src, timeout=24 * 3600, echo=True)
-                print("\n[returned; its timers keep running. Ctrl-C to stop and go back to the launcher]")
+                print("\n[returned; its timers keep running. Ctrl-C to stop and go back to its app]")
                 while True:
                     c2 = wg.s.read(256)
                     if c2:
@@ -359,68 +413,68 @@ def main():
             path = args.rest[0]
             mod = os.path.splitext(os.path.basename(path))[0]
             name = (args.name or mod)[:12]
-            wg.enter()
+            take_over(wg)
             wg.put(mod + ".py", open(path, "rb").read())
-            wg.exec("import json, sys\ntry:\n    _a = json.load(open('apps.json'))\nexcept Exception:\n    _a = []\n_a = [x for x in _a if x['mod'] != %r] + [{'mod': %r, 'name': %r, 'about': 'installed with wedgie.py'}]\njson.dump(_a, open('apps.json', 'w'))\nsys.modules.pop(%r, None)" % (mod, mod, name, mod))
+            wg.exec("import json\njson.dump([{'mod': %r, 'name': %r, 'about': 'installed with wedgie.py'}], open('apps.json', 'w'))" % (mod, name))
             wg.sync()
+            wg.leave()
+            print("installed %s as %r; it's the app it runs now" % (mod, name))
+        elif c in ("off", "uninstall"):
+            m = manifest()
+            take_over(wg)
+            have = look(wg, m)
+            remove_files(wg, have, others(m, have, None))
+            write_apps(wg, m, have, None)
             wg.leave(reset=False)
-            print("installed %s as %r; it's in the launcher" % (mod, name))
-        elif c == "uninstall":
-            mod = args.rest[0]
-            wg.enter()
-            wg.exec("import json, os\n_a = json.load(open('apps.json'))\njson.dump([x for x in _a if x['mod'] != %r], open('apps.json', 'w'))\ntry:\n    os.remove(%r)\nexcept OSError:\n    pass" % (mod, mod + ".py"))
-            wg.sync()
-            wg.leave(reset=False)
-            print("removed", mod)
+            print("its app is off; it shows \"no software\"")
         elif c == "update":
             m = manifest()
-            wg.enter()
+            take_over(wg)
             have = look(wg, m)
             names = [f["name"] for f in m["files"]]
-            for n in [n[:-3] + ".mpy" for n in names if n.endswith(".py")]:
-                if n in have["files"] and n not in names:       # stale bytecode MicroPython would import first
-                    wg.exec("os.remove(%r)" % n)
+            for n in [n[:-3] + ".mpy" for n in names if n.endswith(".py")] + RETIRED:
+                if n in have["files"] and n not in names:       # stale bytecode MicroPython would import first; retired core files
+                    wg.exec("import os\nos.remove(%r)" % n)
             todo = copy(wg, m, set(m["core"]), have)
-            write_apps(wg, m, have)
+            act = active_of(m, have)                            # one app from 0.2 on: the one it ran first stays
+            remove_files(wg, have, others(m, have, act))
+            write_apps(wg, m, have, act)
             wg.leave()      # the new firmware only runs after a soft reset (see "Plugging in" above)
             print("wedgie %s: %s" % (m["version"], "%d files updated" % len(todo) if todo else "already up to date"))
-        elif c == "carts":
+        elif c in ("apps", "carts"):
             m = manifest()
-            wg.enter()
+            take_over(wg)
             have = look(wg, m)
             wg.leave(reset=False)
+            act = active_of(m, have)
             on = {a["mod"]: a.get("v") for a in have["apps"]}
             for cart in m["carts"]:
-                state = ("on it" if on[cart["mod"]] == cart["v"] else "on it, update ready") if cart["mod"] in on else "%d KB" % max(1, cart["size"] // 1024)
+                state = ("runs it" if on.get(cart["mod"]) == cart["v"] else "runs it, update ready") if cart["mod"] == act else "%d KB" % max(1, cart["size"] // 1024)
                 print("%-10s %-12s %-20s %s" % (cart["mod"], cart["name"], state, cart.get("about", "")))
-        elif c == "cart":
-            if len(args.rest) != 2 or args.rest[0] not in ("add", "remove"):
-                sys.exit("usage: wedgie.py cart add|remove <mod>   (wedgie.py carts lists them)")
+            if act and not any(x["mod"] == act for x in m["carts"]):
+                print("%-10s %-12s %-20s" % (act, "(yours)", "runs it"))
+        elif c in ("use", "cart"):
+            mod = args.rest[-1] if args.rest else ""
+            if c == "cart" and args.rest[:1] == ["remove"]:
+                sys.exit("wedgie.py off   takes its app off")
             m = manifest()
-            cart = next((x for x in m["carts"] if x["mod"] == args.rest[1]), None)
+            cart = next((x for x in m["carts"] if x["mod"] == mod), None)
             if not cart:
-                sys.exit("no cartridge %r; wedgie.py carts lists them" % args.rest[1])
-            try:
-                wg.request({"type": "home"}, 1)        # close a launcher app first (its Timer would keep drawing)
-            except TimeoutError:
-                pass
-            wg.enter()
+                sys.exit("no app %r; wedgie.py apps lists them" % mod)
+            take_over(wg)
             have = look(wg, m)
-            if args.rest[0] == "add":
-                copy(wg, m, set(cart["files"]), have)
-                wg.exec("import sys\nfor _n in %r:\n    sys.modules.pop(_n, None)" % [n[:-3] for n in cart["files"] if n.endswith(".py")])
-                write_apps(wg, m, have)
-                print("%s is on it; wedgie.py launch %s" % (cart["name"], cart["mod"]))
-            else:
-                others = [x for x in m["carts"] if x["mod"] != cart["mod"] and all(have["hashes"].get(n) for n in x["files"])]
-                keep = set(m["core"]) | {n for x in others for n in x["files"]}
-                for n in cart["files"]:
-                    if n not in keep and have["hashes"].get(n):
-                        wg.exec("import os\nos.remove(%r)" % n)
-                        have["hashes"][n] = None
-                write_apps(wg, m, have, drop=[cart["mod"]])
-                print("removed", cart["name"])
-            wg.leave(reset=False)
+            size = {f["name"]: f["size"] for f in m["files"]}
+            gone = others(m, have, cart["mod"])
+            need = sum(size[n] for n in cart["files"] if not have["hashes"].get(n))
+            free = int(wg.exec("import os\n_s = os.statvfs('/')\nprint(_s[0] * _s[3])").strip())
+            if free + sum(size[n] for n in gone) < need + FLOOR:
+                wg.leave(reset=False)
+                sys.exit("not enough room: %s needs %d KB. Delete some saves or files first." % (cart["name"], need // 1024))
+            remove_files(wg, have, gone)
+            copy(wg, m, set(cart["files"]), have)
+            write_apps(wg, m, have, cart["mod"])
+            wg.leave()      # a fresh heap for it
+            print("%s is the app it runs now" % cart["name"])
         else:
             sys.exit("unknown command %r; see: wedgie.py --help" % c)
     finally:

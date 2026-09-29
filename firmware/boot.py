@@ -14,7 +14,7 @@ except Exception as e:
 # READ THIS before touching boot, USB or anything that talks to a wedgie: about a second after
 # power-up the serial port disappears and comes back (a new port, same board ID) while the drive is
 # added. Every host has to live with that: wait before identifying a new port, retry an open that
-# fails, find a wedgie by its ID, and never soft-reset to get back to the launcher (run main.py; see
+# fails, find a wedgie by its ID, and never soft-reset just to restart its app (run main.py; see
 # src/serial/repl.ts leave). The first soft reset after an update from firmware older than 0.1.3 has
 # no mark yet and drops the port too. A host that reconnects and soft-resets again loops forever
 # (wedgie.dev did, 2026-09-27: e6ea8c1). Hosts that handle this: src/serial/wedgies.ts, install.ts,

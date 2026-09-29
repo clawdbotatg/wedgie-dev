@@ -1,26 +1,30 @@
 // /connect/<ID>: one wedgie, one page, no tabs. The 3D wedgie shows its real screen (a shot every
-// ~0.7 s) and pressing its buttons presses the real ones. Then Hardware (is the chip proven working,
-// screen and button test), Firmware (the version, one Update button), Cartridges (tap one to play it;
-// one it doesn't have goes on first), and a folded Developer section (code, console).
+// ~0.7 s) and pressing its buttons presses the real ones. Then Hardware (is the chip proven working),
+// Firmware (the version, one Update button), Software (the one app it runs: tap another and it
+// restarts into that), Saves (each game's, download / put back / delete), and a folded Developer
+// section (screen and button tests, code, files, console).
 // The page holds the wedgie's USB port while it's open, so nothing else (another tab, wedgie.py,
 // mpremote) can talk to it meanwhile.
 //
 // USB and resets: nothing here soft-resets a wedgie, except the firmware update's final reboot. Wedgie
 // firmware 0.1.1+ adds its WEDGIE USB drive at power-up, which disconnects and reconnects USB; after
 // that reboot the wedgie comes back as a NEW port (a new W.Wedgie, same ID), and this page picks it up
-// by its ID. Raw-REPL work (tests, code, cartridges) stops the launcher with Ctrl-C and restarts it by
-// running main.py (Repl.leave({ reset: false })), which keeps the port.
+// by its ID. Raw-REPL work (tests, code, installs) stops its app with Ctrl-C and starts it again by
+// running main.py (Repl.leave({ reset: false })), which keeps the port. Picking another app ends with
+// a soft reset (a fresh heap for it); 0.1.3+ keeps the port through that too.
 import { esc, KEYS, type Screen } from "../ui/device";
 import { place3D, idScreen as idCanvas, colorScreen } from "../ui/place3d";
 import type { Wedgie3D } from "../ui/wedgie3d";
 import * as W from "../serial/wedgies";
 import { pyStr, type Repl } from "../serial/repl";
-import { installCore, installCart, removeCart, takeOver, firmwareManifest, type Cart, type Manifest } from "../serial/install";
+import { installCore, useApp, removeApp, takeOver, firmwareManifest, type Cart, type Manifest } from "../serial/install";
+import * as FS from "../serial/files";
 import { cartHtml } from "../ui/cart";
 import * as F from "../ui/facts";
 
 const APP_SAMPLE = `# A wedgie app: draw with lcd, read the buttons, tick on a Timer so USB stays free.
-# X goes back to the launcher. "Save as an app" puts it in the launcher's list.
+# Every button is yours. "Make it its app" puts it on as the one app the wedgie boots into.
+# Saves: import save; save.store("best", 12); save.load("best", 0)  (its own folder, kept across apps)
 from machine import Timer
 from lcd import LCD, Keys, color, WHITE, BLACK
 
@@ -34,8 +38,6 @@ timer = None
 def tick(_):
     global x, y, dx, dy
     for k in keys.pressed():
-        if k == "X":
-            return stop()
         if k == "A":
             dx, dy = -dx, -dy
     x += dx; y += dy
@@ -62,7 +64,7 @@ start()
 
 const PROBE_SAMPLE = `# No wedgie firmware on this board yet, so the wedgie.dev probe is loaded first:
 #   ident(big, small)   col(r, g, b)   _LCD()   KEYS (pin numbers)   Pin
-# Install the firmware to get lcd, Keys and the launcher.
+# Install the firmware to get lcd, Keys and saves.
 import time
 ident("HI!", "from wedgie.dev")
 time.sleep(2)
@@ -94,8 +96,13 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
           <div class="card wd-sec carts">
             <h3>Software</h3>
             <p class="fine" id="d-carts-note"></p>
-            <h4 class="shelf-h" id="d-on-h">On this wedgie</h4><div class="shelf" id="d-on"></div>
-            <h4 class="shelf-h" id="d-more-h">Get more</h4><div class="shelf" id="d-more"></div>
+            <div class="shelf" id="d-shelf"></div>
+          </div>
+          <div class="card wd-sec saves">
+            <h3>Saves</h3>
+            <p class="fine" id="d-saves-note"></p>
+            <div id="d-saves"></div>
+            <div class="row"><button class="btn btn-sm" data-sv="all">Download all</button><label class="btn btn-sm file-btn">Put saves back<input type="file" id="d-saves-in" accept=".json,application/json" hidden></label></div>
           </div>
           <details class="card wd-sec dev">
             <summary>Developer</summary>
@@ -106,9 +113,13 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
               <button class="btn btn-sm btn-green" data-act="run">Run on it</button>
               <button class="btn btn-sm" data-act="stop">Stop</button>
               <input id="d-appname" class="recess name" placeholder="app name" maxlength="12" value="My app">
-              <button class="btn btn-sm" data-act="saveapp">Save as an app</button>
+              <button class="btn btn-sm" data-act="saveapp">Make it its app</button>
             </div>
             <pre class="recess out" id="d-out"></pre>
+            <h4>Files <span class="fine" id="d-fs-free"></span></h4>
+            <div class="row"><button class="btn btn-sm" data-fs="refresh">Show files</button><label class="btn btn-sm file-btn">Upload a file<input type="file" id="d-fs-in" hidden></label></div>
+            <div class="fs recess" id="d-fs" hidden></div>
+            <div class="fs-view" id="d-fs-view" hidden></div>
             <h4>Console</h4>
             <pre class="recess out log" id="d-log"></pre>
           </details>
@@ -130,7 +141,6 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
   const wedgie = () => w?.kind === "wedgie";
   const carts = () => (w?.carts || []);
   const newCarts = () => !!w?.carts;                // firmware 0.1.4+: cartridges come and go
-  const ours = () => wedgie() || (w?.kind === "wallet" && newCarts());   // the Wallet cart running counts
 
   // ---- the 3D wedgie: the real screen (mirrored), and its buttons press the real ones ---------------
   const canvas = document.createElement("canvas");
@@ -190,13 +200,11 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
       link = r;
       setScreen(wedgie() ? { kind: "live" } : idScreen());
       paint();
+      if (liveFs()) loadSaves();
       await held;
     }).catch((e) => { status(`<b class="bad">Can't open it:</b> ${esc(e?.message || e)}`); })
       .finally(() => { if (x === w) { link = null; } });
   }
-  const off = W.onChange(attach);
-  attach();
-  mirror();
 
   // ---- painting --------------------------------------------------------------------------------------
   const status = (s: string, at = "#d-status") => { const el = $(at); el.hidden = !s; el.innerHTML = s; };
@@ -221,7 +229,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     const x = w!;
     $("#d-light").className = `light ${F.overall(x, m)}`;
     $("#d-hint").textContent = wedgie() && link ? "Its real screen. Click its buttons (or press arrows, Enter, A, B, X, Y) to press the real ones." : "";
-    paintHw(x); paintFw(x); paintCarts(x);
+    paintHw(x); paintFw(x); paintCarts(x); paintSaves();
     main.querySelectorAll<HTMLButtonElement>("[data-act]").forEach((b) => (b.disabled = !link || (!!busy && b.dataset.act !== "stop") || (b.dataset.act === "chip" && !newCarts())));
   }
 
@@ -236,7 +244,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
       ["Board", `${esc(x.board || "?")} <span class="fine">${esc(x.cpu || "")}</span>`],
       ["Chip", chip + facts],
       ["Board ID", `<span class="mono">${esc(x.uid || "?")}</span>`],
-      ...(x.free != null ? [["Room", `${kb(x.free)} free for cartridges`]] : []),
+      ...(x.free != null ? [["Room", `${kb(x.free)} free`]] : []),
     ].map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
     const hw = $("#d-hw");
     if (hw.dataset.html !== rows) { hw.dataset.html = rows; hw.innerHTML = rows; }   // a repaint must not snap "How we know" shut
@@ -246,118 +254,237 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     const box = $("#d-fw");
     if (!m) { box.innerHTML = ""; return; }
     const cur = x.kind === "wedgie" ? x.version : null, fresh = cur === m.version;
-    const what = x.kind === "wallet" ? "The Wallet is running. Press X on the wedgie to leave it, then check for updates here."
+    const what = x.kind === "wallet" ? "The Wallet is running, so its firmware version isn't known here. Update puts on the latest; the Wallet stays."
       : fresh ? "Up to date." : cur ? `wedgie ${esc(m.version)} is ready.` : `This board has MicroPython but no wedgie firmware yet.`;
     const sig = `${cur}|${m.version}|${x.kind}|${!!link}|${!!busy}`;
     if (box.dataset.sig === sig) return;
     box.dataset.sig = sig;
     box.innerHTML = `<div class="fwrow"><div><h4>${cur ? `wedgie ${esc(cur)}` : x.kind === "wallet" ? "wedgie" : "No wedgie firmware"}</h4><p>${what}</p></div>` +
-      (x.kind === "wallet" ? "" : `<button class="btn btn-sm ${fresh ? "" : "btn-green"}" data-fw ${!link || busy ? "disabled" : ""}>${fresh ? "Reinstall" : cur ? "Update" : "Install"}</button>`) + `</div>` +
-      (fresh || x.kind === "wallet" ? "" : `<p class="fine">Takes a minute. Your cartridges stay on it.</p>`);
+      `<button class="btn btn-sm ${fresh ? "" : "btn-green"}" data-fw ${!link || busy ? "disabled" : ""}>${fresh ? "Reinstall" : cur || x.kind === "wallet" ? "Update" : "Install"}</button>` + `</div>` +
+      (fresh ? "" : `<p class="fine">Takes a minute. Its app and its saves stay on it.</p>`);
     box.querySelector<HTMLButtonElement>("[data-fw]")?.addEventListener("click", updateFw);
   }
 
-  // ---- cartridges -------------------------------------------------------------------------------------
-  const inserting: Record<string, number> = {};   // mod -> progress while it goes in
-  let confirmOut = "";                             // a cart whose Remove was tapped once
+  // ---- software: the one app it runs ------------------------------------------------------------------
+  const inserting: Record<string, number> = {};   // mod -> progress while it goes on
+  let confirmOut = false;                          // Remove was tapped once
+  const active = () => (w?.carts || [])[0]?.mod || null;
+  const slot = () => !!w?.slot;                    // 0.2+: one app, no menu
+  const canPick = () => slot() || w?.kind === "wallet";   // the Wallet as its app: it stops on Ctrl-C
   function paintCarts(x: W.Wedgie) {
     if (!m) return;
     const note = $("#d-carts-note");
-    if (x.kind === "micropython") note.innerHTML = "Cartridges run on wedgie firmware. Install it above first.";
-    else if (!newCarts()) note.innerHTML = "Update the firmware above to put cartridges on and take them off.";
-    else note.innerHTML = "Tap one under Get more to put it on. Tap one it has to play it.";
-    const on = new Map(carts().map((c) => [c.mod, c.v]));
-    const legacy = !newCarts() ? new Set(x.apps || []) : null;      // 0.1.3: apps it has, no versions
-    const has = (c: Cart) => (legacy ? legacy.has(c.mod) : on.has(c.mod));
-    fill($("#d-on"), m.carts.filter(has), x, on, legacy);
-    fill($("#d-more"), m.carts.filter((c) => !has(c)), x, on, legacy);
-    $("#d-on-h").hidden = !$("#d-on").children.length;
-    $("#d-more-h").hidden = !$("#d-more").children.length;
-  }
-  function fill(shelf: HTMLElement, list: Cart[], x: W.Wedgie, on: Map<string, string | undefined>, legacy: Set<string> | null) {
-    const keep = new Set(list.map((c) => c.mod));
-    shelf.querySelectorAll<HTMLElement>(".cart-slot").forEach((el) => { if (!keep.has(el.dataset.mod!)) el.remove(); });
-    list.forEach((c, i) => {
-      let slot = shelf.querySelector<HTMLElement>(`.cart-slot[data-mod="${c.mod}"]`);
-      if (!slot) {
-        document.querySelector(`.cart-slot[data-mod="${c.mod}"]`)?.remove();   // moved between shelves
-        slot = document.createElement("div");
-        slot.className = "cart-slot";
-        slot.dataset.mod = c.mod;
-        slot.innerHTML = `<button class="cart" title="${esc(c.about || "")}">${cartHtml(c)}</button><p class="cart-about">${esc(c.about || "")}</p><button class="cart-out" hidden></button>`;
-        slot.querySelector<HTMLButtonElement>(".cart")!.onclick = () => play(c);
-        slot.querySelector<HTMLButtonElement>(".cart-out")!.onclick = () => eject(c);
+    const a = m.carts.find((c) => c.mod === active());
+    if (x.kind === "micropython") note.innerHTML = "Apps run on wedgie firmware. Install it above first.";
+    else if (x.kind === "wedgie" && !slot()) note.innerHTML = "Update the firmware above first. From 0.2 a wedgie runs one app: it boots straight into it, and the app gets every button.";
+    else note.innerHTML = a ? `It runs <b>${esc(a.name)}</b>. Tap another and it restarts into that. Saves stay.` : "Nothing on it yet. Tap one: it goes on and the wedgie restarts into it.";
+    const shelf = $("#d-shelf");
+    m.carts.forEach((c, i) => {
+      let slotEl = shelf.querySelector<HTMLElement>(`.cart-slot[data-mod="${c.mod}"]`);
+      if (!slotEl) {
+        slotEl = document.createElement("div");
+        slotEl.className = "cart-slot";
+        slotEl.dataset.mod = c.mod;
+        slotEl.innerHTML = `<button class="cart" title="${esc(c.about || "")}">${cartHtml(c)}</button><p class="cart-about">${esc(c.about || "")}</p><button class="cart-out" hidden></button>`;
+        slotEl.querySelector<HTMLButtonElement>(".cart")!.onclick = () => pick(c);
+        slotEl.querySelector<HTMLButtonElement>(".cart-out")!.onclick = () => eject();
       }
-      if (shelf.children[i] !== slot) shelf.insertBefore(slot, shelf.children[i] || null);
-      const installed = legacy ? legacy.has(c.mod) : on.has(c.mod);
-      const outdated = !legacy && installed && on.get(c.mod) !== c.v;
-      const playing = x.running === c.mod;
+      if (shelf.children[i] !== slotEl) shelf.insertBefore(slotEl, shelf.children[i] || null);
+      const on = active() === c.mod;
+      const outdated = on && (x.carts || [])[0]?.v !== c.v;
+      const playing = on && x.running === c.mod;
       const p = inserting[c.mod];
-      const btn = slot.querySelector<HTMLButtonElement>(".cart")!;
-      btn.classList.toggle("playing", playing);
-      btn.classList.toggle("absent", !installed);
+      const btn = slotEl.querySelector<HTMLButtonElement>(".cart")!;
+      btn.classList.toggle("playing", on);
+      btn.classList.toggle("absent", !on);
       btn.classList.toggle("busy", p !== undefined);
-      btn.disabled = !link || !!busy || !ours() || (!installed && !newCarts());
+      btn.disabled = !link || !!busy || !canPick() || (on && !outdated);
       btn.style.setProperty("--p", String(p ?? 0));
-      slot.querySelector(".cart-state")!.innerHTML = p !== undefined ? "installing" : playing ? "▶ playing" : outdated ? "update" : !installed ? kb(c.size) : "";
-      slot.querySelector(".cart-state")!.className = `cart-state${playing ? " on" : outdated || !installed ? " soft" : ""}`;
-      const out = slot.querySelector<HTMLButtonElement>(".cart-out")!;
-      out.hidden = !installed || !newCarts();
+      const st = slotEl.querySelector(".cart-state")!;
+      st.innerHTML = p !== undefined ? "installing" : outdated ? "update" : playing ? "▶ running" : on ? "on it" : kb(c.size);
+      st.className = `cart-state${on && !outdated ? " on" : outdated || !on ? " soft" : ""}`;
+      const out = slotEl.querySelector<HTMLButtonElement>(".cart-out")!;
+      out.hidden = !on || !slot();
       out.disabled = !link || !!busy;
-      out.textContent = confirmOut === c.mod ? `Remove ${c.name}?` : "Remove";
-      out.classList.toggle("sure", confirmOut === c.mod);
+      out.textContent = confirmOut ? `Take ${c.name} off?` : "Take it off";
+      out.classList.toggle("sure", confirmOut);
     });
   }
 
-  // Tap one it doesn't have (or an old one): it goes on, back to the menu, so the next can go on right
-  // after. Tap one it has: it plays; whatever was running is stopped first.
-  async function play(c: Cart) {
+  // Tap one: it goes on (the old app's files come off, saves stay) and the wedgie restarts into it.
+  async function pick(c: Cart) {
     if (!link || busy || !w) return;
     const x = w, r = link;
-    confirmOut = "";
-    const installed = newCarts() ? carts().some((a) => a.mod === c.mod) : (x.apps || []).includes(c.mod);
-    const outdated = newCarts() && carts().find((a) => a.mod === c.mod)?.v !== c.v;
-    if (installed && !outdated) {
-      busy = "launch"; paint();
-      const launch = () => r.request({ type: "launch", app: c.mod }, 8000);
-      try {
-        if (x.kind === "wallet") { await takeOver(r); await backToLauncher(r); }
-        try { await launch(); }
-        catch { await takeOver(r); await backToLauncher(r); await launch(); }   // something owned the screen
-        x.running = c.mod; setScreen({ kind: "live" });
-      } catch (e: any) { status(`<b class="bad">${esc(c.name)} didn't open:</b> ${esc(e?.message || e)}. Press X on the wedgie and try again.`); }
-      busy = ""; paint(); W.touch();
-      return;
-    }
+    confirmOut = false;
     busy = "cart"; inserting[c.mod] = 0; paint();
+    setScreen({ kind: "loading", p: 0 });
     try {
-      await installCart(r, c, (p) => { inserting[c.mod] = p; paint(); });
+      await useApp(r, c, (p) => { inserting[c.mod] = p; setScreen({ kind: "loading", p }); paint(); });
       delete inserting[c.mod];
+      status(`Restarting it into <b>${esc(c.name)}</b>…`);
+      // The soft reset: a fresh heap for the new app. The port stays on 0.1.3+; attach() finds it by ID either way.
+      await r.leave();
+      W.reidentify(x);
+      release?.(); release = null; link = null;
+      setTimeout(() => status(""), 6000);
     } catch (e: any) {
       delete inserting[c.mod];
       status(`<b class="bad">${esc(c.name)} didn't go on:</b> ${esc(e?.message || e)}`);
+      await backToApp(r).catch(() => {});
+      setScreen({ kind: "live" });
     }
-    await backToLauncher(r).catch(() => {});
-    busy = ""; setScreen({ kind: "live" }); paint(); W.touch();
-  }
-
-  async function eject(c: Cart) {
-    if (!link || busy || !w) return;
-    if (confirmOut !== c.mod) { confirmOut = c.mod; paint(); return; }
-    confirmOut = "";
-    const r = link;
-    busy = "cart"; paint();
-    try { await removeCart(r, c); } catch (e: any) { status(`<b class="bad">Couldn't remove ${esc(c.name)}:</b> ${esc(e?.message || e)}`); }
-    await backToLauncher(r).catch(() => {});
     busy = ""; paint(); W.touch();
   }
 
-  /** Raw REPL → the launcher, same port (main.py, no reset), then its hello refreshes what we know. */
-  async function backToLauncher(r: Repl) {
+  async function eject() {
+    if (!link || busy || !w) return;
+    if (!confirmOut) { confirmOut = true; paint(); return; }
+    confirmOut = false;
+    const r = link;
+    busy = "cart"; paint();
+    try { await removeApp(r); } catch (e: any) { status(`<b class="bad">Couldn't take it off:</b> ${esc(e?.message || e)}`); }
+    await backToApp(r).catch(() => {});
+    busy = ""; paint(); W.touch();
+  }
+
+  // ---- saves and files --------------------------------------------------------------------------------
+  // live: the slot answers ls/get/rm while the app runs. Otherwise (the Wallet has USB to itself) the
+  // raw REPL, which stops the app for a moment.
+  const liveFs = () => slot() && w?.kind === "wedgie";
+  async function withFiles<T>(what: string, fn: (r: Repl, live: boolean) => Promise<T>, write = false): Promise<T | undefined> {
+    if (!link || busy || !w) return;
+    const r = link, lv = liveFs() && !write;
+    busy = what; paint();
+    try {
+      if (!lv) await takeOver(r);
+      return await fn(r, lv);
+    } catch (e: any) {
+      tstatus("");
+      $("#d-saves-note").innerHTML = `<b class="bad">${esc(what)} failed:</b> ${esc(e?.message || e)}`;
+    } finally {
+      if (!lv) { await backToApp(r).catch(() => {}); setScreen({ kind: "live" }); }
+      busy = ""; paint(); W.touch();
+    }
+  }
+
+  let savesList: FS.Entry[] | null = null, savesFor = "";
+  let confirmSave = "";
+  const gameName = (g: string) => m?.carts.find((c) => c.mod === g)?.name || g;
+  async function loadSaves() {
+    const got = await withFiles("Reading saves", (r, lv) => FS.ls(r, "/saves", lv));
+    if (got) { savesList = got.files; savesFor = id; paintSaves(); }
+  }
+  function paintSaves() {
+    const box = $("#d-saves"), note = $("#d-saves-note");
+    const games = new Map<string, { size: number; files: number }>();
+    for (const f of savesList || []) {
+      const g = f.path.split("/")[2];
+      if (!g || f.dir) continue;
+      const e = games.get(g) || { size: 0, files: 0 };
+      e.size += f.size; e.files++;
+      games.set(g, e);
+    }
+    if (!note.querySelector(".bad")) {
+      note.innerHTML = savesList === null ? (w?.kind === "wallet" ? `The Wallet has USB to itself. <a href="#" data-sv="load">Show saves</a> (stops it for a moment).` : "")
+        : games.size ? "Each game keeps its own. Switching apps or updating the firmware never touches them." : "No saves yet. Games that save keep them here, across apps and firmware updates.";
+      note.querySelector<HTMLElement>('[data-sv="load"]')?.addEventListener("click", (e) => { e.preventDefault(); loadSaves(); });
+    }
+    const html = [...games].map(([g, e]) => `<div class="save-row"><div><b>${esc(gameName(g))}</b> <span class="fine">${e.files} file${e.files > 1 ? "s" : ""} · ${kb(e.size)}</span></div>
+      <div class="row"><button class="btn btn-sm" data-sv-dl="${esc(g)}">Download</button><button class="btn btn-sm${confirmSave === g ? " sure" : ""}" data-sv-rm="${esc(g)}">${confirmSave === g ? "Delete them?" : "Delete"}</button></div></div>`).join("");
+    if (box.dataset.html !== html) {
+      box.dataset.html = html; box.innerHTML = html;
+      box.querySelectorAll<HTMLButtonElement>("[data-sv-dl]").forEach((b) => (b.onclick = () => downloadSaves(b.dataset.svDl!)));
+      box.querySelectorAll<HTMLButtonElement>("[data-sv-rm]").forEach((b) => (b.onclick = () => deleteSaves(b.dataset.svRm!)));
+    }
+    main.querySelectorAll<HTMLButtonElement>("[data-sv]").forEach((b) => (b.disabled = !link || !!busy || !games.size));
+    const inp = $<HTMLInputElement>("#d-saves-in");
+    inp.disabled = !link || !!busy || !(slot() || w?.kind === "wallet");
+    inp.parentElement!.classList.toggle("disabled", inp.disabled);
+  }
+  async function downloadSaves(game?: string) {
+    const b = await withFiles("Downloading saves", (r, lv) => FS.saves(r, lv, game));
+    if (!b) return;
+    b.id = id; b.at = new Date().toISOString();
+    FS.download(`wedgie-${id}-saves${game ? "-" + game : ""}.json`, JSON.stringify(b), "application/json");
+  }
+  async function deleteSaves(game: string) {
+    if (confirmSave !== game) { confirmSave = game; paintSaves(); return; }
+    confirmSave = "";
+    await withFiles("Deleting saves", (r, lv) => FS.rm(r, `/saves/${game}`, lv));
+    await loadSaves();
+  }
+  $<HTMLInputElement>("#d-saves-in").onchange = async (e) => {
+    const f = (e.target as HTMLInputElement).files?.[0];
+    (e.target as HTMLInputElement).value = "";
+    if (!f) return;
+    let b: FS.Bundle;
+    try { b = JSON.parse(await f.text()); if (!b || b["wedgie-saves"] !== 1) throw new Error(); }
+    catch { $("#d-saves-note").innerHTML = `<b class="bad">That isn't a saves file.</b> It's the .json that Download gives you.`; return; }
+    const n = await withFiles("Putting saves back", (r) => FS.restore(r, b), true);
+    if (n !== undefined) { await loadSaves(); $("#d-saves-note").innerHTML = `${n} save file${n === 1 ? "" : "s"} put back.`; }
+  };
+  main.querySelector<HTMLButtonElement>('[data-sv="all"]')!.onclick = () => downloadSaves();
+
+  // Developer: every file on it.
+  let fsList: FS.Listing | null = null, fsOpen = "", confirmFs = "";
+  async function loadFiles() {
+    const got = await withFiles("Listing files", (r, lv) => FS.ls(r, "/", lv));
+    if (got) { fsList = got; paintFiles(); }
+  }
+  function paintFiles() {
+    const box = $("#d-fs");
+    box.hidden = !fsList;
+    if (!fsList) return;
+    $("#d-fs-free").textContent = fsList.free != null ? `${kb(fsList.free)} free` : "";
+    box.innerHTML = fsList.files.map((f) => {
+      const depth = f.path.split("/").length - 2;
+      const name = f.path.split("/").pop();
+      return f.dir ? `<div class="fs-row dir" style="--d:${depth}">${esc(name)}/</div>`
+        : `<div class="fs-row${fsOpen === f.path ? " open" : ""}" style="--d:${depth}"><a href="#" data-fs-open="${esc(f.path)}">${esc(name)}</a><span class="fine">${f.size < 1024 ? f.size + " B" : kb(f.size)}</span>
+          <button class="btn btn-xs" data-fs-dl="${esc(f.path)}">Download</button><button class="btn btn-xs${confirmFs === f.path ? " sure" : ""}" data-fs-rm="${esc(f.path)}">${confirmFs === f.path ? "Delete it?" : "Delete"}</button></div>`;
+    }).join("") || `<p class="fine">No files.</p>`;
+    box.querySelectorAll<HTMLElement>("[data-fs-open]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); viewFile(a.dataset.fsOpen!); }));
+    box.querySelectorAll<HTMLButtonElement>("[data-fs-dl]").forEach((b) => (b.onclick = async () => {
+      const bytes = await withFiles("Reading it", (r, lv) => FS.get(r, b.dataset.fsDl!, lv));
+      if (bytes) FS.download(b.dataset.fsDl!.split("/").pop()!, bytes);
+    }));
+    box.querySelectorAll<HTMLButtonElement>("[data-fs-rm]").forEach((b) => (b.onclick = async () => {
+      const p = b.dataset.fsRm!;
+      if (confirmFs !== p) { confirmFs = p; paintFiles(); return; }
+      confirmFs = "";
+      await withFiles("Deleting it", (r, lv) => FS.rm(r, p, lv));
+      if (fsOpen === p) { fsOpen = ""; $("#d-fs-view").hidden = true; }
+      await loadFiles();
+    }));
+  }
+  async function viewFile(p: string) {
+    const bytes = await withFiles("Reading it", (r, lv) => FS.get(r, p, lv));
+    if (!bytes) return;
+    fsOpen = p;
+    const v = $("#d-fs-view");
+    const text = /\.(py|json|txt|log|md|csv)$/.test(p) || !bytes.some((b) => b === 0) ? new TextDecoder().decode(bytes.subarray(0, 64 * 1024)) : null;
+    v.hidden = false;
+    v.innerHTML = `<div class="row"><b class="mono">${esc(p)}</b> <span class="fine">${bytes.length} bytes</span><button class="btn btn-xs" id="d-fs-close">Close</button></div>` +
+      (text !== null ? `<pre class="recess out">${esc(text)}</pre>` : `<p class="fine">Not text. Download it to look inside.</p>`);
+    $("#d-fs-close").onclick = () => { fsOpen = ""; v.hidden = true; paintFiles(); };
+    paintFiles();
+  }
+  main.querySelector<HTMLButtonElement>('[data-fs="refresh"]')!.onclick = () => { $<HTMLButtonElement>('[data-fs="refresh"]').textContent = "Refresh"; loadFiles(); };
+  $<HTMLInputElement>("#d-fs-in").onchange = async (e) => {
+    const f = (e.target as HTMLInputElement).files?.[0];
+    (e.target as HTMLInputElement).value = "";
+    if (!f) return;
+    const name = f.name.replace(/[^\w.\-]/g, "_");
+    await withFiles("Uploading", async (r) => FS.put(r, "/" + name, new Uint8Array(await f.arrayBuffer())), true);
+    await loadFiles();
+  };
+
+  /** Raw REPL → its app again, same port (main.py, no reset), then its hello refreshes what we know. */
+  async function backToApp(r: Repl) {
     await r.leave({ reset: false });
     let h: any = null;
     for (let i = 0; i < 12 && !h; i++) h = await r.hello(700).catch(() => null);
-    if (h && w) { if (String(h.fw || "").startsWith("wedgie-")) w.kind = "wedgie"; w.version = h.version; w.apps = h.apps; w.carts = h.carts; w.free = h.free ?? w.free; w.running = h.running ?? null; w.firmware = `wedgie ${h.version}`; }
+    if (h && w) { if (String(h.fw || "").startsWith("wedgie-")) w.kind = "wedgie"; w.slot = !!h.slot; w.version = h.version; w.apps = h.apps; w.carts = h.carts; w.free = h.free ?? w.free; w.running = h.running ?? null; w.firmware = `wedgie ${h.version}`; }
   }
 
   // ---- firmware ---------------------------------------------------------------------------------------
@@ -382,12 +509,12 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     } catch (e: any) {
       meter(null);
       status(`<b class="bad">Update failed:</b> ${esc(e?.message || e)}. It's safe to try again.`);
-      await backToLauncher(r).catch(() => {});
+      await backToApp(r).catch(() => {});
     }
     busy = ""; paint();
   }
 
-  // ---- hardware tests (raw REPL: stop the launcher, run, start it again) ------------------------------
+  // ---- hardware tests (raw REPL: stop its app, run, start it again) ------ ------------------------------
   const act = async (name: string, fn: (r: Repl) => Promise<void>, opts: { probe?: boolean; keep?: boolean } = {}) => {
     if (busy || !link) return;
     busy = name; paint();
@@ -402,7 +529,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     if (!opts.keep) await restart(r);
   };
   const restart = async (r: Repl) => {
-    if (wedgie()) await backToLauncher(r).catch(() => {}); else await r.leave({ reset: true });
+    if (wedgie()) await backToApp(r).catch(() => {}); else await r.leave({ reset: true });
     setScreen(wedgie() ? { kind: "live" } : idScreen());
     busy = ""; stopFn = null;
     paint(); W.touch();
@@ -461,7 +588,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     }, { probe: !wedgie(), keep: true }),
     stop: () => stopFn?.(),
     saveapp: () => {
-      if (!wedgie()) { out.textContent = "Install wedgie firmware first; apps live in its launcher."; return; }
+      if (!wedgie() || !slot()) { out.textContent = "Install or update the wedgie firmware first (0.2+ runs one app)."; return; }
       const name = ($<HTMLInputElement>("#d-appname").value || "").trim() || "sketch";
       const mod = name.toLowerCase().replace(/[^a-z0-9_]/g, "_").replace(/^[^a-z_]/, "_$&").slice(0, 20);
       act("Save", async (r) => {
@@ -470,23 +597,23 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
         for (let i = 0; i < src.length; i += 1024) await r.exec(`_f.write(${pyStr(src.slice(i, i + 1024))})`);
         await r.exec(`_f.close()
 import json, sys
-try:
-    _a = json.load(open("apps.json"))
-except Exception:
-    _a = []
-_a = [x for x in _a if x["mod"] != ${pyStr(mod)}] + [{"mod": ${pyStr(mod)}, "name": ${pyStr(name.slice(0, 12))}, "about": "yours"}]
-json.dump(_a, open("apps.json", "w"))
+json.dump([{"mod": ${pyStr(mod)}, "name": ${pyStr(name.slice(0, 12))}, "about": "yours"}], open("apps.json", "w"))
 sys.modules.pop(${pyStr(mod)}, None)
 import os
 try:
     os.sync()
 except AttributeError:
     pass`);
-        out.textContent = `Saved as ${mod}.py; it's in the wedgie's launcher now.`;
+        out.textContent = `Saved as ${mod}.py; it's the wedgie's app now, and it boots into it.`;
       }, { probe: false });
     },
   };
   main.querySelectorAll<HTMLButtonElement>("[data-act]").forEach((b) => (b.onclick = () => handlers[b.dataset.act!]?.()));
+
+  // Last: attach() paints, and painting reads everything declared above.
+  const off = W.onChange(attach);
+  attach();
+  mirror();
 
   return () => {
     alive = false;

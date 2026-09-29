@@ -1,6 +1,9 @@
-// /test: the test bench. Plug a wedgie in, do what its own screen says, unplug. Nothing on this page
-// needs touching once the computer has the test-bench profile (Chrome then lets the page use every
-// Pico without asking). Every unit takes the same path from scratch:
+// /format (was /test): wipe a wedgie, set it up fresh, test it. Plug it in, press Format, do what its
+// own screen says, unplug. Nothing starts until Format is pressed (a wedgie plugged in here by mistake
+// keeps everything). A used wedgie's saves (/saves) are copied into this browser first and put back
+// after the new firmware goes on, unless "wipe its saves too" is ticked; a backup that couldn't be put
+// back (unplugged mid-way) waits here, by board ID, for that board to come back. With the test-bench
+// profile Chrome lets the page use every Pico without asking. Every unit takes the same path:
 //  0. a used one (anything answering on serial) is told to reboot into BOOTSEL;
 //  1. BOOTSEL (a blank Pico boots there): wipe + plain MicroPython over WebUSB (picoboot.ts);
 //  2. board facts (bench.py); a board with the Pico W's WiFi chip goes round once more for the W build;
@@ -11,6 +14,7 @@
 import * as W from "../serial/wedgies";
 import type { Repl } from "../serial/repl";
 import { installCore } from "../serial/install";
+import * as FS from "../serial/files";
 import { checkChip } from "../serial/chipcheck";
 import { usbSupported, bootDevices, isBoot, pickBoot, flashMicroPython, BOOT_PIDS } from "../serial/picoboot";
 
@@ -31,7 +35,7 @@ function boardName(b: any) {
   return `${b.cpu} board (not a Raspberry Pi Pico)`;
 }
 
-/** The one-time Chrome setup both benches need (/test, /update): the profile that lets wedgie.dev use
+/** The one-time Chrome setup both benches need (/format, /update): the profile that lets wedgie.dev use
  *  every Pico without asking, so a bench runs hands-off. */
 export function benchSetup() {
   return `<div class="test-setup card">
@@ -44,21 +48,25 @@ export function benchSetup() {
     </div>`;
 }
 
-export function test(main: HTMLElement) {
+const SAVES = (uid: string) => `wedgie.saves.${uid}`;   // a backup waiting to go back on
+const backup = (uid?: string): FS.Bundle | null => { try { return uid ? JSON.parse(localStorage.getItem(SAVES(uid)) || "null") : null; } catch { return null; } };
+
+export function format(main: HTMLElement) {
   main.innerHTML = `
   <section class="test-page">
     <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
-    <h1>Wedgie test bench</h1>
+    <h1>Format a wedgie</h1>
     <div class="test-status">
       <div class="status-text" id="t-text">Plug in a wedgie</div>
-      <div class="status-detail" id="t-detail">New or used. Then follow its screen.</div>
+      <div class="status-detail" id="t-detail">New or used. Nothing happens until you press Format.</div>
       <div class="meter" id="t-meter" hidden><div class="meter-track"><div class="meter-fill"></div></div></div>
     </div>
     <div class="test-grid" id="t-grid"></div>
     <div class="test-actions" id="t-actions"></div>
     <div class="test-id" id="t-id"></div>
     <dl class="kv test-facts" id="t-facts" hidden></dl>
-    <p class="fine">Anything plugged in here gets wiped and set up fresh.</p>
+    <label class="fine test-wipe"><input type="checkbox" id="t-wipe"> Wipe its saves too</label>
+    <p class="fine">Format wipes the wedgie and sets it up fresh: MicroPython, the wedgie firmware, then a test of the chip and every button. Its saves are kept unless you tick the box.</p>
     ${benchSetup()}
   </section>`;
   const $ = (id: string) => document.getElementById(id)!;
@@ -91,6 +99,7 @@ export function test(main: HTMLElement) {
   };
 
   let busy = false;
+  let go = false;                 // Format was pressed for the unit on the bench now
   let flashedAt = 0;              // we just put MicroPython on a unit: the next serial board is it
   let wantWifi = false;           // the next flash is the W build (the unit has the WiFi chip)
   let waitBoot = 0;               // a unit was told to reboot into BOOTSEL
@@ -107,11 +116,24 @@ export function test(main: HTMLElement) {
     waitBoot = Date.now();
     status("Restarting it into boot mode…", "To wipe it and set it up fresh.");
     buttons("");
+    const wipe = ($("t-wipe") as HTMLInputElement).checked;
     W.withRepl(w, async (r) => {
       await r.write("\r\x03\x03");
       await new Promise((res) => setTimeout(res, 150));
       await r.write("\x01");
       await r.waitFor(RAW, 3000);
+      if (w.uid && wipe) try { localStorage.removeItem(SAVES(w.uid)); } catch {}
+      else if (w.uid) {
+        status("Copying its saves…", "They go back on after the wipe.");
+        const b = await FS.saves(r, false).catch(() => null);      // firmware before 0.2 has no saves
+        const n = b ? Object.keys(b.files).length : 0;
+        if (b && n) {
+          b.id = w.short; b.at = new Date().toISOString();
+          try { localStorage.setItem(SAVES(w.uid), JSON.stringify(b)); fact("Saves", `${n} file${n > 1 ? "s" : ""} copied off`); }
+          catch { fact("Saves", "couldn't copy them off (browser storage full)"); }
+        }
+        status("Restarting it into boot mode…", "To wipe it and set it up fresh.");
+      }
       await r.write("import machine\nmachine.bootloader()\x04");
       await new Promise((res) => setTimeout(res, 300));
     }).catch(() => {});
@@ -145,6 +167,7 @@ export function test(main: HTMLElement) {
     } catch (e: any) {
       set(BOARD, "fail", e?.message || String(e));
       status("FAIL", "Couldn't put MicroPython on. Unplug it, hold BOOTSEL, plug it back in.", "bad");
+      go = false;
     }
     progress(null);
     busy = false;
@@ -189,8 +212,15 @@ export function test(main: HTMLElement) {
           set(FW, "running", "Installing");
           status("Installing the wedgie firmware…", "Don't unplug it.");
           progress(0);
-          const got = await installCore(r, (p) => progress(p), { launcher: false });   // the core; cartridges go on at /connect
+          const got = await installCore(r, (p) => progress(p), { launcher: false });   // the core; its app gets picked at /connect
           progress(null);
+          const kept = backup(b.uid);
+          if (kept && !($("t-wipe") as HTMLInputElement).checked) {
+            status("Putting its saves back…", "Don't unplug it.");
+            const n = await FS.restore(r, kept);
+            try { localStorage.removeItem(SAVES(b.uid)); } catch {}
+            fact("Saves", `${n} file${n === 1 ? "" : "s"} put back`);
+          }
           set(FW, "pass", `wedgie ${got.version}`); step = CHIP;
           await r.exec(await W.probe(), 10000);        // load the bench again (the install ran its own code)
           await r.exec(await benchPy(), 10000);
@@ -244,6 +274,7 @@ export function test(main: HTMLElement) {
     if (gone) { waitBoot = Date.now(); pick(); return; }
     for (let i = step + 1; i <= COLORS; i++) if (tests[i].state === "waiting") set(i, "skip", "");
     const failed = tests.filter((t) => t.state !== "pass").map((t) => t.name);
+    go = false;
     if (failed.length) status("FAIL", `${failed.join(", ")}. Unplug it.`, "bad");
     else status("PASS", `${w.short} is ready. Unplug it.`, "good");
     if (w.uid) ended.set(w.uid, Date.now());
@@ -279,17 +310,20 @@ export function test(main: HTMLElement) {
     if (busy) return;
     const boot = (await bootDevices()).find((d) => !flashed.has(d));
     if (busy) return;
-    if (boot) return void flash(boot);
+    const midway = !!(flashedAt || waitBoot);   // one unit's format is under way (its reboots come back here)
+    if (boot) return void (go || midway ? flash(boot) : ask(`A Pico in boot mode (${BOOT_PIDS[boot.productId]})`));
     const ws = W.wedgies();
     for (const k of [...tested]) if (!ws.some((w) => w.key === k)) tested.delete(k);
     const next = ws.find((w) => w.state === "ready" && !done(w));
     if (next) {
       if (flashedAt && Date.now() - flashedAt < 90000) return void run(next);
+      if (!go) return ask(`${next.short || "A wedgie"} · ${next.board || ""}`, next.uid);
       reset();
       idLine(next.uid || "", next.board || "");
       return void toBoot(next);
     }
     const bad = ws.find((w) => w.state === "error" && !done(w));
+    if (bad && !go && !midway && /No MicroPython/.test(bad.error || "")) return ask("A board with something else on it (not MicroPython)");
     if (bad && /No MicroPython/.test(bad.error || "")) {
       // New boards often ship with a maker's demo on them. Opening the port at 1200 baud is the
       // standard "reboot into BOOTSEL" knock (pico-sdk, CircuitPython and Arduino builds all obey it).
@@ -309,6 +343,7 @@ export function test(main: HTMLElement) {
     }
     if (bad) {
       tested.add(bad.key);
+      go = false;
       reset();
       const noMp = false;
       status("Can't talk to it", noMp ? "Something other than MicroPython is on it. Unplug it, hold BOOTSEL, plug it back in." : bad.error || "", "bad");
@@ -323,6 +358,13 @@ export function test(main: HTMLElement) {
     }
     if (!flashedAt && !waitBoot && !actions.innerHTML && !justEnded) idle();
   }
+  // A unit is plugged in: nothing happens to it until Format is pressed.
+  function ask(what: string, uid?: string) {
+    const kept = backup(uid);
+    status(`Plugged in: ${what}`, kept ? `Saves from its last format are waiting in this browser (${Object.keys(kept.files).length} files); they go back on.` : "Format wipes it and sets it up fresh, then tests it.");
+    if (!document.getElementById("t-go")) buttons(`<button class="btn btn-green" id="t-go">Format it</button>`);
+    $("t-go").onclick = () => { go = true; buttons(""); pick(); };
+  }
   // Without the profile, the first sight of a unit needs a tap.
   function idle() {
     buttons(`<p class="fine">Plugged in and nothing happens? No profile yet: <a href="#" id="t-new">pick a new Pico</a> · <a href="#" id="t-used">pick a used one</a></p>`);
@@ -332,7 +374,7 @@ export function test(main: HTMLElement) {
 
   draw();
   if (!W.supported() || !usbSupported()) {
-    status("Can't see USB here", "Open wedgie.dev/test in Chrome or Edge on a computer.", "bad");
+    status("Can't see USB here", "Open wedgie.dev/format in Chrome or Edge on a computer.", "bad");
     return;
   }
   navigator.usb.addEventListener("connect", (e) => { if (isBoot((e as USBConnectionEvent).device)) setTimeout(pick, 300); });

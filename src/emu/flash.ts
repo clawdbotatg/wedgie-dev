@@ -1,11 +1,11 @@
 // What goes on the virtual wedgie's flash: every file in /fw/manifest.json (published from
-// firmware/ by tools/fw.mjs) with every cartridge in its launcher, plus the few things a real board
-// has that the repo does not.
+// firmware/ by tools/fw.mjs), with one app in apps.json (the one it runs), plus the few things a real
+// board has that the repo does not.
 
 export type Manifest = { version: string; files: { name: string; size: number; sha256: string }[]; carts: App[] };
-type App = { mod: string; name?: string; entry?: string; about?: string; v?: string };
+type App = { mod: string; name?: string; entry?: string; usb?: boolean; about?: string; v?: string };
 
-export async function loadFlash(base = "/fw/") {
+export async function loadFlash(base = "/fw/", app = "hello") {
   const manifest: Manifest = await (await fetch(base + "manifest.json", { cache: "no-cache" })).json();
   const files: Record<string, string | Uint8Array> = {};
   await Promise.all(manifest.files.map(async (f) => {
@@ -13,15 +13,15 @@ export async function loadFlash(base = "/fw/") {
     if (!r.ok) throw new Error(`fw/${f.name}: HTTP ${r.status}`);
     files[f.name] = /\.(py|json)$/.test(f.name) ? await r.text() : new Uint8Array(await r.arrayBuffer());
   }));
-  files["apps.json"] = JSON.stringify(manifest.carts.map(({ mod, name, entry, about, v }) => ({ mod, name, entry, about, v })));
+  files["apps.json"] = JSON.stringify(manifest.carts.filter((c) => c.mod === app).map(({ mod, name, entry, usb, about, v }) => ({ mod, name, entry, usb, about, v })));
   emulatorOnly(files);
   return { manifest, files };
 }
 
 // On the board an app with an `entry` (usbwallet.run) may own the CPU in a loop forever. The
 // emulator is one thread, so an app that also offers start()/stop() (the Timer form, which the
-// firmware keeps for exactly this) is launched that way instead: it starts itself at import and the
-// launcher's X calls stop(). Apps whose entry returns (demo.run) keep their entry.
+// firmware keeps for exactly this) is run that way instead: it starts itself at import. Apps whose
+// entry has no Timer form (demo.run) keep their entry and own the worker; keys still work.
 function emulatorOnly(files: Record<string, string | Uint8Array>) {
   const appsJson = files["apps.json"];
   if (typeof appsJson === "string") {
@@ -54,8 +54,8 @@ ALLOW_GENKEY = False
 ALLOW_SOFT_KEY = True   # no chip in the emulator: run the wallet on a software key anyway
 `;
 
-// firmware/main.py, except the launcher runs on a Timer (menu.start) instead of owning the CPU
-// (menu.run): the Worker is one thread, and apps like hello tick on Timers of their own.
+// firmware/main.py, except the slot runs on a Timer (slot.start) instead of owning the CPU
+// (slot.run): the Worker is one thread, and apps like hello tick on Timers of their own.
 export const BOOT = `import sys
 try:
     import boot
@@ -63,10 +63,12 @@ except Exception as e:
     sys.print_exception(e)
 try:
     import lcd
+    import wedgie
     import loader
-    loader.load("menu")
-    import menu
-    menu.start()
+    _a = wedgie.active()
+    loader.load(_a["mod"] if _a else "slot")
+    import slot
+    slot.start()
 except Exception as e:
     sys.print_exception(e)
 `;

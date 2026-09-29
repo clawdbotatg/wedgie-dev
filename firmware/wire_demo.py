@@ -1,5 +1,5 @@
 # wire_demo: clear-sign an ERC-7730 wire-format request on the Pico wallet (emulator or board).
-# Emulator: tools/emu run wire_demo    keys: up/down scroll, left/right switch request, A approve, Y reject, X quit
+# Emulator: tools/emu run wire_demo    keys: up/down scroll, left/right switch request, A approve, Y reject
 # The request bytes below were made by wire_encode.py (host). ROOT is the toy root-of-trust P-256 key.
 import time, binascii
 from machine import Timer
@@ -64,8 +64,6 @@ def draw():
 def tick(_):
     global which, top, status
     for k in keys.pressed():
-        if k == "X":
-            stop(); return
         if k == "down": top += 1
         if k == "up": top = max(0, top - 1)
         if k in ("left", "right"):
