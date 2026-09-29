@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>wedgie cover</title>
+<!-- The X/Twitter header (public/img/cover.png), rendered by `node tools/og.mjs cover`: the waistband
+     stripes edge to edge and the real 3D wedgie in front. 1500x500, dev server only. -->
+<style>
+  html, body { margin: 0; width: 1500px; height: 500px; overflow: hidden; background: #f4f4f1; }
+  body { position: relative; }
+  .band { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 22px;
+    padding: 34px 0; background: linear-gradient(#ffffff, #eeeeea); box-shadow: 0 1px 0 #fff inset, 0 10px 30px -18px rgba(0,0,0,.35); }
+  .band i { display: block; height: 30px; box-shadow: inset 0 5px 0 rgba(255,255,255,.35), inset 0 -5px 0 rgba(0,0,0,.12); }
+  .band i:nth-child(1) { background: linear-gradient(#34d463, #19a843); }
+  .band i:nth-child(2) { background: linear-gradient(#bdbebf, #9c9d9e); }
+  .band i:nth-child(3) { background: linear-gradient(#f2463f, #cc2621); }
+  #dev { position: absolute; left: 50%; top: 50%; width: 620px; transform: translate(-22%, -47%); }
+</style>
+</head>
+<body>
+  <div class="band"><i></i><i></i><i></i></div>
+  <div id="dev"></div>
+  <script type="module">
+    import { mountWedgie3D } from "/src/ui/wedgie3d.ts";
+    await mountWedgie3D(document.getElementById("dev"), { interactive: false, screen: "/screens/wallet-home.png", side: -1 });
+    setTimeout(() => (window.ready = true), 1500);
+  </script>
+</body>
+</html>
