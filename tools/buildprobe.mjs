@@ -23,11 +23,13 @@ for (const vp of [{ width: 1360, height: 900, name: "desktop" }, { width: 390, h
   await page.goto(base + "/build?app=usbwallet&chip=none&lid=pink");
   await page.waitForSelector("[data-app]");
   check(q().app === "usbwallet" && q().chip === "atecc" && q().lid === "pink" && q().base === "black", `${vp.name}: link read, wallet forces the chip, defaults filled in (${new URL(page.url()).search})`);
-  check(await page.locator('#bld-chip [data-chip="0"]').isDisabled(), `${vp.name}: "No chip" off for the wallet`);
+  check(await page.locator('#bld-chip [data-chip="none"]').isDisabled() && await page.locator('#bld-chip [data-chip="trustm"]').isDisabled(), `${vp.name}: "No chip" and Trust M off for the wallet (it needs the ATECC608)`);
   check((await page.locator("#bld-steps").innerText()).includes("ATECC608"), `${vp.name}: build list has the chip`);
 
   await tap('[data-app="demo"]');
-  await tap('#bld-chip [data-chip="0"]');
+  await tap('#bld-chip [data-chip="trustm"]');
+  check(q().chip === "trustm" && (await page.locator("#bld-steps").innerText()).includes("Trust M"), `${vp.name}: Trust M picked, on the build list`);
+  await tap('#bld-chip [data-chip="none"]');
   await tap('.sw[data-part="a"][data-color="blue"]');
   await tap('.sw[data-part="base"][data-color="orange"]');
   check(q().app === "demo" && q().chip === "none" && q().a === "blue" && q().base === "orange", `${vp.name}: taps land in the URL`);

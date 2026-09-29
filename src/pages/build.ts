@@ -1,4 +1,4 @@
-// /build: pick a wedgie — its app, whether it has the secure chip, the color of every printed part —
+// /build: pick a wedgie — its app, its secure chip (or none), the color of every printed part —
 // and the URL becomes that wedgie (/build?app=usbwallet&chip=atecc&lid=white&...). Anyone with the link
 // sees the same one and can buy it or build it from the list below. Firmware is always the latest.
 import "./build.css";
@@ -28,7 +28,14 @@ const PARTS = [
   { key: "stick", part: "joystick", name: "Joystick", stl: "joystick.stl", def: "grey" },
 ] as const;
 const DEF_APP = "hello";
-const NEEDS_CHIP = new Set(["usbwallet"]);
+// Secure chips: URL key, the name carts.json's "chip" uses, what to buy. The core has a driver for each.
+const CHIPS = [
+  { key: "atecc", chip: "ATECC608", name: "ATECC608", about: "Adafruit ATECC608 breakout",
+    buy: [["https://www.amazon.com/s?k=ATECC608&i=electronics", "Amazon"], ["https://www.adafruit.com/product/4314", "Adafruit"], ["https://www.digikey.com/en/products/detail/adafruit-industries-llc/4314/10419053", "DigiKey"]] },
+  { key: "trustm", chip: "OPTIGA Trust M", name: "Trust M", about: "Adafruit Infineon OPTIGA Trust M breakout",
+    buy: [["https://www.adafruit.com/product/4351", "Adafruit"]] },
+];
+const chipOf = (key: string) => CHIPS.find((c) => c.key === key);
 // What each app looks like on the preview's screen.
 const SCREENS: Record<string, string[]> = {
   hello: ["hello"], keytest: ["buttons"], demo: ["demo", "demo-2"], mock: ["wallet-home", "wallet-chart", "wallet-send", "wallet-receive"],
@@ -41,7 +48,7 @@ const PRESETS = [
   { name: "Plain", q: "app=hello&chip=none&lid=white&base=black&a=green&b=grey&x=grey&y=red&stick=grey" },
 ];
 
-type Build = { app: string; chip: boolean; colors: Record<string, string> };
+type Build = { app: string; chip: string; colors: Record<string, string> };   // chip: a CHIPS key or "none"
 
 function read(carts: Cart[]): Build {
   const q = new URLSearchParams(location.search);
@@ -49,11 +56,16 @@ function read(carts: Cart[]): Build {
   const app = a && (!carts.length || carts.some((c) => c.mod === a)) ? a : DEF_APP;
   const colors: Record<string, string> = {};
   for (const p of PARTS) colors[p.key] = COLORS[q.get(p.key) || ""] ? q.get(p.key)! : p.def;
-  return { app, chip: NEEDS_CHIP.has(app) || q.get("chip") !== "none", colors };
+  return { app, chip: fitChip(carts, app, q.get("chip") || ""), colors };
+}
+// The app's chip if it needs one; else the one asked for (an unknown one: the ATECC608).
+function fitChip(carts: Cart[], app: string, want: string) {
+  const need = CHIPS.find((c) => c.chip === carts.find((x) => x.mod === app)?.chip);
+  return need ? need.key : want === "none" || chipOf(want) ? want : "atecc";
 }
 // Every choice goes in the URL, defaults too, so a link means the same wedgie if the defaults change.
 function query(b: Build) {
-  const q = new URLSearchParams({ app: b.app, chip: b.chip ? "atecc" : "none" });
+  const q = new URLSearchParams({ app: b.app, chip: b.chip });
   for (const p of PARTS) q.set(p.key, b.colors[p.key]);
   return q.toString();
 }
@@ -79,10 +91,10 @@ export async function build(main: HTMLElement) {
       </div>
       <div class="bld-pick">
         <div class="card"><h3>Software</h3><p class="fine">The one app it boots into. You can swap it any time from Connect.</p><div class="bld-apps" id="bld-apps"><p class="fine">Loading apps…</p></div></div>
-        <div class="card"><h3>Chip</h3><p class="fine">The secure chip keeps keys. Wallets need it; games don't.</p>
+        <div class="card"><h3>Chip</h3><p class="fine">The secure chip keeps keys. Wallets need one; games don't.</p>
           <div class="seg" role="radiogroup" aria-label="secure chip" id="bld-chip">
-            <button data-chip="1" role="radio">ATECC608 secure chip</button>
-            <button data-chip="0" role="radio">No chip</button>
+            ${CHIPS.map((c) => `<button data-chip="${c.key}" role="radio">${c.name}</button>`).join("")}
+            <button data-chip="none" role="radio">No chip</button>
           </div><p class="fine" id="bld-chip-note"></p></div>
         <div class="card"><h3>Colors</h3><p class="fine">Every printed part, in any PETG you like.</p><div class="bld-colors" id="bld-colors"></div></div>
         <div class="card"><h3>Firmware</h3><p class="fine">Always the latest: <b id="bld-fw">…</b>. Every wedgie updates itself from Connect.</p></div>
@@ -134,19 +146,20 @@ export async function build(main: HTMLElement) {
         ${miniCart(c)}<span><b>${esc(c.name)}</b><span class="fine">${esc(c.about || "")}</span></span></button>`).join("");
       $("#bld-apps").querySelectorAll<HTMLButtonElement>("[data-app]").forEach((x) => (x.onclick = () => {
         const app = x.dataset.app!;
-        set({ ...b, app, chip: b.chip || NEEDS_CHIP.has(app) });
+        set({ ...b, app, chip: fitChip(m!.carts, app, b.chip) });
       }));
       $("#bld-fw").textContent = `wedgie ${m.version}`;
     }
     // Chip
-    const must = NEEDS_CHIP.has(b.app);
+    const must = cart?.chip;
     $("#bld-chip").querySelectorAll<HTMLButtonElement>("button").forEach((x) => {
-      const on = (x.dataset.chip === "1") === b.chip;
+      const on = x.dataset.chip === b.chip;
       x.classList.toggle("on", on); x.setAttribute("aria-checked", String(on));
-      x.disabled = must && x.dataset.chip === "0";
-      x.onclick = () => set({ ...b, chip: x.dataset.chip === "1" });
+      x.disabled = !!must && !on;
+      x.onclick = () => set({ ...b, chip: x.dataset.chip! });
     });
-    $("#bld-chip-note").textContent = must ? `${cart?.name || b.app} needs the chip.` : "";
+    $("#bld-chip-note").textContent = must ? `${cart!.name} needs the ${must}.` : "";
+    const chip = chipOf(b.chip);
     // Colors: one row of swatches per part.
     $("#bld-colors").innerHTML = PARTS.map((p) => `<div class="bld-color"><span class="bld-part">${p.name} <span class="fine">${COLORS[b.colors[p.key]].name}</span></span><span class="bld-sw">${
       Object.entries(COLORS).map(([k, c]) => `<button class="sw${b.colors[p.key] === k ? " on" : ""}" style="--c:#${c.hex.toString(16).padStart(6, "0")}" data-part="${p.key}" data-color="${k}" title="${c.name}" aria-label="${p.name}: ${c.name}" aria-pressed="${b.colors[p.key] === k}"></button>`).join("")
@@ -164,14 +177,14 @@ export async function build(main: HTMLElement) {
         <div class="buy">${link("https://www.amazon.com/s?k=raspberry+pi+pico+with+header&i=electronics", "Amazon")}${link("https://www.adafruit.com/product/6315", "Adafruit")}${link("https://www.microcenter.com/product/692334/raspberry-pi-pico-2w-with-header", "Micro Center")}</div></li>
       <li><b>The screen hat</b> <span>Waveshare Pico-LCD-1.3.</span>
         <div class="buy">${link("https://www.amazon.com/dp/B092VVCBQP", "Amazon")}${link("https://www.waveshare.com/pico-lcd-1.3.htm", "Waveshare")}${link("https://thepihut.com/products/1-3-ips-lcd-display-module-for-raspberry-pi-pico-240x240", "The Pi Hut")}</div></li>
-      ${b.chip ? `<li><b>The chip</b> <span>Adafruit ATECC608 breakout, plus a STEMMA QT / Qwiic cable with bare wire ends.</span>
-        <div class="buy">${link("https://www.amazon.com/s?k=ATECC608&i=electronics", "Amazon")}${link("https://www.adafruit.com/product/4314", "Adafruit")}${link("https://www.digikey.com/en/products/detail/adafruit-industries-llc/4314/10419053", "DigiKey")}</div></li>` : ""}
+      ${chip ? `<li><b>The chip</b> <span>${chip.about}, plus a STEMMA QT / Qwiic cable with bare wire ends.</span>
+        <div class="buy">${chip.buy.map(([u, t]) => link(u, t)).join("")}</div></li>` : ""}
       ${b.app === "battery" ? `<li><b>A battery hat</b> <span>The Battery app reads a Waveshare Pico-UPS-B.</span>
         <div class="buy">${link("https://www.waveshare.com/pico-ups-b.htm", "Waveshare")}</div></li>` : ""}
       <li><b>Print the case</b> <span>PETG, 0.16 mm layers, 4 walls, no supports. Lid in ${cname("lid").toLowerCase()}, base in ${cname("base").toLowerCase()}, joystick in ${cname("stick").toLowerCase()}, buttons: ${buttons}.</span>
         <div class="buy">${[["lid.stl", `Lid · ${cname("lid")}`], ["base.stl", `Base · ${cname("base")}`], ["joystick.stl", `Joystick · ${cname("stick")}`], ["button.stl", "Button ×4"]]
           .map(([f, t]) => `<a class="btn btn-xs" href="${CASE}${f}" download>${t}</a>`).join("")}</div></li>
-      <li><b>Put it together</b> <span>${b.chip ? "Wedge the chip's wires in, then the chip, then the case." : "Plug the Pico into the hat, then snap the case on. Skip the chip steps."}</span>
+      <li><b>Put it together</b> <span>${chip ? "Wedge the chip's wires in, then the chip, then the case." : "Plug the Pico into the hat, then snap the case on. Skip the chip steps."}</span>
         <div class="buy"><a class="btn btn-xs" href="/assemble">Assembly guide</a></div></li>
       <li><b>Put ${esc(cart?.name || b.app)} on it</b> <span>Plug it in, tap Connect at the top, open your wedgie, and tap ${esc(cart?.name || b.app)}. It gets the latest firmware too.</span>
         <div class="buy"><a class="btn btn-xs" href="/connect">Connect</a></div></li>`;
