@@ -10,3 +10,4 @@ public/fw
 .claude/worktrees
 public/lore.md
 __pycache__
+.env
