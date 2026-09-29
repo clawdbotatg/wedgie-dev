@@ -28,6 +28,11 @@ for (const vp of [{ width: 1360, height: 900, name: "desktop" }, { width: 390, h
   check(q().app === "usbwallet" && q().chip === "atecc" && q().lid === "pink" && q().base === "black", `${vp.name}: link read, wallet forces the chip, defaults filled in (${new URL(page.url()).search})`);
   check(await page.locator('#bld-chip [data-slot="0"]').isDisabled() && q().chip2 === "none", `${vp.name}: the wallet locks the ATECC608 into the first slot; the second is free`);
   check((await page.locator("#bld-steps").innerText()).includes("ATECC608"), `${vp.name}: build list has the chip`);
+  const cost = async () => +(await page.locator("#bld-price").innerText()).replace("$", "");
+  const withChip = await cost();
+  check(q().pico === "nulllab" && withChip === 57, `${vp.name}: default board in the URL; wallet price is parts + $30 = $${withChip}`);
+  await tap('[data-pico="green"]');
+  check(q().pico === "green" && await cost() < withChip && (await page.locator("#bld-steps").innerText()).includes("Green USB-C Pico"), `${vp.name}: another board: in the URL, cheaper, on the build list`);
 
   await tap('[data-app="demo"]');
   const slot = (i) => page.locator(`#bld-chip [data-slot="${i}"]`);
@@ -44,6 +49,7 @@ for (const vp of [{ width: 1360, height: 900, name: "desktop" }, { width: 390, h
     `${vp.name}: a sensor in the second slot; VCNL4040 (0x60, like the ATECC608) can't go with it`);
   await slot(0).selectOption("none");
   await slot(1).selectOption("none");
+  check(await cost() === 51 - 2, `${vp.name}: no chips, green board: $${await cost()}`);
   await tap('.sw[data-part="a"][data-color="blue"]');
   await tap('.sw[data-part="base"][data-color="orange"]');
   check(q().app === "demo" && q().chip === "none" && q().a === "blue" && q().base === "orange", `${vp.name}: taps land in the URL`);

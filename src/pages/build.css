@@ -46,3 +46,4 @@
 .bld-slot select:disabled { opacity: .7; }
 #bld-chip-note { margin-top: 10px; }
 @media (max-width: 480px) { .bld-slots { grid-template-columns: 1fr; } }
+.bld-cost td:first-child { padding-right: 12px; }
