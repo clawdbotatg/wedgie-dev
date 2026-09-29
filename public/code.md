@@ -65,7 +65,8 @@ Other things about the wedgie (building one, the USB protocol, the secure chip):
   256 KB per app.
 - `entry`: a function the firmware calls after importing (a game loop). Leave it out for a Timer app
   (it starts itself at import).
-- `fw`: the oldest firmware it runs on. Use `"0.2.3"` if you use `show_start`/`show(y0, y1)`/`show_rect`.
+- `fw`: the oldest firmware it runs on. `"0.2.3"` if you use `show_start`/`show(y0, y1)`/`show_rect`,
+  `"0.2.4"` if you use `wedgie.rand`.
 - `name` up to 14 characters (it's printed on the cartridge), `about` one line, `label` the cartridge
   color, `icon` 12 rows of 12 characters: `.` clear, `k` black, `w` white, `g` green, `r` red,
   `y` yellow, `b` blue, `s` grey.
@@ -220,6 +221,30 @@ touch it. Save at checkpoints, never every frame (flash wears).
 In the emulator every save shows up under **Saves**; the person can edit one (`"level": 8`) and it runs
 again from there, so nobody plays through levels 1-7 to test level 8. Tell them which save does what.
 
+## Randomness from the secure chip
+
+Every wedgie has a secure chip (ATECC608 or OPTIGA Trust M) with a true hardware random generator.
+Use it for anything where fair or unguessable matters: shuffling a deck, dice, loot, a crypto game.
+Firmware 0.2.4+ (`"fw": "0.2.4"`):
+
+```python
+from wedgie import rand, rand_below, rand_source
+rand(32)            # 32 random bytes from the chip
+rand_below(52)      # a fair whole number 0..51 (no modulo bias), 32 bytes fetched per 10 draws
+rand_source()       # "OPTIGA Trust M", "ATECC608", or "os.urandom (why)"
+for i in range(51, 0, -1):          # a fair shuffle: Fisher-Yates, every swap from the chip
+    j = rand_below(i + 1); deck[i], deck[j] = deck[j], deck[i]
+```
+
+- Measured on a Trust M: the first call takes ~0.5 s (it finds the chip), then 12 ms per 32 bytes.
+  Draw what a round needs at its start (shuffle once), not one byte per frame.
+- **Show `rand_source()` on screen** where fairness matters ("shuffled by OPTIGA Trust M"). An
+  ATECC608 as shipped (config not locked) answers a fixed pattern instead of randomness; `rand`
+  detects that and uses the Pico's own generator, and `rand_source()` says so. So does the emulator,
+  which has no chip.
+- For looks (star fields, particles) plain `random` is fine and faster.
+- Example: Hi-Lo, https://github.com/clawdbotatg/wedgie-starter/blob/main/hilo/hilo.py
+
 ## The rest of the hardware
 
 - Screen: `lcd.LCD()` is a `framebuf.FrameBuffer` (240x240, RGB565) plus `show`, `show_start`,
@@ -230,8 +255,8 @@ again from there, so nobody plays through levels 1-7 to test level 8. Tell them 
 - MicroPython, not CPython: `math random struct json time array framebuf micropython gc`,
   `time.ticks_ms()`, `ticks_diff()`, `sleep_ms()`. No real clock, no files outside the flash, no pip.
 - Sound: none built in. Free pins for extras: GP0 GP1 GP6 GP7 GP14 GP22 GP26 GP27 GP28.
-- The secure chip (ATECC608 or Trust M) is for wallets and crypto games: see /skill.md. Never lock
-  it or make keys on it unless the person asks; both are permanent.
+- The secure chip (ATECC608 or Trust M): random numbers above; keys and signing for wallets and
+  crypto games in /skill.md. Never lock it or make keys on it unless the person asks; both are permanent.
 
 ## Before you say it's done
 

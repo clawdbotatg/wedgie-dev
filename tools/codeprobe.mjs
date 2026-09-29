@@ -48,6 +48,7 @@ try {
   await page.click("#c-try button");
   await page.waitForSelector("#c-shelf button.cart", { timeout: 20000 });
   check(await page.locator("#c-shelf .cart-name").first().textContent() === "Dodge", "the starter repo's Dodge is on the shelf");
+  await page.click('#c-shelf .cart-slot[data-mod="dodge"] button.cart');
   const vwUp = () => page.waitForFunction(() => window.__codeVw && window.__codeVw.fps > 5, null, { timeout: 30000 });
   await vwUp();
   check(true, `Dodge runs in the virtual wedgie (${await page.evaluate(() => window.__codeVw.fps)} fps)`);
@@ -59,11 +60,12 @@ try {
   await page.keyboard.down("d"); await page.waitForTimeout(600); await page.keyboard.up("d");
   check(before !== await page.evaluate(() => window.__codeVw.screenshotPNG()), "D on the keyboard moves the ship (the screen changes)");
 
-  // Saves: play until the rocks win; Dodge saves its best; the page keeps it; edit it and run again.
-  await page.waitForFunction(() => !!localStorage.getItem("wedgie.emu.saves.dodge"), null, { timeout: 150000 }).catch(() => {});   // rocks are random: a game over can take a while
-  const saved = await page.evaluate(() => localStorage.getItem("wedgie.emu.saves.dodge"));
-  check(!!saved && saved.includes('"best"'), `a game over's save.store reaches the page: ${saved}`);
-  await page.locator("#c-vw").screenshot({ path: `${out}/code-dodge-over.png` });
+  // Saves: one kept from an earlier run (emuprobe covers save.store reaching the page) shows up, can be
+  // edited, and the game runs again from it.
+  await page.evaluate(() => localStorage.setItem("wedgie.emu.saves.dodge", JSON.stringify({ best: { ext: ".json", b64: btoa("2") } })));
+  await page.click("#c-again");
+  await page.waitForSelector('#c-save-list [data-sv="best"]', { timeout: 10000 });
+  check(true, "a kept save is listed under Saves");
   await page.click('#c-save-list [data-sv="best"]');
   await page.fill("#c-save-edit", "4321");
   await page.click("#c-save-put");
@@ -74,10 +76,23 @@ try {
   const b = JSON.parse(await page.evaluate(() => localStorage.getItem("wedgie.emu.saves.dodge"))).best;
   check(atob(b.b64) === "4321", "an edited save is kept and the game runs again with it (see code-dodge-best.png: best 4321)");
 
+  // Hi-Lo: its deck is shuffled by wedgie.rand; the emulator has no chip, so the Pico's own generator.
+  await page.click('#c-shelf .cart-slot[data-mod="hilo"] button.cart');
+  await page.waitForTimeout(4000);
+  const src = await page.textContent("#c-out");        // an entry app owns the emulator: no exec, read what it printed
+  check(/shuffled by os\.urandom \(no chip\)/.test(src), `Hi-Lo: no chip in the emulator, and it says so: ${src.trim().slice(0, 80)}`);
+  const h1 = await page.evaluate(() => window.__codeVw.screenshotPNG());
+  await page.locator("#c-vw .vw").focus();
+  await page.keyboard.down("w"); await page.waitForTimeout(150); await page.keyboard.up("w");
+  await page.waitForTimeout(800);
+  check(h1 !== await page.evaluate(() => window.__codeVw.screenshotPNG()), "Hi-Lo: W (up: higher) turns the next card");
+  await page.locator("#c-vw").screenshot({ path: `${out}/code-hilo.png` });
+  check(!/Traceback/.test(await page.textContent("#c-out")), "Hi-Lo: no traceback in Output");
+
   // A folder from this computer (the fallback input; Chrome's picker can't be driven headless).
   await page.evaluate(() => { document.querySelector("#c-dirin").closest("label").hidden = false; });
   await page.setInputFiles("#c-dirin", starter);
-  await page.waitForFunction(() => /wedgie-starter/.test(document.querySelector("#c-note")?.textContent || ""), null, { timeout: 10000 });
+  await page.waitForFunction(() => /wedgie-starter: 2 apps/.test(document.querySelector("#c-note")?.textContent || ""), null, { timeout: 10000 });
   check(true, `a folder opens: ${await page.textContent("#c-note")}`);
 
   await page.fill("#c-repo", "someone/broken");

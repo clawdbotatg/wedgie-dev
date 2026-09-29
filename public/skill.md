@@ -229,7 +229,9 @@ pulled plug keeps the last good save. Save at checkpoints, not every frame (flas
   (`trustm.py`). The chip's breakout has a spare STEMMA QT port: other I2C boards daisy-chain on the
   same bus with no new wires. NEVER lock an ATECC608 or generate a key on it unless the person asks
   explicitly; both are permanent and can brick the chip for its current use.
-- `import wedgie`: `wedgie.uid()`, `wedgie.short()`, `wedgie.board()`, `wedgie.VERSION`.
+- `import wedgie`: `wedgie.uid()`, `wedgie.short()`, `wedgie.board()`, `wedgie.VERSION`;
+  `wedgie.rand(n)` / `rand_below(n)` / `rand_source()` (0.2.4+): true random bytes from the secure chip
+  (the Pico's own generator when there's none, or an ATECC608 isn't locked yet, and it says so).
 - Speed and memory: ~300 KB RAM free with the 115 KB screen buffer (less on RP2040: import `lcd`
   before big modules). Drawing primitives run in C; per-pixel Python loops are slow (~300k simple
   iterations/s) — use `@micropython.viper` for pixel work, precompute, `gc.collect()` between scenes.

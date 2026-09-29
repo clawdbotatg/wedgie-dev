@@ -12,6 +12,7 @@ import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { fakeWedgies } from "./fakewedgies.mjs";
+const CUR = readFileSync(new URL("../firmware/wedgie.py", import.meta.url), "utf8").match(/VERSION = "([^"]+)"/)[1];   // the fake that is up to date
 
 const base = (process.argv[2] || "http://localhost:4173").replace(/\/connect\/?$/, "").replace(/\/$/, "");
 const out = process.argv[3] || "shots";
@@ -25,7 +26,7 @@ await ctx.addInitScript(fakeWedgies, [
   { uid: "e66138935f5a2c29", machine: "Raspberry Pi Pico 2 W with RP2350", files: { "boot.py": 1 } },
   { uid: "de6474e3a3152a2f", machine: "Raspberry Pi Pico with RP2040", files: { "main.py": 1, "menu.py": 1, "wedgiedrive.py": 1, "wedgie.py": 'VERSION = "0.1.3"',
     "apps.json": JSON.stringify([{ mod: "hello", name: "Hello" }, { mod: "keytest", name: "Buttons" }]), "hello.py": 1, "keytest.py": 1 }, chip: "none" },
-  { uid: "aa11bb22cc3d9f01", machine: "Raspberry Pi Pico 2 W with RP2350", files: { "main.py": 1, "slot.py": 1, "wedgiedrive.py": 1, "wedgie.py": 'VERSION = "0.2.3"',
+  { uid: "aa11bb22cc3d9f01", machine: "Raspberry Pi Pico 2 W with RP2350", files: { "main.py": 1, "slot.py": 1, "wedgiedrive.py": 1, "wedgie.py": `VERSION = "${CUR}"`,
     "apps.json": "[]", "/saves/hello/best.json": '{"score": 120}', "junk.txt": "delete me" } },
 ]);
 
@@ -152,7 +153,8 @@ await wait(() => window.__ports[2]._st.files.has("/notes.txt") && document.query
 await page.focus(".wd-3d canvas.w3d").catch(() => {});
 await page.keyboard.press("a");
 await wait(() => window.__ports[2]._st.presses.includes("A"), null, 5000, "A on the 3D wedgie pressed the real A");
-await page.screenshot({ path: `${out}/connect-carts${phone ? "-phone" : ""}.png`, fullPage: true });
+await page.screenshot({ path: `${out}/connect-carts${phone ? "-phone" : ""}.png`, fullPage: true })
+  .catch(async (e) => console.log(`     (screenshot skipped: ${e.message.split("\n")[0]}; page ${await page.evaluate(() => document.documentElement.scrollHeight)} px tall)`));
 
 // ---- back to the list (no reload), then the 0.1.3 wedgie: its update keeps its first app ---------------
 await page.click(".back");
@@ -161,7 +163,7 @@ await page.click(`.wrow[data-id="${OLD}"]`);
 await wait(() => document.querySelector("[data-fw]") && !document.querySelector("[data-fw]").disabled, null, 10000, "0.1.3 page, Update enabled");
 check(/Update the firmware/.test(await page.textContent("#d-carts-note")), "0.1.3: Software asks for the update");
 await page.click("[data-fw]");
-await wait((id) => /Up to date/.test(document.querySelector("#d-fw")?.textContent || "") && location.pathname === `/connect/${id}`, OLD, 120000, "0.1.3 → 0.2.3, came back by its ID");
+await wait((id) => /Up to date/.test(document.querySelector("#d-fw")?.textContent || "") && location.pathname === `/connect/${id}`, OLD, 120000, `0.1.3 → ${CUR}, came back by its ID`);
 check((await st(1, "resets")) === 1 && (await st(1, "drops")) === 0, "one soft reset, at the end; its port stayed (0.1.3 marks soft resets)");
 const a3 = await appsOn(1), f3 = await files(1);
 check(JSON.stringify(a3) === "[]", "no app yet (nobody picked one): " + JSON.stringify(a3));

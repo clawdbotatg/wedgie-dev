@@ -3,7 +3,7 @@
 # interrupted; from the REPL they are plain calls:  import wedgie; wedgie.shot(); wedgie.press("A")
 import sys, os, json, machine
 
-VERSION = "0.2.3"
+VERSION = "0.2.4"
 
 
 def uid():
@@ -137,6 +137,82 @@ def chip():
     _chip = d.get("type_") or ("none" if not d.get("error") else None)
     d["chip"] = d.pop("type_", None)
     return d
+
+
+# ---- randomness from the secure chip -------------------------------------------------------------
+# rand(n): bytes from the chip's hardware random generator, for games (a fair shuffle, dice) and anything
+# that must not be guessable. The chip is found at the first call and kept open. Where they came from:
+# rand_source(). No chip, or an ATECC608 whose config isn't locked yet (as shipped its Random answers a
+# fixed pattern, ffff0000..., not randomness): os.urandom, the Pico's own generator, and it says so.
+_rng = None         # ("atecc", ATECC608) | ("trustm", Session) | ("none", why)
+_pool = b""         # rand_below's unused random bytes
+
+
+def _find_rng():
+    from machine import Pin
+    for p in (4, 5):                # no pull-ups on SDA/SCL: nothing on the bus, don't wait on timeouts
+        if not Pin(p, Pin.IN, Pin.PULL_DOWN).value():
+            Pin(p, Pin.IN)
+            return ("none", "no chip")
+        Pin(p, Pin.IN)
+    try:
+        import atecc
+        a = atecc.ATECC608(sda=4, scl=5)
+        r1 = a.run(0x1B, 0x01, 0, resp_len=32, wait_ms=25)    # Random, mode 1: the EEPROM seed isn't rewritten
+        r2 = a.run(0x1B, 0x01, 0, resp_len=32, wait_ms=25)
+        if r1 == r2:
+            return ("none", "ATECC608 not locked: its random is a fixed pattern")
+        return ("atecc", a)
+    except Exception:
+        pass
+    try:
+        import trustm
+        trustm.bus(4, 5)
+        return ("trustm", trustm.Session())
+    except Exception:
+        return ("none", "no chip")
+
+
+def rand(n=32):
+    global _rng
+    for _ in range(2):              # a chip that stopped answering (wedgie.chip() resets a Trust M): find it again
+        if _rng is None:
+            _rng = _find_rng()
+        kind, h = _rng
+        if kind == "none":
+            break
+        try:
+            out = b""
+            while len(out) < n:
+                out += h.run(0x1B, 0x01, 0, resp_len=32, wait_ms=25) if kind == "atecc" else h.random(max(8, min(256, n - len(out))))
+            return out[:n]
+        except Exception:
+            _rng = None
+    try:
+        return os.urandom(n)
+    except (AttributeError, OSError):            # a port without it (not the Pico): random is still random-ish
+        import random
+        return bytes(random.getrandbits(8) for _ in range(n))
+
+
+def rand_source():
+    """Where rand()'s bytes come from: "ATECC608", "OPTIGA Trust M", or "os.urandom (why)"."""
+    if _rng is None:
+        rand(1)
+    return {"atecc": "ATECC608", "trustm": "OPTIGA Trust M"}.get(_rng[0]) or "os.urandom (%s)" % _rng[1]
+
+
+def rand_below(n):
+    """A fair whole number 0 <= x < n (n up to 2**24) from rand(), 32 bytes fetched at a time."""
+    global _pool
+    lim = (1 << 24) // n * n        # draws at or above this would favor small numbers: draw again
+    while True:
+        if len(_pool) < 3:
+            _pool = rand(32)
+        x = _pool[0] << 16 | _pool[1] << 8 | _pool[2]
+        _pool = _pool[3:]
+        if x < lim:
+            return x % n
 
 
 def send(obj):
