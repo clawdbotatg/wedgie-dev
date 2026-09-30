@@ -316,19 +316,34 @@ export async function installCore(r: Repl, onProgress: (p: number, what: string)
   return { version: m.version, written: todo.length, outdated, restarted: false, untouched: false };
 }
 
-// The wedgie's own screen while software goes on: the waistband, what's happening, a bar.
-const INSERT_PY = `import lcd as _L
-_d = _L.LCD()
-def _ins(title, name, p):
-    W, I, M = _L.color(254, 254, 254), _L.color(26, 27, 26), _L.color(120, 123, 120)
-    _d.fill(W)
-    for y, c in ((10, _L.color(34, 196, 82)), (19, _L.color(169, 170, 171)), (28, _L.color(227, 49, 44))):
-        _d.fill_rect(0, y, 240, 5, c)
-    _d.center_text(title, 92, M, 2)
-    _d.center_text(name, 120, I, 2)
-    _d.rect(30, 160, 180, 14, _L.color(200, 200, 196))
-    _d.fill_rect(32, 162, int(176 * p), 10, _L.color(34, 196, 82))
-    _d.show()`;
+// The wedgie's own screen while software goes on: the boot screen and the boot bar (loader.screen, 0.3.3+).
+// Older firmware has no loader.screen: it gets the old drawing below.
+const INSERT_PY = `_ld = None
+try:
+    import loader as _ld
+except ImportError:
+    pass
+if _ld and hasattr(_ld, "screen"):
+    _bar = None
+    def _ins(title, name, p):
+        global _bar
+        if _bar is None:
+            _bar = _ld.screen(title, name) or False
+        if _bar:
+            _bar.to(p)
+else:
+    import lcd as _L
+    _d = _L.LCD()
+    def _ins(title, name, p):
+        W, I, M = _L.color(254, 254, 254), _L.color(26, 27, 26), _L.color(120, 123, 120)
+        _d.fill(W)
+        for y, c in ((10, _L.color(34, 196, 82)), (19, _L.color(169, 170, 171)), (28, _L.color(227, 49, 44))):
+            _d.fill_rect(0, y, 240, 5, c)
+        _d.center_text(title, 92, M, 2)
+        _d.center_text(name, 120, I, 2)
+        _d.rect(30, 160, 180, 14, _L.color(200, 200, 196))
+        _d.fill_rect(32, 162, int(176 * p), 10, _L.color(34, 196, 82))
+        _d.show()`;
 
 /** Draw on the wedgie's own screen while we work (needs its lcd.py; a board without one shows nothing). */
 async function deviceScreen(r: Repl, title: string, name: string) {

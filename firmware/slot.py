@@ -56,34 +56,27 @@ def _band(title, lines):
     d.show()
 
 
+_prog = None     # (title, the boot bar) while a checked install runs
+
+
 def progress(title, what, p):
-    """The screen during a checked install (job.py): never leave a yes looking like nothing happened."""
-    d.fill(WHITE)
-    for y, c in ((10, GREEN), (19, GREY_S), (28, RED)):
-        d.fill_rect(0, y, 240, 5, c)
-    for i, s in enumerate(_wrap(title, 15)[:2]):
-        d.center_text(s, 72 + i * 24, INK, 2)
-    d.center_text(what[:28], 136, MUTED)
-    d.rect(30, 160, 180, 14, GREY_S)
-    d.fill_rect(32, 162, int(176 * max(0, min(1, p))), 10, GREEN)
-    d.show()
+    """The screen during a checked install (job.py): the boot screen and the boot bar (loader.screen),
+    drawn the moment A is pressed, so a yes never looks like nothing happened."""
+    global _prog
+    import loader
+    if not _prog or _prog[0] != title:
+        _prog = (title, loader.screen(title.replace("...", ""), what))
+    else:
+        loader.what(what)
+    if _prog[1]:
+        _prog[1].to(max(0, min(1, p)))
 
 
 def empty():
     """The wedgie's own home: the boot logo, and where to pick what it runs."""
-    try:
-        with open("logo.bin", "rb") as f:
-            x, y, w, h = struct.unpack(">4H", f.read(8))
-            bg = f.read(2)
-            d.fill(bg[0] | bg[1] << 8)          # the framebuffer keeps pixels as the panel's bytes
-            b = memoryview(L._BUF)
-            for r in range(h):
-                o = ((y + r) * 240 + x) * 2
-                f.readinto(b[o:o + w * 2])
-        top = y + h + 16
-    except (OSError, ValueError):
-        d.fill(WHITE)
-        top = 110
+    import loader
+    y = loader.logo(d)
+    top = y + 16 if y else 110
     d.center_text("no software", top, INK, 2)
     d.center_text("pick what it runs at", top + 28, MUTED)
     d.center_text("wedgie.dev/connect", top + 44, GREEN_D)

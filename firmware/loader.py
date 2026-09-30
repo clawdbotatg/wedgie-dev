@@ -193,6 +193,65 @@ class _Bar:
         d.cs(1)
 
 
+def logo(d):
+    """The boot logo into d's framebuffer (the screen isn't pushed): its background everywhere, the logo
+    in its box. Returns the y just under the logo (None: no logo.bin, a white screen)."""
+    try:
+        with open("logo.bin", "rb") as f:
+            x, y, w, h = struct.unpack(">4H", f.read(8))
+            bg = f.read(2)
+            d.fill(bg[0] | bg[1] << 8)          # the framebuffer keeps pixels as the panel's bytes
+            b = memoryview(lcd._BUF)
+            for r in range(h):
+                o = ((y + r) * 240 + x) * 2
+                f.readinto(b[o:o + w * 2])
+        return y + h
+    except (OSError, ValueError):
+        d.fill(lcd.color(254, 254, 254))
+        return None
+
+
+def screen(title="", what=""):
+    """The boot screen with the boot bar, for anything with progress (an install, an update): the logo,
+    title over it, what under the bar, the bar empty. Returns the bar (bar.to(0..1) fills it) or None
+    without bar.bin. The one progress bar a wedgie shows: don't draw another."""
+    d = lcd.LCD()
+    logo(d)
+    ink = lcd.color(26, 27, 26)
+    lines = [""]
+    for w in title.split():
+        if lines[-1] and len(lines[-1]) + 1 + len(w) > 15:
+            lines.append("")
+        lines[-1] = (lines[-1] + " " + w).strip()
+    lines = [l for l in lines if l][:2]
+    for i, l in enumerate(lines):
+        d.center_text(l[:15], (30 if len(lines) == 1 else 16) + i * 24, ink, 2)
+    if what:
+        d.center_text(what[:28], 214, lcd.color(120, 123, 120))
+    d.show()
+    try:
+        with open("bar.bin", "rb") as f:
+            return _Bar(f)
+    except Exception as e:
+        print("loader: no bar:", e)
+        return None
+
+
+def what(text):
+    """Change the line under the bar (screen()) without touching the bar."""
+    d = lcd.LCD()
+    try:
+        with open("logo.bin", "rb") as f:
+            f.seek(8)
+            bg = f.read(2)
+            c = bg[0] | bg[1] << 8
+    except OSError:
+        c = lcd.color(254, 254, 254)
+    d.fill_rect(0, 210, 240, 16, c)
+    d.center_text(text[:28], 214, lcd.color(120, 123, 120))
+    d.show(210, 226)
+
+
 def _bar():
     if not splash.up or not splash.bg:   # no logo on screen: load without a bar
         return None
