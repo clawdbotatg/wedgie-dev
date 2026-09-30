@@ -3,6 +3,7 @@
 # A runs it again. Each test is timed after a gc.collect(); ms are per call, averaged.
 import sys, time, gc, machine, framebuf, micropython
 import lcd as L
+import ui
 
 RP2350 = "RP2350" in sys.implementation._machine
 res = {}            # name -> ms
@@ -123,13 +124,12 @@ def run_all():
 
 
 def draw():
-    d.fill(L.WHITE)
-    for y, c in ((6, L.color(34, 196, 82)), (12, L.color(169, 170, 171)), (18, L.color(227, 49, 44))):
-        d.fill_rect(0, y, 240, 4, c)
-    d.text("speed lab   A: again", 4, 28, L.color(26, 27, 26))
+    d.fill(ui.WHITE)
+    ui.band(d, 2)
+    d.text("speed lab   A: again", 4, 30, ui.INK)
     y = 44
     for s in lines[:18]:
-        d.text(s[:30], 0, y, L.color(26, 27, 26))
+        d.text(s[:30], 0, y, ui.INK)
         y += 11
     d.show()
 

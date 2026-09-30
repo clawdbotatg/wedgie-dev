@@ -27,10 +27,8 @@ import lcd as L
 import wedgie as W
 import save
 
-WHITE, INK = L.color(254, 254, 254), L.color(26, 27, 26)
-MUTED = L.color(120, 123, 120)
-GREEN, GREEN_D = L.color(34, 196, 82), L.color(22, 140, 52)
-GREY_S, RED = L.color(169, 170, 171), L.color(227, 49, 44)
+import ui
+from ui import WHITE, INK, MUTED, GREEN_D, RED
 
 d = None
 keys = None
@@ -42,17 +40,9 @@ _buf = ""
 _serve_t = None     # the background Timer that answers USB while an entry app owns the CPU
 
 
-def _band(title, lines):
-    d.fill(WHITE)
-    for y, c in ((10, GREEN), (19, GREY_S), (28, RED)):
-        d.fill_rect(0, y, 240, 5, c)
-    d.text("wedgie", 6, 42, INK)
+def _band(title, lines, hint=""):
+    ui.page(d, title, lines, hint, show=False)
     d.text(W.short(), 240 - 8 * 6 - 6, 42, MUTED)
-    d.center_text(title, 96, INK, 2)
-    y = 132
-    for s, c in lines:
-        d.center_text(s[:28], y, c)
-        y += 16
     d.show()
 
 
@@ -65,7 +55,7 @@ def progress(title, what, p):
     global _prog
     import loader
     if not _prog or _prog[0] != title:
-        _prog = (title, loader.screen(title.replace("...", ""), what))
+        _prog = (title, ui.progress(title.replace("...", ""), what))
     else:
         loader.what(what)
     if _prog[1]:
@@ -87,9 +77,9 @@ def empty():
 def _ended(why=None):
     name = app.get("name", app["mod"])
     if why:
-        _band(name, [(why[:28], RED), ("", MUTED), ("A tries again", MUTED)])
+        _band(name, [(why[:56], RED)], "A  try again")
     else:
-        _band(name, [("ended", MUTED), ("", MUTED), ("A starts it again", MUTED)])
+        _band(name, [("ended", MUTED)], "A  start it again")
 
 
 def open_app():
@@ -259,54 +249,17 @@ def handle(line):
 ASK_MS = 60000      # no answer to "let this computer in?" in a minute is a no
 
 
-def _wrap(s, n):
-    out = [""]
-    for w in s.split():
-        if out[-1] and len(out[-1]) + 1 + len(w) > n:
-            out.append("")
-        out[-1] = (out[-1] + " " + w).strip()
-    return out
-
-
 def ask(job="", note=""):
-    """Let the computer do `job` (what it says it wants, e.g. "Update firmware to 0.2.8")? Only a real
-    press answers (Keys physical: a press sent over USB can't), A yes, Y no. Nothing comes off USB
-    meanwhile, so the computer waits. note: a checked job (job.py: signed files only) says so;
-    otherwise the job is the computer's word, so the screen says a yes gives it full access."""
+    """Let the computer do `job` (what it says it wants, e.g. "Update firmware to 0.2.8")? ui.ask: only a
+    real press answers, A yes, Y no. Nothing comes off USB meanwhile, so the computer waits. note: a
+    checked job (job.py: signed files only) says so; otherwise the job is the computer's word, so the
+    screen says a yes gives it full access."""
     import os
-    k = L.Keys(physical=True)
-    k.pressed()                             # a key already down doesn't count
     wallet = "usbwallet.py" in os.listdir()
-    d.fill(WHITE)
-    for y, c in ((10, GREEN), (19, GREY_S), (28, RED)):
-        d.fill_rect(0, y, 240, 5, c)
-    title = _wrap(job + "?", 15) if job else ["LET THIS", "COMPUTER IN?"]
-    if len(title) > 2:
-        title = _wrap(job + "?", 28)[:3]
-        for i, s in enumerate(title):
-            d.center_text(s, 48 + i * 14, INK)
-    else:
-        for i, s in enumerate(title):
-            d.center_text(s, 48 + i * 24, INK, 2)
-    y = 108
-    lines = ["The computer gets full", "access for this one job."] + (["Its wallet key too."] if wallet else [])
+    lines = ["The computer gets full access for this one job."] + (["Its wallet key too."] if wallet else [])
     if note:
-        lines = _wrap(note, 28)[:2] + ["Only those files change."]
-    for s in lines + ["", "Didn't ask for this? Y."]:
-        d.center_text(s, y, INK)
-        y += 14
-    d.fill_rect(0, 184, 240, 26, GREEN)
-    d.center_text("A  yes", 189, WHITE, 2)
-    d.fill_rect(0, 214, 240, 26, RED)
-    d.center_text("Y  no", 219, WHITE, 2)
-    d.show()
-    t0 = time.ticks_ms()
-    while time.ticks_diff(time.ticks_ms(), t0) < ASK_MS:
-        for key in k.pressed():
-            if key in ("A", "Y"):
-                return key == "A"
-        time.sleep_ms(20)
-    return False
+        lines = [note, "Only those files change."]
+    return ui.ask(d, (job + "?") if job else "Let this computer in?", lines + ["Didn't ask for this? Y."], ms=ASK_MS)
 
 
 def let_in(job=""):

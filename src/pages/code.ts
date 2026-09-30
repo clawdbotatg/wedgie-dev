@@ -100,6 +100,22 @@ export function code(main: HTMLElement) {
       </ul>
       <p class="fine">All of it, with numbers and code: <a href="/code.md">code.md</a>. The <b>Speed lab</b> app times each trick on your own wedgie.</p>
     </div>
+
+    <div class="card code-fast code-look">
+      <h3>Look and feel: the built-in kit</h3>
+      <p class="fine">Every wedgie has <code>ui</code>. Use it for everything that isn't your game's own art, so apps look like a wedgie and nobody rebuilds it:</p>
+      <div class="look-row">
+        <figure><img src="/img/look/page.png" alt="" width="120" height="120"><figcaption><code>ui.page</code> a title, lines, a hint</figcaption></figure>
+        <figure><img src="/img/look/ask.png" alt="" width="120" height="120"><figcaption><code>ui.ask</code> yes or no</figcaption></figure>
+        <figure><img src="/img/look/progress.png" alt="" width="120" height="120"><figcaption><code>ui.progress</code> the boot bar</figcaption></figure>
+      </div>
+      <ul>
+        <li><b>One palette.</b> <code>ui.INK</code>, <code>ui.MUTED</code>, <code>ui.GREEN</code> (yes), <code>ui.RED</code> (no), the waistband <code>ui.band</code>.</li>
+        <li><b>Buttons mean the same everywhere.</b> A (green) is yes / go / again, Y (red) is no / back.</li>
+        <li><b>Slow things show the boot bar,</b> never a bar of your own.</li>
+      </ul>
+      <p class="fine">The details: <a href="/code.md">code.md</a>, "Look and feel".</p>
+    </div>
   </section>`;
   const $ = <T extends HTMLElement = HTMLElement>(s: string) => main.querySelector(s) as T;
   const note = $("#c-note"), outEl = $("#c-out");

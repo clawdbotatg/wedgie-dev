@@ -157,6 +157,12 @@ try {
   const al = await asked;
   check(/let in: False 18 52/.test(al), `lock: Y says no, the app's screen comes back (${al.trim()})`);
 
+  // the look-and-feel kit (firmware/ui.py): a page, for code.md's pictures
+  const pg = await page.evaluate(() => window.vw.exec("import slot, lcd, ui\nslot.stop()\nd = lcd.LCD()\nui.page(d, 'Game over', [('score 120', ui.INK), ('best 340', ui.MUTED)], 'A  play again')\nprint('page ok')"));
+  await page.waitForTimeout(500);
+  await page.locator(".vw").screenshot({ path: `${out}/emu-ui-page.png` });
+  check(/page ok/.test(pg), "ui.page draws");
+
   // an install's screen is the boot screen with the boot bar (loader.screen), not a bar of its own
   const pr = await page.evaluate(() => window.vw.exec("import slot\nslot.stop()\nslot._prog = None\nslot.progress('Installing Hello...', 'hello.py', 0.1)\nslot.progress('Installing Hello...', 'hello.py', 0.6)\nprint('bar:', bool(slot._prog[1]))"));
   await page.waitForTimeout(600);

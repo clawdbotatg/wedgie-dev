@@ -2,6 +2,7 @@
 // showing the question its real screen shows, the green A button pressing itself, and the words.
 // The page can't answer for them (only a real press counts), so this is all it can do, and it must be
 // impossible to miss: a yes that nobody knows to give looks like a hung install.
+import { P } from "./palette";
 import { place3D } from "./place3d";
 import type { Wedgie3D } from "./wedgie3d";
 
@@ -21,18 +22,18 @@ export function askScreen(job: string, checked = false) {
   const c = document.createElement("canvas");
   c.width = c.height = 240;
   const g = c.getContext("2d")!;
-  g.fillStyle = "#fefefe"; g.fillRect(0, 0, 240, 240);
-  [["#22c452", 10], ["#a9aaab", 19], ["#e3312c", 28]].forEach(([col, y]) => { g.fillStyle = col as string; g.fillRect(0, y as number, 240, 5); });
-  g.textAlign = "center"; g.textBaseline = "top"; g.fillStyle = "#1a1b1a";
+  g.fillStyle = P.WHITE; g.fillRect(0, 0, 240, 240);
+  [[P.GREEN, 10], [P.GREY, 19], [P.RED, 28]].forEach(([col, y]) => { g.fillStyle = col as string; g.fillRect(0, y as number, 240, 5); });
+  g.textAlign = "center"; g.textBaseline = "top"; g.fillStyle = P.INK;
   const title = job ? wrap(job + "?", 15).slice(0, 2) : ["LET THIS", "COMPUTER IN?"];
   g.font = "16px Silkscreen, monospace";
   title.forEach((s, i) => g.fillText(s, 120, 48 + i * 24));
   g.font = "9px Silkscreen, monospace";
   (checked ? ["Only those files change."] : ["The computer gets full", "access for this one job."]).concat(["", "Didn't ask for this? Y."])
     .forEach((s, i) => g.fillText(s, 120, 108 + i * 14));
-  g.fillStyle = "#22c452"; g.fillRect(0, 184, 240, 26);
-  g.fillStyle = "#e3312c"; g.fillRect(0, 214, 240, 26);
-  g.fillStyle = "#fefefe"; g.font = "16px Silkscreen, monospace";
+  g.fillStyle = P.GREEN; g.fillRect(0, 184, 240, 26);
+  g.fillStyle = P.RED; g.fillRect(0, 214, 240, 26);
+  g.fillStyle = P.WHITE; g.font = "16px Silkscreen, monospace";
   g.fillText("A  yes", 120, 189); g.fillText("Y  no", 120, 219);
   return c;
 }

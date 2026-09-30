@@ -499,3 +499,7 @@ body.test-mode .top, body.test-mode .foot { display: none; }
 .ask-a .ask-3d { height: 260px; }
 .ask-key { display: inline-block; background: #278c3c; color: #fff; border-radius: 999px; padding: 0 .45em; animation: askpulse 1s ease-in-out infinite; }
 @keyframes askpulse { 50% { box-shadow: 0 0 0 8px rgba(39,140,60,.25); } }
+/* /code: the look-and-feel card's pictures */
+.look-row { display: flex; gap: 12px; flex-wrap: wrap; margin: 8px 0; }
+.look-row figure { margin: 0; width: 120px; text-align: center; font-size: 12px; }
+.look-row img { border-radius: 8px; image-rendering: pixelated; box-shadow: 0 1px 4px rgba(0,0,0,.15); }

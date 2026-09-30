@@ -19,15 +19,9 @@ def stuck(e):
         pass
     sys.print_exception(e)
     try:
-        import lcd
+        import lcd, ui
         d = lcd.LCD()
-        ink = lcd.color(26, 27, 26)
-        d.fill(lcd.color(254, 254, 254))
-        d.center_text("wedgie broke", 70, lcd.color(227, 49, 44), 2)
-        d.center_text(("%s" % e)[:28], 100, ink)
-        d.center_text("A  let the computer in", 170, ink)
-        d.center_text("B  try again", 190, ink)
-        d.show()
+        ui.page(d, "wedgie broke", [("%s" % e, ui.RED), ("", ui.MUTED), ("A  let the computer in", ui.INK), ("B  try again", ui.INK)])
     except Exception:
         pass
     from machine import Pin

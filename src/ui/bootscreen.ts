@@ -1,3 +1,4 @@
+import { P } from "./palette";
 // The wedgie's boot screen on the page: the undies logo (/fw/logo.bin) and the boot bar (/fw/bar.bin),
 // decoded from the same files the wedgie draws them from (firmware/loader.py screen / _Bar), so the
 // page's picture of an install matches the real screen. One progress bar everywhere (CLAUDE.md).
@@ -41,7 +42,7 @@ function piece(img: ImageData, s: Uint8Array, rows: number, y0: number, a: numbe
 
 function draw(title: string, what: string, p: number) {
   const g = canvas.getContext("2d")!;
-  if (!logo || !bar) { g.fillStyle = "#fefefe"; g.fillRect(0, 0, 240, 240); return; }
+  if (!logo || !bar) { g.fillStyle = P.WHITE; g.fillRect(0, 0, 240, 240); return; }
   const img = g.createImageData(240, 240);
   const bg = logo.bg;
   for (let i = 0; i < 240 * 240; i++) { img.data[i * 4] = ((bg >> 11) & 31) * 255 / 31; img.data[i * 4 + 1] = ((bg >> 5) & 63) * 255 / 63; img.data[i * 4 + 2] = (bg & 31) * 255 / 31; img.data[i * 4 + 3] = 255; }
@@ -64,12 +65,12 @@ function draw(title: string, what: string, p: number) {
   }
   g.putImageData(img, 0, 0);
   g.textAlign = "center"; g.textBaseline = "top";
-  g.fillStyle = "#1a1b1a"; g.font = "16px Silkscreen, monospace";
+  g.fillStyle = P.INK; g.font = "16px Silkscreen, monospace";
   const words = title.split(/\s+/), lines = [""];
   for (const w of words) { if (lines[lines.length - 1] && (lines[lines.length - 1] + " " + w).length > 15) lines.push(""); lines[lines.length - 1] = (lines[lines.length - 1] + " " + w).trim(); }
   const ls = lines.filter(Boolean).slice(0, 2);
   ls.forEach((s, i) => g.fillText(s, 120, (ls.length === 1 ? 30 : 16) + i * 24));
-  if (what) { g.fillStyle = "#787b78"; g.font = "8px Silkscreen, monospace"; g.fillText(what.slice(0, 28), 120, 214); }
+  if (what) { g.fillStyle = P.MUTED; g.font = "8px Silkscreen, monospace"; g.fillText(what.slice(0, 28), 120, 214); }
 }
 
 /** The boot screen with the bar at p (0..1): one canvas, redrawn in place (the 3D wedgie shows it live). */

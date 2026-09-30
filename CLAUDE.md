@@ -55,7 +55,13 @@ what agents outside this repo read (keep it true when the firmware or the USB pr
    anything slow) shows the boot logo and the boot bar: `loader.screen(title, what)` returns the bar,
    `bar.to(0..1)` fills it, `loader.what(text)` changes the line under it. Never draw another bar
    (0.3.2 did; Austin, 2026-09-30). The site's picture of the wedgie screen should match it.
-11. Everything is MIT — never use the CC BY-NC case STLs from picowallet/instant-wallet.
+11. **One look: `firmware/ui.py`.** The palette (`ui.WHITE/INK/MUTED/GREEN/GREEN_D/GREY/RED`) and the
+   system screens' pieces (`ui.page`, `ui.ask`, `ui.band`, `ui.wrap`, `ui.progress`) live there only.
+   Every system screen uses them; apps are told to (`public/code.md` "Look and feel", the /code card,
+   pictures in `public/img/look/` from emuprobe). The page's drawings of wedgie screens take colors from
+   `src/ui/palette.ts`. `python3 tools/test_style.py` fails on a re-typed palette color, a second
+   bar.bin reader, or palette.ts drifting from ui.py.
+12. Everything is MIT — never use the CC BY-NC case STLs from picowallet/instant-wallet.
 
 ## Run / check
 
@@ -69,6 +75,7 @@ node tools/updateprobe.mjs http://localhost:4173 <outdir>   # /update, plug-in-a
 node tools/emuprobe.mjs <outdir>                            # the virtual wedgie
 node tools/codeprobe.mjs http://localhost:4173 <outdir> ~/clawd/wedgie-starter   # /code: emulator, saves, repos
 python3 tools/test_drive.py                                 # the WEDGIE drive's SCSI answers
+python3 tools/test_style.py                                 # one palette, one progress bar (firmware/ui.py)
 python3 tools/fakedevice.py                                 # a pty wedgie for public/wedgie.py
 ```
 

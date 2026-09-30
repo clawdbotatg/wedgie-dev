@@ -207,7 +207,8 @@ def logo(d):
                 f.readinto(b[o:o + w * 2])
         return y + h
     except (OSError, ValueError):
-        d.fill(lcd.color(254, 254, 254))
+        import ui
+        d.fill(ui.WHITE)
         return None
 
 
@@ -215,19 +216,14 @@ def screen(title="", what=""):
     """The boot screen with the boot bar, for anything with progress (an install, an update): the logo,
     title over it, what under the bar, the bar empty. Returns the bar (bar.to(0..1) fills it) or None
     without bar.bin. The one progress bar a wedgie shows: don't draw another."""
+    import ui
     d = lcd.LCD()
     logo(d)
-    ink = lcd.color(26, 27, 26)
-    lines = [""]
-    for w in title.split():
-        if lines[-1] and len(lines[-1]) + 1 + len(w) > 15:
-            lines.append("")
-        lines[-1] = (lines[-1] + " " + w).strip()
-    lines = [l for l in lines if l][:2]
+    lines = [l for l in ui.wrap(title, ui.COLS_BIG) if l][:2]
     for i, l in enumerate(lines):
-        d.center_text(l[:15], (30 if len(lines) == 1 else 16) + i * 24, ink, 2)
+        d.center_text(l[:ui.COLS_BIG], (30 if len(lines) == 1 else 16) + i * 24, ui.INK, 2)
     if what:
-        d.center_text(what[:28], 214, lcd.color(120, 123, 120))
+        d.center_text(what[:ui.COLS_SMALL], 214, ui.MUTED)
     d.show()
     try:
         with open("bar.bin", "rb") as f:
@@ -246,9 +242,11 @@ def what(text):
             bg = f.read(2)
             c = bg[0] | bg[1] << 8
     except OSError:
-        c = lcd.color(254, 254, 254)
+        import ui
+        c = ui.WHITE
+    import ui
     d.fill_rect(0, 210, 240, 16, c)
-    d.center_text(text[:28], 214, lcd.color(120, 123, 120))
+    d.center_text(text[:ui.COLS_SMALL], 214, ui.MUTED)
     d.show(210, 226)
 
 
