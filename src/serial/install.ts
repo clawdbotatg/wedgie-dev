@@ -127,10 +127,11 @@ export async function letIn(r: Repl, ask: (s: string) => void = askHint, job = "
   const h = await r.hello(700).catch(() => null);
   if (!h?.sealed || h.open) return;
   ask(ASK_TEXT);
+  const close = typeof document !== "undefined" ? (await import("../ui/askmodal")).askModal(job) : () => {};
   let v: any;
   try { v = await r.request({ type: "open", for: job }, 65000); }   // job: what the wedgie's screen asks
   catch { throw new Error("nobody pressed A on the wedgie"); }
-  finally { ask(""); }
+  finally { ask(""); close(); }
   if (v.type === "open") return;
   if (v.type === "refused") throw new Error("the wedgie said no (Y on its screen)");
   if (v.type === "busy") throw new Error("the wedgie is busy signing; try again after");

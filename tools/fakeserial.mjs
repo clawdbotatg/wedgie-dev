@@ -29,7 +29,7 @@ await ctx.addInitScript(fakeWedgies, [
   { uid: "de6474e3a3152a2f", machine: "Raspberry Pi Pico with RP2040", files: { "main.py": 1, "menu.py": 1, "wedgiedrive.py": 1, "wedgie.py": 'VERSION = "0.1.3"',
     "apps.json": JSON.stringify([{ mod: "hello", name: "Hello" }, { mod: "keytest", name: "Buttons" }]), "hello.py": 1, "keytest.py": 1 }, chip: "none" },
   { uid: "aa11bb22cc3d9f01", machine: "Raspberry Pi Pico 2 W with RP2350", files: { "main.py": 1, "slot.py": 1, "wedgiedrive.py": 1, "wedgie.py": `VERSION = "${CUR}"`,
-    "apps.json": "[]", "/saves/hello/best.json": '{"score": 120}', "junk.txt": "delete me" }, person: { say: "yes", ms: 1500 } },
+    "apps.json": "[]", "/saves/hello/best.json": '{"score": 120}', "junk.txt": "delete me" }, person: { say: "yes", ms: 5000 } },
 ]);
 
 let bad = 0;
@@ -79,8 +79,12 @@ const shelfOn = (mod) => `document.querySelector('#d-shelf .cart-slot[data-mod="
 const pickApp = async (mod, what) => { await page.click(`#d-shelf .cart-slot[data-mod="${mod}"] .cart`); return wait(new Function(`return ${shelfOn(mod)}`), null, 30000, what); };
 await page.click(`#d-shelf .cart-slot[data-mod="hello"] .cart`);
 await wait(() => /Press A on the wedgie/.test(document.querySelector("#d-status")?.textContent || ""), null, 5000, "sealed: the page says to press A on the wedgie");
+await wait(() => document.querySelector(".ask-a .ask-3d"), null, 5000, "sealed: the Press A modal is up");
+await page.waitForTimeout(2500);
+await page.screenshot({ path: `${out}/connect-ask${phone ? "-phone" : ""}.png` });
 await wait(new Function(`return ${shelfOn("hello")}`), null, 30000, "Hello on, running");
 check((await st(2, "asks")) === 1, "sealed: it asked its person once");
+check(!(await page.$(".ask-a")), "the Press A modal is gone once it answered");
 check((await files(2)).includes("hello.py"), "hello.py is on it");
 const a1 = await appsOn(2);
 check(a1?.length === 1 && a1[0].mod === "hello" && /^[0-9a-f]{12}$/.test(a1[0].v), "apps.json: just hello, with its version: " + JSON.stringify(a1));

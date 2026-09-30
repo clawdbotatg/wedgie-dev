@@ -494,3 +494,8 @@ body.test-mode .top, body.test-mode .foot { display: none; }
 .upd-card .meter { margin-top: 4px; }
 .upd-card .meter-track { height: 22px; padding: 4px; }
 .unplug-tip { flex-basis: 100%; text-align: center; margin: 4px 0 0; }
+/* Press A on your wedgie (ui/askmodal.ts) */
+.ask-a { width: min(520px, 100%); }
+.ask-a .ask-3d { height: 260px; }
+.ask-key { display: inline-block; background: #278c3c; color: #fff; border-radius: 999px; padding: 0 .45em; animation: askpulse 1s ease-in-out infinite; }
+@keyframes askpulse { 50% { box-shadow: 0 0 0 8px rgba(39,140,60,.25); } }
