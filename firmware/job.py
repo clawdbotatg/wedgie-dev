@@ -146,6 +146,7 @@ def run(mid, m, ask):
                 write = []
                 time.sleep_ms(100)
                 import machine
+                W.restarting = True         # main.py lets this SystemExit through
                 machine.soft_reset()
             elif t == "abort":
                 W.send({"id": qid, "type": "ok"})

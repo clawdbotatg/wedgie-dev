@@ -64,6 +64,11 @@ while True:
         e = RuntimeError("the slot ended")
     except KeyboardInterrupt:       # only once the person let the computer in
         break
+    except SystemExit:              # machine.soft_reset() is a SystemExit: let the one a job asked for through
+        if getattr(sys.modules.get("wedgie"), "restarting", False):   # (0.3.0 caught it: "wedgie broke"
+            raise                                                      # after every checked install)
+        e = RuntimeError("an app called sys.exit")
+        sys.modules.pop("slot", None)
     except BaseException as x:
         e = x
         sys.modules.pop("slot", None)
