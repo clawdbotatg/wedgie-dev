@@ -51,7 +51,11 @@ what agents outside this repo read (keep it true when the firmware or the USB pr
    `Keys(physical=True)`). A yes is for one job: main.py locks it again when it next starts. Every REPL path on a host goes
    through `letIn` (install.ts takeOver, format.ts) or `let_in` (public/wedgie.py enter). Never add a
    way in that skips the press, and never let a USB `press` answer it.
-10. Everything is MIT — never use the CC BY-NC case STLs from picowallet/instant-wallet.
+10. **One progress screen: the boot screen.** Anything with progress on a wedgie (install, update,
+   anything slow) shows the boot logo and the boot bar: `loader.screen(title, what)` returns the bar,
+   `bar.to(0..1)` fills it, `loader.what(text)` changes the line under it. Never draw another bar
+   (0.3.2 did; Austin, 2026-09-30). The site's picture of the wedgie screen should match it.
+11. Everything is MIT — never use the CC BY-NC case STLs from picowallet/instant-wallet.
 
 ## Run / check
 
