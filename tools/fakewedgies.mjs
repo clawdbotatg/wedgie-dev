@@ -34,6 +34,7 @@ export function fakeWedgies(specs) {
     const wedgie = () => st.files.has("main.py") && (st.files.has("menu.py") || st.files.has("slot.py"));
     // 0.2: the app it runs (null while stopped by Ctrl-C, or with none on it)
     const sealed = () => slot() && cmpV(version() || "0", "0.2.5") >= 0;
+    const h_jobs = () => cmpV(version() || "0", "0.3.0") >= 0 && slot();
     const running = () => (slot() ? (st.stopped ? null : apps()[0]?.mod ?? null) : st.launched);
     const norm = (k) => "/" + k.replace(/^\//, "");
     const lsAll = (root = "/") => {
@@ -65,6 +66,7 @@ export function fakeWedgies(specs) {
       if (v >= "0.1.4") Object.assign(h, { carts: apps().map((a) => ({ mod: a.mod, v: a.v })), free: 600000, chip: null });
       if (slot()) h.slot = 1;
       if (sealed()) Object.assign(h, { sealed: true, open: !!st.open });
+      if (cmpV(version() || "0", "0.3.0") >= 0 && slot()) h.jobs = 1;
       return JSON.stringify(h);
     };
     const answer = (stdout) => push("OK" + stdout + "\x04\x04>");
@@ -113,6 +115,38 @@ export function fakeWedgies(specs) {
       if (slot() && msg.type === "get") { const k = find(msg.path); return push(k ? chunks(id, st.files.get(k)) : JSON.stringify({ id, type: "error", error: "can't read it" }) + "\r\n"); }
       if (slot() && msg.type === "rm") { rmAll(msg.path); return push(JSON.stringify({ id, type: "ok", free: 600000 }) + "\r\n"); }
       if (msg.type === "press") { st.presses.push(msg.key); return ok(); }
+      // 0.3.0+ checked installs (firmware/job.py). The fake trusts the signature; it checks names and hashes.
+      if (msg.type === "sums" && h_jobs()) {
+        const sums = {};
+        for (const n of msg.names || []) sums[n] = st.files.has(n) ? await sha(st.files.get(n)) : null;
+        return push(JSON.stringify({ id, type: "sums", sums, apps: apps() }) + "\r\n");
+      }
+      if (msg.type === "job" && h_jobs()) {
+        const listed = new Map(msg.release.split("\n").slice(2).filter(Boolean).map((l) => l.split("  ").reverse()));
+        if ((msg.write || []).some((n) => !listed.has(n))) return push(JSON.stringify({ id, type: "error", error: "not in the signed list" }) + "\r\n");
+        st.asks = (st.asks || 0) + 1; st.jobs = (st.jobs || 0) + 1;
+        const p = st.person || {};
+        return setTimeout(() => {
+          if (p.say === "no") return push(JSON.stringify({ id, type: "refused" }) + "\r\n");
+          st.job = { m: msg, listed, got: new Map() };
+          push(JSON.stringify({ id, type: "go" }) + "\r\n");
+        }, p.ms ?? 300);
+      }
+      if (msg.type === "put" && st.job) {
+        const j = st.job, prev = j.got.get(msg.name) || new Uint8Array();
+        const add = Uint8Array.from(atob(msg.data || ""), (x) => x.charCodeAt(0)), u = new Uint8Array(prev.length + add.length);
+        u.set(prev); u.set(add, prev.length); j.got.set(msg.name, u);
+        if (msg.end && (await sha(u)) !== j.listed.get(msg.name)) { st.job = null; return push(JSON.stringify({ id, type: "error", error: "doesn't match the signed list" }) + "\r\n"); }
+        return ok();
+      }
+      if (msg.type === "commit" && st.job) {
+        const j = st.job; st.job = null;
+        for (const [n, u] of j.got) st.files.set(n, u);
+        for (const n of j.m.delete || []) st.files.delete(n);
+        if (j.m.apps != null) st.files.set("apps.json", text(j.m.apps));
+        push(JSON.stringify({ id, type: "done" }) + "\r\n");
+        return setTimeout(() => softReset(), 100);
+      }
       if (msg.type === "open" && sealed()) {
         if (st.open) return push(JSON.stringify({ id, type: "open" }) + "\r\n");
         st.asks = (st.asks || 0) + 1;
@@ -145,6 +179,14 @@ export function fakeWedgies(specs) {
       }
       push(JSON.stringify({ id, type: "error", error: "unknown type" }) + "\r\n");
     }
+    function softReset() {
+      st.resets++; st.launched = null; st.stopped = false; st.open = false;
+      const drop = st.files.has("wedgiedrive.py") && (!st.mark || st.driveOn);
+      st.driveOn = st.files.has("wedgiedrive.py") && !st.mark;    // the new boot.py adds it only without a mark
+      st.mark = st.files.has("wedgiedrive.py");
+      if (drop && st.resetHook) { st.drops++; st.resetHook(); return; }
+      if (wedgie()) setTimeout(() => push(hello(null, "ready") + "\r\n"), 300);
+    }
     function streams() {
       const readable = new ReadableStream({ start(c) { push = (s) => { try { c.enqueue(enc.encode(s)); } catch {} }; } });
       const writable = new WritableStream({ write(chunk) {
@@ -155,15 +197,7 @@ export function fakeWedgies(specs) {
           if (ch === "\x01") { raw = true; code = ""; push("raw REPL; CTRL-B to exit\r\n>"); continue; }
           if (ch === "\x02") { raw = false; continue; }
           if (!raw) {
-            if (ch === "\x04") {
-              st.resets++; st.launched = null; st.stopped = false; st.open = false;
-              const drop = st.files.has("wedgiedrive.py") && (!st.mark || st.driveOn);
-              st.driveOn = st.files.has("wedgiedrive.py") && !st.mark;    // the new boot.py adds it only without a mark
-              st.mark = st.files.has("wedgiedrive.py");
-              if (drop && st.resetHook) { st.drops++; st.resetHook(); continue; }
-              if (wedgie()) setTimeout(() => push(hello(null, "ready") + "\r\n"), 300);
-              continue;
-            }
+            if (ch === "\x04") { softReset(); continue; }
             // Repl.leave({ reset: false }) types exec(open("main.py").read()) + CR: the launcher starts again, home
             if (ch === "\r") { if (line.startsWith("exec(open(")) { line = ""; st.launched = null; st.stopped = false; st.open = false; st.relaunches = (st.relaunches || 0) + 1; } continue; }
             if (ch === "\n") { const l = line; line = ""; if (l.startsWith("{")) { try { onJson(JSON.parse(l)); } catch {} } continue; }

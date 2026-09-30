@@ -33,7 +33,7 @@ const RETIRED = ["menu.py", "menu.mpy"];
 const FLOOR = 32 * 1024;
 /** Bytes per write while copying: small, so each needs little RAM in one piece (RP2040). */
 const CHUNK = 1024;
-export type Manifest = { version: string; files: FileInfo[]; core: string[]; carts: Cart[] };
+export type Manifest = { version: string; files: FileInfo[]; core: string[]; carts: Cart[]; signed?: boolean };
 
 let manifest: Promise<Manifest> | null = null;
 export function firmwareManifest(): Promise<Manifest> {
@@ -175,6 +175,12 @@ async function copy(r: Repl, files: FileInfo[], have: Have, onProgress: (p: numb
 /** apps.json rebuilt from the flash: the one app (`only`: a cart whose files are all there, v from their
  *  real hashes so a changed file shows as an update, or the person's own app as it was), or none. */
 async function writeApps(r: Repl, m: Manifest, have: Have, only: string | null) {
+  const list = await appsFor(m, have, only);
+  await r.exec(`import json, os\n_f = open("apps.json", "w")\n_f.write(${JSON.stringify(JSON.stringify(list))})\n_f.close()\ntry:\n    os.sync()\nexcept AttributeError:\n    pass`);
+  return list;
+}
+/** What apps.json should say once `only` is the app (have: the files as they'll be). */
+async function appsFor(m: Manifest, have: Have, only: string | null) {
   const list: any[] = [];
   const c = m.carts.find((x) => x.mod === only);
   if (c && c.files.every((n) => have.hashes[n])) {
@@ -184,8 +190,63 @@ async function writeApps(r: Repl, m: Manifest, have: Have, only: string | null) 
     const own = (have.apps || []).find((a) => a && a.mod === only);
     if (own) list.push(own);
   }
-  await r.exec(`import json, os\n_f = open("apps.json", "w")\n_f.write(${JSON.stringify(JSON.stringify(list))})\n_f.close()\ntry:\n    os.sync()\nexcept AttributeError:\n    pass`);
   return list;
+}
+
+// ---- checked installs (firmware 0.3.0+, firmware/job.py) -----------------------------------------------
+// The wedgie installs signed files itself: it checks /fw/release.txt against our key, asks its person
+// ("Install Buttons?"), takes the files in chunks, checks each one's sha256 against the list, then puts
+// them in place and restarts itself. The site never gets the REPL. Used when the wedgie can (hello says
+// jobs), the manifest is signed, and every file is in the signed list (a GitHub app's aren't: those, the
+// file explorer and /debug still ask for full access).
+
+/** `have` without the REPL, or null when a checked install can't be used. */
+async function checkedHave(r: Repl, m: Manifest): Promise<Have | null> {
+  if (!m.signed) return null;
+  const h = await r.hello(700).catch(() => null);
+  if (!h?.jobs) return null;
+  const v = await r.request({ type: "sums", names: allNames(m) }, 30000).catch(() => null);
+  if (!v?.sums) return null;
+  return { hashes: v.sums, files: Object.keys(v.sums).filter((n) => v.sums[n]), apps: v.apps || [] };
+}
+
+let release: Promise<{ text: string; sig: string }> | null = null;
+const signedList = () => release ||= Promise.all(["release.txt", "release.sig"].map((n) => fetch("/fw/" + n, { cache: "no-cache" }).then((x) => x.text())))
+  .then(([text, sig]) => ({ text, sig: sig.trim() }));
+
+/** Run one checked job. False (nothing asked, nothing changed) when a file isn't in the signed list. */
+async function job(r: Repl, m: Manifest, title: string, write: string[], del: string[], apps: any[] | null, onProgress: (p: number, what: string) => void) {
+  const rel = await signedList();
+  const listed = new Set(rel.text.split("\n").slice(2).map((l) => l.split("  ")[1]).filter(Boolean));
+  if (!write.every((n) => listed.has(n) && !m.files.find((f) => f.name === n)?.url)) return false;
+  const files = await Promise.all(write.map(async (n) => {
+    const f = m.files.find((x) => x.name === n)!;
+    const buf = new Uint8Array(await (await fetch("/fw/" + n, { cache: "no-cache" })).arrayBuffer());
+    if (hex(await crypto.subtle.digest("SHA-256", buf)) !== f.sha256) throw new Error("wedgie.dev was updated since this page opened. Reload the page, then try again");
+    return { n, buf };
+  }));
+  askHint(ASK_TEXT); onProgress(0, ASK_TEXT);
+  const close = (await import("../ui/askmodal")).askModal(title, true);
+  let v: any;
+  try { v = await r.request({ type: "job", job: title, release: rel.text, sig: rel.sig, write, delete: del, apps: apps && JSON.stringify(apps) }, 120000); }
+  catch { throw new Error("nobody pressed A on the wedgie"); }
+  finally { askHint(""); close(); }
+  if (v.type === "refused") throw new Error("the wedgie said no (Y on its screen)");
+  if (v.type === "busy") throw new Error("the wedgie is busy signing; try again after");
+  if (v.type !== "go") throw new Error(`the wedgie said ${v.error || v.type}`);
+  const total = files.reduce((t, f) => t + f.buf.length, 0) || 1;
+  let done = 0;
+  for (const { n, buf } of files) {
+    for (let o = 0; o < Math.max(buf.length, 1); o += CHUNK) {
+      const a = await r.request({ type: "put", name: n, data: b64(buf.subarray(o, o + CHUNK)), end: o + CHUNK >= buf.length }, 15000);
+      if (a.type !== "ok") throw new Error(`the wedgie stopped: ${a.error || a.type}`);
+      done += Math.min(CHUNK, buf.length - o);
+      onProgress(done / total, n);
+    }
+  }
+  const d = await r.request({ type: "commit" }, 30000);
+  if (d.type !== "done") throw new Error(`the wedgie stopped: ${d.error || d.type}`);
+  return true;       // it restarts itself now: the caller doesn't leave() (its port may drop)
 }
 /** The app it runs now: the first in apps.json whose files are there (0.1.x kept several). */
 function activeOf(m: Manifest, have: Have): string | null {
@@ -215,6 +276,25 @@ const fileInfo = (m: Manifest, names: string[]) => names.map((n) => m.files.find
  *  raw REPL; the caller reboots it (the new core only runs after one). */
 export async function installCore(r: Repl, onProgress: (p: number, what: string) => void, opts: { launcher?: boolean; screen?: boolean } = {}) {
   const m = await firmwareManifest();
+  const ch = opts.launcher === false ? null : await checkedHave(r, m);
+  if (ch) {
+    const act = activeOf(m, ch);
+    const sha = (n: string) => m.files.find((f) => f.name === n)!.sha256;
+    const keep = m.carts.find((c) => c.mod === act)?.files || [];      // its app's files come up to date too
+    const write = [...new Set([...m.core, ...keep])].filter((n) => ch.hashes[n] !== sha(n));
+    const del = others(m, ch, act);
+    for (const n of write) ch.hashes[n] = sha(n);
+    for (const n of del) ch.hashes[n] = null;
+    const apps = await appsFor(m, ch, act);
+    if (!write.length && !del.length && JSON.stringify(apps) === JSON.stringify(ch.apps)) {
+      onProgress(1, "already up to date");      // nothing to ask for; it keeps running
+      return { version: m.version, written: 0, outdated: [] as Cart[], restarted: false, untouched: true };
+    }
+    if (await job(r, m, `Update firmware to ${m.version}`, write, del, apps, (p, w) => onProgress(0.02 + 0.96 * p, w))) {
+      onProgress(1, write.length ? `${write.length} files updated` : "already up to date");
+      return { version: m.version, written: write.length, outdated: m.carts.filter((c) => apps.some((a) => a.mod === c.mod && a.v !== c.v)), restarted: true, untouched: false };
+    }
+  }
   onProgress(0, "stopping what it runs");
   if (opts.launcher === false) await r.enter({ reset: false });   // a board already in the raw REPL (/format's bench)
   else await takeOver(r, (s) => { askHint(s); if (s) onProgress(0, s); }, `Update firmware to ${m.version}`);
@@ -233,7 +313,7 @@ export async function installCore(r: Repl, onProgress: (p: number, what: string)
   const apps = await writeApps(r, m, have, act);
   onProgress(1, todo.length ? `${todo.length} files updated` : "already up to date");
   const outdated = m.carts.filter((c) => apps.some((a) => a.mod === c.mod && a.v !== c.v));
-  return { version: m.version, written: todo.length, outdated };
+  return { version: m.version, written: todo.length, outdated, restarted: false, untouched: false };
 }
 
 // The wedgie's own screen while software goes on: the waistband, what's happening, a bar.
@@ -265,6 +345,18 @@ async function deviceScreen(r: Repl, title: string, name: string) {
  *  stays, a fresh heap for the app). Checked for room first, so a switch that can't fit changes nothing. */
 export async function useApp(r: Repl, cart: Cart, onProgress: (p: number, what: string) => void, opts: { launcher?: boolean; manifest?: Manifest } = {}) {
   const m = opts.manifest || await firmwareManifest();
+  const ch = opts.launcher === false ? null : await checkedHave(r, m);
+  if (ch) {
+    const sha = (n: string) => m.files.find((f) => f.name === n)?.sha256 || "";
+    const write = cart.files.filter((n) => ch.hashes[n] !== sha(n));
+    const del = others(m, ch, cart.mod);
+    for (const n of write) ch.hashes[n] = sha(n);
+    for (const n of del) ch.hashes[n] = null;
+    if (await job(r, m, `Install ${cart.name}`, write, del, await appsFor(m, ch, cart.mod), onProgress)) {
+      onProgress(1, write.length ? "in" : "already in");
+      return { written: write.length, restarted: true };
+    }
+  }
   onProgress(0, "opening the slot");
   if (opts.launcher === false) await r.enter({ reset: false });
   else await takeOver(r, (s) => { askHint(s); if (s) onProgress(0, s); }, `Install ${cart.name}`);
@@ -283,14 +375,17 @@ export async function useApp(r: Repl, cart: Cart, onProgress: (p: number, what: 
   await screen?.(1);
   await writeApps(r, m, have, cart.mod);
   onProgress(1, todo.length ? "in" : "already in");
-  return { written: todo.length };
+  return { written: todo.length, restarted: false };
 }
 
 /** Take its app off: the app's files the core doesn't need, then an empty apps.json ("no software"). */
 export async function removeApp(r: Repl) {
   const m = await firmwareManifest();
+  const ch = await checkedHave(r, m);
+  if (ch && await job(r, m, "Take its app off", [], others(m, ch, null), [], () => {})) return { restarted: true };
   await takeOver(r, askHint, "Take its app off");
   const have = await look(r, allNames(m));
   await removeFiles(r, have, others(m, have, null));
   await writeApps(r, m, have, null);
+  return { restarted: false };
 }

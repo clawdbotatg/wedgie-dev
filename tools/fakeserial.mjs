@@ -88,7 +88,7 @@ check(!(await page.$(".ask-a")), "the Press A modal is gone once it answered");
 check((await files(2)).includes("hello.py"), "hello.py is on it");
 const a1 = await appsOn(2);
 check(a1?.length === 1 && a1[0].mod === "hello" && /^[0-9a-f]{12}$/.test(a1[0].v), "apps.json: just hello, with its version: " + JSON.stringify(a1));
-check((await st(2, "inserting")) >= 2, "its screen showed it going on");
+check((await st(2, "jobs")) >= 1 && (await st(2, "interrupts")) === 0, "a checked install (0.3.0+): the wedgie did it itself, no Ctrl-C, no REPL");
 check((await st(2, "resets")) === 1 && (await st(2, "drops")) === 1, "one soft reset into it; the first one since the plug-in dropped the port, and the page found it again");
 
 // switch: the old app's files come off; a shared file stays only while something needs it

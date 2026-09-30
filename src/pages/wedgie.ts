@@ -409,11 +409,12 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     busy = "cart"; inserting[c.mod] = 0; paint();
     setScreen({ kind: "loading", p: 0 });
     try {
-      await useApp(r, c, (p) => { inserting[c.mod] = p; setScreen({ kind: "loading", p }); paint(); }, { manifest: view() });
+      const res = await useApp(r, c, (p) => { inserting[c.mod] = p; setScreen({ kind: "loading", p }); paint(); }, { manifest: view() });
       delete inserting[c.mod];
       status(`Restarting it into <b>${esc(c.name)}</b>…`);
-      // The soft reset: a fresh heap for the new app. The port stays on 0.1.3+; attach() finds it by ID either way.
-      await r.leave();
+      // The soft reset: a fresh heap for the new app (a checked install restarts itself). The port may drop;
+      // attach() finds it by ID either way.
+      if (!res.restarted) await r.leave();
       W.reidentify(x);
       release?.(); release = null; link = null;
       setTimeout(() => status(""), 6000);
@@ -432,8 +433,11 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     confirmOut = false;
     const r = link;
     busy = "cart"; paint();
-    try { await removeApp(r); } catch (e: any) { status(`<b class="bad">Couldn't take it off:</b> ${esc(e?.message || e)}`); }
-    await backToApp(r).catch(() => {});
+    const x = w;
+    let restarted = false;
+    try { restarted = (await removeApp(r)).restarted; } catch (e: any) { status(`<b class="bad">Couldn't take it off:</b> ${esc(e?.message || e)}`); }
+    if (restarted) { W.reidentify(x); release?.(); release = null; link = null; }   // it restarted itself (a checked job)
+    else await backToApp(r).catch(() => {});
     busy = ""; paint(); W.touch();
   }
 
@@ -587,10 +591,12 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
       setScreen({ kind: "loading", p: 0 });
       let drawn = 0;
       const res = await installCore(r, (p, what) => { meter(p, what); if (p - drawn >= 0.05 || p === 1) { drawn = p; setScreen({ kind: "loading", p }); } });
+      if (res.untouched) { meter(1, "Already up to date."); setScreen(home()); busy = ""; paint(); setTimeout(() => meter(null), 4000); return; }
       meter(1, res.written ? `wedgie ${res.version} installed. Restarting it…` : "Already up to date. Restarting it…");
       // The one soft reset: the new firmware only runs after one. The port drops and the wedgie comes back as a
       // new port (the drive re-enumerates USB on firmware older than 0.1.3); attach() finds it by its ID.
-      await r.leave();
+      // A checked install (0.3.0+) restarts itself.
+      if (!res.restarted) await r.leave();
       status("Restarting it on the new firmware. It comes back here in a few seconds.");
       // Identify it again (queued behind this session, so it starts once the port is let go). On 0.1.3+ the
       // port survives a soft reset; if it doesn't, the disconnect marks it gone and the replug is a new one.
