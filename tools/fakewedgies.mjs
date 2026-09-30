@@ -24,7 +24,10 @@ export function fakeWedgies(specs) {
     // mark: boot.py's soft-reset mark (watchdog scratch) is set. 0.1.3+ sets it at power-up; a board that
     // powered up on older firmware (or none) has no mark, so the first soft reset after an update looks like a
     // power-up to the new boot.py: it adds the WEDGIE drive, which drops the port and plugs it back in.
-    const st = { files, launched: null, presses: [], shots: 0, resets: 0, drops: 0, chips: 0, interrupts: 0, resetHook: null, mark: files.has("wedgiedrive.py") };
+    // driveOn: the drive is up (added at this power-up). A soft reset takes it off again, and that
+    // changes USB too: the first soft reset after a plug-in drops the port as well (seen on a real
+    // RP2040 wedgie 2026-09-29: the page lost it after every firmware update). While dropped, open() fails.
+    const st = { files, launched: null, presses: [], shots: 0, resets: 0, drops: 0, chips: 0, interrupts: 0, resetHook: null, mark: files.has("wedgiedrive.py"), driveOn: files.has("wedgiedrive.py") };
     let push = () => {};
     let raw = false, code = "", line = "", cur = null, curName = "";
     const slot = () => st.files.has("slot.py") && st.files.has("main.py");
@@ -154,7 +157,10 @@ export function fakeWedgies(specs) {
           if (!raw) {
             if (ch === "\x04") {
               st.resets++; st.launched = null; st.stopped = false; st.open = false;
-              if (st.files.has("wedgiedrive.py") && !st.mark && st.resetHook) { st.mark = true; st.drops++; st.resetHook(); continue; }
+              const drop = st.files.has("wedgiedrive.py") && (!st.mark || st.driveOn);
+              st.driveOn = st.files.has("wedgiedrive.py") && !st.mark;    // the new boot.py adds it only without a mark
+              st.mark = st.files.has("wedgiedrive.py");
+              if (drop && st.resetHook) { st.drops++; st.resetHook(); continue; }
               if (wedgie()) setTimeout(() => push(hello(null, "ready") + "\r\n"), 300);
               continue;
             }
@@ -170,7 +176,7 @@ export function fakeWedgies(specs) {
       return { readable, writable };
     }
     let cur2 = streams();
-    const port = { getInfo: () => ({ usbVendorId: 0x2e8a, usbProductId: 5 }), async open() { cur2 = streams(); }, async close() {},
+    const port = { getInfo: () => ({ usbVendorId: 0x2e8a, usbProductId: 5 }), async open() { if (st.dropped) throw new DOMException("Failed to open serial port.", "NetworkError"); cur2 = streams(); }, async close() {},
       get readable() { return cur2.readable; }, get writable() { return cur2.writable; }, _st: st };
     return port;
   }
@@ -184,10 +190,11 @@ export function fakeWedgies(specs) {
   window.__ports = ports;
   const t = new EventTarget();
   const plugged = new Set(ports);
-  window.__plug = (i, on) => { const p = ports[i]; if (on) { plugged.add(p); t.dispatchEvent(Object.assign(new Event("connect"), { port: p })); } else { plugged.delete(p); t.dispatchEvent(Object.assign(new Event("disconnect"), { port: p })); } };
+  window.__plug = (i, on) => { const p = ports[i]; p._st.dropped = !on; if (on && p._st.files.has("wedgiedrive.py")) p._st.mark = p._st.driveOn = true; if (on) { plugged.add(p); t.dispatchEvent(Object.assign(new Event("connect"), { port: p })); } else { plugged.delete(p); t.dispatchEvent(Object.assign(new Event("disconnect"), { port: p })); } };
   for (const p of ports) p._st.resetHook = () => {
-    setTimeout(() => t.dispatchEvent(Object.assign(new Event("disconnect"), { port: p })), 50);
-    setTimeout(() => t.dispatchEvent(Object.assign(new Event("connect"), { port: p })), 600);
+    p._st.dropped = true;
+    setTimeout(() => t.dispatchEvent(Object.assign(new Event("disconnect"), { port: p })), 1500);   // macOS tells the page late
+    setTimeout(() => { p._st.dropped = false; t.dispatchEvent(Object.assign(new Event("connect"), { port: p })); }, 5000);
   };
   Object.defineProperty(navigator, "serial", { value: Object.assign(t, { getPorts: async () => ports.filter((p) => plugged.has(p)), requestPort: async () => ports[0] }) });
 }

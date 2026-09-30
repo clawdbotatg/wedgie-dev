@@ -76,7 +76,7 @@ export const shortId = (uid: string) => uid.slice(-6).toUpperCase();
 
 function add(port: SerialPort) {
   const have = list.find((w) => w.port === port && w.state !== "gone");
-  if (have) return have;
+  if (have) { if (have.state === "error") identify(have); return have; }   // back after a drop: try again
   const w: Wedgie = { key: nextKey++, port, state: "identifying", log: "" };
   list.push(w);
   emit();
@@ -140,6 +140,9 @@ async function identify(w: Wedgie) {
     w.state = "ready";
     w.readyAt = Date.now();
   } catch (e: any) {
+    // Unplugged meanwhile (a restart's USB drop, 2026-09-29: "Something else has this wedgie open" after
+    // every update): stay gone; its connect event identifies it again.
+    if ((w.state as string) === "gone") return;   // set by the disconnect listener while talk() ran
     w.state = "error";
     w.error = e?.message || String(e);
     if (/failed to open|busy|access denied|already open/i.test(w.error || "")) w.error = "Something else has this wedgie open: another wedgie.dev tab, mpremote or Thonny. Close it, then unplug and replug.";

@@ -85,7 +85,7 @@ check((await files(2)).includes("hello.py"), "hello.py is on it");
 const a1 = await appsOn(2);
 check(a1?.length === 1 && a1[0].mod === "hello" && /^[0-9a-f]{12}$/.test(a1[0].v), "apps.json: just hello, with its version: " + JSON.stringify(a1));
 check((await st(2, "inserting")) >= 2, "its screen showed it going on");
-check((await st(2, "resets")) === 1 && (await st(2, "drops")) === 0, "one soft reset into it; the port stayed");
+check((await st(2, "resets")) === 1 && (await st(2, "drops")) === 1, "one soft reset into it; the first one since the plug-in dropped the port, and the page found it again");
 
 // switch: the old app's files come off; a shared file stays only while something needs it
 await pickApp("wire_demo", "Clear sign on");
@@ -111,6 +111,7 @@ check(asks === 4 && !(await st(2, "open")), `sealed: every job asked (hello, Cle
 
 // a no changes nothing
 await page.evaluate(() => { window.__ports[2]._st.person = { say: "no", ms: 300 }; });
+await wait(() => document.querySelector('#d-shelf .cart-slot[data-mod="hello"] .cart:not(:disabled)') && document.querySelector("#d-missing").hidden, null, 15000, "back after taking it off");
 const beforeNo = JSON.stringify(await files(2));
 await page.click(`#d-shelf .cart-slot[data-mod="hello"] .cart`);
 await wait(() => /said no/.test(document.querySelector("main")?.textContent || ""), null, 10000, "a no: the page says the wedgie said no");
@@ -180,7 +181,7 @@ await wait(() => document.querySelector("[data-fw]") && !document.querySelector(
 check(/Update the firmware/.test(await page.textContent("#d-carts-note")), "0.1.3: Software asks for the update");
 await page.click("[data-fw]");
 await wait((id) => /Up to date/.test(document.querySelector("#d-fw")?.textContent || "") && location.pathname === `/connect/${id}`, OLD, 120000, `0.1.3 → ${CUR}, came back by its ID`);
-check((await st(1, "resets")) === 1 && (await st(1, "drops")) === 0, "one soft reset, at the end; its port stayed (0.1.3 marks soft resets)");
+check((await st(1, "resets")) === 1 && (await st(1, "drops")) === 1, "one soft reset, at the end; its port dropped and it came back by its ID");
 const a3 = await appsOn(1), f3 = await files(1);
 check(JSON.stringify(a3) === "[]", "no app yet (nobody picked one): " + JSON.stringify(a3));
 check(!f3.includes("hello.py") && !f3.includes("keytest.py") && !f3.includes("menu.py") && f3.includes("slot.py"), "its old apps and the menu gone, the slot on");
