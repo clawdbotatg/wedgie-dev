@@ -147,12 +147,16 @@ export class Repl {
   // after updating from them (firmware/boot.py). A soft reset is only for boards without wedgie
   // firmware, and for booting a new firmware (then the port may drop; wedgies.ts finds it by its ID).
   // On 0.1.x a launcher app's Timer survived Ctrl-C: install.ts takeOver asks it to stop first.
+  // A Ctrl-C that lands while the firmware is inside a Timer callback is lost (firmware/slot.py), so
+  // it's sent again until the raw REPL answers (seen on a real wedgie running Speed lab, 2026-09-29).
   async enter(opts: { reset?: boolean } = {}) {
-    await this.write("\r\x03\x03");
-    await sleep(150);
-    this.buf = "";
-    await this.write("\x01");
-    await this.waitFor(RAW_PROMPT, 4000);
+    for (let i = 0; ; i++) {
+      await this.write("\r\x03\x03");
+      await sleep(150);
+      this.buf = "";
+      await this.write("\x01");
+      try { await this.waitFor(RAW_PROMPT, i < 4 ? 1200 : 4000); break; } catch (e) { if (i >= 4) throw e; }
+    }
     if (opts.reset === false) return;
     await this.write("\x04");
     await this.waitFor("soft reboot", 4000);

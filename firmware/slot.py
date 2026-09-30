@@ -234,7 +234,7 @@ def handle(line):
         stop()
         W.send({"id": mid, "type": "ok"})
     elif t == "open":
-        W.send({"id": mid, "type": "open" if let_in() else "refused"})
+        W.send({"id": mid, "type": "open" if let_in(str(m.get("for") or "")[:60]) else "refused"})
     elif t == "reboot":
         W.send({"id": mid, "type": "rebooting"})
         import machine
@@ -247,9 +247,20 @@ def handle(line):
 ASK_MS = 60000      # no answer to "let this computer in?" in a minute is a no
 
 
-def ask():
-    """Let the computer in? Only a real press answers (Keys physical: a press sent over USB can't),
-    A yes, Y no. Nothing comes off USB meanwhile, so the computer waits."""
+def _wrap(s, n):
+    out = [""]
+    for w in s.split():
+        if out[-1] and len(out[-1]) + 1 + len(w) > n:
+            out.append("")
+        out[-1] = (out[-1] + " " + w).strip()
+    return out
+
+
+def ask(job=""):
+    """Let the computer do `job` (what it says it wants, e.g. "Update firmware to 0.2.8")? Only a real
+    press answers (Keys physical: a press sent over USB can't), A yes, Y no. Nothing comes off USB
+    meanwhile, so the computer waits. The job is the computer's word, so the screen still says a yes
+    gives it full access for this one job (checked jobs: docs/SECURITY-ROADMAP.md)."""
     import os
     k = L.Keys(physical=True)
     k.pressed()                             # a key already down doesn't count
@@ -257,15 +268,21 @@ def ask():
     d.fill(WHITE)
     for y, c in ((10, GREEN), (19, GREY_S), (28, RED)):
         d.fill_rect(0, y, 240, 5, c)
-    d.center_text("LET THIS", 48, INK, 2)
-    d.center_text("COMPUTER IN?", 72, INK, 2)
+    title = _wrap(job + "?", 15) if job else ["LET THIS", "COMPUTER IN?"]
+    if len(title) > 2:
+        title = _wrap(job + "?", 28)[:3]
+        for i, s in enumerate(title):
+            d.center_text(s, 48 + i * 14, INK)
+    else:
+        for i, s in enumerate(title):
+            d.center_text(s, 48 + i * 24, INK, 2)
     y = 108
-    lines = ["It can change anything", "on this wedgie,"] + (["and use its wallet key,"] if wallet else [])
-    for s in lines + ["for this one job.", "", "Didn't ask for this? Y."]:
+    lines = ["The computer gets full", "access for this one job."] + (["Its wallet key too."] if wallet else [])
+    for s in lines + ["", "Didn't ask for this? Y."]:
         d.center_text(s, y, INK)
         y += 14
     d.fill_rect(0, 184, 240, 26, GREEN)
-    d.center_text("A  let it in", 189, WHITE, 2)
+    d.center_text("A  yes", 189, WHITE, 2)
     d.fill_rect(0, 214, 240, 26, RED)
     d.center_text("Y  no", 219, WHITE, 2)
     d.show()
@@ -278,7 +295,7 @@ def ask():
     return False
 
 
-def let_in():
+def let_in(job=""):
     """{"type": "open"}: may this computer have the REPL? Asks the person, unless they already said
     yes for this job (or nothing is sealed: the emulator). Yes turns Ctrl-C on (wedgie.set_open) until
     main.py starts again."""
@@ -289,12 +306,12 @@ def let_in():
     _paused = True
     kept = _keep()
     try:
-        ok = ask()
+        ok = ask(job)
     finally:
         _paused = False
     if ok:
         W.set_open()
-        _band("computer in", [("it locks again when done", MUTED)])
+        _band("working...", [(job[:28], INK), ("it locks again when done", MUTED)])
     elif kept:
         _unkeep()                       # the app's screen as it was: an app that doesn't redraw by
     elif state == "empty":              # itself would otherwise sit under the question forever

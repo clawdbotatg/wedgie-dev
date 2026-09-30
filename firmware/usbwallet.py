@@ -198,7 +198,7 @@ def handle_line(line):
         if state in ("confirm", "working", "provision"):
             send({"id": mid, "type": "busy"}); return
         import slot
-        send({"id": mid, "type": "open" if slot.let_in() else "refused"})
+        send({"id": mid, "type": "open" if slot.let_in(str(m.get("for") or "")[:60]) else "refused"})
         dirty = True
     elif t == "reboot":     # a clean restart from the host; mpremote's reset can wedge the Mac's port
         send({"id": mid, "type": "rebooting"})

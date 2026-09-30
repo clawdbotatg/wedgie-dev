@@ -107,8 +107,8 @@ _free()`;
 /** Stop what the wedgie runs and take its raw REPL, without a soft reset, with its RAM freed. The app is
  *  stopped properly first (on 0.1.x its Timer would otherwise keep drawing over everything; 0.2 stops
  *  it on Ctrl-C too). 0.2.5+ is sealed: the person lets this computer in first (letIn). */
-export async function takeOver(r: Repl, ask = askHint) {
-  await letIn(r, ask);
+export async function takeOver(r: Repl, ask = askHint, job = "") {
+  await letIn(r, ask, job);
   await r.request({ type: "stop" }, 800).catch(() => {});
   await r.enter({ reset: false });
   await r.exec(FREE_PY, 10000).catch(() => {});
@@ -123,12 +123,12 @@ export function setAskHint(fn: (s: string) => void) { askHint = fn; }
  *  presses A on its own screen ({"type": "open"}; Y or a minute with no answer is a no). Once they have,
  *  it stays open until its app starts again (the end of this job) and answers at once. Anything else (older firmware, bare
  *  MicroPython, a board already in its REPL) has no lock and is left alone. */
-export async function letIn(r: Repl, ask: (s: string) => void = askHint) {
+export async function letIn(r: Repl, ask: (s: string) => void = askHint, job = "") {
   const h = await r.hello(700).catch(() => null);
   if (!h?.sealed || h.open) return;
   ask(ASK_TEXT);
   let v: any;
-  try { v = await r.request({ type: "open" }, 65000); }
+  try { v = await r.request({ type: "open", for: job }, 65000); }   // job: what the wedgie's screen asks
   catch { throw new Error("nobody pressed A on the wedgie"); }
   finally { ask(""); }
   if (v.type === "open") return;
@@ -216,7 +216,7 @@ export async function installCore(r: Repl, onProgress: (p: number, what: string)
   const m = await firmwareManifest();
   onProgress(0, "stopping what it runs");
   if (opts.launcher === false) await r.enter({ reset: false });   // a board already in the raw REPL (/format's bench)
-  else await takeOver(r, (s) => { askHint(s); if (s) onProgress(0, s); });
+  else await takeOver(r, (s) => { askHint(s); if (s) onProgress(0, s); }, `Update firmware to ${m.version}`);
   onProgress(0.02, "checking what's on it");
   const have = await look(r, allNames(m));
   const stale = m.files.filter((f) => f.name.endsWith(".py")).map((f) => f.name.replace(/\.py$/, ".mpy"))
@@ -266,7 +266,7 @@ export async function useApp(r: Repl, cart: Cart, onProgress: (p: number, what: 
   const m = opts.manifest || await firmwareManifest();
   onProgress(0, "opening the slot");
   if (opts.launcher === false) await r.enter({ reset: false });
-  else await takeOver(r, (s) => { askHint(s); if (s) onProgress(0, s); });
+  else await takeOver(r, (s) => { askHint(s); if (s) onProgress(0, s); }, `Install ${cart.name}`);
   const have = await look(r, allNames(m));
   const size = (n: string) => m.files.find((x) => x.name === n)?.size ?? 0;   // 0: an old repo app's file (not in m); it frees its room anyway
   const need = cart.files.reduce((t, f) => t + (have.hashes[f] ? 0 : size(f)), 0);
@@ -288,7 +288,7 @@ export async function useApp(r: Repl, cart: Cart, onProgress: (p: number, what: 
 /** Take its app off: the app's files the core doesn't need, then an empty apps.json ("no software"). */
 export async function removeApp(r: Repl) {
   const m = await firmwareManifest();
-  await takeOver(r);
+  await takeOver(r, askHint, "Take its app off");
   const have = await look(r, allNames(m));
   await removeFiles(r, have, others(m, have, null));
   await writeApps(r, m, have, null);
