@@ -15,6 +15,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { checkAppJson, parseRepo } from "../src/apps/appjson.mjs";
 
+import { published, releaseText } from "./release.mjs";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const sha = (buf) => createHash("sha256").update(buf).digest("hex");
 /** A cart's version: the same function as cartV in src/serial/install.ts. */
@@ -27,7 +28,7 @@ export function buildFirmware() {
   const files = [];
   for (const name of readdirSync(src).sort()) {
     const p = join(src, name);
-    if (!statSync(p).isFile() || name.startsWith(".") || !/\.(py|bin|json|mpy)$/.test(name) || name === "carts.json" || name === "apps.json") continue;
+    if (!published(name, p)) continue;
     const buf = readFileSync(p);
     copyFileSync(p, join(out, name));
     files.push({ name, size: buf.length, sha256: sha(buf) });
@@ -59,7 +60,17 @@ export function buildFirmware() {
       carts.push({ ...a, repo: e.repo, sha: e.sha, v: cartV(hashes), size: a.files.reduce((s, n) => s + byName.get(n).size, 0) });
     }
   }
-  writeFileSync(join(out, "manifest.json"), JSON.stringify({ version, files, core, carts }, null, 1));
+  // The signed file list (tools/sign.mjs). signed: it covers exactly these files; a wedgie refuses a
+  // checked install from an unsigned manifest.
+  let signed = false;
+  try {
+    const txt = readFileSync(join(root, "release/firmware.txt"), "utf8");
+    copyFileSync(join(root, "release/firmware.txt"), join(out, "release.txt"));
+    copyFileSync(join(root, "release/firmware.sig"), join(out, "release.sig"));
+    signed = txt === releaseText();
+    if (!signed) console.warn("fw: release/firmware.txt is out of date: run node tools/sign.mjs");
+  } catch {}
+  writeFileSync(join(out, "manifest.json"), JSON.stringify({ version, files, core, carts, signed }, null, 1));
   copyFileSync(join(root, "LORE.md"), join(root, "public/lore.md")); // served at wedgie.dev/lore.md
   return { version, core: core.length, carts: carts.length };
 }

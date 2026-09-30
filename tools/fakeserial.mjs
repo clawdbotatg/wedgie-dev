@@ -90,10 +90,10 @@ check((await st(2, "resets")) === 1 && (await st(2, "drops")) === 1, "one soft r
 // switch: the old app's files come off; a shared file stays only while something needs it
 await pickApp("wire_demo", "Clear sign on");
 let f = await files(2);
-check(!f.includes("hello.py") && f.includes("wire_demo.py") && f.includes("p256.py"), "switched: hello.py gone, wire_demo on");
+check(!f.includes("hello.py") && f.includes("wire_demo.py") && f.includes("cbor.py"), "switched: hello.py gone, wire_demo on");
 await pickApp("usbwallet", "Wallet on");
 f = await files(2);
-check(!f.includes("wire_demo.py") && !f.includes("cbor.py") && f.includes("p256.py") && f.includes("usbwallet.py"), "switched again: its own files gone, shared p256.py kept");
+check(!f.includes("wire_demo.py") && !f.includes("cbor.py") && f.includes("usbwallet.py"), "switched again: its own files gone");
 check(JSON.stringify((await appsOn(2)).map((a) => [a.mod, a.usb])) === '[["usbwallet",true]]', "apps.json: the Wallet, which has USB to itself");
 check((await files(2)).includes("/saves/hello/best.json"), "switching apps never touched the saves");
 
@@ -103,7 +103,7 @@ check(/Take Wallet off\?/.test(await page.textContent('#d-shelf .cart-slot[data-
 await page.click('#d-shelf .cart-slot[data-mod="usbwallet"] .cart-out');
 await wait(() => JSON.parse(new TextDecoder().decode(window.__ports[2]._st.files.get("apps.json"))).length === 0, null, 15000, "Wallet off");
 f = await files(2);
-check(!f.includes("usbwallet.py") && !f.includes("p256.py") && f.includes("slot.py"), "its files gone, the core stays");
+check(!f.includes("usbwallet.py") && !f.includes("keccak.py") && f.includes("slot.py"), "its files gone, the core stays");
 await wait(() => /Nothing on it yet/.test(document.querySelector("#d-carts-note").textContent), null, 10000, "the page: nothing on it");
 
 const asks = await st(2, "asks");

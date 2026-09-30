@@ -15,12 +15,12 @@
    "files": ["mock.py", "mock_qr.bin"], "label": "#e0a100",
    "icon": ["............", ".kkkkkkkkkk.", ".kyyyyyyyyk.", ".kkkkkkkkkk.", ".k........k.", ".k.....ggkk.", ".k.....gg.k.", ".k........k.", ".kkkkkkkkkk.", "............", "............", "............"]},
   {"mod": "wire_demo", "name": "Clear sign", "about": "Reads a signed transaction request and shows it in plain words.",
-   "files": ["wire_demo.py", "wire_decode.py", "cbor.py", "rlp.py", "p256.py"], "label": "#1f8fd6",
+   "files": ["wire_demo.py", "wire_decode.py", "cbor.py", "rlp.py"], "label": "#1f8fd6",
    "icon": ["............", ".kkkkkkk....", ".kwwwwwkk...", ".kwkkkwwkk..", ".kwwwwwwwk..", ".kwkkkkkwk..", ".kwwwwwwwk..", ".kwkkkwggg..", ".kwwwwggg...", ".kkkkkkg....", "............", "............"]},
   {"mod": "battery", "name": "Battery", "about": "Battery level from a Waveshare Pico-UPS-B hat.",
    "files": ["battery.py"], "label": "#16a34a",
    "icon": ["............", "............", ".kkkkkkkkk..", ".kgggggg.kk.", ".kgggggg..k.", ".kgggggg..k.", ".kgggggg.kk.", ".kkkkkkkkk..", "............", "............", "............", "............"]},
   {"mod": "usbwallet", "name": "Wallet", "entry": "run", "usb": true, "chip": "ATECC608", "about": "The USB hardware wallet. Its key lives in the ATECC608 chip.",
-   "files": ["usbwallet.py", "eip712.py", "keccak.py", "signer.py", "blockies.py", "p256.py"], "label": "#e3312c",
+   "files": ["usbwallet.py", "eip712.py", "keccak.py", "signer.py", "blockies.py"], "label": "#e3312c",
    "icon": ["............", "..kkkkkkk...", ".kwwwwwwwk..", "kkkkkkkkkkk.", "kwwwwwwwwwk.", "kwwwwwwkkkk.", "kwwwwwwkyyk.", "kwwwwwwkkkk.", "kwwwwwwwwwk.", "kkkkkkkkkkk.", "............", "............"]}
 ]

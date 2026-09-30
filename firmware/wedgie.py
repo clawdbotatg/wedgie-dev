@@ -3,7 +3,7 @@
 # interrupted; from the REPL they are plain calls:  import wedgie; wedgie.shot(); wedgie.press("A")
 import sys, os, json, machine
 
-VERSION = "0.2.8"
+VERSION = "0.2.9"
 
 # The lock. main.py turns Ctrl-C off before anything else and never ends by itself, so a computer
 # can only send the slot's JSON lines: it can't stop the app, reach the REPL, or make the secure chip
@@ -14,6 +14,34 @@ VERSION = "0.2.8"
 # wedgie long after the job. SEALED stays False where main.py doesn't run (the emulator).
 SEALED = False
 _open = False
+
+# The release key (tools/sign.mjs writes it here): a file list signed with it is ours. A checked install
+# hashes every file it's sent against that list (release_ok), so the computer can't swap in others.
+RELEASE_KEY = ("75467e0970a70909082a39594e9c29e8c6e42cf3663ab9ae31dbbb8babc522f3", "dc7b3ed1006e9273a185c4a6f754cd5c1fd15f0d0a8464f78a9c65ac938eb8d3")
+
+
+def release_ok(text, sig):
+    """text: the signed list (tools/release.mjs), sig: "r s" in hex. True if our key signed it.
+    Pure-Python P-256 (p256.py): a few seconds on an RP2040, once per job."""
+    try:
+        import p256, hashlib
+        r, s = (int(x, 16) for x in sig.split())
+        return p256.verify(int(RELEASE_KEY[0], 16), int(RELEASE_KEY[1], 16), hashlib.sha256(text).digest(), r, s)
+    except Exception:
+        return False
+
+
+def release_files(text):
+    """{name: sha256} from a signed list, and its version."""
+    lines = text.decode().split("\n") if isinstance(text, bytes) else text.split("\n")
+    if lines[0] != "wedgie-release 1" or not lines[1].startswith("version "):
+        raise ValueError("not a release list")
+    files = {}
+    for l in lines[2:]:
+        if l:
+            h, n = l.split("  ", 1)
+            files[n] = h
+    return lines[1][8:], files
 
 
 def is_open():
