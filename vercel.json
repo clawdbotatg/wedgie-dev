@@ -102,6 +102,10 @@
     {
       "source": "/code",
       "destination": "/index.html"
+    },
+    {
+      "source": "/debug",
+      "destination": "/index.html"
     }
   ],
   "trailingSlash": false

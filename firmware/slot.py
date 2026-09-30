@@ -56,6 +56,19 @@ def _band(title, lines):
     d.show()
 
 
+def progress(title, what, p):
+    """The screen during a checked install (job.py): never leave a yes looking like nothing happened."""
+    d.fill(WHITE)
+    for y, c in ((10, GREEN), (19, GREY_S), (28, RED)):
+        d.fill_rect(0, y, 240, 5, c)
+    for i, s in enumerate(_wrap(title, 15)[:2]):
+        d.center_text(s, 72 + i * 24, INK, 2)
+    d.center_text(what[:28], 136, MUTED)
+    d.rect(30, 160, 180, 14, GREY_S)
+    d.fill_rect(32, 162, int(176 * max(0, min(1, p))), 10, GREEN)
+    d.show()
+
+
 def empty():
     """The wedgie's own home: the boot logo, and where to pick what it runs."""
     try:
@@ -237,7 +250,7 @@ def handle(line):
         W.send({"id": mid, "type": "open" if let_in(str(m.get("for") or "")[:60]) else "refused"})
     elif t == "job":                    # a checked install (job.py): signed files only, no REPL
         import job
-        _asking(lambda: job.run(mid, m, ask))
+        _asking(lambda: job.run(mid, m, ask, progress))
     elif t == "sums":
         import job
         W.send({"id": mid, "type": "sums", "sums": job.sums(m.get("names")), "apps": W.apps()})

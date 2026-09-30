@@ -67,18 +67,24 @@ def check(m):
     return version, files
 
 
-def run(mid, m, ask):
-    """Check, ask, then take the files. ask(job, note) -> bool is the slot's yes/no screen."""
+def run(mid, m, ask, show=None):
+    """Check, ask, then take the files. ask(job, note) -> bool is the slot's yes/no screen; show(title,
+    what, p) draws the progress screen (the moment A is pressed, then as files arrive)."""
+    show = show or (lambda *a: None)
     try:
         version, files = check(m)
     except ValueError as e:
         W.send({"id": mid, "type": "error", "error": str(e)})
         return
     write = list(m.get("write") or [])
-    if not ask(str(m.get("job") or "Update")[:60], "checked: wedgie.dev release " + version):
+    title = str(m.get("job") or "Update")[:60]
+    if not ask(title, "checked: wedgie.dev release " + version):
         W.send({"id": mid, "type": "refused"})
         return
+    title = title.replace("Install", "Installing").replace("Update", "Updating") + "..."
+    show(title, "starting", 0)
     W.send({"id": mid, "type": "go"})
+    chunks = 0
     got = {}                                # name -> sha256 of what arrived
     h, f, cur = None, None, None
     poll = select.poll()
@@ -114,6 +120,9 @@ def run(mid, m, ask):
                 b = binascii.a2b_base64(q.get("data") or "")
                 f.write(b)
                 h.update(b)
+                chunks += 1
+                if chunks % 6 == 1:
+                    show(title, n, (len(got) + 0.5) / max(1, len(write)))
                 if q.get("end"):
                     f.close()
                     f, cur = None, None
@@ -124,6 +133,7 @@ def run(mid, m, ask):
                 W.send({"id": qid, "type": "ok"})
                 gc.collect()
             elif t == "commit":
+                show(title, "restarting...", 1)
                 missing = [n for n in write if n not in got]
                 if missing:
                     W.send({"id": qid, "type": "error", "error": "not sent: " + " ".join(missing)})

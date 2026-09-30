@@ -18,6 +18,7 @@
   python3 wedgie.py update                    install/update the wedgie firmware (only changed files; its app and saves stay)
   python3 wedgie.py ls                        files on it, saves included
   python3 wedgie.py saves [backup f.json | restore f.json]    its saves (/saves/<game>/), out to a file and back
+  python3 wedgie.py debug                     a report (firmware, files, free space and RAM, error.log); asks on its screen
 
   --port /dev/cu.usbmodemXXXX  (or --id A1B2C3) picks one when several are plugged in.
 
@@ -123,7 +124,7 @@ class Wedgie:
                 raise TimeoutError("waiting for %r" % marker)
             data += self.s.read(4096)
 
-    def let_in(self):
+    def let_in(self, job=""):
         """0.2.5+ is sealed: Ctrl-C does nothing until its person presses A on the wedgie's own screen
         ({"type": "open"}; Y or a minute with no answer is a no). A yes lasts until its app starts again."""
         h = self.hello(1.0)
@@ -131,7 +132,7 @@ class Wedgie:
             return
         sys.stderr.write("press A on the wedgie to let this computer in\n")
         try:
-            v = self.request({"type": "open"}, 65)
+            v = self.request({"type": "open", "for": job}, 65)
         except TimeoutError:
             sys.exit("nobody pressed A on the wedgie")
         if v.get("type") != "open":
@@ -414,10 +415,10 @@ def cart_entry(cart):
     return a
 
 
-def take_over(wg):
+def take_over(wg, job=""):
     """Stop its app and take the raw REPL, with its RAM freed: Ctrl-C leaves the app loaded, and on an
     RP2040 a copy then fails with MemoryError. lcd stays (its 115 KB framebuffer)."""
-    wg.let_in()                                 # sealed: its person says yes first
+    wg.let_in(job)                              # sealed: its person says yes first (job: what its screen asks)
     try:
         wg.request({"type": "stop"}, 1)        # stop its app first (0.1.x: "home"; its Timer would keep drawing)
     except TimeoutError:
@@ -577,6 +578,15 @@ def main():
             write_apps(wg, m, have, act)
             wg.leave()      # the new firmware only runs after a soft reset (see "Plugging in" above)
             print("wedgie %s: %s" % (m["version"], "%d files updated" % len(todo) if todo else "already up to date"))
+        elif c == "debug":
+            code = urllib.request.urlopen(SITE + "/device/debug.py").read().decode()
+            take_over(wg, "Debug and read logs")
+            out = wg.exec(code, 30)
+            wg.leave(reset=False)       # its app again, locked
+            line = next((l for l in out.splitlines() if l.startswith("@debug ")), None)
+            if not line:
+                sys.exit("no report: " + out[-500:])
+            print(json.dumps(json.loads(line[7:]), indent=1))
         elif c in ("apps", "carts"):
             m = manifest()
             take_over(wg)
