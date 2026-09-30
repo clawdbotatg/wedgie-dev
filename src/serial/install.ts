@@ -201,11 +201,15 @@ async function appsFor(m: Manifest, have: Have, only: string | null) {
 // file explorer and /debug still ask for full access).
 
 /** `have` without the REPL, or null when a checked install can't be used. */
-async function checkedHave(r: Repl, m: Manifest): Promise<Have | null> {
+async function checkedHave(r: Repl, m: Manifest, hash?: string[]): Promise<Have | null> {
   if (!m.signed) return null;
   const h = await r.hello(700).catch(() => null);
   if (!h?.jobs) return null;
-  const v = await r.request({ type: "sums", names: allNames(m) }, 30000).catch(() => null);
+  // hash: the files whose contents matter (the rest only need to be there or not; hashing the whole
+  // flash took seconds before every question). 0.3.0-0.3.3 don't know exists: they get it all hashed.
+  const rest = hash ? allNames(m).filter((n) => !hash.includes(n)) : [];
+  let v = await r.request({ type: "sums", names: hash || allNames(m), exists: rest }, 30000).catch(() => null);
+  if (v?.sums && rest.some((n) => !(n in v.sums))) v = await r.request({ type: "sums", names: allNames(m) }, 30000).catch(() => null);
   if (!v?.sums) return null;
   return { hashes: v.sums, files: Object.keys(v.sums).filter((n) => v.sums[n]), apps: v.apps || [] };
 }
@@ -219,12 +223,13 @@ async function job(r: Repl, m: Manifest, title: string, write: string[], del: st
   const rel = await signedList();
   const listed = new Set(rel.text.split("\n").slice(2).map((l) => l.split("  ")[1]).filter(Boolean));
   if (!write.every((n) => listed.has(n) && !m.files.find((f) => f.name === n)?.url)) return false;
-  const files = await Promise.all(write.map(async (n) => {
+  const fetched = Promise.all(write.map(async (n) => {      // downloads while the wedgie asks
     const f = m.files.find((x) => x.name === n)!;
     const buf = new Uint8Array(await (await fetch("/fw/" + n, { cache: "no-cache" })).arrayBuffer());
     if (hex(await crypto.subtle.digest("SHA-256", buf)) !== f.sha256) throw new Error("wedgie.dev was updated since this page opened. Reload the page, then try again");
     return { n, buf };
   }));
+  fetched.catch(() => {});
   askHint(ASK_TEXT); onProgress(0, ASK_TEXT);
   const close = (await import("../ui/askmodal")).askModal(title, true);
   let v: any;
@@ -234,6 +239,8 @@ async function job(r: Repl, m: Manifest, title: string, write: string[], del: st
   if (v.type === "refused") throw new Error("the wedgie said no (Y on its screen)");
   if (v.type === "busy") throw new Error("the wedgie is busy signing; try again after");
   if (v.type !== "go") throw new Error(`the wedgie said ${v.error || v.type}`);
+  let files: { n: string; buf: Uint8Array }[];
+  try { files = await fetched; } catch (e) { await r.request({ type: "abort" }, 5000).catch(() => {}); throw e; }
   const total = files.reduce((t, f) => t + f.buf.length, 0) || 1;
   let done = 0;
   for (const { n, buf } of files) {
@@ -360,7 +367,7 @@ async function deviceScreen(r: Repl, title: string, name: string) {
  *  stays, a fresh heap for the app). Checked for room first, so a switch that can't fit changes nothing. */
 export async function useApp(r: Repl, cart: Cart, onProgress: (p: number, what: string) => void, opts: { launcher?: boolean; manifest?: Manifest } = {}) {
   const m = opts.manifest || await firmwareManifest();
-  const ch = opts.launcher === false ? null : await checkedHave(r, m);
+  const ch = opts.launcher === false ? null : await checkedHave(r, m, cart.files);
   if (ch) {
     const sha = (n: string) => m.files.find((f) => f.name === n)?.sha256 || "";
     const write = cart.files.filter((n) => ch.hashes[n] !== sha(n));
@@ -396,7 +403,7 @@ export async function useApp(r: Repl, cart: Cart, onProgress: (p: number, what: 
 /** Take its app off: the app's files the core doesn't need, then an empty apps.json ("no software"). */
 export async function removeApp(r: Repl) {
   const m = await firmwareManifest();
-  const ch = await checkedHave(r, m);
+  const ch = await checkedHave(r, m, []);
   if (ch && await job(r, m, "Take its app off", [], others(m, ch, null), [], () => {})) return { restarted: true };
   await takeOver(r, askHint, "Take its app off");
   const have = await look(r, allNames(m));

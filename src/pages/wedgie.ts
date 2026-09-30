@@ -20,6 +20,9 @@ import { pyStr, type Repl } from "../serial/repl";
 import { installCore, useApp, removeApp, takeOver, setAskHint, firmwareManifest, type Cart, type Manifest } from "../serial/install";
 import * as FS from "../serial/files";
 import { cartHtml } from "../ui/cart";
+import { bootScreen } from "../ui/bootscreen";
+import { askScreen } from "../ui/askmodal";
+import { ASK_TEXT } from "../serial/install";
 import * as F from "../ui/facts";
 import { cmpVersion } from "../apps/appjson.mjs";
 import { loadRepo, savedRepos, saveRepo, forgetRepo, withRepos, type Repo } from "../apps/repos";
@@ -211,7 +214,8 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
       case "live": return canvas;
       case "id": return idCanvas(s.id, s.sub);
       case "color": return colorScreen(s.css);
-      case "loading": return idCanvas(`${Math.round(s.p * 100)}%`, "installing");
+      case "ask": return askScreen(s.job, true);           // what the wedgie asks, as it asks it
+      case "loading": return bootScreen(s.title || "Installing", s.what || "", s.p);   // the wedgie's own boot bar
       case "text": return idCanvas(s.text);
       default: return colorScreen("#101012");
     }
@@ -407,9 +411,10 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     if ((wrongChip(c) || oldFw(c)) && confirmChip !== c.mod) { confirmChip = c.mod; paint(); return; }
     confirmChip = "";
     busy = "cart"; inserting[c.mod] = 0; paint();
-    setScreen({ kind: "loading", p: 0 });
+    const T = `Installing ${c.name}`;
+    setScreen({ kind: "loading", p: 0, title: T });
     try {
-      const res = await useApp(r, c, (p) => { inserting[c.mod] = p; setScreen({ kind: "loading", p }); paint(); }, { manifest: view() });
+      const res = await useApp(r, c, (p, what) => { inserting[c.mod] = p; setScreen(what === ASK_TEXT ? { kind: "ask", job: `Install ${c.name}` } : { kind: "loading", p, title: T, what }); paint(); }, { manifest: view() });
       delete inserting[c.mod];
       status(`Restarting it into <b>${esc(c.name)}</b>…`);
       // The soft reset: a fresh heap for the new app (a checked install restarts itself). The port may drop;
@@ -588,9 +593,9 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     busy = "fw"; paint(); meter(0, "starting");
     try {
       if (x.kind === "micropython") { await r.enter({ reset: true }); }   // bare MicroPython: no drive, a reset is safe
-      setScreen({ kind: "loading", p: 0 });
+      setScreen({ kind: "loading", p: 0, title: "Updating firmware" });
       let drawn = 0;
-      const res = await installCore(r, (p, what) => { meter(p, what); if (p - drawn >= 0.05 || p === 1) { drawn = p; setScreen({ kind: "loading", p }); } });
+      const res = await installCore(r, (p, what) => { meter(p, what); if (what === ASK_TEXT || p - drawn >= 0.05 || p === 1) { drawn = p; setScreen(what === ASK_TEXT ? { kind: "ask", job: `Update firmware to ${m?.version || ""}` } : { kind: "loading", p, title: "Updating firmware", what }); } });
       if (res.untouched) { meter(1, "Already up to date."); setScreen(home()); busy = ""; paint(); setTimeout(() => meter(null), 4000); return; }
       meter(1, res.written ? `wedgie ${res.version} installed. Restarting it…` : "Already up to date. Restarting it…");
       // The one soft reset: the new firmware only runs after one. The port drops and the wedgie comes back as a

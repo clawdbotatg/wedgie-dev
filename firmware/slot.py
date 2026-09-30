@@ -246,7 +246,7 @@ def handle(line):
         _asking(lambda: job.run(mid, m, ask, progress))
     elif t == "sums":
         import job
-        W.send({"id": mid, "type": "sums", "sums": job.sums(m.get("names")), "apps": W.apps()})
+        W.send({"id": mid, "type": "sums", "sums": job.sums(m.get("names"), m.get("exists")), "apps": W.apps()})
     elif t == "reboot":
         W.send({"id": mid, "type": "rebooting"})
         import machine

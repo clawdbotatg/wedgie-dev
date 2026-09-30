@@ -3,7 +3,8 @@
 // black base. Colours from picowallet emu/web/device3d.js.
 export type Screen =
   | { kind: "off" }
-  | { kind: "loading"; p: number }
+  | { kind: "loading"; p: number; title?: string; what?: string }
+  | { kind: "ask"; job: string }
   | { kind: "id"; id: string; sub?: string }
   | { kind: "color"; css: string }
   | { kind: "text"; text: string }
@@ -82,6 +83,8 @@ function screenSvg(s: Screen, i: number): string {
         (s.sub ? `<text x="${X + W / 2}" y="${Y + 84}" text-anchor="middle" class="lcd lcd-sub">${esc(s.sub)}</text>` : "");
     case "live":
       return bg("#16161a") + `<image class="live" x="${X}" y="${Y}" width="${W}" height="${W}" preserveAspectRatio="none" style="image-rendering:pixelated"/>`;
+    case "ask":
+      return bg("#fefefe");
     case "text":
       return bg("#101014") + `<text x="${X + 6}" y="${Y + 16}" class="lcd lcd-txt">${esc(s.text)}</text>`;
   }

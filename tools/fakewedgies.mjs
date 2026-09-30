@@ -118,7 +118,9 @@ export function fakeWedgies(specs) {
       // 0.3.0+ checked installs (firmware/job.py). The fake trusts the signature; it checks names and hashes.
       if (msg.type === "sums" && h_jobs()) {
         const sums = {};
+        for (const n of msg.exists || []) sums[n] = st.files.has(n) ? 1 : null;
         for (const n of msg.names || []) sums[n] = st.files.has(n) ? await sha(st.files.get(n)) : null;
+        st.hashed = (st.hashed || 0) + (msg.names || []).length;
         return push(JSON.stringify({ id, type: "sums", sums, apps: apps() }) + "\r\n");
       }
       if (msg.type === "job" && h_jobs()) {

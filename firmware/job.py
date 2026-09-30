@@ -21,8 +21,16 @@ KEEP = ("main.py", "boot.py", "wedgie.py", "slot.py", "lcd.py", "job.py", "p256.
 IDLE_MS = 30000
 
 
-def sums(names):
+def sums(names, exists=()):
+    """sha256 of each of names; for exists, only whether it's there (1 or None): hashing every file
+    on the flash took seconds before each question."""
     out = {}
+    for n in exists or ():
+        try:
+            os.stat(n)
+            out[n] = 1
+        except OSError:
+            out[n] = None
     for n in names or []:
         try:
             h = hashlib.sha256()
@@ -50,10 +58,11 @@ def _clean(names):
             pass
 
 
-def check(m):
-    """The job's files against its signed list: (version, {name: sha}) or raises ValueError."""
+def check(m, sig=True):
+    """The job's files against its signed list: (version, {name: sha}) or raises ValueError. sig=False
+    skips the signature (pure-Python P-256: seconds on an RP2040), which run() checks after the yes."""
     rel = m.get("release") or ""
-    if not W.RELEASE_KEY[0] or not W.release_ok(rel.encode(), m.get("sig") or ""):
+    if sig and (not W.RELEASE_KEY[0] or not W.release_ok(rel.encode(), m.get("sig") or "")):
         raise ValueError("not signed by wedgie.dev")
     version, files = W.release_files(rel)
     for n in m.get("write") or []:
@@ -71,8 +80,10 @@ def run(mid, m, ask, show=None):
     """Check, ask, then take the files. ask(job, note) -> bool is the slot's yes/no screen; show(title,
     what, p) draws the progress screen (the moment A is pressed, then as files arrive)."""
     show = show or (lambda *a: None)
+    # The question first, so it's on the screen the moment the job arrives (the signature takes seconds
+    # on an RP2040: checked after the yes, under the boot bar). Nothing is written until it passes.
     try:
-        version, files = check(m)
+        version, files = check(m, sig=False)
     except ValueError as e:
         W.send({"id": mid, "type": "error", "error": str(e)})
         return
@@ -82,6 +93,12 @@ def run(mid, m, ask, show=None):
         W.send({"id": mid, "type": "refused"})
         return
     title = title.replace("Install", "Installing").replace("Update", "Updating") + "..."
+    show(title, "checking the signature", 0)
+    try:
+        check(m)
+    except ValueError as e:
+        W.send({"id": mid, "type": "error", "error": str(e)})
+        return
     show(title, "starting", 0)
     W.send({"id": mid, "type": "go"})
     chunks = 0
