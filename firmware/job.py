@@ -106,7 +106,7 @@ def run(mid, m, ask, show=None):
     h, f, cur = None, None, None
     poll = select.poll()
     poll.register(sys.stdin, select.POLLIN)
-    buf, last = "", time.ticks_ms()
+    buf, last = [], time.ticks_ms()
     try:
         while time.ticks_diff(time.ticks_ms(), last) < IDLE_MS:
             if not poll.poll(50):
@@ -114,11 +114,11 @@ def run(mid, m, ask, show=None):
             ch = sys.stdin.read(1)
             if ch != "\n":
                 if ch not in "\r\x03":
-                    buf += ch
+                    buf.append(ch)      # a list: += on a str copies the whole line for every char
                 if len(buf) > 8192:
-                    buf = ""
+                    buf = []
                 continue
-            line, buf = buf, ""
+            line, buf = "".join(buf), []
             last = time.ticks_ms()
             try:
                 q = json.loads(line)

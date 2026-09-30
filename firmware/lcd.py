@@ -86,6 +86,22 @@ class LCD(framebuf.FrameBuffer):
         self.spi.write(self.buffer if y0 == 0 and y1 == 240 else memoryview(self.buffer)[y0 * 480:y1 * 480])
         self.cs(1)
 
+    def push(self, rows, y0):
+        """Push full-width rows from another buffer (bytes for rows y0.., 480 a row) straight to the
+        panel. The frame buffer isn't touched: ui.ask(keep=True) shows its question this way, so the
+        app's screen is still there to show() again after."""
+        if _pushing:
+            _pushing.show_wait()
+        y1 = min(240, y0 + len(rows) // 480)
+        if y0 >= y1:
+            return
+        self._cmd(0x2A, [0x00, 0x00, 0x00, 0xEF])
+        self._cmd(0x2B, [0x00, y0, 0x00, y1 - 1])
+        self._cmd(0x2C)
+        self.dc(1); self.cs(0)
+        self.spi.write(memoryview(rows)[:(y1 - y0) * 480])
+        self.cs(1)
+
     def show_rect(self, x, y, w, h):
         """Push only this box (a sprite's old and new place, a score): the panel's window is set to it
         and its rows go one after another. Costs its own bytes plus ~20 us a row."""

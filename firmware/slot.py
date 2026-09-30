@@ -36,7 +36,7 @@ app = None          # the active app's apps.json entry (None: nothing on it yet)
 mod = None          # its module, once imported
 state = "empty"     # empty | running | entry (an entry to call) | ended | error
 _poll = None
-_buf = ""
+_buf = []          # the line coming in, a char at a time (a list: += on a 3 KB str copies it each time)
 _serve_t = None     # the background Timer that answers USB while an entry app owns the CPU
 
 
@@ -259,7 +259,7 @@ def ask(job="", note=""):
     lines = ["The computer gets full access for this one job."] + (["Its wallet key too."] if wallet else [])
     if note:
         lines = [note, "Only those files change."]
-    return ui.ask(d, (job + "?") if job else "Let this computer in?", lines + ["Didn't ask for this? Y."], ms=ASK_MS)
+    return ui.ask(d, (job + "?") if job else "Let this computer in?", lines + ["Didn't ask for this? Y."], ms=ASK_MS, keep=True)
 
 
 def let_in(job=""):
@@ -276,63 +276,34 @@ def let_in(job=""):
         _band("working...", [(job[:28], INK), ("it locks again when done", MUTED)])
     else:
         _back()
-    _gone(KEEP)
     return ok
 
 
 def _asking(fn, restore=True):
-    """Run a question (and a job) with the app's ticks paused and its screen kept, then put it back."""
-    global _paused, _kept
+    """Run a question (and a job) with the app's ticks paused, then put its screen back."""
+    global _paused, _prog
     _paused = True
-    _kept = _keep()
+    _prog = None
     try:
         return fn()
     finally:
         _paused = False
         if restore:
             _back()
-            _gone(KEEP)
-
-
-_kept = False
 
 
 def _back():
-    if _kept:
-        _unkeep()                       # the app's screen as it was: an app that doesn't redraw by
-    elif state == "empty":              # itself would otherwise sit under the question forever
+    """The screen from before the question. The question (ui.ask keep=True) left the frame buffer alone,
+    so it's the app's screen as it was: an app that doesn't redraw by itself would otherwise sit under
+    the question forever. After a yes the progress screen drew over it: a failed job says so."""
+    if ui.kept and not _prog:
+        d.show()
+    elif state == "empty":
         empty()
     elif state in ("ended", "error"):
         _ended()
-
-
-KEEP = "_screen.bin"    # the app's screen while the question is up (no RAM for a second 115 KB copy)
-
-
-def _keep():
-    try:
-        with open(KEEP, "wb") as f:
-            f.write(L._BUF)
-        return True
-    except Exception:
-        return False
-
-
-def _unkeep():
-    try:
-        with open(KEEP, "rb") as f:
-            f.readinto(L._BUF)
-        d.show()
-    except Exception:
-        pass
-
-
-def _gone(p):
-    try:
-        import os
-        os.remove(p)
-    except OSError:
-        pass
+    else:
+        _band("nothing changed", [("it keeps its app", MUTED)])
 
 
 def serve(_=None):
@@ -346,15 +317,15 @@ def serve(_=None):
         if not ch:
             return
         if ch == "\n":
-            line, _buf = _buf, ""
+            line, _buf = "".join(_buf), []
             if line.strip().startswith("{"):
                 handle(line)
         elif ch == "\x03":              # a Ctrl-C while sealed is just a byte: start a clean line
-            _buf = ""
+            _buf = []
         elif ch != "\r":
-            _buf += ch
-            if len(_buf) > 4096:
-                _buf = ""
+            _buf.append(ch)
+            if len(_buf) > 16384:       # a job carries the signed release list (3 KB and growing)
+                _buf = []
 
 
 def _own_usb():

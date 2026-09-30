@@ -77,11 +77,7 @@ def buttons(d, yes="yes", no="no"):
     d.center_text(("Y  " + no)[:COLS_BIG], 219, WHITE, 2)
 
 
-def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None):
-    """A yes/no question: A yes, Y no, no answer in `ms` is a no. Only real presses count (a press
-    sent over USB can't answer). True for yes."""
-    k = keys or L.Keys(physical=True)
-    k.pressed()                             # a key already down doesn't count
+def _ask_draw(d, question, lines, yes, no):
     d.fill(WHITE)
     band(d)
     y = max(title(d, question, 48, 2) + 12, 108)
@@ -92,7 +88,67 @@ def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None):
             d.center_text(x, y, INK)
             y += 14
     buttons(d, yes, no)
-    d.show()
+
+
+class _Strip:
+    """A band of full-width rows, drawn with the LCD's calls (y as on the screen) and pushed straight
+    to the panel (lcd.push), so the frame buffer keeps what it had."""
+    width = height = 240
+
+    def __init__(self, rows):
+        import framebuf
+        self.rows, self.y0 = rows, 0
+        self.buf = bytearray(480 * rows)
+        self.fb = framebuf.FrameBuffer(self.buf, 240, rows, framebuf.RGB565)
+
+    def _in(self, y, h):
+        return y < self.y0 + self.rows and y + h > self.y0
+
+    def fill(self, c):
+        self.fb.fill(c)
+
+    def fill_rect(self, x, y, w, h, c):
+        if self._in(y, h):
+            self.fb.fill_rect(x, y - self.y0, w, h, c)
+
+    def text(self, s, x, y, c):
+        if self._in(y, 8):
+            self.fb.text(s, x, y - self.y0, c)
+
+    def center_text(self, s, y, c, scale=1):
+        if self._in(y, 8 * scale):
+            L.LCD.center_text(self, s, y, c, scale)
+
+    def big_text(self, s, x, y, c, scale=2):
+        L.LCD.big_text(self, s, x, y, c, scale)
+
+
+kept = False    # the last ask(keep=True) left the frame buffer as it was (False: no RAM for a strip)
+
+
+def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None, keep=False):
+    """A yes/no question: A yes, Y no, no answer in `ms` is a no. Only real presses count (a press
+    sent over USB can't answer). True for yes. keep=True: the question goes straight to the panel a
+    band at a time and the frame buffer keeps the screen under it (d.show() puts that back), so it's up
+    at once: saving 115 KB to flash first took seconds. ui.kept says whether it could."""
+    global kept
+    k = keys or L.Keys(physical=True)
+    k.pressed()                             # a key already down doesn't count
+    kept = False
+    if keep and hasattr(d, "push"):
+        try:
+            s = _Strip(40)
+            for y0 in range(0, 240, s.rows):
+                s.y0 = y0
+                _ask_draw(s, question, lines, yes, no)
+                d.push(s.buf, y0)
+            kept = True
+        except MemoryError:
+            pass
+        s = None
+    if not kept:
+        _ask_draw(d, question, lines, yes, no)
+        d.show()
     t0 = time.ticks_ms()
     while time.ticks_diff(time.ticks_ms(), t0) < ms:
         for key in k.pressed():
