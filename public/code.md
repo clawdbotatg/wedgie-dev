@@ -205,6 +205,25 @@ The rules that follow from it:
     `print()` the frame time now and then. The **Speed lab** app (pick it at wedgie.dev/connect) times
     all of the above on that wedgie.
 
+## Loading and progress: use the wedgie's own bar
+
+Anything that takes a while (loading levels, building a map, a long computation) shows the wedgie's
+boot screen: the logo and the same bar it fills at power-up. It's built in (firmware 0.3.3+), so
+**never draw your own progress bar**.
+
+```python
+import loader
+bar = loader.screen("Loading level 3", "tiles")   # the logo, your title, the empty bar, a line under it
+for i, part in enumerate(parts):
+    build(part)
+    bar.to((i + 1) / len(parts))                  # 0..1; it only moves forward
+    loader.what(part.name)                        # change the line under the bar
+# then draw your own screen as usual (d.show() covers it)
+```
+
+It draws straight to the screen (not your framebuffer) and costs about 9 KB of RAM while it's up.
+`bar` is None if the board has no bar.bin; check before `bar.to`.
+
 ## Saves (and starting at level 8)
 
 ```python
