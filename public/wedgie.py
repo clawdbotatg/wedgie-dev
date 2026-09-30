@@ -371,6 +371,49 @@ FREE_PY = """def _free():
 _free()"""
 
 
+def checked(wg, m):
+    """A wedgie that installs signed files itself (0.3.0+, hello says jobs): no REPL needed. Returns
+    `have` like look() does (hashes, apps), or None for older firmware or an unsigned manifest."""
+    h = wg.hello(1.5) or {}
+    if not h.get("jobs") or not m.get("signed"):
+        return None
+    names = sorted(set(m["core"]) | {n for c in m["carts"] for n in c["files"]})
+    v = wg.request({"type": "sums", "names": names}, 30)
+    return {"hashes": v["sums"], "apps": v.get("apps") or [], "files": [n for n, s in v["sums"].items() if s]}
+
+
+def job(wg, title, write, delete, apps):
+    """Checked install (firmware/job.py): the wedgie checks the signed list, asks its person, takes the
+    files one chunk at a time, checks each against the list, then puts them in place and restarts."""
+    rel = urllib.request.urlopen(SITE + "/fw/release.txt").read().decode()
+    sig = urllib.request.urlopen(SITE + "/fw/release.sig").read().decode().strip()
+    sys.stderr.write("press A on the wedgie: %s?\n" % title)
+    v = wg.request({"type": "job", "job": title, "release": rel, "sig": sig, "write": write, "delete": delete,
+                    "apps": None if apps is None else json.dumps(apps)}, 120)
+    if v.get("type") == "refused":
+        sys.exit("the wedgie said no (Y on its screen)")
+    if v.get("type") != "go":
+        sys.exit("the wedgie said: %s" % (v.get("error") or v))
+    for i, n in enumerate(write):
+        data = urllib.request.urlopen(SITE + "/fw/" + n).read()
+        print("[%d/%d] %s" % (i + 1, len(write), n))
+        for o in range(0, max(len(data), 1), 1024):
+            r = wg.request({"type": "put", "name": n, "data": base64.b64encode(data[o:o + 1024]).decode(), "end": o + 1024 >= len(data)}, 15)
+            if r.get("type") != "ok":
+                sys.exit("the wedgie stopped: %s" % (r.get("error") or r))
+    r = wg.request({"type": "commit"}, 30)
+    if r.get("type") != "done":
+        sys.exit("the wedgie stopped: %s" % (r.get("error") or r))
+
+
+def cart_entry(cart):
+    a = {"mod": cart["mod"], "name": cart["name"], "about": cart.get("about", ""), "v": cart["v"]}
+    for k in ("entry", "usb"):
+        if cart.get(k):
+            a[k] = cart[k]
+    return a
+
+
 def take_over(wg):
     """Stop its app and take the raw REPL, with its RAM freed: Ctrl-C leaves the app loaded, and on an
     RP2040 a copy then fails with MemoryError. lcd stays (its 115 KB framebuffer)."""
@@ -554,6 +597,13 @@ def main():
             cart = next((x for x in m["carts"] if x["mod"] == mod), None)
             if not cart:
                 sys.exit("no app %r; wedgie.py apps lists them" % mod)
+            have = checked(wg, m)
+            if have:
+                sha = {f["name"]: f["sha256"] for f in m["files"]}
+                job(wg, "Install " + cart["name"], [n for n in cart["files"] if have["hashes"].get(n) != sha[n]],
+                    others(m, have, cart["mod"]), [cart_entry(cart)])
+                print("%s is the app it runs now (checked install; saves stay)" % cart["name"])
+                return
             take_over(wg)
             have = look(wg, m)
             size = {f["name"]: f["size"] for f in m["files"]}

@@ -322,7 +322,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
   function paintFw(x: W.Wedgie) {
     const box = $("#d-fw");
     if (!m) { box.innerHTML = ""; return; }
-    const cur = x.kind === "wedgie" ? x.version : null, fresh = cur === m.version;
+    const cur = x.kind === "wedgie" ? x.version : null, fresh = !!cur && cmpVersion(cur, m.version) >= 0;   // newer (a test build) is never "updated" back
     const what = x.kind === "wallet" ? "The Wallet is running, so its firmware version isn't known here. Update puts on the latest; the Wallet stays."
       : fresh ? "Up to date." : cur ? `wedgie ${esc(m.version)} is ready.` : `This board has MicroPython but no wedgie firmware yet.`;
     const sig = `${cur}|${m.version}|${x.kind}|${!!link}|${!!busy}`;

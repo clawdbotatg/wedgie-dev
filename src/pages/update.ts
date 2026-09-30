@@ -10,6 +10,7 @@ import * as W from "../serial/wedgies";
 import { installCore, useApp, firmwareManifest, type Manifest } from "../serial/install";
 import { benchSetup } from "./format";
 import * as F from "../ui/facts";
+import { cmpVersion } from "../apps/appjson.mjs";
 
 type Job = { uid: string; key: number; state: "waiting" | "updating" | "restarting" | "done" | "fresh" | "fail"; from: string; board: string;
   p: number; what: string; error?: string; at: number; gone?: boolean };
@@ -94,7 +95,7 @@ export function update(main: HTMLElement) {
       j.gone = !w;
       if (j.state === "restarting") {
         if (w && w.state === "ready" && (w.readyAt || 0) > j.at) {
-          const ok = w.kind === "wedgie" && w.version === m.version;
+          const ok = w.kind === "wedgie" && !!w.version && cmpVersion(w.version, m.version) >= 0;
           // key/at move to the wedgie that came back, so only a later replug counts as "plugged in again"
           Object.assign(j, { state: ok ? "done" : "fail", error: ok ? undefined : `came back on ${w.firmware || "?"}`, key: w.key, at: Date.now() });
         }

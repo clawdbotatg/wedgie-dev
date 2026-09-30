@@ -235,6 +235,12 @@ def handle(line):
         W.send({"id": mid, "type": "ok"})
     elif t == "open":
         W.send({"id": mid, "type": "open" if let_in(str(m.get("for") or "")[:60]) else "refused"})
+    elif t == "job":                    # a checked install (job.py): signed files only, no REPL
+        import job
+        _asking(lambda: job.run(mid, m, ask))
+    elif t == "sums":
+        import job
+        W.send({"id": mid, "type": "sums", "sums": job.sums(m.get("names")), "apps": W.apps()})
     elif t == "reboot":
         W.send({"id": mid, "type": "rebooting"})
         import machine
@@ -256,11 +262,11 @@ def _wrap(s, n):
     return out
 
 
-def ask(job=""):
+def ask(job="", note=""):
     """Let the computer do `job` (what it says it wants, e.g. "Update firmware to 0.2.8")? Only a real
     press answers (Keys physical: a press sent over USB can't), A yes, Y no. Nothing comes off USB
-    meanwhile, so the computer waits. The job is the computer's word, so the screen still says a yes
-    gives it full access for this one job (checked jobs: docs/SECURITY-ROADMAP.md)."""
+    meanwhile, so the computer waits. note: a checked job (job.py: signed files only) says so;
+    otherwise the job is the computer's word, so the screen says a yes gives it full access."""
     import os
     k = L.Keys(physical=True)
     k.pressed()                             # a key already down doesn't count
@@ -278,6 +284,8 @@ def ask(job=""):
             d.center_text(s, 48 + i * 24, INK, 2)
     y = 108
     lines = ["The computer gets full", "access for this one job."] + (["Its wallet key too."] if wallet else [])
+    if note:
+        lines = _wrap(note, 28)[:2] + ["Only those files change."]
     for s in lines + ["", "Didn't ask for this? Y."]:
         d.center_text(s, y, INK)
         y += 14
@@ -303,23 +311,40 @@ def let_in(job=""):
     if not W.SEALED or W.is_open():
         W.set_open()
         return True
-    _paused = True
-    kept = _keep()
-    try:
-        ok = ask(job)
-    finally:
-        _paused = False
+    ok = _asking(lambda: ask(job), restore=False)
     if ok:
         W.set_open()
         _band("working...", [(job[:28], INK), ("it locks again when done", MUTED)])
-    elif kept:
+    else:
+        _back()
+    _gone(KEEP)
+    return ok
+
+
+def _asking(fn, restore=True):
+    """Run a question (and a job) with the app's ticks paused and its screen kept, then put it back."""
+    global _paused, _kept
+    _paused = True
+    _kept = _keep()
+    try:
+        return fn()
+    finally:
+        _paused = False
+        if restore:
+            _back()
+            _gone(KEEP)
+
+
+_kept = False
+
+
+def _back():
+    if _kept:
         _unkeep()                       # the app's screen as it was: an app that doesn't redraw by
     elif state == "empty":              # itself would otherwise sit under the question forever
         empty()
     elif state in ("ended", "error"):
         _ended()
-    _gone(KEEP)
-    return ok
 
 
 KEEP = "_screen.bin"    # the app's screen while the question is up (no RAM for a second 115 KB copy)

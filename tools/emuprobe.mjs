@@ -78,7 +78,7 @@ try {
   const ex = await page.evaluate(() => window.vw.exec("1 + 1"));
   check(ex.trim() === "2", `exec("1 + 1") -> ${JSON.stringify(ex)}`);
   const fw = await page.evaluate(() => window.vw.exec("import wedgie; wedgie.hello()['fw'], wedgie.hello()['slot'], wedgie.active()['mod']"));
-  check(/wedgie-0\.2.*1, 'hello'/.test(fw), `wedgie.hello(): ${fw.trim()}`);
+  check(/wedgie-0\.[2-9].*1, 'hello'/.test(fw), `wedgie.hello(): ${fw.trim()}`);
 
   // saves: the app's own folder, JSON and bytes, the last good one kept, names(), delete
   const sv = await page.evaluate(() => window.vw.exec([
@@ -168,7 +168,7 @@ try {
   // imports what it needs
   const freePy = (await import("node:fs")).readFileSync(join(root, "src/serial/install.ts"), "utf8").match(/const FREE_PY = `([\s\S]*?)`;/)[1];
   const fr = await page.evaluate((code) => window.vw.exec(code + "\nimport sys, gc\nprint(sorted(k for k in sys.modules if k[0] != '_' and k != 'micropython'), len([k for k in globals() if not k.startswith('__')]))\nimport wedgie\nprint(wedgie.VERSION)"), freePy);
-  check(/\['lcd', 'splash'\] 2\s+0\.2/.test(fr), `freeing RAM before an install: ${fr.trim().replace(/\n/g, " | ")}`);
+  check(/\['lcd', 'splash'\] 2\s+0\.[2-9]/.test(fr), `freeing RAM before an install: ${fr.trim().replace(/\n/g, " | ")}`);
 
   // Demo: an entry (demo.run) that owns the CPU. Frames must still reach the page, and X is its own
   // (the scene before), not a way out.
