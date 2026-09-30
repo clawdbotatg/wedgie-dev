@@ -384,4 +384,12 @@ export function format(main: HTMLElement) {
   W.start();
   idle();
   pick();
+  // A deploy while the bench is open leaves this page with an old manifest, and the next unit fails
+  // ("lcd.py didn't copy cleanly"). So between units (nothing plugged in, nothing under way) it reloads.
+  const first = fetch("/fw/manifest.json", { cache: "no-cache" }).then((r) => r.text()).catch(() => "");
+  setInterval(async () => {
+    if (busy || go || flashedAt || waitBoot || W.wedgies().length || (await bootDevices().catch(() => [])).length) return;
+    const now = await fetch("/fw/manifest.json", { cache: "no-cache" }).then((r) => r.text()).catch(() => "");
+    if (now && (await first) && now !== (await first)) location.reload();
+  }, 30000);
 }
