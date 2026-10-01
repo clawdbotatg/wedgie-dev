@@ -205,6 +205,7 @@ async function checkedHave(r: Repl, m: Manifest, hash?: string[]): Promise<Have 
   if (!m.signed) return null;
   const h = await r.hello(700).catch(() => null);
   if (!h?.jobs) return null;
+  if (h.version === "0.3.6") return null;    // 0.3.6 runs out of memory reading a long line (a job, sums): full access instead
   // hash: the files whose contents matter (the rest only need to be there or not; hashing the whole
   // flash took seconds before every question). 0.3.0-0.3.3 don't know exists: they get it all hashed.
   const rest = hash ? allNames(m).filter((n) => !hash.includes(n)) : [];
