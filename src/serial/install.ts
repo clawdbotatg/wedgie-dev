@@ -298,7 +298,9 @@ export async function installCore(r: Repl, onProgress: (p: number, what: string)
       onProgress(1, "already up to date");      // nothing to ask for; it keeps running
       return { version: m.version, written: 0, outdated: [] as Cart[], restarted: false, untouched: true };
     }
-    if (await job(r, m, `Update firmware to ${m.version}`, write, del, apps, (p, w) => onProgress(0.02 + 0.96 * p, w))) {
+    // "Update firmware", no version: the wedgie titles its progress "Updating firmware..." from this and
+    // keeps 2 lines, so "to 0.3.8" was cut to a dangling "to". Its question shows the release on line 2.
+    if (await job(r, m, "Update firmware", write, del, apps, (p, w) => onProgress(0.02 + 0.96 * p, w))) {
       onProgress(1, write.length ? `${write.length} files updated` : "already up to date");
       return { version: m.version, written: write.length, outdated: m.carts.filter((c) => apps.some((a) => a.mod === c.mod && a.v !== c.v)), restarted: true, untouched: false };
     }
