@@ -108,6 +108,12 @@ try {
   const rmv = await ask({ id: 53, type: "rm", path: "/saves/hello" });
   const after = await ask({ id: 54, type: "ls", path: "/saves" });
   check(rmv[0]?.type === "ok" && JSON.stringify(after[0]?.files) === "[]", "USB rm: the game's saves folder gone");
+  // a job line carries the signed release list (3 KB+): the slot reads it into a buffer made once at boot
+  // (a growing str or list ran an RP2040 out of memory, 0.3.6), and drops a line too long for it
+  const long = await ask({ id: 55, type: "ping", pad: "é" + "x".repeat(5000) });
+  const huge = await ask({ id: 56, type: "ping", pad: "x".repeat(9000) });
+  const after2 = await ask({ id: 57, type: "ping" });
+  check(long[0]?.type === "pong" && !huge.length && after2[0]?.type === "pong", `USB: a 5 KB line is answered, a 9 KB one dropped, the next one fine (${long.length} ${huge.length} ${after2.length})`);
 
   // no app: the "no software yet" screen
   await page.evaluate(() => window.vw.reboot(""));

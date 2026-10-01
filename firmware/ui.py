@@ -137,7 +137,7 @@ def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None, keep=Fal
     kept = False
     if keep and hasattr(d, "push"):
         try:
-            s = _Strip(40)
+            s = _Strip(16)          # 7.7 KB: an RP2040 heap under an app has little more in one piece
             for y0 in range(0, 240, s.rows):
                 s.y0 = y0
                 _ask_draw(s, question, lines, yes, no)
