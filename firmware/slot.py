@@ -36,9 +36,7 @@ app = None          # the active app's apps.json entry (None: nothing on it yet)
 mod = None          # its module, once imported
 state = "empty"     # empty | running | entry (an entry to call) | ended | error
 _poll = None
-LINE = 6144         # the longest line read (a job carries the signed release list: 3.2 KB and growing)
-_lb = bytearray(LINE)   # the line coming in, made once here while the heap is fresh: on an RP2040 a
-_ln = 0                 # growing str or list needs bigger and bigger free blocks and runs out (0.3.6)
+_buf = ""
 _serve_t = None     # the background Timer that answers USB while an entry app owns the CPU
 
 
@@ -310,7 +308,7 @@ def _back():
 
 def serve(_=None):
     """Read what the host sent; handle each full line. Never blocks."""
-    global _ln, _breath
+    global _buf, _breath
     _breath = True
     for _ in range(4096):
         if not _poll.poll(0):
@@ -319,24 +317,15 @@ def serve(_=None):
         if not ch:
             return
         if ch == "\n":
-            n, _ln = _ln, 0
-            if n <= LINE:
-                line = str(memoryview(_lb)[:n], "utf-8")
-                if line.strip().startswith("{"):
-                    handle(line)
+            line, _buf = _buf, ""
+            if line.strip().startswith("{"):
+                handle(line)
         elif ch == "\x03":              # a Ctrl-C while sealed is just a byte: start a clean line
-            _ln = 0
+            _buf = ""
         elif ch != "\r":
-            b = ch.encode() if ord(ch) > 127 else None
-            if _ln + (len(b) if b else 1) > LINE:
-                _ln = LINE + 1          # too long: dropped at its newline
-                continue
-            if b:
-                _lb[_ln:_ln + len(b)] = b
-                _ln += len(b)
-            else:
-                _lb[_ln] = ord(ch)
-                _ln += 1
+            _buf += ch
+            if len(_buf) > 4096:
+                _buf = ""
 
 
 def _own_usb():
