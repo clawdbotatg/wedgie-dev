@@ -66,7 +66,7 @@ export function fakeWedgies(specs) {
       if (v >= "0.1.4") Object.assign(h, { carts: apps().map((a) => ({ mod: a.mod, v: a.v })), free: 600000, chip: null });
       if (slot()) h.slot = 1;
       if (sealed()) Object.assign(h, { sealed: true, open: !!st.open });
-      if (cmpV(version() || "0", "0.3.0") >= 0 && slot()) h.jobs = 1;
+      if (cmpV(version() || "0", "0.3.0") >= 0 && slot()) h.jobs = cmpV(version(), "0.3.10") >= 0 ? 2 : 1;
       return JSON.stringify(h);
     };
     const answer = (stdout) => push("OK" + stdout + "\x04\x04>");
@@ -123,9 +123,18 @@ export function fakeWedgies(specs) {
         st.hashed = (st.hashed || 0) + (msg.names || []).length;
         return push(JSON.stringify({ id, type: "sums", sums, apps: apps() }) + "\r\n");
       }
-      if (msg.type === "job" && h_jobs()) {
+      // 0.3.10+: a job without its release asks at once; the signed list comes after the yes ("release")
+      if (msg.type === "release" && st.job && !st.job.listed) {
         const listed = new Map(msg.release.split("\n").slice(2).filter(Boolean).map((l) => l.split("  ").reverse()));
-        if ((msg.write || []).some((n) => !listed.has(n))) return push(JSON.stringify({ id, type: "error", error: "not in the signed list" }) + "\r\n");
+        if ((st.job.m.write || []).some((n) => !listed.has(n))) { st.job = null; return push(JSON.stringify({ id, type: "error", error: "not in the signed list" }) + "\r\n"); }
+        st.job.listed = listed;
+        return push(JSON.stringify({ id, type: "ok", version: msg.release.split("\n")[1].slice(8) }) + "\r\n");
+      }
+      if (msg.type === "job" && h_jobs()) {
+        st.lateJobs = (st.lateJobs || 0) + (msg.release ? 0 : 1);
+        st.hashAtAsk = st.hashed || 0;
+        const listed = msg.release ? new Map(msg.release.split("\n").slice(2).filter(Boolean).map((l) => l.split("  ").reverse())) : null;
+        if (listed && (msg.write || []).some((n) => !listed.has(n))) return push(JSON.stringify({ id, type: "error", error: "not in the signed list" }) + "\r\n");
         st.asks = (st.asks || 0) + 1; st.jobs = (st.jobs || 0) + 1;
         const p = st.person || {};
         return setTimeout(() => {
@@ -135,6 +144,7 @@ export function fakeWedgies(specs) {
         }, p.ms ?? 300);
       }
       if (msg.type === "put" && st.job) {
+        if (!st.job.listed) { st.job = null; return push(JSON.stringify({ id, type: "error", error: "the signed list comes first" }) + "\r\n"); }
         const j = st.job, prev = j.got.get(msg.name) || new Uint8Array();
         const add = Uint8Array.from(atob(msg.data || ""), (x) => x.charCodeAt(0)), u = new Uint8Array(prev.length + add.length);
         u.set(prev); u.set(add, prev.length); j.got.set(msg.name, u);
@@ -143,6 +153,7 @@ export function fakeWedgies(specs) {
       }
       if (msg.type === "commit" && st.job) {
         const j = st.job; st.job = null;
+        for (const n of j.m.write || []) if (!j.got.has(n) && !(st.files.has(n) && (await sha(st.files.get(n))) === j.listed.get(n))) return push(JSON.stringify({ id, type: "error", error: "not sent: " + n }) + "\r\n");
         for (const [n, u] of j.got) st.files.set(n, u);
         for (const n of j.m.delete || []) st.files.delete(n);
         if (j.m.apps != null) st.files.set("apps.json", text(j.m.apps));

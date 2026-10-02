@@ -236,9 +236,10 @@ def handle(line):
         if not ok:
             _restart()
     elif t == "job":                    # a checked install (job.py): signed files only, no REPL
-        import job
-        _asking(lambda: job.run(mid, m, ask, progress))
+        _asking(lambda: _job(mid, m))
         _restart()                      # it ended before its commit (a no, a bad file): start again
+    elif t == "sums" and not m.get("names"):    # only which files are there: no job.py needed
+        W.send({"id": mid, "type": "sums", "sums": _there(m.get("exists")), "apps": W.apps()})
     elif t == "sums":
         import job
         W.send({"id": mid, "type": "sums", "sums": job.sums(m.get("names"), m.get("exists")), "apps": W.apps()})
@@ -265,6 +266,35 @@ def ask(job="", note=""):
     if note:
         lines = [note, "Only those files change."]
     return ui.ask(d, (job + "?") if job else "Let this computer in?", lines + ["Didn't ask for this? Y."], ms=ASK_MS)
+
+
+def _job(mid, m):
+    """A checked install. 0.3.10+ hosts send the signed list after the yes: the question goes up from
+    code already loaded, and job.py (9 KB to compile: a few hundred ms on an RP2040) loads only after
+    a yes, under the progress screen. Older hosts send it with the job: job.py checks it, then asks."""
+    if "release" in m:
+        import job
+        return job.run(mid, m, ask, progress)
+    title = str(m.get("job") or "Update")[:60]
+    if not ask(title, "checked: wedgie.dev release " + str(m.get("version") or "")[:12]):
+        W.send({"id": mid, "type": "refused"})
+        return
+    progress(title.replace("Install", "Installing").replace("Update", "Updating") + "...", "starting", 0)
+    import job
+    job.run(mid, m, lambda *a: True, progress)      # asked already
+
+
+def _there(names):
+    """{name: 1 or None}: which of names are on it."""
+    import os
+    out = {}
+    for n in names or ():
+        try:
+            os.stat(n)
+            out[n] = 1
+        except OSError:
+            out[n] = None
+    return out
 
 
 def let_in(job=""):

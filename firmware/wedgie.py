@@ -3,7 +3,7 @@
 # interrupted; from the REPL they are plain calls:  import wedgie; wedgie.shot(); wedgie.press("A")
 import sys, os, json, machine
 
-VERSION = "0.3.9"
+VERSION = "0.3.10"
 
 # The lock. main.py turns Ctrl-C off before anything else and never ends by itself, so a computer
 # can only send the slot's JSON lines: it can't stop the app, reach the REPL, or make the secure chip
@@ -124,7 +124,7 @@ def hello(mid=None, **extra):
          "short": short(), "board": name, "cpu": cpu, "wifi": wifi, "machine": sys.implementation._machine,
          "micropython": os.uname().release, "apps": [x["mod"] for x in a],
          "carts": [{"mod": x["mod"], "v": x.get("v")} for x in a], "free": free(), "chip": _chip, "slot": 1,
-         "sealed": SEALED, "open": is_open(), "jobs": 1}
+         "sealed": SEALED, "open": is_open(), "jobs": 2}
     if mid is not None:
         d["id"] = mid
     d.update(extra)

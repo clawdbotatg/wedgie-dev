@@ -1,19 +1,23 @@
 # Checked installs: the wedgie puts software on itself, so the computer never gets the REPL.
 #
-#   {"type":"job","job":"Install Buttons","release":<release.txt>,"sig":"<r> <s>",
-#    "write":[names],"delete":[names],"apps":<apps.json text or null>}
+#   {"type":"job","job":"Install Buttons","version":"0.3.10","write":[names],"delete":[names],
+#    "apps":<apps.json text or null>}
 #
-# The release list must be signed with our key (wedgie.release_ok) and name every file to write.
-# Then the person is asked on the screen ("Install Buttons?"; the list is checked, so a yes gives
-# nothing but those files). Yes answers {"type":"go"}, and until the job ends nothing else runs:
+# The question goes up the moment that arrives ("Install Buttons?"). Nothing before it reads the flash
+# or checks a signature: the person sees it in milliseconds. A no answers {"type":"refused"}. A yes
+# answers {"type":"go"}, and until the job ends nothing else runs (under the boot bar):
+#   {"type":"release","release":<release.txt>,"sig":"<r> <s>"} -> {"type":"ok"}  the signed list (our key,
+#        wedgie.release_ok: seconds of pure-Python P-256) must name every file to write and be that version
+#   {"type":"sums","names":[..],"exists":[..]}           -> {"type":"sums"}  what's on it already
 #   {"type":"put","name":n,"data":<base64>,"end":bool}  -> {"type":"ok"}   (chunks, in order)
 #   {"type":"commit"}                                    -> {"type":"done"}, then a soft reset
 #   {"type":"abort"}, a bad file, or 30 s of nothing     -> the job ends, nothing changed
-# Each file goes to a temp file, hashed as it comes; on commit every one must match its line in the
-# list, then they're renamed into place (main.py last), the deletes happen and apps.json is written.
-# Saves (/saves) and the core's own boot files can't be deleted. Also {"type":"sums","names":[..]}:
-# the sha256 of files on it, so a host sends only what differs. Only the slot (and the Wallet,
-# which forwards these) calls this.
+# Each file goes to a temp file, hashed as it comes; on commit every file in write must match its line
+# in the list: one that came, or one already on it (this job's sums said so), then the ones that came
+# are renamed into place (main.py last), the deletes happen and apps.json is written. Saves (/saves)
+# and the core's own boot files can't be deleted. 0.3.0-0.3.9 took the release in the job itself
+# (hello "jobs": 1); a job that carries one still works that way. Outside a job, {"type":"sums"} works
+# too. Only the slot (and the Wallet, which forwards these) calls this.
 import sys, os, json, time, gc, select, hashlib, binascii
 import wedgie as W
 
@@ -58,6 +62,15 @@ def _clean(names):
             pass
 
 
+def rules(m):
+    """What a job may ask for before its list is checked: raises ValueError."""
+    for n in m.get("delete") or []:
+        if n in KEEP or n.startswith("/") or n.startswith("saves"):
+            raise ValueError("can't delete %s" % n)
+    if m.get("apps") is not None:
+        json.loads(m["apps"])
+
+
 def check(m, sig=True):
     """The job's files against its signed list: (version, {name: sha}) or raises ValueError. sig=False
     skips the signature (pure-Python P-256: seconds on an RP2040), which run() checks after the yes."""
@@ -68,41 +81,47 @@ def check(m, sig=True):
     for n in m.get("write") or []:
         if n not in files:
             raise ValueError("%s isn't in the signed list" % n)
-    for n in m.get("delete") or []:
-        if n in KEEP or n.startswith("/") or n.startswith("saves"):
-            raise ValueError("can't delete %s" % n)
-    if m.get("apps") is not None:
-        json.loads(m["apps"])
+    rules(m)
     return version, files
 
 
 def run(mid, m, ask, show=None):
-    """Check, ask, then take the files. ask(job, note) -> bool is the slot's yes/no screen; show(title,
-    what, p) draws the progress screen (the moment A is pressed, then as files arrive)."""
+    """Ask, then check and take the files. ask(job, note) -> bool is the slot's yes/no screen (the slot
+    asks a 0.3.10+ job itself before loading this, and passes a yes); show(title, what, p) draws the
+    progress screen (the moment A is pressed, then as files arrive)."""
     show = show or (lambda *a: None)
-    # The question first, so it's on the screen the moment the job arrives (the signature takes seconds
-    # on an RP2040: checked after the yes, under the boot bar). Nothing is written until it passes.
+    late = "release" not in m           # the list comes after the yes (0.3.10+ hosts)
     try:
-        version, files = check(m, sig=False)
+        if late:
+            rules(m)
+            note = "checked: wedgie.dev release " + str(m.get("version") or "")[:12]
+        else:
+            version, files = check(m, sig=False)
+            note = "checked: wedgie.dev release " + version
     except ValueError as e:
         W.send({"id": mid, "type": "error", "error": str(e)})
         return
     write = list(m.get("write") or [])
     title = str(m.get("job") or "Update")[:60]
-    if not ask(title, "checked: wedgie.dev release " + version):
+    if not ask(title, note):
         W.send({"id": mid, "type": "refused"})
         return
     title = title.replace("Install", "Installing").replace("Update", "Updating") + "..."
-    show(title, "checking the signature", 0)
-    try:
-        check(m)
-    except ValueError as e:
-        W.send({"id": mid, "type": "error", "error": str(e)})
-        return
-    show(title, "starting", 0)
+    if late:
+        files = None
+        show(title, "starting", 0)
+    else:
+        show(title, "checking the signature", 0)
+        try:
+            check(m)
+        except ValueError as e:
+            W.send({"id": mid, "type": "error", "error": str(e)})
+            return
+        show(title, "starting", 0)
     W.send({"id": mid, "type": "go"})
     chunks = 0
     got = {}                                # name -> sha256 of what arrived
+    there = {}                              # name -> sha256 of what's on it (this job's sums)
     h, f, cur = None, None, None
     poll = select.poll()
     poll.register(sys.stdin, select.POLLIN)
@@ -125,8 +144,31 @@ def run(mid, m, ask, show=None):
             except ValueError:
                 continue
             qid, t = q.get("id"), q.get("type")
-            if t == "put":
+            if t == "release":
+                show(title, "checking the signature", 0)
+                try:
+                    m["release"], m["sig"] = q.get("release") or "", q.get("sig") or ""
+                    version, files = check(m)
+                    if m.get("version") and version != m["version"]:
+                        raise ValueError("the signed list is %s, not %s" % (version, m["version"]))
+                except ValueError as e:
+                    W.send({"id": qid, "type": "error", "error": str(e)})
+                    return
+                show(title, "starting", 0)
+                last = time.ticks_ms()
+                W.send({"id": qid, "type": "ok", "version": version})
+            elif t == "sums":
+                show(title, "looking at what's on it", 0)
+                v = sums(q.get("names"), q.get("exists"))
+                for n in q.get("names") or []:
+                    there[n] = v.get(n)
+                last = time.ticks_ms()
+                W.send({"id": qid, "type": "sums", "sums": v, "apps": W.apps()})
+            elif t == "put":
                 n = q.get("name")
+                if files is None:
+                    W.send({"id": qid, "type": "error", "error": "the signed list comes first"})
+                    return
                 if n not in write:
                     W.send({"id": qid, "type": "error", "error": "%s isn't in this job" % n})
                     return
@@ -134,7 +176,7 @@ def run(mid, m, ask, show=None):
                     if f:
                         f.close()
                     f, h, cur = open(_tmp(n), "wb"), hashlib.sha256(), n
-                b = binascii.a2b_base64(q.get("data") or "")
+                b = binascii.a2b_base64((q.get("data") or "").encode())
                 f.write(b)
                 h.update(b)
                 chunks += 1
@@ -150,12 +192,15 @@ def run(mid, m, ask, show=None):
                 W.send({"id": qid, "type": "ok"})
                 gc.collect()
             elif t == "commit":
+                if files is None:
+                    W.send({"id": qid, "type": "error", "error": "the signed list comes first"})
+                    return
                 show(title, "restarting...", 1)
-                missing = [n for n in write if n not in got]
+                missing = [n for n in write if n not in got and there.get(n) != files[n]]
                 if missing:
                     W.send({"id": qid, "type": "error", "error": "not sent: " + " ".join(missing)})
                     return
-                for n in sorted(write, key=lambda n: n == "main.py"):     # main.py last
+                for n in sorted(got, key=lambda n: n == "main.py"):     # main.py last
                     try:
                         os.remove(n)
                     except OSError:
@@ -175,6 +220,7 @@ def run(mid, m, ask, show=None):
                 import machine
                 W.restarting = True         # main.py lets this SystemExit through
                 machine.soft_reset()
+                return                      # (the emulator's soft_reset returns: it restarts once this does)
             elif t == "abort":
                 W.send({"id": qid, "type": "ok"})
                 return

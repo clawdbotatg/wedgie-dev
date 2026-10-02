@@ -127,9 +127,11 @@ export async function letIn(r: Repl, ask: (s: string) => void = askHint, job = "
   const h = await r.hello(700).catch(() => null);
   if (!h?.sealed || h.open) return;
   ask(ASK_TEXT);
+  const asked = r.request({ type: "open", for: job }, 65000);   // job: what the wedgie's screen asks
+  asked.catch(() => {});
   const close = typeof document !== "undefined" ? (await import("../ui/askmodal")).askModal(job) : () => {};
   let v: any;
-  try { v = await r.request({ type: "open", for: job }, 65000); }   // job: what the wedgie's screen asks
+  try { v = await asked; }
   catch { throw new Error("nobody pressed A on the wedgie"); }
   finally { ask(""); close(); }
   if (v.type === "open") return;
@@ -200,12 +202,19 @@ async function appsFor(m: Manifest, have: Have, only: string | null) {
 // jobs), the manifest is signed, and every file is in the signed list (a GitHub app's aren't: those, the
 // file explorer and /debug still ask for full access).
 
-/** `have` without the REPL, or null when a checked install can't be used. */
-async function checkedHave(r: Repl, m: Manifest, hash?: string[]): Promise<Have | null> {
+/** `have` without the REPL, or null when a checked install can't be used. late (0.3.10+, hello jobs 2):
+ *  only which files are there; the job asks first and compares contents after the yes, so nothing slow
+ *  happens before the question (hashing every file for an update took about half a second). "update":
+ *  late unless it's on this version already (then every file is hashed to tell "up to date"). */
+async function checkedHave(r: Repl, m: Manifest, hash?: string[], late: boolean | "update" = false): Promise<(Have & { late?: boolean }) | null> {
   if (!m.signed) return null;
   const h = await r.hello(700).catch(() => null);
   if (!h?.jobs) return null;
   if (h.version === "0.3.6") return null;    // 0.3.6 runs out of memory reading a long line (a job, sums): full access instead
+  if (h.jobs >= 2 && (late === true || (late === "update" && h.version !== m.version))) {
+    const v = await r.request({ type: "sums", names: [], exists: allNames(m) }, 30000).catch(() => null);
+    if (v?.sums) return { hashes: v.sums, files: Object.keys(v.sums).filter((n) => v.sums[n]), apps: v.apps || [], late: true };
+  }
   // hash: the files whose contents matter (the rest only need to be there or not; hashing the whole
   // flash took seconds before every question). 0.3.0-0.3.3 don't know exists: they get it all hashed.
   const rest = hash ? allNames(m).filter((n) => !hash.includes(n)) : [];
@@ -219,10 +228,15 @@ let release: Promise<{ text: string; sig: string }> | null = null;
 const signedList = () => release ||= Promise.all(["release.txt", "release.sig"].map((n) => fetch("/fw/" + n, { cache: "no-cache" }).then((x) => x.text())))
   .then(([text, sig]) => ({ text, sig: sig.trim() }));
 
-/** Run one checked job. False (nothing asked, nothing changed) when a file isn't in the signed list. */
-async function job(r: Repl, m: Manifest, title: string, write: string[], del: string[], apps: any[] | null, onProgress: (p: number, what: string) => void) {
-  const rel = await signedList();
-  const listed = new Set(rel.text.split("\n").slice(2).map((l) => l.split("  ")[1]).filter(Boolean));
+/** Run one checked job: the number of files sent, or false (nothing asked, nothing changed) when a file
+ *  isn't in the signed list. late (0.3.10+): the job carries only its name, version and files, so the
+ *  question is up at once; after the yes go the signed list, a look at what's there, then what differs. */
+async function job(r: Repl, m: Manifest, title: string, write: string[], del: string[], apps: any[] | null, onProgress: (p: number, what: string) => void, late = false): Promise<{ sent: number } | false> {
+  // late: the signed list goes after the yes, so the question doesn't wait for its download. The
+  // manifest lists the same files (tools/fw.mjs and tools/sign.mjs publish the same set).
+  const relP = signedList();
+  relP.catch(() => {});
+  const listed = late ? new Set(m.files.map((f) => f.name)) : new Set((await relP).text.split("\n").slice(2).map((l) => l.split("  ")[1]).filter(Boolean));
   if (!write.every((n) => listed.has(n) && !m.files.find((f) => f.name === n)?.url)) return false;
   const fetched = Promise.all(write.map(async (n) => {      // downloads while the wedgie asks
     const f = m.files.find((x) => x.name === n)!;
@@ -232,9 +246,13 @@ async function job(r: Repl, m: Manifest, title: string, write: string[], del: st
   }));
   fetched.catch(() => {});
   askHint(ASK_TEXT); onProgress(0, ASK_TEXT);
+  const rel = late ? null : await relP;
+  // the job goes first; the page's "Press A" modal loads while the wedgie asks
+  const asked = r.request({ type: "job", job: title, ...(rel ? { release: rel.text, sig: rel.sig } : { version: m.version }), write, delete: del, apps: apps && JSON.stringify(apps) }, 120000);
+  asked.catch(() => {});
   const close = (await import("../ui/askmodal")).askModal(title, true);
   let v: any;
-  try { v = await r.request({ type: "job", job: title, release: rel.text, sig: rel.sig, write, delete: del, apps: apps && JSON.stringify(apps) }, 120000); }
+  try { v = await asked; }
   catch { throw new Error("nobody pressed A on the wedgie"); }
   finally { askHint(""); close(); }
   if (v.type === "refused") throw new Error("the wedgie said no (Y on its screen)");
@@ -242,6 +260,16 @@ async function job(r: Repl, m: Manifest, title: string, write: string[], del: st
   if (v.type !== "go") throw new Error(`the wedgie said ${v.error || v.type}`);
   let files: { n: string; buf: Uint8Array }[];
   try { files = await fetched; } catch (e) { await r.request({ type: "abort" }, 5000).catch(() => {}); throw e; }
+  if (late) {
+    onProgress(0, "checking the signature");
+    const sl = await relP;
+    const a = await r.request({ type: "release", release: sl.text, sig: sl.sig }, 60000);
+    if (a.type !== "ok") throw new Error(`the wedgie stopped: ${a.error || a.type}`);
+    onProgress(0, "looking at what's on it");
+    const s = await r.request({ type: "sums", names: write }, 30000);
+    if (s.type !== "sums") throw new Error(`the wedgie stopped: ${s.error || s.type}`);
+    files = files.filter(({ n }) => s.sums[n] !== m.files.find((f) => f.name === n)!.sha256);
+  }
   const total = files.reduce((t, f) => t + f.buf.length, 0) || 1;
   let done = 0;
   for (const { n, buf } of files) {
@@ -254,7 +282,7 @@ async function job(r: Repl, m: Manifest, title: string, write: string[], del: st
   }
   const d = await r.request({ type: "commit" }, 30000);
   if (d.type !== "done") throw new Error(`the wedgie stopped: ${d.error || d.type}`);
-  return true;       // it restarts itself now: the caller doesn't leave() (its port may drop)
+  return { sent: files.length };       // it restarts itself now: the caller doesn't leave() (its port may drop)
 }
 /** The app it runs now: the first in apps.json whose files are there (0.1.x kept several). */
 function activeOf(m: Manifest, have: Have): string | null {
@@ -284,7 +312,7 @@ const fileInfo = (m: Manifest, names: string[]) => names.map((n) => m.files.find
  *  raw REPL; the caller reboots it (the new core only runs after one). */
 export async function installCore(r: Repl, onProgress: (p: number, what: string) => void, opts: { launcher?: boolean; screen?: boolean } = {}) {
   const m = await firmwareManifest();
-  const ch = opts.launcher === false ? null : await checkedHave(r, m);
+  const ch = opts.launcher === false ? null : await checkedHave(r, m, undefined, "update");
   if (ch) {
     const act = activeOf(m, ch);
     const sha = (n: string) => m.files.find((f) => f.name === n)!.sha256;
@@ -300,9 +328,10 @@ export async function installCore(r: Repl, onProgress: (p: number, what: string)
     }
     // "Update firmware", no version: the wedgie titles its progress "Updating firmware..." from this and
     // keeps 2 lines, so "to 0.3.8" was cut to a dangling "to". Its question shows the release on line 2.
-    if (await job(r, m, "Update firmware", write, del, apps, (p, w) => onProgress(0.02 + 0.96 * p, w))) {
-      onProgress(1, write.length ? `${write.length} files updated` : "already up to date");
-      return { version: m.version, written: write.length, outdated: m.carts.filter((c) => apps.some((a) => a.mod === c.mod && a.v !== c.v)), restarted: true, untouched: false };
+    const j = await job(r, m, "Update firmware", write, del, apps, (p, w) => onProgress(0.02 + 0.96 * p, w), !!ch.late);
+    if (j) {
+      onProgress(1, j.sent ? `${j.sent} files updated` : "already up to date");
+      return { version: m.version, written: j.sent, outdated: m.carts.filter((c) => apps.some((a) => a.mod === c.mod && a.v !== c.v)), restarted: true, untouched: false };
     }
   }
   onProgress(0, "stopping what it runs");
@@ -370,16 +399,17 @@ async function deviceScreen(r: Repl, title: string, name: string) {
  *  stays, a fresh heap for the app). Checked for room first, so a switch that can't fit changes nothing. */
 export async function useApp(r: Repl, cart: Cart, onProgress: (p: number, what: string) => void, opts: { launcher?: boolean; manifest?: Manifest } = {}) {
   const m = opts.manifest || await firmwareManifest();
-  const ch = opts.launcher === false ? null : await checkedHave(r, m, cart.files);
+  const ch = opts.launcher === false ? null : await checkedHave(r, m, cart.files, true);
   if (ch) {
     const sha = (n: string) => m.files.find((f) => f.name === n)?.sha256 || "";
     const write = cart.files.filter((n) => ch.hashes[n] !== sha(n));
     const del = others(m, ch, cart.mod);
     for (const n of write) ch.hashes[n] = sha(n);
     for (const n of del) ch.hashes[n] = null;
-    if (await job(r, m, `Install ${cart.name}`, write, del, await appsFor(m, ch, cart.mod), onProgress)) {
-      onProgress(1, write.length ? "in" : "already in");
-      return { written: write.length, restarted: true };
+    const j = await job(r, m, `Install ${cart.name}`, write, del, await appsFor(m, ch, cart.mod), onProgress, !!ch.late);
+    if (j) {
+      onProgress(1, j.sent ? "in" : "already in");
+      return { written: j.sent, restarted: true };
     }
   }
   onProgress(0, "opening the slot");
@@ -406,8 +436,8 @@ export async function useApp(r: Repl, cart: Cart, onProgress: (p: number, what: 
 /** Take its app off: the app's files the core doesn't need, then an empty apps.json ("no software"). */
 export async function removeApp(r: Repl) {
   const m = await firmwareManifest();
-  const ch = await checkedHave(r, m, []);
-  if (ch && await job(r, m, "Take its app off", [], others(m, ch, null), [], () => {})) return { restarted: true };
+  const ch = await checkedHave(r, m, [], true);
+  if (ch && await job(r, m, "Take its app off", [], others(m, ch, null), [], () => {}, !!ch.late)) return { restarted: true };
   await takeOver(r, askHint, "Take its app off");
   const have = await look(r, allNames(m));
   await removeFiles(r, have, others(m, have, null));

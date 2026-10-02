@@ -180,6 +180,51 @@ try {
   await page.locator(".vw").screenshot({ path: `${out}/emu-installing.png` });
   check(/bar: True/.test(pr), `install screen uses the boot bar (${pr.trim()})`);
 
+  // a checked install through the real firmware (job.py, 0.3.10+): the job carries no release, so the
+  // question is up at once; after A: the signed list (real signature), sums, the file, commit, restart
+  await page.evaluate(() => window.vw.reboot("hello"));
+  await page.waitForTimeout(3000);
+  const req = (msg, ms = 10000) => page.evaluate(([msg, ms]) => new Promise((res) => { const off = window.vw.onOutput((l) => { if (l.includes(`"id": ${msg.id},`) || l.includes(`"id": ${msg.id}}`)) { off(); res(JSON.parse(l)); } }); window.vw.write(JSON.stringify(msg) + "\n"); setTimeout(() => { off(); res(null); }, ms); }), [msg, ms]);
+  await page.evaluate(() => window.vw.exec("import slot, sys\n_a = slot.ask\ndef _ask2(*a, **k):\n    print('@asked', 'job' in sys.modules)\n    return _a(*a, **k)\nslot.ask = _ask2"));
+  const exi = await req({ id: 69, type: "sums", names: [], exists: ["hello.py", "keytest.py", "nope.py"] });
+  check(exi?.sums?.["hello.py"] === 1 && exi.sums["nope.py"] === null && exi.apps?.[0]?.mod === "hello", `sums (exists only) before the question: ${JSON.stringify(exi?.sums)}`);
+  const rel = await page.evaluate(() => Promise.all(["release.txt", "release.sig", "keytest.py"].map((n) => fetch("/fw/" + n).then((r) => r.text()))));
+  const ver = rel[0].split("\n")[1].slice(8);
+  const asking = page.evaluate(() => new Promise((res) => { const t0 = performance.now(); const off = window.vw.onOutput((l) => { if (l.includes("@asked")) { off(); res([performance.now() - t0, l]); } }); setTimeout(() => { off(); res([-1, ""]); }, 10000); }));
+  const go = req({ id: 70, type: "job", job: "Install Key test", version: ver, write: ["keytest.py"], delete: ["hello.py"], apps: JSON.stringify([{ mod: "keytest", name: "Key test", v: "x" }]) }, 30000);
+  const [askedMs, askedLine] = await asking;
+  await page.waitForTimeout(800);
+  await page.locator(".vw").screenshot({ path: `${out}/emu-job-ask.png` });
+  await page.evaluate(() => window.vw.press("A", 150));
+  const g = await go;
+  check(askedMs >= 0 && askedMs < 300 && g?.type === "go", `job: the question is up ${Math.round(askedMs)} ms after the job arrives, A says go (${JSON.stringify(g)})`);
+  check(/@asked False/.test(askedLine), `job: asked before job.py was even loaded (${askedLine.trim()})`);
+  const rok = await req({ id: 71, type: "release", release: rel[0], sig: rel[1].trim() }, 120000);
+  check(rok?.type === "ok" && rok.version === ver, `job: the signed list checks out after the yes (${JSON.stringify(rok)})`);
+  const sm = await req({ id: 72, type: "sums", names: ["keytest.py"] });
+  check(sm?.type === "sums" && "keytest.py" in sm.sums, `job: sums after the yes (${JSON.stringify(sm?.sums)})`);
+  const bytes = new TextEncoder().encode(rel[2]);
+  let put = null;
+  for (let o = 0, i = 0; o < bytes.length; o += 1024, i++) {
+    put = await req({ id: 73 + i, type: "put", name: "keytest.py", data: Buffer.from(bytes.subarray(o, o + 1024)).toString("base64"), end: o + 1024 >= bytes.length });
+    if (put?.type !== "ok") break;
+  }
+  check(put?.type === "ok", `job: keytest.py sent (${JSON.stringify(put)})`);
+  const back = page.evaluate(() => new Promise((res) => { const all = []; const off = window.vw.onOutput((l) => { all.push(l); if (l.includes('"ready"')) { off(); res(l); } }); setTimeout(() => { off(); res("no ready: " + all.join(" / ").slice(0, 600)); }, 20000); }));
+  const done = await req({ id: 90, type: "commit" });
+  const ready = await back;
+  check(done?.type === "done" && /"type": "ready"/.test(ready), `job: commit, then it restarts (the emulator boots fresh files) (${JSON.stringify(done)})`);
+
+  // a no to a job: refused, then it starts again from the top
+  await page.waitForTimeout(2000);
+  const nob = page.evaluate(() => new Promise((res) => { const got = []; const off = window.vw.onOutput((l) => { if (/"refused"|"ready"/.test(l)) got.push(l.includes("refused") ? "refused" : "ready"); if (got.length >= 2) { off(); res(got); } }); setTimeout(() => { off(); res(got); }, 15000); }));
+  await page.evaluate(() => window.vw.write(JSON.stringify({ id: 91, type: "job", job: "Install Hello", version: "x", write: ["hello.py"], delete: [], apps: null }) + "\n"));
+  await page.waitForTimeout(1500);
+  await page.evaluate(() => window.vw.press("Y", 150));
+  const nj = await nob;
+  check(nj.join(" ") === "refused ready", `job + Y: refused, then it restarts (${nj.join(" ")})`);
+  await page.waitForTimeout(2000);
+
   // the Wallet (no chip: software key) must not crash; it has USB to itself
   await page.evaluate(() => window.vw.reboot("usbwallet"));
   await page.waitForTimeout(3000);
