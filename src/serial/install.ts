@@ -117,6 +117,11 @@ export async function takeOver(r: Repl, ask = askHint, job = "") {
 export const ASK_TEXT = "Press A on the wedgie to let this computer in";
 /** Where a page shows ASK_TEXT while the wedgie waits for its person ("" when they answered). */
 export let askHint: (s: string) => void = () => {};
+/** The last question's time: site = ms from the click to the request going out (what the site did
+ *  first), wedgie = ms from the request arriving to the question on its screen (0.3.11+ says). */
+export let lastAsk: { site: number; wedgie: number | null; what: string } | null = null;
+let askStart = 0;
+const startAsk = () => { askStart = performance.now(); };
 export function setAskHint(fn: (s: string) => void) { askHint = fn; }
 
 /** A sealed wedgie (0.2.5+: its hello says sealed) turns Ctrl-C off, so the REPL is shut until its person
@@ -124,16 +129,19 @@ export function setAskHint(fn: (s: string) => void) { askHint = fn; }
  *  it stays open until its app starts again (the end of this job) and answers at once. Anything else (older firmware, bare
  *  MicroPython, a board already in its REPL) has no lock and is left alone. */
 export async function letIn(r: Repl, ask: (s: string) => void = askHint, job = "") {
+  if (!askStart) startAsk();
   const h = await r.hello(700).catch(() => null);
   if (!h?.sealed || h.open) return;
   ask(ASK_TEXT);
+  const site = performance.now() - (askStart || performance.now());
   const asked = r.request({ type: "open", for: job }, 65000);   // job: what the wedgie's screen asks
   asked.catch(() => {});
   const close = typeof document !== "undefined" ? (await import("../ui/askmodal")).askModal(job) : () => {};
   let v: any;
   try { v = await asked; }
   catch { throw new Error("nobody pressed A on the wedgie"); }
-  finally { ask(""); close(); }
+  finally { ask(""); close(); askStart = 0; }
+  lastAsk = { site: Math.round(site), wedgie: v.asked_ms ?? null, what: job };
   if (v.type === "open") return;
   if (v.type === "refused") throw new Error("the wedgie said no (Y on its screen)");
   if (v.type === "busy") throw new Error("the wedgie is busy signing; try again after");
@@ -248,13 +256,15 @@ async function job(r: Repl, m: Manifest, title: string, write: string[], del: st
   askHint(ASK_TEXT); onProgress(0, ASK_TEXT);
   const rel = late ? null : await relP;
   // the job goes first; the page's "Press A" modal loads while the wedgie asks
+  const site = performance.now() - (askStart || performance.now());
   const asked = r.request({ type: "job", job: title, ...(rel ? { release: rel.text, sig: rel.sig } : { version: m.version }), write, delete: del, apps: apps && JSON.stringify(apps) }, 120000);
   asked.catch(() => {});
   const close = (await import("../ui/askmodal")).askModal(title, true);
   let v: any;
   try { v = await asked; }
   catch { throw new Error("nobody pressed A on the wedgie"); }
-  finally { askHint(""); close(); }
+  finally { askHint(""); close(); askStart = 0; }
+  lastAsk = { site: Math.round(site), wedgie: v.asked_ms ?? null, what: title };
   if (v.type === "refused") throw new Error("the wedgie said no (Y on its screen)");
   if (v.type === "busy") throw new Error("the wedgie is busy signing; try again after");
   if (v.type !== "go") throw new Error(`the wedgie said ${v.error || v.type}`);
@@ -311,6 +321,7 @@ const fileInfo = (m: Manifest, names: string[]) => names.map((n) => m.files.find
 /** Install or update the firmware core (not the carts; the ones already on it stay). Leaves the board in
  *  raw REPL; the caller reboots it (the new core only runs after one). */
 export async function installCore(r: Repl, onProgress: (p: number, what: string) => void, opts: { launcher?: boolean; screen?: boolean } = {}) {
+  startAsk();
   const m = await firmwareManifest();
   const ch = opts.launcher === false ? null : await checkedHave(r, m, undefined, "update");
   if (ch) {
@@ -398,6 +409,7 @@ async function deviceScreen(r: Repl, title: string, name: string) {
  *  names it. Leaves the board in raw REPL; the caller restarts it (Repl.leave: a soft reset, the port
  *  stays, a fresh heap for the app). Checked for room first, so a switch that can't fit changes nothing. */
 export async function useApp(r: Repl, cart: Cart, onProgress: (p: number, what: string) => void, opts: { launcher?: boolean; manifest?: Manifest } = {}) {
+  startAsk();
   const m = opts.manifest || await firmwareManifest();
   const ch = opts.launcher === false ? null : await checkedHave(r, m, cart.files, true);
   if (ch) {
@@ -435,6 +447,7 @@ export async function useApp(r: Repl, cart: Cart, onProgress: (p: number, what: 
 
 /** Take its app off: the app's files the core doesn't need, then an empty apps.json ("no software"). */
 export async function removeApp(r: Repl) {
+  startAsk();
   const m = await firmwareManifest();
   const ch = await checkedHave(r, m, [], true);
   if (ch && await job(r, m, "Take its app off", [], others(m, ch, null), [], () => {}, !!ch.late)) return { restarted: true };

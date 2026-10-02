@@ -3,7 +3,7 @@
 # interrupted; from the REPL they are plain calls:  import wedgie; wedgie.shot(); wedgie.press("A")
 import sys, os, json, machine
 
-VERSION = "0.3.10"
+VERSION = "0.3.11"
 
 # The lock. main.py turns Ctrl-C off before anything else and never ends by itself, so a computer
 # can only send the slot's JSON lines: it can't stop the app, reach the REPL, or make the secure chip
@@ -117,6 +117,15 @@ def free():
 _chip = None        # what the last chip() found: "ATECC608", "OPTIGA Trust M", "none" (None: not asked yet)
 
 
+def _ram():
+    """Bytes of heap free right now (wedgie.dev shows it; the emulator's heap is set from real boards)."""
+    import gc
+    return gc.mem_free()
+
+
+asked_ms = None     # how long the last question took to be on the screen, from its request arriving
+
+
 def hello(mid=None, **extra):
     name, cpu, wifi = board()
     a = apps()
@@ -124,7 +133,7 @@ def hello(mid=None, **extra):
          "short": short(), "board": name, "cpu": cpu, "wifi": wifi, "machine": sys.implementation._machine,
          "micropython": os.uname().release, "apps": [x["mod"] for x in a],
          "carts": [{"mod": x["mod"], "v": x.get("v")} for x in a], "free": free(), "chip": _chip, "slot": 1,
-         "sealed": SEALED, "open": is_open(), "jobs": 2}
+         "sealed": SEALED, "open": is_open(), "jobs": 2, "ram": _ram()}
     if mid is not None:
         d["id"] = mid
     d.update(extra)

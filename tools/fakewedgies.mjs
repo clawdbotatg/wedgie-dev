@@ -67,6 +67,7 @@ export function fakeWedgies(specs) {
       if (slot()) h.slot = 1;
       if (sealed()) Object.assign(h, { sealed: true, open: !!st.open });
       if (cmpV(version() || "0", "0.3.0") >= 0 && slot()) h.jobs = cmpV(version(), "0.3.10") >= 0 ? 2 : 1;
+      if (cmpV(version() || "0", "0.3.11") >= 0 && slot()) h.ram = 52000;
       return JSON.stringify(h);
     };
     const answer = (stdout) => push("OK" + stdout + "\x04\x04>");
@@ -138,9 +139,10 @@ export function fakeWedgies(specs) {
         st.asks = (st.asks || 0) + 1; st.jobs = (st.jobs || 0) + 1;
         const p = st.person || {};
         return setTimeout(() => {
-          if (p.say === "no") return push(JSON.stringify({ id, type: "refused" }) + "\r\n");
+          const asked_ms = cmpV(version() || "0", "0.3.11") >= 0 ? 42 : undefined;
+          if (p.say === "no") return push(JSON.stringify({ id, type: "refused", asked_ms }) + "\r\n");
           st.job = { m: msg, listed, got: new Map() };
-          push(JSON.stringify({ id, type: "go" }) + "\r\n");
+          push(JSON.stringify({ id, type: "go", asked_ms }) + "\r\n");
         }, p.ms ?? 300);
       }
       if (msg.type === "put" && st.job) {

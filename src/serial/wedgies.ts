@@ -29,6 +29,7 @@ export type Wedgie = {
   running?: string | null; // the app on its screen (null: none, or 0.1.x's menu)
   slot?: boolean;        // 0.2+: runs one app, no menu (slot.py)
   free?: number;         // bytes free on its flash
+  ram?: number;          // bytes of heap free when it said hello (0.3.11+)
   chip?: any;            // what answered on I2C: { type, serial? }
   proof?: ChipCheck & { state: "checking" | "done" | "unknown" };   // the chip proven working (once per plug-in)
   error?: string;
@@ -193,6 +194,7 @@ function talk(w: Wedgie) {
     w.apps = h.apps;
     w.carts = h.carts;
     w.free = h.free ?? undefined;
+    w.ram = h.ram ?? undefined;
     w.running = w.kind === "wallet" ? "usbwallet" : h.running ?? null;
     w.slot = !!h.slot;
     w.uid = h.uid || h.serial;

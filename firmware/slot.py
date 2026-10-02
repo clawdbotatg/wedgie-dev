@@ -36,6 +36,7 @@ app = None          # the active app's apps.json entry (None: nothing on it yet)
 mod = None          # its module, once imported
 state = "empty"     # empty | running | entry (an entry to call) | ended | error
 _poll = None
+_rx = 0             # ticks_ms when the line being handled arrived
 _buf = ""           # the line coming in: its last few chars here, full 256-char pieces in _parts
 _parts = []         # (str += per char copied the whole line every char; a list of chars needed a 13 KB block: 0.3.6 died of it)
 _serve_t = None     # the background Timer that answers USB while an entry app owns the CPU
@@ -193,6 +194,9 @@ def stop():
 
 
 def handle(line):
+    global _rx
+    _rx = time.ticks_ms()               # a question's time is counted from here (wedgie.asked_ms)
+    W.asked_ms = None
     try:
         m = json.loads(line)
     except ValueError:
@@ -232,7 +236,7 @@ def handle(line):
         W.send({"id": mid, "type": "ok"})
     elif t == "open":
         ok = let_in(str(m.get("for") or "")[:60])
-        W.send({"id": mid, "type": "open" if ok else "refused"})
+        W.send({"id": mid, "type": "open" if ok else "refused", "asked_ms": W.asked_ms})
         if not ok:
             _restart()
     elif t == "job":                    # a checked install (job.py): signed files only, no REPL
@@ -265,7 +269,10 @@ def ask(job="", note=""):
     lines = ["The computer gets full access for this one job."] + (["Its wallet key too."] if wallet else [])
     if note:
         lines = [note, "Only those files change."]
-    return ui.ask(d, (job + "?") if job else "Let this computer in?", lines + ["Didn't ask for this? Y."], ms=ASK_MS)
+    W.asked_ms = None
+    ok = ui.ask(d, (job + "?") if job else "Let this computer in?", lines + ["Didn't ask for this? Y."], ms=ASK_MS)
+    W.asked_ms = time.ticks_diff(ui.drawn, _rx)
+    return ok
 
 
 def _job(mid, m):
@@ -277,7 +284,7 @@ def _job(mid, m):
         return job.run(mid, m, ask, progress)
     title = str(m.get("job") or "Update")[:60]
     if not ask(title, "checked: wedgie.dev release " + str(m.get("version") or "")[:12]):
-        W.send({"id": mid, "type": "refused"})
+        W.send({"id": mid, "type": "refused", "asked_ms": W.asked_ms})
         return
     progress(title.replace("Install", "Installing").replace("Update", "Updating") + "...", "starting", 0)
     import job

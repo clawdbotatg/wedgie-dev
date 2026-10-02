@@ -118,7 +118,7 @@ def run(mid, m, ask, show=None):
             W.send({"id": mid, "type": "error", "error": str(e)})
             return
         show(title, "starting", 0)
-    W.send({"id": mid, "type": "go"})
+    W.send({"id": mid, "type": "go", "asked_ms": W.asked_ms})
     chunks = 0
     got = {}                                # name -> sha256 of what arrived
     there = {}                              # name -> sha256 of what's on it (this job's sums)

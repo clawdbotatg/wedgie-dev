@@ -17,7 +17,7 @@ import { place3D, idScreen as idCanvas, colorScreen } from "../ui/place3d";
 import type { Wedgie3D } from "../ui/wedgie3d";
 import * as W from "../serial/wedgies";
 import { pyStr, type Repl } from "../serial/repl";
-import { installCore, useApp, removeApp, takeOver, setAskHint, firmwareManifest, type Cart, type Manifest } from "../serial/install";
+import { installCore, useApp, removeApp, takeOver, setAskHint, firmwareManifest, lastAsk, type Cart, type Manifest } from "../serial/install";
 import * as FS from "../serial/files";
 import { cartHtml } from "../ui/cart";
 import { bootScreen } from "../ui/bootscreen";
@@ -77,6 +77,8 @@ time.sleep(2)
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const kb = (n: number) => `${Math.max(1, Math.round(n / 1024))} KB`;
+/** How long the last question took to show: the site's part, then the wedgie's (0.3.11+ reports it). */
+const askTime = () => lastAsk ? ` <span class="fine">Question on its screen in ${lastAsk.wedgie != null ? `${lastAsk.site + lastAsk.wedgie} ms (site ${lastAsk.site}, wedgie ${lastAsk.wedgie})` : `${lastAsk.site} ms + the wedgie's part`}.</span>` : "";
 
 export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => void): () => void {
   main.innerHTML = `
@@ -276,7 +278,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
   }
 
   // ---- painting --------------------------------------------------------------------------------------
-  const status = (s: string, at = "#d-status") => { const el = $(at); if (!el) return; el.hidden = !s; el.innerHTML = s; };
+  const status = (s: string, at = "#d-status") => { const el = $(at); if (!el) return; el.hidden = !s; el.innerHTML = s; if (/Question on its screen/.test(s)) el.dataset.ask = el.textContent || ""; };   // data-ask: for the probes
   const tstatus = (s: string) => status(s, "#d-tstatus");   // the Developer section's own line (tests, Run, Save)
   setAskHint((s) => status(s && `<b>${esc(s)}.</b> It asks on its screen.`));
   const meter = (p: number | null, t = "") => {
@@ -318,6 +320,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
       ["Chip", chip + facts],
       ["Board ID", `<span class="mono">${esc(x.uid || "?")}</span>`],
       ...(x.free != null ? [["Room", `${kb(x.free)} free`]] : []),
+      ...(x.ram != null ? [["Memory", `${kb(x.ram)} free`]] : []),
     ].map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
     const hw = $("#d-hw");
     if (hw.dataset.html !== rows) { hw.dataset.html = rows; hw.innerHTML = rows; }   // a repaint must not snap "How we know" shut
@@ -416,7 +419,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     try {
       const res = await useApp(r, c, (p, what) => { inserting[c.mod] = p; setScreen(what === ASK_TEXT ? { kind: "ask", job: `Install ${c.name}` } : { kind: "loading", p, title: T, what }); paint(); }, { manifest: view() });
       delete inserting[c.mod];
-      status(`Restarting it into <b>${esc(c.name)}</b>…`);
+      status(`Restarting it into <b>${esc(c.name)}</b>…${askTime()}`);
       // The soft reset: a fresh heap for the new app (a checked install restarts itself). The port may drop;
       // attach() finds it by ID either way.
       if (!res.restarted) await r.leave();
@@ -583,7 +586,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     await r.leave({ reset: false });
     let h: any = null;
     for (let i = 0; i < 12 && !h; i++) h = await r.hello(700).catch(() => null);
-    if (h && w) { if (String(h.fw || "").startsWith("wedgie-")) w.kind = "wedgie"; w.slot = !!h.slot; w.version = h.version; w.apps = h.apps; w.carts = h.carts; w.free = h.free ?? w.free; w.running = h.running ?? null; w.firmware = `wedgie ${h.version}`; }
+    if (h && w) { if (String(h.fw || "").startsWith("wedgie-")) w.kind = "wedgie"; w.slot = !!h.slot; w.version = h.version; w.apps = h.apps; w.carts = h.carts; w.free = h.free ?? w.free; w.ram = h.ram ?? w.ram; w.running = h.running ?? null; w.firmware = `wedgie ${h.version}`; }
   }
 
   // ---- firmware ---------------------------------------------------------------------------------------
@@ -602,7 +605,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
       // new port (the drive re-enumerates USB on firmware older than 0.1.3); attach() finds it by its ID.
       // A checked install (0.3.0+) restarts itself.
       if (!res.restarted) await r.leave();
-      status("Restarting it on the new firmware. It comes back here in a few seconds.");
+      status("Restarting it on the new firmware. It comes back here in a few seconds." + askTime());
       // Identify it again (queued behind this session, so it starts once the port is let go). On 0.1.3+ the
       // port survives a soft reset; if it doesn't, the disconnect marks it gone and the replug is a new one.
       W.reidentify(x);

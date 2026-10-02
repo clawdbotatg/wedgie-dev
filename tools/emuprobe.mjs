@@ -198,6 +198,7 @@ try {
   await page.evaluate(() => window.vw.press("A", 150));
   const g = await go;
   check(askedMs >= 0 && askedMs < 300 && g?.type === "go", `job: the question is up ${Math.round(askedMs)} ms after the job arrives, A says go (${JSON.stringify(g)})`);
+  check(typeof g?.asked_ms === "number" && g.asked_ms < 200, `job: the wedgie says how long its question took (${g?.asked_ms} ms)`);
   check(/@asked False/.test(askedLine), `job: asked before job.py was even loaded (${askedLine.trim()})`);
   const rok = await req({ id: 71, type: "release", release: rel[0], sig: rel[1].trim() }, 120000);
   check(rok?.type === "ok" && rok.version === ver, `job: the signed list checks out after the yes (${JSON.stringify(rok)})`);

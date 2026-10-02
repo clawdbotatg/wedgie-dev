@@ -77,6 +77,9 @@ def buttons(d, yes="yes", no="no"):
     d.center_text(("Y  " + no)[:COLS_BIG], 219, WHITE, 2)
 
 
+drawn = 0       # ticks_ms when the last ask() finished drawing its question (the slot reports it)
+
+
 def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None):
     """A yes/no question: A yes, Y no, no answer in `ms` is a no. Only real presses count (a press
     sent over USB can't answer). True for yes."""
@@ -93,6 +96,8 @@ def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None):
             y += 14
     buttons(d, yes, no)
     d.show()
+    global drawn
+    drawn = time.ticks_ms()
     t0 = time.ticks_ms()
     while time.ticks_diff(time.ticks_ms(), t0) < ms:
         for key in k.pressed():
