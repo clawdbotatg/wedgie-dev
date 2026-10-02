@@ -36,7 +36,8 @@ app = None          # the active app's apps.json entry (None: nothing on it yet)
 mod = None          # its module, once imported
 state = "empty"     # empty | running | entry (an entry to call) | ended | error
 _poll = None
-_buf = ""
+_buf = ""           # the line coming in: its last few chars here, full 256-char pieces in _parts
+_parts = []         # (str += per char copied the whole line every char; a list of chars needed a 13 KB block: 0.3.6 died of it)
 _serve_t = None     # the background Timer that answers USB while an entry app owns the CPU
 
 
@@ -230,10 +231,14 @@ def handle(line):
         stop()
         W.send({"id": mid, "type": "ok"})
     elif t == "open":
-        W.send({"id": mid, "type": "open" if let_in(str(m.get("for") or "")[:60]) else "refused"})
+        ok = let_in(str(m.get("for") or "")[:60])
+        W.send({"id": mid, "type": "open" if ok else "refused"})
+        if not ok:
+            _restart()
     elif t == "job":                    # a checked install (job.py): signed files only, no REPL
         import job
         _asking(lambda: job.run(mid, m, ask, progress))
+        _restart()                      # it ended before its commit (a no, a bad file): start again
     elif t == "sums":
         import job
         W.send({"id": mid, "type": "sums", "sums": job.sums(m.get("names"), m.get("exists")), "apps": W.apps()})
@@ -259,28 +264,25 @@ def ask(job="", note=""):
     lines = ["The computer gets full access for this one job."] + (["Its wallet key too."] if wallet else [])
     if note:
         lines = [note, "Only those files change."]
-    return ui.ask(d, (job + "?") if job else "Let this computer in?", lines + ["Didn't ask for this? Y."], ms=ASK_MS, keep=True)
+    return ui.ask(d, (job + "?") if job else "Let this computer in?", lines + ["Didn't ask for this? Y."], ms=ASK_MS)
 
 
 def let_in(job=""):
     """{"type": "open"}: may this computer have the REPL? Asks the person, unless they already said
     yes for this job (or nothing is sealed: the emulator). Yes turns Ctrl-C on (wedgie.set_open) until
-    main.py starts again."""
-    global _paused
+    main.py starts again. False only after a no: the caller restarts it (_restart)."""
     if not W.SEALED or W.is_open():
         W.set_open()
         return True
-    ok = _asking(lambda: ask(job), restore=False)
+    ok = _asking(lambda: ask(job))
     if ok:
         W.set_open()
         _band("working...", [(job[:28], INK), ("it locks again when done", MUTED)])
-    else:
-        _back()
     return ok
 
 
-def _asking(fn, restore=True):
-    """Run a question (and a job) with the app's ticks paused, then put its screen back."""
+def _asking(fn):
+    """Run a question (and a job) with the app's ticks paused."""
     global _paused, _prog
     _paused = True
     _prog = None
@@ -288,27 +290,26 @@ def _asking(fn, restore=True):
         return fn()
     finally:
         _paused = False
-        if restore:
-            _back()
 
 
-def _back():
-    """The screen from before the question. The question (ui.ask keep=True) left the frame buffer alone,
-    so it's the app's screen as it was: an app that doesn't redraw by itself would otherwise sit under
-    the question forever. After a yes the progress screen drew over it: a failed job says so."""
-    if ui.kept and not _prog:
-        d.show()
-    elif state == "empty":
-        empty()
-    elif state in ("ended", "error"):
-        _ended()
-    else:
-        _band("nothing changed", [("it keeps its app", MUTED)])
+def _restart():
+    """After a no, or a job that ended before its commit: start from the top. The question goes straight
+    over the app's screen and nothing keeps that screen, so the question is up at once (0.3.5 saved the
+    115 KB screen to flash first: seconds before every question). A soft reset keeps USB (boot.py,
+    0.1.3+) and main.py lets it through (W.restarting). An entry app owns the main loop and this then
+    runs in its USB timer, where a soft reset's SystemExit is swallowed: that one gets a hard reset (its
+    port drops and comes back; hosts find a wedgie by its ID)."""
+    import machine
+    time.sleep_ms(100)                  # the answer goes out first
+    if state == "entry" and not _own_usb():    # (the Wallet reads USB in its own loop: a soft reset works)
+        machine.reset()
+    W.restarting = True
+    machine.soft_reset()
 
 
 def serve(_=None):
     """Read what the host sent; handle each full line. Never blocks."""
-    global _buf, _breath
+    global _buf, _parts, _breath
     _breath = True
     for _ in range(4096):
         if not _poll.poll(0):
@@ -317,15 +318,19 @@ def serve(_=None):
         if not ch:
             return
         if ch == "\n":
-            line, _buf = _buf, ""
+            line = "".join(_parts) + _buf if _parts else _buf
+            _buf, _parts = "", []
             if line.strip().startswith("{"):
                 handle(line)
         elif ch == "\x03":              # a Ctrl-C while sealed is just a byte: start a clean line
-            _buf = ""
+            _buf, _parts = "", []
         elif ch != "\r":
             _buf += ch
-            if len(_buf) > 4096:
+            if len(_buf) >= 256:
+                _parts.append(_buf)
                 _buf = ""
+                if len(_parts) > 24:    # over 6 KB: not a line we take (a job is 3.2 KB)
+                    _parts = []
 
 
 def _own_usb():

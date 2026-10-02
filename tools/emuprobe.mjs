@@ -147,18 +147,26 @@ try {
   check(late === "1", "a tick that isn't back to back runs even before USB's turn (no choppy apps)");
   check(kb === "True", "a Ctrl-C inside a tick reaches the main loop");
 
-  // the lock (main.py seals a real board; here it's switched on by hand): "let this computer in?" asks
-  // on the screen, Y says no, and the app's screen comes back as it was (an app that doesn't redraw by
-  // itself must not sit under the question)
-  const asked = page.evaluate(() => window.vw.exec("import wedgie, slot, lcd\nwedgie.SEALED = True\nslot.stop()\nlcd._BUF[0] = 0x12\nlcd._BUF[1] = 0x34\nok = slot.let_in()\nimport ui\nprint('let in:', ok, lcd._BUF[0], lcd._BUF[1], 'kept', ui.kept)\nwedgie.SEALED = False"));
+  // the lock (main.py seals a real board; here it's switched on by hand): "let this computer in?" is on
+  // the screen at once (nothing is saved first: 0.3.5 wrote the 115 KB screen to flash, seconds on a real
+  // board), and Y says no
+  const asked = page.evaluate(() => window.vw.exec("import wedgie, slot, ui, time\nwedgie.SEALED = True\nslot.stop()\n_t0 = time.ticks_ms()\n_ask = ui.ask\ndef _timed(*a, **k):\n    print('asked after', time.ticks_diff(time.ticks_ms(), _t0), 'ms')\n    return _ask(*a, **k)\nui.ask = _timed\nok = slot.let_in()\nui.ask = _ask\nprint('let in:', ok)\nwedgie.SEALED = False"));
   await page.waitForTimeout(2500);
   await page.locator(".vw").screenshot({ path: `${out}/emu-ask.png` });
   await page.evaluate(() => window.vw.press("Y", 150));
   const al = await asked;
-  check(/let in: False 18 52/.test(al), `lock: Y says no, the app's screen comes back (${al.trim()})`);
-  // the question goes straight to the panel (ui.ask keep=True): the frame buffer keeps the app's screen,
-  // so nothing is saved to flash first (that took seconds on a real board before every question)
-  check(/kept True/.test(al), `the question leaves the frame buffer alone (${al.trim()})`);
+  const askMs = +(al.match(/asked after (\d+)/) || [])[1];
+  check(/let in: False/.test(al) && askMs < 30, `lock: the question is up at once (${askMs} ms), Y says no (${al.trim().replace(/\n/g, " | ")})`);
+
+  // a no over USB answers "refused", then the wedgie starts again from the top (the question drew over
+  // the app's screen and nothing kept it)
+  await page.evaluate(() => window.vw.exec("import wedgie\nwedgie.SEALED = True"));
+  const no = page.evaluate(() => new Promise((res) => { const got = []; const off = window.vw.onOutput((l) => { if (/"refused"|"ready"/.test(l)) got.push(l.includes("refused") ? "refused" : "ready"); if (got.length >= 2) { off(); res(got); } }); window.vw.write(JSON.stringify({ id: 60, type: "open", for: "Install Buttons" }) + "\n"); setTimeout(() => { off(); res(got); }, 12000); }));
+  await page.waitForTimeout(1500);
+  await page.evaluate(() => window.vw.press("Y", 150));
+  const nog = await no;
+  check(nog.join(" ") === "refused ready", `USB open + Y: refused, then it restarts (${nog.join(" ")})`);
+  await page.waitForTimeout(3000);
 
   // the look-and-feel kit (firmware/ui.py): a page, for code.md's pictures
   const pg = await page.evaluate(() => window.vw.exec("import slot, lcd, ui\nslot.stop()\nd = lcd.LCD()\nui.page(d, 'Game over', [('score 120', ui.INK), ('best 340', ui.MUTED)], 'A  play again')\nprint('page ok')"));
