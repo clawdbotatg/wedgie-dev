@@ -62,7 +62,14 @@ what agents outside this repo read (keep it true when the firmware or the USB pr
    pictures in `public/img/look/` from emuprobe). The page's drawings of wedgie screens take colors from
    `src/ui/palette.ts`. `python3 tools/test_style.py` fails on a re-typed palette color, a second
    bar.bin reader, or palette.ts drifting from ui.py.
-12. Everything is MIT — never use the CC BY-NC case STLs from picowallet/instant-wallet.
+12. **Anything slow on a wedgie: trace click to screen first.** List every step (host requests, what
+   the wedgie reads, imports/compiles, hashing, flash writes, drawing), estimate each, and fix them all in
+   one release. Fixing the first cause found and shipping took five releases for the install question
+   (0.3.6-0.3.10, two crashed a real board). The emulator has 448 KB of heap, an RP2040 about 190 KB with
+   115 KB of it the framebuffer: a firmware change that allocates more is unproven until a real board runs
+   it. Say so; never call it tested because the emulator passed. Offer Austin simple tradeoffs early
+   ("a no can reboot it" made 0.3.9 easy).
+13. Everything is MIT — never use the CC BY-NC case STLs from picowallet/instant-wallet.
 
 ## Run / check
 
