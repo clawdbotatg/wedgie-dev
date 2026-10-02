@@ -69,9 +69,8 @@ what agents outside this repo read (keep it true when the firmware or the USB pr
    made 0.3.9 easy).
 13. **The emulator runs out of memory where a wedgie would.** Its MicroPython is our own build with a fixed
    heap (`src/emu/mp`, rebuilt by `tools/emu-mp/build.sh`; the npm build grew its heap without limit and
-   hid 0.3.6's crash). `DEFAULT_HEAP` in `src/emu/runtime.ts` (260 KB) is calibrated: the smallest heap
-   where the Wallet and a checked install run, and where 0.3.6's line reading dies as it did on a real
-   board. A firmware change that allocates more must pass emuprobe at that heap; don't raise it to make a
+   hid 0.3.6's crash). `DEFAULT_HEAP` in `src/emu/runtime.ts` (250 KB) is the smallest heap where the
+   Wallet and a checked install run; not yet checked against a real board's gc.mem_free(). A firmware change that allocates more must pass emuprobe at that heap; don't raise it to make a
    test pass. It's still a model: a real board is the final word, so say "passes the emulator", not "works".
 14. Everything is MIT — never use the CC BY-NC case STLs from picowallet/instant-wallet.
 
