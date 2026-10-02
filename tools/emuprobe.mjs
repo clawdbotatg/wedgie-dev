@@ -108,6 +108,12 @@ try {
   const rmv = await ask({ id: 53, type: "rm", path: "/saves/hello" });
   const after = await ask({ id: 54, type: "ls", path: "/saves" });
   check(rmv[0]?.type === "ok" && JSON.stringify(after[0]?.files) === "[]", "USB rm: the game's saves folder gone");
+  // a long line (an old host's job carried the 3 KB signed list) while Hello runs, on an RP2040-sized heap
+  // (DEFAULT_HEAP): 0.3.6 built lines as a list of chars and died here on a real board ("allocating 8192 bytes")
+  console.log("     mem: " + (await page.evaluate(() => window.vw.exec("import gc, micropython\ngc.collect()\nprint(gc.mem_free(), gc.mem_alloc())\nmicropython.mem_info()"))).replace(/\n/g, " | ").slice(0, 400));
+  const longl = await ask({ id: 58, type: "ping", pad: "x".repeat(4000) });
+  const alive = await ask({ id: 59, type: "hello" });
+  check(longl[0]?.type === "pong" && alive[0]?.running === "hello", `USB: a 4 KB line is answered and Hello keeps running (${longl.length} ${alive[0]?.running})`);
 
   // no app: the "no software yet" screen
   await page.evaluate(() => window.vw.reboot(""));
@@ -195,7 +201,9 @@ try {
   const [askedMs, askedLine] = await asking;
   await page.waitForTimeout(800);
   await page.locator(".vw").screenshot({ path: `${out}/emu-job-ask.png` });
-  await page.evaluate(() => window.vw.press("A", 150));
+  let went = false;
+  go.then(() => { went = true; });
+  for (let i = 0; i < 10 && !went; i++) { await page.evaluate(() => window.vw.press("A", 150)); await page.waitForTimeout(1000); }   // an A before the question is up doesn't count
   const g = await go;
   check(askedMs >= 0 && askedMs < 300 && g?.type === "go", `job: the question is up ${Math.round(askedMs)} ms after the job arrives, A says go (${JSON.stringify(g)})`);
   check(/@asked False/.test(askedLine), `job: asked before job.py was even loaded (${askedLine.trim()})`);
@@ -217,10 +225,11 @@ try {
 
   // a no to a job: refused, then it starts again from the top
   await page.waitForTimeout(2000);
-  const nob = page.evaluate(() => new Promise((res) => { const got = []; const off = window.vw.onOutput((l) => { if (/"refused"|"ready"/.test(l)) got.push(l.includes("refused") ? "refused" : "ready"); if (got.length >= 2) { off(); res(got); } }); setTimeout(() => { off(); res(got); }, 15000); }));
+  const nob = page.evaluate(() => new Promise((res) => { const got = [], all = []; const off = window.vw.onOutput((l) => { all.push(l.slice(0, 80)); if (/"refused"|"ready"/.test(l)) got.push(l.includes("refused") ? "refused" : "ready"); if (got.length >= 2) { off(); res(got); } }); setTimeout(() => { off(); got.push("| " + all.join(" / ")); res(got); }, 15000); }));
   await page.evaluate(() => window.vw.write(JSON.stringify({ id: 91, type: "job", job: "Install Hello", version: "x", write: ["hello.py"], delete: [], apps: null }) + "\n"));
-  await page.waitForTimeout(1500);
-  await page.evaluate(() => window.vw.press("Y", 150));
+  let answered = false;
+  nob.then(() => { answered = true; });
+  for (let i = 0; i < 12 && !answered; i++) { await page.waitForTimeout(1000); await page.evaluate(() => window.vw.press("Y", 150)); }   // a Y before the question is up doesn't count
   const nj = await nob;
   check(nj.join(" ") === "refused ready", `job + Y: refused, then it restarts (${nj.join(" ")})`);
   await page.waitForTimeout(2000);

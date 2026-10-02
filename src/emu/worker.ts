@@ -1,8 +1,8 @@
 // The virtual wedgie runs in this Worker so a busy loop in Python never freezes the page. Keys and
 // serial input arrive through SharedArrayBuffers (readable even while Python is busy); frames and
 // console lines go out with postMessage. Port of picowallet's emu/web/worker.js (MIT).
-import mpUrl from "@micropython/micropython-webassembly-pyscript/micropython.mjs?url";
-import wasmUrl from "@micropython/micropython-webassembly-pyscript/micropython.wasm?url";
+import mpUrl from "./mp/micropython.mjs?url";
+import wasmUrl from "./mp/micropython.wasm?url";
 import machinePy from "./shims/machine.py?raw";
 import rp2Py from "./shims/rp2.py?raw";
 import bootstrapPy from "./shims/_bootstrap.py?raw";

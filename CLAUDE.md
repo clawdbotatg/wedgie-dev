@@ -65,11 +65,15 @@ what agents outside this repo read (keep it true when the firmware or the USB pr
 12. **Anything slow on a wedgie: trace click to screen first.** List every step (host requests, what
    the wedgie reads, imports/compiles, hashing, flash writes, drawing), estimate each, and fix them all in
    one release. Fixing the first cause found and shipping took five releases for the install question
-   (0.3.6-0.3.10, two crashed a real board). The emulator has 448 KB of heap, an RP2040 about 190 KB with
-   115 KB of it the framebuffer: a firmware change that allocates more is unproven until a real board runs
-   it. Say so; never call it tested because the emulator passed. Offer Austin simple tradeoffs early
-   ("a no can reboot it" made 0.3.9 easy).
-13. Everything is MIT — never use the CC BY-NC case STLs from picowallet/instant-wallet.
+   (0.3.6-0.3.10, two crashed a real board). Offer Austin simple tradeoffs early ("a no can reboot it"
+   made 0.3.9 easy).
+13. **The emulator runs out of memory where a wedgie would.** Its MicroPython is our own build with a fixed
+   heap (`src/emu/mp`, rebuilt by `tools/emu-mp/build.sh`; the npm build grew its heap without limit and
+   hid 0.3.6's crash). `DEFAULT_HEAP` in `src/emu/runtime.ts` (260 KB) is calibrated: the smallest heap
+   where the Wallet and a checked install run, and where 0.3.6's line reading dies as it did on a real
+   board. A firmware change that allocates more must pass emuprobe at that heap; don't raise it to make a
+   test pass. It's still a model: a real board is the final word, so say "passes the emulator", not "works".
+14. Everything is MIT — never use the CC BY-NC case STLs from picowallet/instant-wallet.
 
 ## Run / check
 

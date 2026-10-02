@@ -217,12 +217,20 @@ def freq(*a):
     return 150_000_000
 
 
+_resetting = False
+
+
 def reset():
-    _emu.reset()
+    # A board stops right here; this returns, so the code after it runs on until the worker restarts.
+    # Once is enough: a second reset (job.py's, then the slot's _restart) restarted it twice.
+    global _resetting
+    if not _resetting:
+        _resetting = True
+        _emu.reset()
 
 
 def soft_reset():
-    _emu.reset()
+    reset()
 
 
 def bootloader(*a):

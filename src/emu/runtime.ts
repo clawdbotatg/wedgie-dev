@@ -14,7 +14,7 @@ const KEY_PINS: Record<number, KeyName> = { 15: "A", 17: "B", 19: "X", 21: "Y", 
  * which a Pin read the key as up again (worker writes). The last two let press() wait for the app. */
 export const PRESSES = 16, SEEN_DOWN = 32, SEEN_UP = 48, KEY_SLOTS = 64;
 export const W = 240, H = 240, FRAME_BYTES = W * H * 2;
-export const DEFAULT_HEAP = 448 * 1024;
+export const DEFAULT_HEAP = 260 * 1024;   // calibrated: the smallest heap where everything that runs on a real RP2040 wedgie runs here (the Wallet, a checked install), and 0.3.6's line reading dies here as it did on a real board. The virtual wedgie's MicroPython (src/emu/mp, tools/emu-mp/build.sh) has a fixed heap; the npm build grew its heap without limit and hid every memory bug
 
 export type Shims = Record<string, string>;
 type MP = {
