@@ -26,6 +26,38 @@ s = s.replace("    emscripten_scan_registers(gc_scan_func);", "    #if !MICROPY_
 open(p, "w").write(s)
 PY
 sed -i.bak 's/^CFLAGS += -std=c99 -Wall -Werror/CFLAGS += -std=c99 -Wall/' ports/webassembly/Makefile
+# JsProxy refcount. proxy_js_add_obj hands the SAME ref to every Python JsProxy made for one JS object,
+# and each JsProxy's finaliser frees that ref: once the GC collects one, the others call a freed ref
+# ("Cannot read properties of undefined (reading 'call')"). The npm build almost never collected, so it
+# hid this; with a real GC it broke every boot under gc.threshold(256). Count the JsProxies per ref.
+grep -q proxy_js_ref_count ports/webassembly/proxy_js.js || python3 - <<'PY'
+p = "ports/webassembly/proxy_js.js"; s = open(p).read()
+s = s.replace("    globalThis.proxy_js_ref_map = new Map();", "    globalThis.proxy_js_ref_map = new Map();\n    globalThis.proxy_js_ref_count = [];", 1)
+s = s.replace("""    if (existing_ref !== undefined) {
+        return existing_ref;""", """    if (existing_ref !== undefined) {
+        proxy_js_ref_count[existing_ref] = (proxy_js_ref_count[existing_ref] || 1) + 1;
+        return existing_ref;""", 1)
+s = s.replace("""            proxy_js_ref_map.set(js_obj, id);
+            return id;""", """            proxy_js_ref_map.set(js_obj, id);
+            proxy_js_ref_count[id] = 1;
+            return id;""", 1)
+s = s.replace("""    proxy_js_ref_map.set(js_obj, id);
+    return id;""", """    proxy_js_ref_map.set(js_obj, id);
+    proxy_js_ref_count[id] = 1;
+    return id;""", 1)
+assert s.count("proxy_js_ref_count") == 5, s.count("proxy_js_ref_count")
+open(p, "w").write(s)
+p = "ports/webassembly/objjsproxy.c"; s = open(p).read()
+a = """    if (js_ref >= PROXY_JS_REF_NUM_STATIC) {
+        proxy_js_ref_map.delete(proxy_js_ref[js_ref]);"""
+assert a in s
+s = s.replace(a, """    if (js_ref >= PROXY_JS_REF_NUM_STATIC) {
+        if (--proxy_js_ref_count[js_ref] > 0) {
+            return;
+        }
+        proxy_js_ref_map.delete(proxy_js_ref[js_ref]);""", 1)
+open(p, "w").write(s)
+PY
 source ../emsdk/emsdk_env.sh >/dev/null 2>&1
 make -C mpy-cross -j8 CWARN="-Wall -Wno-gnu-folding-constant" >/dev/null
 make -C ports/webassembly VARIANT=wedgie submodules >/dev/null

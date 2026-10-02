@@ -4835,7 +4835,7 @@ function js_get_iter(f_ref,out) { const f = proxy_js_ref[f_ref]; const ret = f[S
 function js_iter_next(f_ref,out) { const f = proxy_js_ref[f_ref]; const ret = f.next(); if (ret.done) { return false; } else { proxy_convert_js_to_mp_obj_jsside(ret.value, out); return true; } }
 function js_subscr_load(f_ref,index_ref,out) { const target = proxy_js_ref[f_ref]; const index = python_index_semantics(target, proxy_convert_mp_to_js_obj_jsside(index_ref)); const ret = target[index]; proxy_convert_js_to_mp_obj_jsside(ret, out); }
 function js_subscr_store(f_ref,idx,value) { const f = proxy_js_ref[f_ref]; f[proxy_convert_mp_to_js_obj_jsside(idx)] = proxy_convert_mp_to_js_obj_jsside(value); }
-function proxy_js_free_obj(js_ref) { if (js_ref >= PROXY_JS_REF_NUM_STATIC) { proxy_js_ref_map.delete(proxy_js_ref[js_ref]); proxy_js_ref[js_ref] = undefined; if (js_ref < proxy_js_ref_next) { proxy_js_ref_next = js_ref; } } }
+function proxy_js_free_obj(js_ref) { if (js_ref >= PROXY_JS_REF_NUM_STATIC) { if (--proxy_js_ref_count[js_ref] > 0) { return; } proxy_js_ref_map.delete(proxy_js_ref[js_ref]); proxy_js_ref[js_ref] = undefined; if (js_ref < proxy_js_ref_next) { proxy_js_ref_next = js_ref; } } }
 function js_check_existing(c_ref) { return proxy_js_check_existing(c_ref); }
 function js_get_error_info(jsref,out_name,out_message) { const error = proxy_js_ref[jsref]; proxy_convert_js_to_mp_obj_jsside(error.name, out_name); proxy_convert_js_to_mp_obj_jsside(error.message, out_message); }
 function js_then_resolve(ret_value,resolve) { const ret_value_js = proxy_convert_mp_to_js_obj_jsside(ret_value); const resolve_js = proxy_convert_mp_to_js_obj_jsside(resolve); resolve_js(ret_value_js); }
@@ -5945,6 +5945,7 @@ function proxy_js_init() {
     globalThis.proxy_js_ref = [globalThis, undefined];
     globalThis.proxy_js_ref_next = PROXY_JS_REF_NUM_STATIC;
     globalThis.proxy_js_ref_map = new Map();
+    globalThis.proxy_js_ref_count = [];
     globalThis.proxy_js_map = new Map();
     globalThis.proxy_js_existing = [undefined];
     globalThis.pyProxyFinalizationRegistry = new FinalizationRegistry(
@@ -5984,6 +5985,7 @@ function proxy_js_add_obj(js_obj) {
     // See if there is an existing JsProxy reference, and use that if there is.
     const existing_ref = proxy_js_ref_map.get(js_obj);
     if (existing_ref !== undefined) {
+        proxy_js_ref_count[existing_ref] = (proxy_js_ref_count[existing_ref] || 1) + 1;
         return existing_ref;
     }
 
@@ -5995,6 +5997,7 @@ function proxy_js_add_obj(js_obj) {
             ++proxy_js_ref_next;
             proxy_js_ref[id] = js_obj;
             proxy_js_ref_map.set(js_obj, id);
+            proxy_js_ref_count[id] = 1;
             return id;
         }
         ++proxy_js_ref_next;
@@ -6005,6 +6008,7 @@ function proxy_js_add_obj(js_obj) {
     proxy_js_ref[id] = js_obj;
     proxy_js_ref_next = proxy_js_ref.length;
     proxy_js_ref_map.set(js_obj, id);
+    proxy_js_ref_count[id] = 1;
     return id;
 }
 

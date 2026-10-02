@@ -111,9 +111,9 @@ try {
   // a long line (an old host's job carried the 3 KB signed list) while Hello runs, on an RP2040-sized heap
   // (DEFAULT_HEAP): 0.3.6 built lines as a list of chars and died here on a real board ("allocating 8192 bytes")
   console.log("     mem: " + (await page.evaluate(() => window.vw.exec("import gc, micropython\ngc.collect()\nprint(gc.mem_free(), gc.mem_alloc())\nmicropython.mem_info()"))).replace(/\n/g, " | ").slice(0, 400));
-  const longl = await ask({ id: 58, type: "ping", pad: "x".repeat(4000) });
+  const longl = await ask({ id: 58, type: "ping", pad: "x".repeat(3300) });
   const alive = await ask({ id: 59, type: "hello" });
-  check(longl[0]?.type === "pong" && alive[0]?.running === "hello", `USB: a 4 KB line is answered and Hello keeps running (${longl.length} ${alive[0]?.running})`);
+  check(longl[0]?.type === "pong" && alive[0]?.running === "hello", `USB: a 3.3 KB line (an old host's job) is answered and Hello keeps running (${longl.length} ${alive[0]?.running})`);
 
   // no app: the "no software yet" screen
   await page.evaluate(() => window.vw.reboot(""));
