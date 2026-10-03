@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 # Host-side test of firmware/wedgiedrive.py's mass-storage protocol: a fake usbdev plays the USB host,
 # sends the SCSI commands an OS sends at plug-in, and checks every reply (and every sector) against
-# the FAT image tools/drive.py builds.   python3 tools/test_drive.py
-import struct, sys, types, subprocess, tempfile
+# the FAT image tools/drive.py builds. Then the writable part: a real FAT library (pyfatfs) saves files
+# onto a copy of the volume, the changed sectors go in as WRITE(10)s, and the wedgie must read their
+# lines back through wedgie.lines() (inbox.py).
+#     uv run --with pyfatfs --with "setuptools<81" python3 tools/test_drive.py
+import struct, sys, types, subprocess, tempfile, time
 from pathlib import Path
 root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(root / "firmware"))
@@ -19,10 +22,26 @@ class Interface:
 fake = types.ModuleType("usbdev"); fake.Interface = Interface; fake.get = lambda: None
 sys.modules["usbdev"] = fake
 mp = types.ModuleType("micropython"); mp.const = lambda x: x; sys.modules["micropython"] = mp
+time.ticks_ms = lambda: int(time.monotonic() * 1000)
+time.ticks_diff = lambda a, b: a - b
+sys.modules["machine"] = types.ModuleType("machine")
 import wedgiedrive as W
 
+def expand(path):
+    """drive.bin -> the whole volume (what Image serves)."""
+    b = Path(path).read_bytes()
+    _, total, n = struct.unpack_from("<4sII", b)
+    lbas = struct.unpack_from("<%dI" % n, b, 12)
+    out = bytearray(total * 512)
+    for i, lba in enumerate(lbas):
+        out[lba * 512:(lba + 1) * 512] = b[12 + 4 * n + i * 512:12 + 4 * n + (i + 1) * 512]
+    return bytes(out)
+
 img = Path(tempfile.mkstemp(suffix=".img")[1])
-subprocess.run([sys.executable, str(root / "tools/drive.py"), "--img", str(img)], check=True, capture_output=True)
+built = subprocess.run([sys.executable, str(root / "tools/drive.py"), "--img", str(img)], capture_output=True)
+if built.returncode:                         # drive.py needs macOS + pngquant: check drive.bin against itself
+    print("(drive.py can't build here: reading drive.bin as it is)")
+    img.write_bytes(expand(root / "firmware/drive.bin"))
 IMG = img.read_bytes()
 
 d = W.Drive(W.Image(str(root / "firmware/drive.bin")))
@@ -40,13 +59,17 @@ def pump_in():
     return got
 
 tag = 0
-def command(cdb, want, data_in=True):
+def command(cdb, want, data_in=True, out=b""):
     global tag
     tag += 1
     buf, cb = pending.pop(OUT)
     cbw = struct.pack("<IIIBBB", 0x43425355, tag, want, 0x80 if data_in else 0, 0, len(cdb)) + cdb.ljust(16, b"\0")
     buf[:] = cbw
     cb(OUT, 0, 31)
+    for i in range(0, len(out), 512):        # the data a write sends, a sector per transfer
+        buf, cb = pending.pop(OUT)
+        buf[:] = out[i:i + 512]
+        cb(OUT, 0, 512)
     got = pump_in()
     csw = got[-1]
     sig, t, residue, status = struct.unpack("<IIIB", csw)
@@ -63,14 +86,73 @@ def check(name, ok):
 data, st = command(b"\x12\x00\x00\x00\x24\x00", 36); check("INQUIRY: removable, 'wedgie.dev'", st == 0 and data[1] == 0x80 and b"wedgie.dev" in data)
 data, st = command(b"\x00" * 6, 0, False);         check("TEST UNIT READY", st == 0)
 data, st = command(b"\x25" + b"\0" * 9, 8);         check("READ CAPACITY: 2048 x 512", st == 0 and struct.unpack(">II", data) == (2047, 512))
-data, st = command(b"\x1a\x00\x3f\x00\xc0\x00", 192); check("MODE SENSE(6): write-protected", st == 0 and data[2] & 0x80)
+data, st = command(b"\x1a\x00\x3f\x00\xc0\x00", 192); check("MODE SENSE(6): writable", st == 0 and not data[2] & 0x80)
 for lba, n in ((0, 1), (1, 8), (19, 4), (27, 40), (2040, 8)):
     data, st = command(b"\x28\x00" + struct.pack(">I", lba) + b"\x00" + struct.pack(">H", n) + b"\x00", n * 512)
     check(f"READ(10) sectors {lba}..{lba + n - 1} match the image", st == 0 and data == IMG[lba * 512:(lba + n) * 512])
-data, st = command(b"\x2a\x00" + b"\0" * 8, 512, False); check("WRITE(10) refused", st == 1)
-data, st = command(b"\x03\x00\x00\x00\x12\x00", 18); check("REQUEST SENSE says write-protected", data[2] == 7 and data[12] == 0x27)
 data, st = command(b"\x28\x00" + struct.pack(">I", 5000) + b"\x00\x00\x01\x00", 512); check("READ past the end fails", st == 1)
 data, st = command(b"\x4a" + b"\0" * 9, 8);         check("unknown command fails cleanly", st == 1 and len(data) == 8)
 check("GET_MAX_LUN = 0", d.on_interface_control_xfer(0, bytes([0xA1, 0xFE, 0, 0, 0, 0, 1, 0])) == b"\x00")
+
+# ---- writes, and files dropped on the drive ------------------------------------------------------
+def write(lba, data):
+    n = len(data) // 512
+    return command(b"\x2a\x00" + struct.pack(">I", lba) + b"\x00" + struct.pack(">H", n) + b"\x00", n * 512, False, data)[1]
+
+try:
+    import fs                                # pyfatfs registers fat://
+    import pyfatfs  # noqa: F401
+except ImportError:
+    print("SKIP the write tests: uv run --with pyfatfs --with 'setuptools<81' python3 tools/test_drive.py")
+    img.unlink()
+    sys.exit(1 if fails else 0)
+
+def save(files):
+    """Save files onto the volume as a host would (a real FAT library); WRITE every changed sector."""
+    before = img.read_bytes()
+    with fs.open_fs("fat://" + str(img)) as v:
+        for name, data in files.items():
+            if data is None:
+                v.remove(name)
+            else:
+                v.writebytes(name, data)
+    after = img.read_bytes()
+    st = 0
+    for lba in range(len(after) // 512):
+        if after[lba * 512:(lba + 1) * 512] != before[lba * 512:(lba + 1) * 512]:
+            st |= write(lba, after[lba * 512:(lba + 1) * 512])
+    return st, after
+
+import wedgie as G
+W.drive = d
+R = G.Lines(6144)
+def lines():
+    d.wrote = d.wrote and d.wrote - 1000      # the host has been quiet long enough
+    out = []
+    while True:
+        r = G._dropped(R)
+        if r is None:
+            return out
+        if r:
+            out.append(r)
+
+big = b'{"type":"ping","id":"big","pad":"' + b"x" * 1400 + b'"}'      # crosses two sectors
+st, after = save({"open.txt": b'{"type":"open"}\n{"type":"ping","id":1}\r\n', "big.txt": big,
+                  "._open.txt": b"\x00\x05\x16\x07" + b"\0" * 60})
+check("WRITE(10)s of a saved file succeed", st == 0)
+check(f"what was written stays in RAM, under the cap ({len(d.over)} sectors)", 0 < len(d.over) <= W._CAP)
+data, st = command(b"\x28\x00" + struct.pack(">I", 0) + b"\x00" + struct.pack(">H", 64) + b"\x00", 64 * 512)
+check("READ(10) gives the host back what it wrote", st == 0 and data == after[:64 * 512])
+got = lines()
+check("dropped files read as request lines: " + repr([g[:30] for g in got]),
+      sorted(got) == sorted([b'{"type":"open"}', b'{"type":"ping","id":1}', big]))
+check("nothing is read twice", lines() == [])
+st, _ = save({"open.txt": b'{"type":"ping","id":2}'})
+check("a file saved again is read again (no newline at the end)", st == 0 and lines() == [b'{"type":"ping","id":2}'])
+st, _ = save({"open.txt": None, "big.txt": None})
+check("deleting files reads nothing", st == 0 and lines() == [])
+st, _ = save({"huge.txt": b"y" * 512 * (W._CAP + 4)})
+check("a write past the RAM cap fails (and is still taken whole)", st == 1 and len(d.over) <= W._CAP)
+data, st = command(b"\x00" * 6, 0, False);           check("the drive still answers after that", st == 0)
 img.unlink()
 sys.exit(1 if fails else 0)

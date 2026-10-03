@@ -1,17 +1,20 @@
-# The WEDGIE drive: when a wedgie is plugged in it also shows up as a tiny read-only USB drive with
+# The WEDGIE drive: when a wedgie is plugged in it also shows up as a tiny USB drive with
 # the underwear as its icon and an "Open wedgie.dev" page on it. The drive sits beside MicroPython's
 # own USB serial port (builtin_driver=True), so wedgie.dev, wedgie.py and mpremote keep working.
 #
 # USB mass storage, Bulk-Only Transport, a handful of SCSI commands, on top of usbdev.py (the
 # micropython-lib runtime USB device core). The disk image is drive.bin (tools/drive.py): a FAT12
-# volume stored sparse, read sector by sector from flash. Nothing is ever written: the drive reports
-# write-protected and refuses WRITE.
+# volume stored sparse, read sector by sector from flash. It takes writes (0.4 test build): a
+# written sector lives in RAM (`over`, at most _CAP of them, made only when one is written) and is gone
+# at unplug; flash is never written. A .txt dropped on it is read as request lines, the same as USB
+# serial (inbox.py, through wedgie.lines()): a phone with no serial port can talk to a wedgie this way.
 #
 # boot.py starts it, only at power-up (not on a soft reset). Hold Y while plugging in to skip it for
 # that boot. Adding the drive re-enumerates USB: the serial port drops and comes back about a second
 # after power-up. Read boot.py's note before changing when or how this starts.
 import struct
 from micropython import const
+from time import ticks_ms
 import usbdev
 
 _CLASS_MSC, _SUBCLASS_SCSI, _PROTO_BOT = const(8), const(6), const(0x50)
@@ -19,6 +22,8 @@ _EP_IN = const(0x80)
 _REQ_GET_MAX_LUN, _REQ_BOT_RESET = const(0xFE), const(0xFF)
 _CBW_SIG, _CSW_SIG = const(0x43425355), const(0x53425355)
 _SECTOR = const(512)
+_CAP = const(12)                    # written sectors kept in RAM: 6 KB at most (the Wallet runs with ~19 KB free)
+drive = None
 
 
 class Image:
@@ -51,6 +56,18 @@ class Drive(usbdev.Interface):
         self.sec = bytearray(_SECTOR)
         self.sense = (0, 0, 0)
         self.ep_out = self.ep_in = None
+        self.over = {}                  # lba -> bytearray(512): what the host wrote (differs from the image)
+        self.base = None                # a sector of the image, to compare a write with (made at the first)
+        self.wrote = 0                  # ticks_ms of the last write; 0: nothing new for inbox.py
+        self.full = False
+
+    def sector(self, lba, buf):
+        """Sector lba as the host sees it: what it wrote, else the image (read into buf)."""
+        b = self.over.get(lba)
+        if b is not None:
+            return b
+        self.img.read(lba, buf)
+        return buf
 
     # ---- descriptors / control ------------------------------------------------------------------
     def desc_cfg(self, desc, itf_num, ep_num, strs):
@@ -136,10 +153,10 @@ class Drive(usbdev.Interface):
             d[0], d[2], d[7], d[12], d[13] = 0x70, self.sense[0], 10, self.sense[1], self.sense[2]
             self.sense = (0, 0, 0)
             self._reply(d)
-        elif op == 0x1A:                                # MODE SENSE(6): write-protected
-            self._reply(b"\x03\x00\x80\x00")
+        elif op == 0x1A:                                # MODE SENSE(6): writable
+            self._reply(b"\x03\x00\x00\x00")
         elif op == 0x5A:                                # MODE SENSE(10)
-            self._reply(b"\x00\x06\x00\x80\x00\x00\x00\x00")
+            self._reply(b"\x00\x06\x00\x00\x00\x00\x00\x00")
         elif op == 0x25:                                # READ CAPACITY(10)
             self._reply(struct.pack(">II", last, _SECTOR))
         elif op == 0x23:                                # READ FORMAT CAPACITIES
@@ -151,8 +168,14 @@ class Drive(usbdev.Interface):
                 self._fail(5, 0x21)                     # LBA out of range
             else:
                 self._read(lba, count)
-        elif op == 0x2A:                                # WRITE(10): no
-            self._fail(7, 0x27)                         # data protect / write protected
+        elif op == 0x2A:                                # WRITE(10)
+            lba = struct.unpack_from(">I", self.cmd, 2)[0]
+            count = struct.unpack_from(">H", self.cmd, 7)[0]
+            if lba + count > self.img.sectors or self.cbw[12] & 0x80:
+                self._fail(5, 0x21)
+            else:
+                self.full = False
+                self._write(lba, count)
         else:
             self._fail(5, 0x20)                         # illegal request / invalid opcode
 
@@ -160,11 +183,36 @@ class Drive(usbdev.Interface):
         if count == 0:
             self._status(True)
             return
-        self.img.read(lba, self.sec)
-        self.submit_xfer(self.ep_in, self.sec, lambda *a: self._read(lba + 1, count - 1))
+        self.submit_xfer(self.ep_in, self.sector(lba, self.sec), lambda *a: self._read(lba + 1, count - 1))
+
+    def _write(self, lba, count):
+        """Take count sectors from the host, one at a time. One the same as the image is dropped from
+        RAM; past _CAP new ones the rest are still taken (the host sends them anyway) and the write fails."""
+        if count == 0:
+            if self.full:
+                self.sense = (3, 0x0C, 0)               # medium error / write error
+            self._status(not self.full)
+            return
+        self.submit_xfer(self.ep_out, self.sec, lambda *a: self._wrote(lba, count))
+
+    def _wrote(self, lba, count):
+        if self.base is None:
+            self.base = bytearray(_SECTOR)
+        self.img.read(lba, self.base)
+        if self.sec == self.base:
+            self.over.pop(lba, None)
+        elif lba in self.over:
+            self.over[lba][:] = self.sec
+        elif len(self.over) < _CAP:
+            self.over[lba] = bytearray(self.sec)
+        else:
+            self.full = True
+        self.wrote = ticks_ms() or 1
+        self._write(lba + 1, count - 1)
 
 
 def start():
+    global drive
     drive = Drive(Image())
     usbdev.get().init(drive, builtin_driver=True, product_str="wedgie", manufacturer_str="wedgie.dev")
     return drive

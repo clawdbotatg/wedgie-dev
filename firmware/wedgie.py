@@ -317,8 +317,12 @@ class Lines:
         self.intr = False       # a Ctrl-C came in (sealed: just a byte); the slot asks about it (hatch.ctrl_c)
 
     def feed(self, ch):
-        """One char from USB. At a newline: the line as bytes (one copy, its own size), or False for
-        one that didn't fit (dropped whole). Otherwise None."""
+        """One char from USB (or one byte, an int: a file dropped on the WEDGIE drive, inbox.py). At a
+        newline: the line as bytes (one copy, its own size), or False for one that didn't fit (dropped
+        whole). Otherwise None."""
+        bs = None
+        if isinstance(ch, int):
+            bs, ch = (ch,), chr(ch) if ch < 128 else ""
         if ch == "\n":
             n, over = self.n, self.over
             self.n, self.over = 0, False
@@ -330,8 +334,9 @@ class Lines:
             return None
         if ch == "\r" or self.over:
             return None
-        o = ord(ch)
-        bs = (o,) if o < 128 else ch.encode()
+        if bs is None:
+            o = ord(ch)
+            bs = (o,) if o < 128 else ch.encode()
         if self.n + len(bs) > len(self.b):
             self.over = True
             return None
@@ -343,6 +348,9 @@ class Lines:
     def pump(self, poll, wait=0):
         """Read USB until a line is done (bytes, or False: too long) or nothing more is waiting (None).
         wait: ms to wait for the first char."""
+        r = _dropped(self)
+        if r is not None:
+            return r
         while poll.poll(wait):
             wait = 0
             ch = sys.stdin.read(1)
@@ -355,6 +363,15 @@ class Lines:
 
 
 _lines = None
+
+
+def _dropped(R):
+    """A line from a file dropped on the WEDGIE drive (inbox.py, imported only once the host wrote)."""
+    dr = getattr(sys.modules.get("wedgiedrive"), "drive", None)
+    if dr is None or not (dr.wrote or "inbox" in sys.modules):
+        return None
+    import inbox
+    return inbox.pump(dr, R)
 
 
 # ---- install mode -----------------------------------------------------------------------------
