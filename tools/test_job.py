@@ -209,7 +209,7 @@ out, f = run({"job": "Update firmware", "write": ["slot.mpy"], "delete": [], "ap
              puts("slot.mpy", read("slot.mpy")) + [{"type": "commit"}])
 check(types_(out)[-2:] == ["done", "reset"] and json.loads(f["apps.json"])[0]["mod"] == "hello", "an update with no apps keeps apps.json: %s" % types_(out))
 
-# 15. raw puts (0.3.15+): a header line with n, then n bytes
+# 15. raw puts (0.3.16+): a header line with n, then n bytes
 def raw_puts(name, data, chunk=4096):
     out = []
     for o in range(0, max(len(data), 1), chunk):

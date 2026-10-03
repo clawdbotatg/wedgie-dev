@@ -216,8 +216,9 @@ def screen(title="", what="", bar=True):
     """The boot screen with the boot bar, for anything with progress (an install, an update): the logo,
     title over it, what under the bar, the bar empty. Returns the bar (bar.to(0..1) fills it) or None
     without bar.bin. The one progress bar a wedgie shows: don't draw another.
-    bar=False: the screen only, nothing allocated (the bar's pieces take 9 KB in one block: on an app's
-    heap that failed, the Wallet's at the yes; the install draws it after its clean restart)."""
+    bar=False: the bar drawn empty into the framebuffer and nothing kept (the bar's pieces take 9 KB in one
+    block: on an app's heap that failed, the Wallet's at the yes). For a screen up while an app is still
+    loaded, or with nothing to measure; the install draws the real bar after its clean restart."""
     import ui
     d = lcd.LCD()
     logo(d)
@@ -226,6 +227,8 @@ def screen(title="", what="", bar=True):
         d.center_text(l[:ui.COLS_BIG], (30 if len(lines) == 1 else 16) + i * 24, ui.INK, 2)
     if what:
         d.center_text(what[:ui.COLS_SMALL], 214, ui.MUTED)
+    if not bar:
+        _track(d)
     d.show()
     if not bar:
         return None
@@ -235,6 +238,28 @@ def screen(title="", what="", bar=True):
     except Exception as e:
         print("loader: no bar:", e)
         return None
+
+
+def _track(d):
+    """The empty bar into d's framebuffer, straight from bar.bin: each row's two ends read into place,
+    the middle filled from its one repeated pixel. Allocates nothing big (no _Bar)."""
+    try:
+        with open("bar.bin", "rb") as f:
+            X, Y, W, H, F0, F1, CW, CR, Lw, Rw, T0, TH = struct.unpack(">12H", f.read(24))
+            if X + W > 240 or Y + H > 240 or Lw + Rw >= W:
+                return
+            b, px = memoryview(lcd._BUF), bytearray(2)
+            for r in range(H):                          # left end: H rows of Lw pixels
+                o = ((Y + r) * 240 + X) * 2
+                f.readinto(b[o:o + Lw * 2])
+            for r in range(H):                          # the middle: one pixel a row, repeated
+                f.readinto(px)
+                d.fill_rect(X + Lw, Y + r, W - Lw - Rw, 1, px[0] | px[1] << 8)
+            for r in range(H):                          # right end
+                o = ((Y + r) * 240 + X + W - Rw) * 2
+                f.readinto(b[o:o + Rw * 2])
+    except (OSError, ValueError):
+        pass
 
 
 def what(text):

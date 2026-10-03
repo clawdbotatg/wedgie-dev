@@ -83,7 +83,7 @@ function wedgie(app, old = false) {
 function job(w, title, write, del, apps, where) {
   const h = w.req({ type: "hello" });
   if (!h?.jobs) return `hello: ${JSON.stringify(h)}`;
-  const bin = args.includes("--b64") ? 0 : h.bin || 0;      // 0.3.15+: raw 4 KB puts, as the site sends them
+  const bin = args.includes("--b64") ? 0 : h.bin || 0;      // 0.3.16+: raw 4 KB puts, as the site sends them
   const ex = w.req({ type: "sums", names: [], exists: F.all }, 30000);
   if (!ex?.sums) return `sums before the job: ${JSON.stringify(ex)}`;
   w.h.chip.write(JSON.stringify({ type: "job", job: title, version, write, delete: del, apps: apps && JSON.stringify(apps), bytes: write.reduce((t, n) => t + fileOf(n).length, 0), raw: !!bin, id: 900 }) + "\n");

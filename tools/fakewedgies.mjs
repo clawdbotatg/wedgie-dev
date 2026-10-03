@@ -33,8 +33,8 @@ export function fakeWedgies(specs) {
     const st = { files, launched: null, presses: [], shots: 0, resets: 0, drops: 0, chips: 0, interrupts: 0, resetHook: null, mark: files.has("wedgiedrive.py") || files.has("wedgiedrive.mpy"), driveOn: files.has("wedgiedrive.py") || files.has("wedgiedrive.mpy") };
     let push = () => {};
     let raw = false, code = "", line = "", cur = null, curName = "";
-    const h_bin = () => cmpV(version() || "0", "0.3.15") >= 0;
-    let rawPut = null;     // a raw put (0.3.15+) whose bytes are still coming: { msg, buf, got }
+    const h_bin = () => cmpV(version() || "0", "0.3.16") >= 0;
+    let rawPut = null;     // a raw put (0.3.16+) whose bytes are still coming: { msg, buf, got }
     const has = (m) => st.files.has(m + ".py") || st.files.has(m + ".mpy");     // 0.3.14+: the core is compiled
     const slot = () => has("slot") && st.files.has("main.py");
     const wedgie = () => st.files.has("main.py") && (has("menu") || has("slot"));
@@ -76,7 +76,7 @@ export function fakeWedgies(specs) {
       if (sealed()) Object.assign(h, { sealed: true, open: !!st.open });
       if (cmpV(version() || "0", "0.3.0") >= 0 && slot()) h.jobs = cmpV(version(), "0.3.10") >= 0 ? 2 : 1;
       if (cmpV(version() || "0", "0.3.11") >= 0 && slot()) h.ram = 52000;
-      if (cmpV(version() || "0", "0.3.15") >= 0 && slot()) h.bin = 4096;     // raw puts (job.py RAW)
+      if (cmpV(version() || "0", "0.3.16") >= 0 && slot()) h.bin = 4096;     // raw puts (job.py RAW)
       return JSON.stringify(h);
     };
     const answer = (stdout) => push("OK" + stdout + "\x04\x04>");

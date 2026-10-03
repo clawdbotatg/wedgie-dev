@@ -123,7 +123,7 @@ export class Repl {
     });
   }
 
-  /** A request whose line is followed by raw bytes (a raw put: msg.n = raw.length, firmware 0.3.15+). */
+  /** A request whose line is followed by raw bytes (a raw put: msg.n = raw.length, firmware 0.3.16+). */
   requestRaw(msg: Record<string, unknown>, raw: Uint8Array, ms = 5000): Promise<any> {
     const id = this.nextId++;
     return new Promise((res, rej) => {

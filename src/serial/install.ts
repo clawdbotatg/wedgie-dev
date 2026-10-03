@@ -236,7 +236,7 @@ async function checkedHave(r: Repl, m: Manifest, hash?: string[], late: boolean 
 }
 
 const uidOf = new WeakMap<Repl, string>();     // its board ID, to find it again if a job's restart drops the port
-const binOf = new WeakMap<Repl, number>();      // 0.3.15+: the most raw bytes one put takes (hello "bin")
+const binOf = new WeakMap<Repl, number>();      // 0.3.16+: the most raw bytes one put takes (hello "bin")
 let release: Promise<{ text: string; sig: string }> | null = null;
 const signedList = () => release ||= Promise.all(["release.txt", "release.sig"].map((n) => fetch("/fw/" + n, { cache: "no-cache" }).then((x) => x.text())))
   .then(([text, sig]) => ({ text, sig: sig.trim() }));
@@ -312,7 +312,7 @@ async function job(r: Repl, m: Manifest, title: string, write: string[], del: st
     }
     const total = files.reduce((t, f) => t + f.buf.length, 0) || 1;
     let done = 0;
-    // 0.3.15+ (hello "bin"): raw bytes after a short line, up to 4 KB a put. Reading a base64 line a char at a
+    // 0.3.16+ (hello "bin"): raw bytes after a short line, up to 4 KB a put. Reading a base64 line a char at a
     // time cost the wedgie ~1 s a KB; a raw 4 KB read takes ~37 ms. Older firmware: base64 lines, 1 KB.
     const bin = binOf.get(r) || 0, size = bin ? Math.min(bin, 4096) : CHUNK;
     for (const { n, buf } of files) {

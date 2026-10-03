@@ -128,7 +128,7 @@ class Wedgie:
             return v
 
     def request_raw(self, msg, raw, timeout=15.0):
-        """A request whose line is followed by raw bytes (a raw put: n = len(raw); firmware 0.3.15+)."""
+        """A request whose line is followed by raw bytes (a raw put: n = len(raw); firmware 0.3.16+)."""
         mid = self.id
         self.id += 1
         self.s.reset_input_buffer()
@@ -534,7 +534,7 @@ def job(wg, title, write, delete, apps):
     # a written .mpy's old .py: job.py's commit removes it (0.3.12+). Not in delete: 0.3.12-0.3.13 refuse
     # to delete their core names (wedgie.py, slot.py, ...)
     h0 = wg.hello(1.5) or {}
-    bin_ = h0.get("bin") or 0           # 0.3.15+: raw bytes, 4 KB a put (base64 lines cost it ~1 s a KB)
+    bin_ = h0.get("bin") or 0           # 0.3.16+: raw bytes, 4 KB a put (base64 lines cost it ~1 s a KB)
     sys.stderr.write("press A on the wedgie: %s?\n" % title)
     try:
         v = wg.request({"type": "job", "job": title, "release": rel, "sig": sig, "write": write, "delete": delete,

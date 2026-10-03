@@ -23,11 +23,7 @@ read = lambda *p: open(os.path.join(root, *p)).read()
 
 # Not on the guide yet: (file, rule). Each is a real debt; the run prints them.
 KNOWN = {
-    ("firmware/slot.py", "busy"),            # let_in's "working..." band: the boot loader in 0.3.13
-    ("firmware/job.py", "busy"),             # "restarting..." under the bar
-    ("firmware/usbwallet.py", "busy"),       # the WORKING screen while it signs
     ("firmware/usbwallet.py", "raw colors"), # the Wallet's black screens
-    ("firmware/usbwallet.py", "kit"),
     ("firmware/speed.py", "raw colors"),     # its timings fill with L.BLUE / L.RED (measurement, not UI)
     ("firmware/hello.py", "kit"),
     ("firmware/keytest.py", "kit"),

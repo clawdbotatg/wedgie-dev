@@ -168,6 +168,26 @@ try {
   check(nog.join(" ") === "refused ready", `USB open + Y: refused, then it restarts (${nog.join(" ")})`);
   await page.waitForTimeout(3000);
 
+  // a yes to "let this computer in" (docs/STYLE.md, busy = the boot loader): the boot screen, titled with
+  // the job as doing ("Installing Buttons"), the bar drawn empty, and no bar kept (its 9 KB) while the app
+  // is still loaded; the computer's own code fills it once it has freed the app (files.ts busy)
+  const bb = (await import("node:fs")).readFileSync(join(root, "firmware/bar.bin"));
+  const [BX, BY, BW, BH, , , , , BL] = Array.from({ length: 12 }, (_, i) => bb.readUInt16BE(i * 2));
+  const m565 = bb.readUInt16BE(24 + BH * BL * 2 + (BH >> 1) * 2);
+  const track = [(m565 >> 11) * 255 / 31, ((m565 >> 5) & 63) * 255 / 63, (m565 & 31) * 255 / 31].map(Math.round);
+  await page.evaluate(() => window.vw.exec("import wedgie\nwedgie.SEALED = True\nwedgie._open = False"));
+  const yes = page.evaluate(() => new Promise((res) => { const off = window.vw.onOutput((l) => { if (/"id": ?62/.test(l)) { off(); res(l); } }); window.vw.write(JSON.stringify({ id: 62, type: "open", for: "Install Buttons" }) + "\n"); setTimeout(() => { off(); res(""); }, 12000); }));
+  await page.waitForTimeout(1500);
+  await page.evaluate(() => window.vw.press("A", 150));
+  const yl = await yes;
+  await page.waitForTimeout(500);
+  await page.locator(".vw").screenshot({ path: `${out}/emu-let-in.png` });
+  const mid = await px(BX + (BW >> 1), BY + (BH >> 1));
+  await page.evaluate(() => window.vw.exec("import wedgie\nwedgie._open = False\nwedgie.SEALED = False"));
+  check(/"type": ?"open"/.test(yl) && near(mid, track), `USB open + A: the boot screen, the bar drawn empty (${mid} ~ ${track}; its RAM: chipprobe, the emulator can't measure it)`);
+  await page.evaluate(() => window.vw.reboot("hello"));
+  await page.waitForTimeout(3000);
+
   // the escape hatch ({"type":"open","full":true}): the white-on-red question, and A gives full control
   // (Ctrl-C on: the same yes as any other)
   // (the yes stops the app as Ctrl-C would: slot._drop. The emulator's slot runs on a Timer, not main.py's
@@ -312,6 +332,12 @@ try {
   await page.waitForTimeout(300);
   await page.locator(".vw").screenshot({ path: `${out}/emu-wallet-approve.png` });
   check(/transfer drawn \('USDC', 6\) 12\.5/.test(cf) && /execute drawn/.test(cx), `Wallet confirm: amounts from the signed fields (${cf.trim()} | ${cx.trim()})`);
+  // signing: the boot screen ("Signing", the chip under it), the bar empty: not the old WORKING screen
+  await page.evaluate(() => window.vw.exec("import usbwallet as u\nu.state = 'working'\nu.draw()"));
+  await page.waitForTimeout(300);
+  await page.locator(".vw").screenshot({ path: `${out}/emu-wallet-signing.png` });
+  const ws = await px(BX + (BW >> 1), BY + (BH >> 1));
+  check(near(ws, track), `Wallet signing: the boot screen, the bar empty (${ws})`);
   await page.evaluate(() => window.vw.exec("import usbwallet as u\nu.req = None\nu.state = 'home'\nu.dirty = True"));
 
   // installs free the RAM an app left behind first (install.ts FREE_PY): only lcd stays, and code after it

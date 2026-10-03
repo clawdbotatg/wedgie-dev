@@ -147,7 +147,7 @@ def progress(title, what, p):
 # running again after the restart, the P-256 check, the sums, the commit. Re-measure on a real board.
 RESTART, SIG, SUMS, COMMIT = 1600, 3100, 500, 300
 PER_KB = 400        # one 1 KB put: reading its 1.4 KB line a char at a time, json, base64, sha, flash
-PER_KB_RAW = 60     # a raw put (0.3.15+): a short header line, then 4 KB read in one go, sha, flash (chipprobe: 45 KB in 2.6 s)
+PER_KB_RAW = 60     # a raw put (0.3.16+): a short header line, then 4 KB read in one go, sha, flash (chipprobe: 45 KB in 2.6 s)
 RAW = 4096          # the most bytes one raw put carries (hello "bin")
 
 
@@ -287,7 +287,7 @@ def run(mid, m, ask, show=None):
                     f, h, cur = open(_tmp(n), "wb"), hashlib.sha256(), n
                 end = q.get("end")
                 k = q.get("n")
-                if k is not None:           # raw (0.3.15+): k bytes follow this line, no base64
+                if k is not None:           # raw (0.3.16+): k bytes follow this line, no base64
                     if not isinstance(k, int) or k < 0 or k > RAW:
                         W.send({"id": qid, "type": "error", "error": "a raw put is 0..%d bytes" % RAW})
                         return
@@ -316,7 +316,7 @@ def run(mid, m, ask, show=None):
                 if cur is not None:
                     W.send({"id": qid, "type": "error", "error": "%s isn't finished" % cur})
                     return
-                show(title, "restarting...", plan.at("commit"))
+                show(title, "restarting", plan.at("commit"))
                 missing = [n for n in write if n not in got and there.get(n) != files[n]]
                 if missing:
                     W.send({"id": qid, "type": "error", "error": "not sent: " + " ".join(missing)})
