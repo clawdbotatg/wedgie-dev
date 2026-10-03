@@ -1,9 +1,9 @@
 # Keypad: typing on a wedgie. A PIN pad and a keyboard, one grid under both. https://wedgie.dev
-# Joystick moves, A (or pressing the joystick in) types the key, Y deletes (Y on nothing = cancel),
+# Joystick moves (pressing it in does nothing), A types the key, Y deletes (Y on nothing = cancel),
 # X = done, B = caps on the keyboard. pin() and text() are what another app would call; run() tries both.
 #
 #   from keypad import pin, text
-#   code = pin(lcd, "Enter PIN", 4)        # "1234", or None for cancel
+#   code = pin(lcd, "Enter PIN", 6)        # "123456", or None for cancel
 #   name = text(lcd, "Name it")            # "my wallet", or None
 import time
 from lcd import LCD, Keys
@@ -97,7 +97,7 @@ def _type(g, field, val, n, most, keys, hint):
             if k in ("up", "down", "left", "right"):
                 g.move(k)
                 continue
-            if k in ("A", "press"):
+            if k == "A":
                 k = g.key()
             elif k == "Y":
                 if not val:
@@ -129,7 +129,7 @@ def _type(g, field, val, n, most, keys, hint):
         time.sleep_ms(20)
 
 
-def pin(d, head="Enter PIN", n=4, keys=None):
+def pin(d, head="Enter PIN", n=6, keys=None):
     """A PIN pad. n digits (it returns as the n-th is typed; n=0: any length, OK to finish).
     Only real presses count unless you pass your own keys: a computer can't type a PIN."""
     g = Grid(d, head, PIN, 36, 96, 174, 28, 5, True)
