@@ -120,9 +120,12 @@ for (const sc of scenarios.filter((x) => !process.env.ONLY || x.name === process
         return answer("@chipwork " + JSON.stringify({ kind: "atecc", msg: hex(m), sha: await sha(m), random: ["ffff0000".repeat(8), "ffff0000".repeat(8)], serial: ATECC_SERIAL, configLocked: true, dataLocked: true }) + "\r\n");
       }
       if (c.includes("@hashes")) {
-        const names = JSON.parse(c.match(/for n in (\[.*?\])\}/)[1]), h = {};
+        const names = JSON.parse(c.match(/^_n = (\[.*\])$/m)[1]), h = {};
+        let apps = [];
+        try { apps = JSON.parse(new TextDecoder().decode(files.get("apps.json"))); } catch {}
+        for (const a of apps) if (Array.isArray(a?.files)) names.push(...a.files.filter((f) => typeof f === "string"));   // as install.ts asks
         for (const n of names) h[n] = files.has(n) ? await sha(files.get(n)) : null;
-        return answer("@hashes " + JSON.stringify({ hashes: h, files: [...files.keys()] }) + "\r\n");
+        return answer("@hashes " + JSON.stringify({ hashes: h, files: [...files.keys()], apps }) + "\r\n");
       }
       let m;
       if ((m = c.match(/_f = open\("([^"]+)", "wb"\)/))) { cur = []; curName = m[1]; return answer(""); }
