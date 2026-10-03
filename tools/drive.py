@@ -4,6 +4,7 @@
 #   Open wedgie.app         Mac: opens wedgie.dev/connect in Chrome (or the default browser), underwear icon
 #   Open wedgie (Windows).url  Windows: an internet shortcut to wedgie.dev/connect
 #   README.txt              what this is
+#   SKILL.md                everything about a wedgie, for an AI: public/skill.md + code.md + trustm.md
 #   .VolumeIcon.icns        the underwear as the drive icon on macOS          (hidden)
 #   autorun.inf + wedgie.ico  the underwear as the drive icon on Windows      (hidden)
 # Stored sparse: only the sectors that aren't all zeros.   python3 tools/drive.py [--img out.img]
@@ -25,7 +26,20 @@ url_win = f"[InternetShortcut]\r\nURL={URL}\r\n".encode()
 readme = b"""This is a wedgie.
 
 Double-click "Open wedgie", or go to https://wedgie.dev/connect in Chrome or Edge.
+
+Using an AI (Claude, Codex, ...)? Point it at SKILL.md on this drive: everything about a wedgie, and how
+to talk to it over USB.
 """
+
+
+def skill():
+    """The three guides on wedgie.dev as one file: the first one's frontmatter, then each body."""
+    out = "\n".join(open(root / "public" / n).read().split("\n---\n", 1)[1] if i else open(root / "public" / n).read()
+                    for i, n in enumerate(("skill.md", "code.md", "trustm.md")))
+    head = ("> You're reading SKILL.md from a WEDGIE drive: a wedgie is plugged into this computer right now.\n"
+            "> Its serial port is the one to talk to (\"Talk to it directly\" below). Newest copy: https://wedgie.dev/skill.md\n")
+    fm_end = out.index("\n---\n", 4) + 5
+    return (out[:fm_end] + "\n" + head + out[fm_end:]).encode()
 autorun = b"[autorun]\r\nicon=wedgie.ico\r\nlabel=wedgie\r\n"
 
 src = Image.open(root / "public/img/sticker.webp").convert("RGBA")
@@ -80,7 +94,7 @@ with tempfile.TemporaryDirectory() as t:
 appledouble = (root / "art/volume-appledouble.bin").read_bytes()   # macOS's own, custom-icon flag set, provenance xattr removed
 
 HIDDEN, READONLY, ARCHIVE, VOLUME = 0x02, 0x01, 0x20, 0x08
-files = [("Open wedgie.app", app_tree, READONLY), ("Open wedgie (Windows).url", url_win, READONLY), ("README.txt", readme, READONLY),
+files = [("Open wedgie.app", app_tree, READONLY), ("Open wedgie (Windows).url", url_win, READONLY), ("README.txt", readme, READONLY), ("SKILL.md", skill(), READONLY),
          (".VolumeIcon.icns", icns, READONLY | HIDDEN), ("autorun.inf", autorun, READONLY | HIDDEN),
          ("wedgie.ico", ico, READONLY | HIDDEN), ("._.", appledouble, READONLY | HIDDEN)]
 

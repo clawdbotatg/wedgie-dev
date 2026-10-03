@@ -1,6 +1,6 @@
 ---
 name: wedgie
-description: Write, install and debug apps on a wedgie (Raspberry Pi Pico + Waveshare Pico-LCD-1.3 240x240 screen, joystick, A/B/X/Y, secure chip on I2C, running MicroPython + wedgie firmware) over USB. Use for "make an app/game for my wedgie", "put this on my wedgie", "what's on my wedgie's screen", "update my wedgie", "why won't my wedgie ...".
+description: Everything about a wedgie (Raspberry Pi Pico + Waveshare Pico-LCD-1.3 240x240 screen, joystick, A/B/X/Y, secure chip on I2C, running MicroPython + wedgie firmware) - what it is, building one, talking to it directly over USB (find its port, hello, screen, buttons, files, the lock and the A press, full control), wedgie.py, apps, updates, the secure chip. Use for "my wedgie is plugged in", "make an app/game for my wedgie", "put this on my wedgie", "what's on my wedgie's screen", "update my wedgie", "sign with my wedgie", "why won't my wedgie ...".
 ---
 
 # Wedgie
@@ -10,6 +10,14 @@ RP2350), a Waveshare Pico-LCD-1.3 hat (240x240 screen, 5-way joystick, A/B/X/Y),
 (ATECC608 or Infineon Trust M) wedged between the boards on I2C. It runs MicroPython plus wedgie
 firmware: a boot logo, one app it boots straight into, saves that outlast apps, and a USB protocol.
 Everything is MIT: https://wedgie.dev
+
+**Everything about a wedgie, in three guides** (this one first):
+- https://wedgie.dev/skill.md (this): the hardware, talking to it over USB, wedgie.py, firmware, the lock.
+- https://wedgie.dev/code.md: making apps and games (the app format, fast graphics, saves, the emulator).
+- https://wedgie.dev/trustm.md: the Trust M secure chip from an app (keys, signatures, ECDH, RSA, counters).
+A plugged-in wedgie (0.3.18+) carries all three as **SKILL.md** on its WEDGIE drive.
+
+**A wedgie is plugged in and you want to talk to it now:** read "Talk to it directly" below.
 
 ## Why "wedgie" (read this, it explains the build)
 
@@ -270,12 +278,43 @@ it's on the site. Anyone else's app lives in their own GitHub repo with a `wedgi
 (https://wedgie.dev/code.md); people add it on their wedgie's page, and `community.json` in this repo
 lists the ones on everyone's shelf, each pinned to the commit that was read.
 
+## Talk to it directly
+
+Everything wedgie.py does is JSON lines over the wedgie's USB serial port. No driver, no tool needed.
+
+1. **Find its port.** macOS: `/dev/cu.usbmodem*`. Linux: `/dev/ttyACM*` (or `/dev/serial/by-id/*wedgie*`).
+   Windows: a `COM` port (USB vendor 0x2e8a, product name "wedgie"). Several boards: ask each for hello
+   and match its `uid`. Just plugged in? Wait 2 s: the port drops once while the WEDGIE drive appears.
+2. **Only one program can hold the port.** If it's busy, the wedgie.dev tab or mpremote has it: ask your
+   person to close it.
+3. **Ask it what it is** (115200 baud, one JSON object per line, answers carry your `id`):
+
+```python
+import serial, json, time                    # pip install pyserial
+s = serial.Serial("/dev/cu.usbmodem1101", 115200, timeout=0.2)
+s.write(b'{"id": 1, "type": "hello"}\n')
+end = time.time() + 3
+while time.time() < end:
+    for line in s.read(65536).decode(errors="replace").splitlines():
+        if line.startswith("{") and '"id": 1' in line:
+            print(json.loads(line))          # version, running app, chip, sealed/open, free RAM...
+```
+
+4. Lines that don't start with `{` are logs (an app's `print()`). No answer at all: the app has USB to
+   itself (the Wallet speaks its own protocol and still answers `hello` and `open`), it's on the "wedgie
+   broke" screen (press A there for full control), or it isn't wedgie firmware (`wedgie.py update`).
+
+What you can do without anyone pressing anything: `hello`, `shot` (its screen), `press` (a button, as if
+pressed: it can drive an app, never answer a question), `chip` (prove the secure chip works), `ls`, and
+`get`/`rm` inside `/saves/` only. Anything else (other files, the REPL, the secure chip's keys, installs)
+needs your person to press **A on the wedgie's own screen**: tell them before you ask. The requests:
+
 ## The USB protocol (what wedgie.py speaks)
 
 While its app runs, the firmware (`slot.py`) answers one JSON line per request on the USB serial port
 (vendor 0x2e8a, 115200), without interrupting anything:
 
-    {"id":1,"type":"hello"}              -> {"id":1,"type":"hello","fw":"wedgie-0.2.0","slot":1,"uid":...,"board":...,"carts":[{mod,v}],"running":...,"free":...}
+    {"id":1,"type":"hello"}              -> {"id":1,"type":"hello","fw":"wedgie-0.3.18","slot":1,"uid":...,"board":...,"carts":[{mod,v}],"running":...,"free":...}
     {"id":2,"type":"shot"}               -> {"id":2,"type":"shot","i":0,"n":38,"fmt":"rgb565be","data":"<base64>"} x n
     {"id":3,"type":"press","key":"A"}    -> {"id":3,"type":"ok"}
     {"id":4,"type":"chip"}               -> the chip proven working: ATECC608 hashes random bytes,
@@ -283,8 +322,11 @@ While its app runs, the firmware (`slot.py`) answers one JSON line per request o
     {"id":5,"type":"ls","path":"/saves"} -> {"type":"ls","files":[[path, bytes], ...],"free":N}  (folders end in /)
     {"id":6,"type":"get","path":"/saves/hello/best.json"} -> {"type":"file","i":0,"n":N,"size":S,"data":"<base64>"} x n
     {"id":7,"type":"rm","path":"..."}    -> {"type":"ok","free":N}   (a folder goes with everything in it)
+                                            get / rm: only /saves/ while locked (0.3.12+); anything else
+                                            answers an error until the person lets you in (open)
     {"id":8,"type":"stop"}  /  {"id":9,"type":"reboot"}
     {"id":10,"type":"open"}              -> {"type":"open"} or {"type":"refused"}  (asks the person; below)
+    {"id":11,"type":"open","full":true}  -> the same, asked in red: full control (below)
 
 `running` is the app on screen (null: none). 0.3.11+: hello also says `"ram"` (bytes of heap free),
 and the answer to a question (`open`, and a checked install's `go` / `refused`) says `"asked_ms"`: ms
