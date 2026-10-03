@@ -43,6 +43,11 @@ if built.returncode:                         # drive.py needs macOS + pngquant: 
     print("(drive.py can't build here: reading drive.bin as it is)")
     img.write_bytes(expand(root / "firmware/drive.bin"))
 IMG = img.read_bytes()
+if Path("/sbin/fsck_msdos").exists():       # macOS checks (and "repairs", in the drive's few KB of RAM) at plug-in
+    fsck = subprocess.run(["/sbin/fsck_msdos", "-n", str(img)], capture_output=True, text=True)
+    print(("ok   " if fsck.returncode == 0 else "FAIL ") + "fsck_msdos finds nothing to repair" + ("" if fsck.returncode == 0 else ":\n" + fsck.stdout))
+    if fsck.returncode:
+        sys.exit(1)
 
 d = W.Drive(W.Image(str(root / "firmware/drive.bin")))
 d.desc_cfg(types.SimpleNamespace(interface=lambda *a: None, endpoint=lambda *a: None), 1, 2, [])
@@ -107,16 +112,37 @@ except ImportError:
     img.unlink()
     sys.exit(1 if fails else 0)
 
+def free_chain(old, vol, name):
+    """Free name's clusters (found in the volume before the delete, old) in both FATs of vol, as a real
+    host's delete does (pyfatfs never writes that back)."""
+    sfn = (name.upper().rpartition(".")[0].ljust(8) + name.upper().rpartition(".")[2].ljust(3)).encode()
+    for o in range(13 * 512, 17 * 512, 32):
+        if old[o:o + 11] == sfn:
+            c = struct.unpack_from("<H", old, o + 26)[0]
+            while 2 <= c < 0xFF8:
+                for fat in (512, 7 * 512):
+                    k = fat + c * 3 // 2
+                    v = vol[k] | vol[k + 1] << 8
+                    nxt = v >> 4 if c & 1 else v & 0xFFF
+                    v = v & 0x000F if c & 1 else v & 0xF000
+                    vol[k], vol[k + 1] = v & 0xFF, v >> 8
+                c = nxt
+            return
+
 def save(files):
     """Save files onto the volume as a host would (a real FAT library); WRITE every changed sector."""
     before = img.read_bytes()
+    gone = [n for n, data in files.items() if data is None]
     with fs.open_fs("fat://" + str(img)) as v:
         for name, data in files.items():
             if data is None:
                 v.remove(name)
             else:
                 v.writebytes(name, data)
-    after = img.read_bytes()
+    after = bytearray(img.read_bytes())
+    for name in gone:
+        free_chain(before, after, name)
+    img.write_bytes(after)
     st = 0
     for lba in range(len(after) // 512):
         if after[lba * 512:(lba + 1) * 512] != before[lba * 512:(lba + 1) * 512]:
@@ -154,5 +180,70 @@ check("deleting files reads nothing", st == 0 and lines() == [])
 st, _ = save({"huge.txt": b"y" * 512 * (W._CAP + 4)})
 check("a write past the RAM cap fails (and is still taken whole)", st == 1 and len(d.over) <= W._CAP)
 data, st = command(b"\x00" * 6, 0, False);           check("the drive still answers after that", st == 0)
+
+# ---- answers: ANSWER.TXT, served from RAM once a request came in through a file -------------------
+import inbox
+def answer_txt():
+    """ANSWER.TXT as a host reads it: every sector over READ(10), opened with a real FAT library."""
+    data, st = command(b"\x28\x00" + struct.pack(">I", 0) + b"\x00" + struct.pack(">H", 2048) + b"\x00", 2048 * 512)
+    img.write_bytes(data)
+    with fs.open_fs("fat://" + str(img)) as v:
+        return v.readbytes("ANSWER.TXT")
+check("ANSWER.TXT is on the drive (zeros until the first answer)", answer_txt() == bytes(2048))
+check("a request came in through a file", inbox.fed)
+over = len(d.over)
+G.send({"id": 1, "type": "pong"})
+a = answer_txt()
+check("an answer lands in ANSWER.TXT: count line, then it, then newlines: " + repr(a[:40]),
+      a.split(b"\n")[:2] == [b"#00000001", b'{"id": 1, "type": "pong"}'] and a.strip(b"\n").count(b"\n") == 1 and len(a) == 2048)
+G.send({"id": 2, "type": "ok"})
+a = answer_txt()
+check("answers stack up, oldest first", a.split(b"\n")[:3] == [b"#00000002", b'{"id": 1, "type": "pong"}', b'{"id": 2, "type": "ok"}'])
+for i in range(40):
+    G.send({"id": 100 + i, "type": "ok", "pad": "x" * 60})
+a = answer_txt()
+got = [l for l in a.split(b"\n") if l]
+check("a full ANSWER.TXT starts over, the newest answer kept: %d lines" % len(got),
+      got[0] == b"#00000042" and got[-1].startswith(b'{"id": 139,') and len(a) == 2048)
+G.send({"id": 3, "type": "big", "pad": "y" * 3000})
+check("an answer too long for the file says so", b"too long" in answer_txt())
+check("answers take no write RAM", len(d.over) == over)
+write(inbox._answer_file(d)[0], b"z" * 512)
+check("a host can't write over ANSWER.TXT", b"zzz" not in answer_txt() and len(d.over) == over)
+
+# ---- many requests in a row: a host that never reuses a freed cluster (macOS) still fits -----------
+clock = [time.ticks_ms() + 10 ** 6]
+W.ticks_ms = inbox.ticks_ms = time.ticks_ms = lambda: clock[0]
+calls = [0]
+_r = W.Drive._reclaim
+def counted(self):
+    calls[0] += 1
+    return _r(self)
+W.Drive._reclaim = counted
+from pyfatfs.PyFat import PyFat
+hint = [0]
+_alloc = PyFat.allocate_bytes
+def next_free(self, size, erase=False):       # like macOS: the next free cluster after the last one used,
+    self.first_free_cluster = max(self.first_free_cluster, hint[0])     # never one just freed
+    got = _alloc(self, size, erase)
+    hint[0] = max(got) + 1
+    return got
+PyFat.allocate_bytes = next_free
+img.write_bytes(IMG)                          # a fresh plug-in (pyfatfs leaks the old chain on an overwrite)
+d.over.clear(); d.when.clear()
+ok = True
+for i in range(3 * W._CAP):
+    clock[0] += 3000
+    line = b'{"type":"ping","id":%d,"p":"%s"}' % (i, b"x" * (i * 97 % 900))     # 1 or 2 sectors
+    files = {"r%d.txt" % i: line + b"\n"}
+    if i:
+        files["r%d.txt" % (i - 1)] = None
+    st, _ = save(files)
+    got = lines()
+    ok = ok and st == 0 and got == [line]
+    if not ok:
+        print("  request", i, "write status", st, "read", got, "RAM sectors", sorted(d.over))
+        break
+check("%d requests in a row, each deleted after (RAM sectors at the end: %d, reclaims: %d)" % (3 * W._CAP, len(d.over), calls[0]), ok)
 img.unlink()
 sys.exit(1 if fails else 0)

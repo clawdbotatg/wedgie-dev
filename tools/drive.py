@@ -4,8 +4,10 @@
 #   Open wedgie.app         Mac: opens wedgie.dev/connect in Chrome (or the default browser), underwear icon
 #   Open wedgie (Windows).url  Windows: an internet shortcut to wedgie.dev/connect
 #   README.txt              what this is
+#   ANSWER.TXT              the wedgie's answers to requests dropped on the drive (inbox.py fills it in RAM)
 #   .VolumeIcon.icns        the underwear as the drive icon on macOS          (hidden)
 #   autorun.inf + wedgie.ico  the underwear as the drive icon on Windows      (hidden)
+#   .fseventsd/no_log, .metadata_never_index  macOS: no event log, no Spotlight on it (hidden; RAM, below)
 # Stored sparse: only the sectors that aren't all zeros.   python3 tools/drive.py [--img out.img]
 # Needs macOS (osacompile, codesign) and pngquant to build; the output (firmware/drive.bin) is committed.
 import io, struct, subprocess, sys, tempfile
@@ -18,6 +20,7 @@ FAT_SECTORS = 6                                                                #
 ROOT_SECTORS = ROOT_ENTRIES * 32 // SECTOR
 DATA0 = RESERVED + NFATS * FAT_SECTORS + ROOT_SECTORS
 LABEL = b"WEDGIE     "
+ANSWER_SIZE = 2048      # ANSWER.TXT: zeros in the image (free: stored sparse); the wedgie serves it from RAM
 
 # ---- the files ------------------------------------------------------------------------------------
 URL = "https://wedgie.dev/connect"
@@ -81,8 +84,11 @@ appledouble = (root / "art/volume-appledouble.bin").read_bytes()   # macOS's own
 
 HIDDEN, READONLY, ARCHIVE, VOLUME = 0x02, 0x01, 0x20, 0x08
 files = [("Open wedgie.app", app_tree, READONLY), ("Open wedgie (Windows).url", url_win, READONLY), ("README.txt", readme, READONLY),
+         ("ANSWER.TXT", bytes(ANSWER_SIZE), READONLY),
          (".VolumeIcon.icns", icns, READONLY | HIDDEN), ("autorun.inf", autorun, READONLY | HIDDEN),
-         ("wedgie.ico", ico, READONLY | HIDDEN), ("._.", appledouble, READONLY | HIDDEN)]
+         ("wedgie.ico", ico, READONLY | HIDDEN), ("._.", appledouble, READONLY | HIDDEN),
+         # the drive takes writes into a few KB of RAM: tell macOS not to keep its event log or Spotlight index on it
+         (".fseventsd", [("no_log", b"", HIDDEN)], HIDDEN), (".metadata_never_index", b"", HIDDEN)]
 
 # ---- FAT12 ------------------------------------------------------------------------------------------
 img = bytearray(TOTAL * SECTOR)
@@ -102,7 +108,8 @@ def short_name(name, n):
     base, _, ext = name.upper().lstrip(".").rpartition(".")
     base = "".join(c for c in (base or ext) if c.isalnum())[:6] or "FILE"
     ext = "".join(c for c in (ext if base else "") if c.isalnum())[:3]
-    return (f"{base}~{n}".ljust(8) + ext.ljust(3)).encode()
+    tail = f"~{n}"
+    return (f"{base[:8 - len(tail)]}{tail}".ljust(8) + ext.ljust(3)).encode()
 
 def lfn_entries(name, sfn):
     csum = 0

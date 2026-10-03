@@ -298,7 +298,11 @@ def rand_below(n):
 
 
 def send(obj):
-    print(json.dumps(obj))
+    s = json.dumps(obj)
+    print(s)
+    ib = sys.modules.get("inbox")
+    if ib and ib.fed:                   # a request came in as a file on the WEDGIE drive: answer there too
+        ib.answer(s)
 
 
 # ---- USB lines: the ONE way firmware reads what a host sends -------------------------------------

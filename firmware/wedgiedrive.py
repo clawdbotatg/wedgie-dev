@@ -14,7 +14,7 @@
 # after power-up. Read boot.py's note before changing when or how this starts.
 import struct
 from micropython import const
-from time import ticks_ms
+from time import ticks_ms, ticks_diff
 import usbdev
 
 _CLASS_MSC, _SUBCLASS_SCSI, _PROTO_BOT = const(8), const(6), const(0x50)
@@ -57,12 +57,17 @@ class Drive(usbdev.Interface):
         self.sense = (0, 0, 0)
         self.ep_out = self.ep_in = None
         self.over = {}                  # lba -> bytearray(512): what the host wrote (differs from the image)
+        self.when = {}                  # lba -> ticks_ms it was last written (for _reclaim)
         self.base = None                # a sector of the image, to compare a write with (made at the first)
         self.wrote = 0                  # ticks_ms of the last write; 0: nothing new for inbox.py
         self.full = False
+        self.ans = None                 # (first lba, end lba, [512-byte memoryviews]): ANSWER.TXT, set by inbox.py
 
     def sector(self, lba, buf):
-        """Sector lba as the host sees it: what it wrote, else the image (read into buf)."""
+        """Sector lba as the host sees it: ANSWER.TXT from RAM, what it wrote, else the image (read into buf)."""
+        a = self.ans
+        if a is not None and a[0] <= lba < a[1]:
+            return a[2][lba - a[0]]
         b = self.over.get(lba)
         if b is not None:
             return b
@@ -195,19 +200,49 @@ class Drive(usbdev.Interface):
             return
         self.submit_xfer(self.ep_out, self.sec, lambda *a: self._wrote(lba, count))
 
+    def _reclaim(self):
+        """RAM is full: forget written data sectors of clusters the FAT now says are free (a deleted
+        file's, like a request already read), if written over 2 s ago (a new file's data can come
+        before its FAT entry). True if one was freed."""
+        b = self.sector(0, self.base)
+        spc, res, nfats, nroot, _, _, fsz = struct.unpack_from("<BHBHHBH", b, 13)
+        data0 = res + nfats * fsz + nroot * 32 // _SECTOR
+        now = ticks_ms()
+        freed = False
+        for lba in list(self.over):
+            if lba < data0 or ticks_diff(now, self.when.get(lba, 0)) < 2000:
+                continue
+            clus = (lba - data0) // spc + 2
+            off = clus * 3 // 2
+            lo = self.sector(res + off // _SECTOR, self.base)[off % _SECTOR]
+            hi = self.sector(res + (off + 1) // _SECTOR, self.base)[(off + 1) % _SECTOR]
+            v = lo | hi << 8
+            if (v >> 4 if clus & 1 else v & 0xFFF) == 0:
+                del self.over[lba]
+                self.when.pop(lba, None)
+                freed = True
+        return freed
+
     def _wrote(self, lba, count):
+        a = self.ans
+        if a is not None and a[0] <= lba < a[1]:        # ANSWER.TXT is the wedgie's: a host write is dropped
+            self._write(lba + 1, count - 1)
+            return
         if self.base is None:
             self.base = bytearray(_SECTOR)
         self.img.read(lba, self.base)
         if self.sec == self.base:
             self.over.pop(lba, None)
+            self.when.pop(lba, None)
         elif lba in self.over:
             self.over[lba][:] = self.sec
-        elif len(self.over) < _CAP:
+        elif len(self.over) < _CAP or self._reclaim():
             self.over[lba] = bytearray(self.sec)
         else:
             self.full = True
         self.wrote = ticks_ms() or 1
+        if lba in self.over:
+            self.when[lba] = self.wrote
         self._write(lba + 1, count - 1)
 
 
