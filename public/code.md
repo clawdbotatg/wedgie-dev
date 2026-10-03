@@ -14,6 +14,7 @@ Python files. The person plays it in the emulator at https://wedgie.dev/code whi
 their own wedgie when it's ready. Everything here is MIT.
 
 Other things about the wedgie (building one, the USB protocol, the secure chip): https://wedgie.dev/skill.md
+The Trust M secure chip from an app: https://wedgie.dev/trustm.md
 
 ## The loop
 
@@ -284,6 +285,9 @@ for i in range(51, 0, -1):          # a fair shuffle: Fisher-Yates, every swap f
   which has no chip.
 - For looks (star fields, particles) plain `random` is fine and faster.
 - Example: Hi-Lo, https://github.com/clawdbotatg/wedgie-starter/blob/main/hilo/hilo.py
+
+**More from the chip** (Trust M: keys that never leave it, signatures, ECDH, RSA, counters, storage):
+`import optiga`, firmware 0.3.17+. Every call, with examples and timings: https://wedgie.dev/trustm.md
 
 ## The rest of the hardware
 
