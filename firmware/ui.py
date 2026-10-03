@@ -116,6 +116,7 @@ def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None, scary=Fa
 
 def progress(head, what="", bar=True):
     """The one progress screen: the boot logo and the boot bar (loader.screen). Returns the bar
-    (bar.to(0..1)) or None; loader.what(text) changes the line under it. bar=False: the screen only."""
+    (bar.to(0..1)) or None; loader.what(text) changes the line under it. bar=False: the bar drawn empty
+    and nothing kept (no RAM), for nothing to measure or a screen up while an app is still loaded."""
     import loader
     return loader.screen(head, what, bar)
