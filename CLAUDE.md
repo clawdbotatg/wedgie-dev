@@ -3,6 +3,8 @@
 The website (wedgie.dev) and the wedgie firmware. `README.md` is the overview; `public/skill.md` is
 what agents outside this repo read (keep it true when the firmware or the USB protocol changes).
 
+**Read `EXPECTATIONS.md` first.** The three rules every change must keep.
+
 ## Landmines
 
 1. **A wedgie's USB port drops about a second after power-up.** boot.py adds the WEDGIE USB drive
