@@ -6,13 +6,13 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
+import { published } from "../release.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 /** A firmware folder (default: firmware/ in this tree): its files, core and carts. */
 export function firmware(fw = join(here, "..", "..", "firmware")) {
   const carts = JSON.parse(readFileSync(join(fw, "carts.json"), "utf8"));
-  const published = (n) => statSync(join(fw, n)).isFile() && /\.(py|bin|json|mpy)$/.test(n) && !n.startsWith(".") && n !== "carts.json" && n !== "apps.json";
-  const all = readdirSync(fw).filter(published).sort();
+  const all = readdirSync(fw).filter((n) => published(n, join(fw, n))).sort();      // what wedgie.dev publishes (a .mpy, not its .py)
   const claimed = new Set(carts.flatMap((c) => c.files));
   return { dir: fw, carts, all, core: all.filter((n) => !claimed.has(n)), file: (n) => readFileSync(join(fw, n)) };
 }

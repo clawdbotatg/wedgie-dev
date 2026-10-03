@@ -60,9 +60,30 @@ class Wedgie:
         self.s = serial.Serial(dev, 115200, timeout=0.05)
         self.buf = b""
         self.id = 1
+        self.sn = next((p.serial_number for p in ports() if p.device == dev), None)   # its board ID
 
     def close(self):
         self.s.close()
+
+    def reopen(self, timeout=20):
+        """Open it again after its port dropped (a restart: the first one since it was plugged in takes
+        the WEDGIE drive away). Found by its board ID: the port's name can change. True once open."""
+        try:
+            self.s.close()
+        except Exception:
+            pass
+        end = time.time() + timeout
+        while time.time() < end:
+            time.sleep(0.5)
+            for p in ports():
+                if (p.serial_number == self.sn) if self.sn else (p.device == self.dev):
+                    try:
+                        self.s = serial.Serial(p.device, 115200, timeout=0.05)
+                    except (serial.SerialException, OSError):
+                        continue
+                    self.dev, self.buf = p.device, b""
+                    return True
+        return False
 
     def _lines(self, until, timeout):
         """Yield lines as they arrive until until(line) is True or timeout."""
@@ -273,8 +294,20 @@ def cart_v(hashes):
     return hashlib.sha256("\n".join(h or "None" for h in hashes).encode()).hexdigest()[:12]
 
 
+def twin(n):
+    """A compiled app file's source name (usbwallet.mpy -> usbwallet.py), or None. MicroPython imports
+    the .py first, so one left beside a new .mpy runs instead of it: looks ask about it, others() takes it
+    off (install.ts twin, the same rule)."""
+    return n[:-4] + ".py" if n.endswith(".mpy") else None
+
+
+def with_twins(names):
+    names = set(names)
+    return names | {twin(n) for n in names if twin(n)}
+
+
 def look(wg, m):
-    names = sorted(set(m["core"]) | {n for c in m["carts"] for n in c["files"]})
+    names = sorted(with_twins(set(m["core"]) | {n for c in m["carts"] for n in c["files"]}))
     return json.loads(wg.exec(HASH_PY % json.dumps(names), 60))
 
 
@@ -284,6 +317,8 @@ def copy(wg, m, names, have):
         print("[%d/%d] %s" % (i + 1, len(todo), f["name"]))
         wg.put(f["name"], urllib.request.urlopen(SITE + "/fw/" + f["name"]).read())
         have["hashes"][f["name"]] = f["sha256"]
+        if twin(f["name"]) and have["hashes"].get(twin(f["name"])):     # the .mpy is on: its old source comes off
+            remove_files(wg, have, [twin(f["name"])])
     return todo
 
 
@@ -308,7 +343,7 @@ def active_of(m, have):
     """The app it runs now: the first in apps.json whose files are there (0.1.x kept several)."""
     for a in have.get("apps", []):
         c = next((x for x in m["carts"] if x["mod"] == a.get("mod")), None)
-        if (all(have["hashes"].get(n) for n in c["files"]) if c else (a.get("mod", "") + ".py") in have["files"]):
+        if (all(have["hashes"].get(n) or have["hashes"].get(twin(n)) for n in c["files"]) if c else (a.get("mod", "") + ".py") in have["files"]):
             return a["mod"]
     return None
 
@@ -317,8 +352,8 @@ def others(m, have, keep):
     """Every app file on it (a cart's, or one apps.json lists for a repo/folder app) that neither the core nor `keep` needs."""
     listed = [a for a in have.get("apps", []) if isinstance(a.get("files"), list)]
     keep_files = next((x["files"] for x in m["carts"] if x["mod"] == keep), None) or next((a["files"] for a in listed if a.get("mod") == keep), [])
-    need = set(m["core"]) | set(keep_files)
-    every = {n for x in m["carts"] for n in x["files"]} | {n for a in listed for n in a["files"]}
+    need = with_twins(set(m["core"]) | set(keep_files))     # a kept app's old .py goes only once its .mpy is on (copy, job)
+    every = with_twins({n for x in m["carts"] for n in x["files"]} | {n for a in listed for n in a["files"]})
     return sorted(every - need - {n for n, h in have["hashes"].items() if not h})
 
 
@@ -389,9 +424,24 @@ def job(wg, title, write, delete, apps):
     files one chunk at a time, checks each against the list, then puts them in place and restarts."""
     rel = urllib.request.urlopen(SITE + "/fw/release.txt").read().decode()
     sig = urllib.request.urlopen(SITE + "/fw/release.sig").read().decode().strip()
+    delete = sorted(set(delete) | {twin(n) for n in write if twin(n)})     # a written .mpy's old source
     sys.stderr.write("press A on the wedgie: %s?\n" % title)
-    v = wg.request({"type": "job", "job": title, "release": rel, "sig": sig, "write": write, "delete": delete,
-                    "apps": None if apps is None else json.dumps(apps)}, 120)
+    try:
+        v = wg.request({"type": "job", "job": title, "release": rel, "sig": sig, "write": write, "delete": delete,
+                        "apps": None if apps is None else json.dumps(apps)}, 120)
+    except (serial.SerialException, OSError):
+        # 0.3.12+: a yes restarts it into install mode, and the first restart since it was plugged in drops
+        # the port. Find it again; in install mode its hello says job (the go went out on the old port).
+        if not wg.reopen():
+            sys.exit("the wedgie restarted and didn't come back: unplug it and plug it in again")
+        h = None
+        for _ in range(10):
+            h = wg.hello(1.0)
+            if h:
+                break
+        if not (h and h.get("job")):
+            sys.exit("the wedgie restarted without the install (did someone press Y?)")
+        v = {"type": "go"}
     if v.get("type") == "refused":
         sys.exit("the wedgie said no (Y on its screen)")
     if v.get("type") != "go":
@@ -626,7 +676,7 @@ def main():
             have = checked(wg, m)
             if have:
                 sha = {f["name"]: f["sha256"] for f in m["files"]}
-                job(wg, "Install " + cart["name"], [n for n in cart["files"] if have["hashes"].get(n) != sha[n]],
+                job(wg, "Install " + cart["name"], [n for n in cart["files"] if have["hashes"].get(n) != sha[n] or have["hashes"].get(twin(n))],
                     others(m, have, cart["mod"]), [cart_entry(cart)])
                 print("%s is the app it runs now (checked install; saves stay)" % cart["name"])
                 return

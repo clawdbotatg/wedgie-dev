@@ -21,6 +21,6 @@
    "files": ["battery.py"], "label": "#16a34a",
    "icon": ["............", "............", ".kkkkkkkkk..", ".kgggggg.kk.", ".kgggggg..k.", ".kgggggg..k.", ".kgggggg.kk.", ".kkkkkkkkk..", "............", "............", "............", "............"]},
   {"mod": "usbwallet", "name": "Wallet", "entry": "run", "usb": true, "chip": "ATECC608", "about": "The USB hardware wallet. Its key lives in the ATECC608 chip.",
-   "files": ["usbwallet.py", "eip712.py", "keccak.py", "signer.py", "blockies.py"], "label": "#e3312c",
+   "files": ["usbwallet.mpy", "eip712.mpy", "keccak.mpy", "signer.mpy", "blockies.mpy"], "label": "#e3312c",
    "icon": ["............", "..kkkkkkk...", ".kwwwwwwwk..", "kkkkkkkkkkk.", "kwwwwwwwwwk.", "kwwwwwwkkkk.", "kwwwwwwkyyk.", "kwwwwwwkkkk.", "kwwwwwwwwwk.", "kkkkkkkkkkk.", "............", "............"]}
 ]

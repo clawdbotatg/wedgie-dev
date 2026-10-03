@@ -255,6 +255,9 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
 
   // ---- finding it, and holding its port -------------------------------------------------------------
   function attach() {
+    // An install has it: a checked install's yes restarts it, the port may drop, and the install finds it
+    // again by its ID and goes on (install.ts job()). Holding its new port here would stall that.
+    if (busy) { paint(); return; }
     const found = W.wedgies().find((x) => x.short === id && x.state !== "gone") || null;
     if (found !== w) {
       release?.(); release = null; link = null; w = found;
@@ -616,7 +619,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
       status(`<b class="bad">Update failed:</b> ${esc(e?.message || e)}. It's safe to try again.`);
       await backToApp(r).catch(() => {});
     }
-    busy = ""; paint();
+    busy = ""; paint(); W.touch();      // attach() again (it waited while the update had it)
   }
 
   // ---- hardware tests (raw REPL: stop its app, run, start it again) ------ ------------------------------

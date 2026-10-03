@@ -202,7 +202,8 @@ function talk(w: Wedgie) {
     w.cpu = h.cpu;
     if (h.backend) w.chip = { type: h.backend === "atecc608" ? "ATECC608" : h.backend, serial: h.serial };
     w.board = h.board || "wedgie";
-    if (w.kind === "wedgie" && h.carts) await prove(w, r);
+    if (h.job) w.proof = { state: "unknown", pass: false, facts: [], detail: "It's installing" };   // in install mode: the job owns it
+    else if (w.kind === "wedgie" && h.carts) await prove(w, r);
     else w.proof = { state: "unknown", pass: false, facts: [],
       detail: w.kind === "wallet" ? "The Wallet is running; it checks the chip itself" : "Update the firmware to check the chip" };
   });
@@ -230,7 +231,26 @@ async function prove(w: Wedgie, r: Repl) {
 /** Ask a wedgie to prove its chip again (the detail page's re-check). r: the page's open session. */
 export async function reprove(w: Wedgie, r: Repl) { await prove(w, r); emit(); }
 
-export function reidentify(w: Wedgie) { identify(w); }
+// A gone one (its port dropped in a restart) is back as a new entry: that one is identified again.
+export function reidentify(w: Wedgie) {
+  const live = w.state === "gone" ? list.find((x) => x.uid && x.uid === w.uid && x.state !== "gone") : w;
+  if (live) identify(live);
+}
+
+/** The wedgie with board ID uid, identified again since `since` (a restart dropped its port; it comes back
+ *  as a new port, or as the same one, a new entry either way): null after ms. A checked install's yes
+ *  restarts it into install mode (install.ts job()). */
+export function waitBack(uid: string, since: number, ms = 20000): Promise<Wedgie | null> {
+  const end = Date.now() + ms;
+  return new Promise((res) => {
+    const look = () => {
+      const w = list.find((x) => x.uid === uid && x.state === "ready" && (x.readyAt || 0) > since);
+      if (w || Date.now() > end) return res(w || null);
+      setTimeout(look, 200);
+    };
+    look();
+  });
+}
 
 // A new grant fires no connect event, so the header's count is told directly.
 const granted = new Set<() => void>();

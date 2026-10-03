@@ -9,7 +9,7 @@
 // share (p256.py) goes on once. apps.json is the wedgie's own list of what it has; it isn't published.
 // Then the community shelf: each repo in community.json, as copied into community/ by tools/community.mjs
 // at its reviewed commit; its carts carry repo + sha.
-import { readdirSync, readFileSync, writeFileSync, mkdirSync, rmSync, copyFileSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync, mkdirSync, rmSync, copyFileSync, statSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -32,6 +32,12 @@ export function buildFirmware() {
     const buf = readFileSync(p);
     copyFileSync(p, join(out, name));
     files.push({ name, size: buf.length, sha256: sha(buf) });
+    // a compiled app file's source, for the browser emulator only (src/emu/flash.ts): not in the
+    // manifest or the signed list, and no wedgie gets it
+    if (name.endsWith(".mpy") && existsSync(p.replace(/\.mpy$/, ".py"))) {
+      mkdirSync(join(out, "src"), { recursive: true });
+      copyFileSync(p.replace(/\.mpy$/, ".py"), join(out, "src", name.replace(/\.mpy$/, ".py")));
+    }
   }
   const version = (readFileSync(join(src, "wedgie.py"), "utf8").match(/VERSION = "([^"]+)"/) || [])[1] || "0";
   const byName = new Map(files.map((f) => [f.name, f]));

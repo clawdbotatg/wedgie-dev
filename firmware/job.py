@@ -271,6 +271,11 @@ def run(mid, m, ask, show=None):
                     except OSError:
                         pass
                     os.rename(_tmp(n), n)
+                    if n.endswith(".mpy"):      # its old source: MicroPython imports a .py first, so it would
+                        try:                    # run instead (the Wallet from source runs out of memory)
+                            os.remove(n[:-4] + ".py")
+                        except OSError:
+                            pass
                 for n in m.get("delete") or []:
                     try:
                         os.remove(n)
@@ -290,8 +295,8 @@ def run(mid, m, ask, show=None):
             elif t == "abort":
                 W.send({"id": qid, "type": "ok"})
                 return
-            elif t == "hello":
-                W.send(W.hello(qid, job=True))
+            elif t == "hello":              # job: a host whose port dropped at the restart finds the job here
+                W.send(W.hello(qid, job=True, asked_ms=W.asked_ms))
     except Exception as e:                  # out of memory, a full flash...: nothing changed, it restarts
         W.failed(qid, e)
     finally:

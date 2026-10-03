@@ -10,6 +10,12 @@ export async function loadFlash(base = "/fw/", app = "hello", extra?: { app: App
   const manifest: Manifest = await (await fetch(base + "manifest.json", { cache: "no-cache" })).json();
   const files: Record<string, string | Uint8Array> = {};
   await Promise.all(manifest.files.map(async (f) => {
+    // A compiled app file (.mpy, tools/mpy.py) runs from its source here (fw/src/): the Timer form below
+    // edits the source, and the emulator's heap doesn't need the bytecode. The board gets the .mpy.
+    if (f.name.endsWith(".mpy")) {
+      const py = f.name.replace(/\.mpy$/, ".py"), s = await fetch(base + "src/" + py, { cache: "no-cache" });
+      if (s.ok) { files[py] = await s.text(); return; }
+    }
     const r = await fetch(base + f.name, { cache: "no-cache" });
     if (!r.ok) throw new Error(`fw/${f.name}: HTTP ${r.status}`);
     files[f.name] = /\.(py|json)$/.test(f.name) ? await r.text() : new Uint8Array(await r.arrayBuffer());

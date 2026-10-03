@@ -2,14 +2,16 @@
 //   wedgie-release 1
 //   version 0.2.9
 //   <sha256>  <name>        one line per file tools/fw.mjs publishes, sorted by name
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-/** The files wedgie.dev publishes from firmware/ (tools/fw.mjs uses this too). */
-export const published = (name, p) => statSync(p).isFile() && !name.startsWith(".") && /\.(py|bin|json|mpy)$/.test(name) && name !== "carts.json" && name !== "apps.json";
+/** The files wedgie.dev publishes from firmware/ (tools/fw.mjs uses this too). A .py with a compiled
+ *  .mpy beside it (tools/mpy.py) is that file's source: the .mpy goes out, not it. */
+export const published = (name, p) => statSync(p).isFile() && !name.startsWith(".") && /\.(py|bin|json|mpy)$/.test(name) && name !== "carts.json" && name !== "apps.json"
+  && !(name.endsWith(".py") && existsSync(p.replace(/\.py$/, ".mpy")));
 
 export function releaseText() {
   const src = join(root, "firmware");

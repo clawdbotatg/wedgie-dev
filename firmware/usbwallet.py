@@ -231,7 +231,9 @@ def hello(mid):
            "sealed": W.SEALED, "open": W.is_open()}
     if address:
         out["qx"], out["qy"], out["address"] = qx, qy, address
-    return out
+    core = W.hello(mid, running="usbwallet")    # version, jobs...: a host can send a checked install
+    core.update(out)                            # (the slot runs it) instead of asking for full access
+    return core
 
 
 def on_sign(mid, r):

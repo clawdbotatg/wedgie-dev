@@ -271,7 +271,8 @@ def ask(job="", note=""):
     checked job (job.py: signed files only) says so; otherwise the job is the computer's word, so the
     screen says a yes gives it full access."""
     import os
-    wallet = "usbwallet.py" in os.listdir()
+    ls = os.listdir()
+    wallet = "usbwallet.mpy" in ls or "usbwallet.py" in ls
     lines = ["The computer gets full access for this one job."] + (["Its wallet key too."] if wallet else [])
     if note:
         lines = [note, "Only those files change."]

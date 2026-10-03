@@ -21,6 +21,7 @@
 // firmware re-adds the drive there, dropping this port mid-copy. Only installCore's caller reboots
 // (it must, to run the new core), and then the wedgie comes back as a new port (wedgies.ts).
 import type { Repl } from "./repl";
+import { waitBack, withRepl, type Wedgie } from "./wedgies";
 
 /** url: where to fetch it, when it isn't /fw/<name> (an app from a repo someone added). */
 export type FileInfo = { name: string; size: number; sha256: string; url?: string };
@@ -177,6 +178,8 @@ async function copy(r: Repl, files: FileInfo[], have: Have, onProgress: (p: numb
     if (check !== f.sha256) throw new Error(`${f.name} didn't copy cleanly; try again`);
     await r.exec(`import os\ntry:\n    os.remove(${JSON.stringify(f.name)})\nexcept OSError:\n    pass\nos.rename(${JSON.stringify(tmp)}, ${JSON.stringify(f.name)})`);
     have.hashes[f.name] = f.sha256;
+    const src = twin(f.name);           // the .mpy is on: its old source comes off (it would run instead)
+    if (src && have.hashes[src]) await removeFiles(r, have, [src]);
     done += f.size;
   }
   return todo;
@@ -218,6 +221,7 @@ async function checkedHave(r: Repl, m: Manifest, hash?: string[], late: boolean 
   if (!m.signed) return null;
   const h = await r.hello(700).catch(() => null);
   if (!h?.jobs) return null;
+  if (h.uid) uidOf.set(r, h.uid);
   if (h.version === "0.3.6") return null;    // 0.3.6 runs out of memory reading a long line (a job, sums): full access instead
   if (h.jobs >= 2 && (late === true || (late === "update" && h.version !== m.version))) {
     const v = await r.request({ type: "sums", names: [], exists: allNames(m) }, 30000).catch(() => null);
@@ -232,6 +236,7 @@ async function checkedHave(r: Repl, m: Manifest, hash?: string[], late: boolean 
   return { hashes: v.sums, files: Object.keys(v.sums).filter((n) => v.sums[n]), apps: v.apps || [] };
 }
 
+const uidOf = new WeakMap<Repl, string>();     // its board ID, to find it again if a job's restart drops the port
 let release: Promise<{ text: string; sig: string }> | null = null;
 const signedList = () => release ||= Promise.all(["release.txt", "release.sig"].map((n) => fetch("/fw/" + n, { cache: "no-cache" }).then((x) => x.text())))
   .then(([text, sig]) => ({ text, sig: sig.trim() }));
@@ -242,6 +247,7 @@ const signedList = () => release ||= Promise.all(["release.txt", "release.sig"].
 async function job(r: Repl, m: Manifest, title: string, write: string[], del: string[], apps: any[] | null, onProgress: (p: number, what: string) => void, late = false): Promise<{ sent: number } | false> {
   // late: the signed list goes after the yes, so the question doesn't wait for its download. The
   // manifest lists the same files (tools/fw.mjs and tools/sign.mjs publish the same set).
+  del = [...new Set([...del, ...write.map(twin).filter((n): n is string => !!n)])];    // a written .mpy's old source
   const relP = signedList();
   relP.catch(() => {});
   const listed = late ? new Set(m.files.map((f) => f.name)) : new Set((await relP).text.split("\n").slice(2).map((l) => l.split("  ")[1]).filter(Boolean));
@@ -256,50 +262,77 @@ async function job(r: Repl, m: Manifest, title: string, write: string[], del: st
   askHint(ASK_TEXT); onProgress(0, ASK_TEXT);
   const rel = late ? null : await relP;
   // the job goes first; the page's "Press A" modal loads while the wedgie asks
-  const site = performance.now() - (askStart || performance.now());
+  const site = performance.now() - (askStart || performance.now()), sent = Date.now();
   const asked = r.request({ type: "job", job: title, ...(rel ? { release: rel.text, sig: rel.sig } : { version: m.version }), write, delete: del, apps: apps && JSON.stringify(apps),
     bytes: write.reduce((t, n) => t + (m.files.find((f) => f.name === n)?.size || 0), 0) }, 120000);    // the wedgie's bar weighs the file part by it
   asked.catch(() => {});
   const close = (await import("../ui/askmodal")).askModal(title, true);
   let v: any;
   try { v = await asked; }
-  catch { throw new Error("nobody pressed A on the wedgie"); }
+  catch {
+    // 0.3.12+: a yes restarts it into install mode (a clean heap), and the first restart since it was
+    // plugged in drops the port (the WEDGIE drive goes): the go went out on a port that's gone. Find it
+    // again by its ID; in install mode its hello says job.
+    const uid = uidOf.get(r);
+    if (r.alive || !uid) throw new Error("nobody pressed A on the wedgie");
+    onProgress(0, "it's restarting into the install");
+    await r.close();                    // it's dead: let go of the port (it may come back as this same one)
+    const back = await waitBack(uid, sent);
+    if (!back) throw new Error("the wedgie restarted and didn't come back. Unplug it and plug it in again");
+    v = { type: "go", port: back };
+  }
   finally { askHint(""); close(); askStart = 0; }
   lastAsk = { site: Math.round(site), wedgie: v.asked_ms ?? null, what: title };
+  if (v.port) return withRepl(v.port as Wedgie, async (r2) => {
+    const h = await r2.hello(1500).catch(() => null);
+    if (!h?.job) throw new Error("the wedgie restarted without the install (did someone press Y?)");
+    if (lastAsk) lastAsk.wedgie = h.asked_ms ?? null;      // the go that carried it went out on the old port
+    return rest(r2);
+  });
   if (v.type === "refused") throw new Error("the wedgie said no (Y on its screen)");
   if (v.type === "busy") throw new Error("the wedgie is busy signing; try again after");
   if (v.type !== "go") throw new Error(`the wedgie said ${v.error || v.type}`);
-  let files: { n: string; buf: Uint8Array }[];
-  try { files = await fetched; } catch (e) { await r.request({ type: "abort" }, 5000).catch(() => {}); throw e; }
-  if (late) {
-    onProgress(0, "checking the signature");
-    const sl = await relP;
-    const a = await r.request({ type: "release", release: sl.text, sig: sl.sig }, 60000);
-    if (a.type !== "ok") throw new Error(`the wedgie stopped: ${a.error || a.type}`);
-    onProgress(0, "looking at what's on it");
-    const s = await r.request({ type: "sums", names: write }, 30000);
-    if (s.type !== "sums") throw new Error(`the wedgie stopped: ${s.error || s.type}`);
-    files = files.filter(({ n }) => s.sums[n] !== m.files.find((f) => f.name === n)!.sha256);
-  }
-  const total = files.reduce((t, f) => t + f.buf.length, 0) || 1;
-  let done = 0;
-  for (const { n, buf } of files) {
-    for (let o = 0; o < Math.max(buf.length, 1); o += CHUNK) {
-      const a = await r.request({ type: "put", name: n, data: b64(buf.subarray(o, o + CHUNK)), end: o + CHUNK >= buf.length }, 15000);
+  return rest(r);
+
+  async function rest(r: Repl): Promise<{ sent: number }> {
+    let files: { n: string; buf: Uint8Array }[];
+    try { files = await fetched; } catch (e) { await r.request({ type: "abort" }, 5000).catch(() => {}); throw e; }
+    if (late) {
+      onProgress(0, "checking the signature");
+      const sl = await relP;
+      const a = await r.request({ type: "release", release: sl.text, sig: sl.sig }, 60000);
       if (a.type !== "ok") throw new Error(`the wedgie stopped: ${a.error || a.type}`);
-      done += Math.min(CHUNK, buf.length - o);
-      onProgress(done / total, n);
+      onProgress(0, "looking at what's on it");
+      const s = await r.request({ type: "sums", names: write }, 30000);
+      if (s.type !== "sums") throw new Error(`the wedgie stopped: ${s.error || s.type}`);
+      files = files.filter(({ n }) => s.sums[n] !== m.files.find((f) => f.name === n)!.sha256);
     }
+    const total = files.reduce((t, f) => t + f.buf.length, 0) || 1;
+    let done = 0;
+    for (const { n, buf } of files) {
+      for (let o = 0; o < Math.max(buf.length, 1); o += CHUNK) {
+        const a = await r.request({ type: "put", name: n, data: b64(buf.subarray(o, o + CHUNK)), end: o + CHUNK >= buf.length }, 15000);
+        if (a.type !== "ok") throw new Error(`the wedgie stopped: ${a.error || a.type}`);
+        done += Math.min(CHUNK, buf.length - o);
+        onProgress(done / total, n);
+      }
+    }
+    const d = await r.request({ type: "commit" }, 30000);
+    if (d.type !== "done") throw new Error(`the wedgie stopped: ${d.error || d.type}`);
+    return { sent: files.length };       // it restarts itself now: the caller doesn't leave() (its port may drop)
   }
-  const d = await r.request({ type: "commit" }, 30000);
-  if (d.type !== "done") throw new Error(`the wedgie stopped: ${d.error || d.type}`);
-  return { sent: files.length };       // it restarts itself now: the caller doesn't leave() (its port may drop)
 }
-/** The app it runs now: the first in apps.json whose files are there (0.1.x kept several). */
+/** A compiled app file's source name (usbwallet.mpy -> usbwallet.py), or null. MicroPython imports the
+ *  .py before the .mpy, so a .py left beside a new .mpy would run instead of it (an old Wallet from
+ *  source, out of memory at start): every look asks about the .py too, and others() takes it off. */
+const twin = (n: string) => (n.endsWith(".mpy") ? n.slice(0, -4) + ".py" : null);
+const withTwins = (names: string[]) => [...new Set([...names, ...names.map(twin).filter((n): n is string => !!n)])];
+/** The app it runs now: the first in apps.json whose files are there (0.1.x kept several). A cart now
+ *  shipped compiled still counts with its old .py files (so an update brings them up to date). */
 function activeOf(m: Manifest, have: Have): string | null {
   for (const a of have.apps || []) {
     const c = m.carts.find((x) => x.mod === a?.mod);
-    if (c ? c.files.every((n) => have.hashes[n]) : a?.mod && (have.files.includes(a.mod + ".py") || have.files.includes(a.mod + ".mpy"))) return a.mod;
+    if (c ? c.files.every((n) => have.hashes[n] || have.hashes[twin(n) || ""]) : a?.mod && (have.files.includes(a.mod + ".py") || have.files.includes(a.mod + ".mpy"))) return a.mod;
   }
   return null;
 }
@@ -307,8 +340,8 @@ function activeOf(m: Manifest, have: Have): string | null {
 function others(m: Manifest, have: Have, keep: string | null) {
   const listed = (have.apps || []).filter((a) => Array.isArray(a?.files));
   const filesOf = (mod: string | null) => m.carts.find((c) => c.mod === mod)?.files || listed.find((a) => a.mod === mod)?.files || [];
-  const need = new Set([...m.core, ...filesOf(keep)]);
-  return [...new Set([...m.carts.flatMap((c) => c.files), ...listed.flatMap((a) => a.files)])]
+  const need = new Set(withTwins([...m.core, ...filesOf(keep)]));    // a kept app's old .py goes only once its .mpy is on (copy, job)
+  return withTwins([...m.carts.flatMap((c) => c.files), ...listed.flatMap((a) => a.files)])
     .filter((n) => !need.has(n) && !m.core.includes(n) && have.hashes[n]);
 }
 async function removeFiles(r: Repl, have: Have, names: string[]) {
@@ -316,7 +349,7 @@ async function removeFiles(r: Repl, have: Have, names: string[]) {
   await r.exec(`import os, sys\nfor _n in ${JSON.stringify(names)}:\n    try:\n        os.remove(_n)\n    except OSError:\n        pass\n    sys.modules.pop(_n.rsplit(".", 1)[0], None)`);
   for (const n of names) have.hashes[n] = null;
 }
-const allNames = (m: Manifest) => [...new Set([...m.core, ...m.carts.flatMap((c) => c.files)])];
+const allNames = (m: Manifest) => withTwins([...m.core, ...m.carts.flatMap((c) => c.files)]);
 const fileInfo = (m: Manifest, names: string[]) => names.map((n) => m.files.find((f) => f.name === n)!);
 
 /** Install or update the firmware core (not the carts; the ones already on it stay). Leaves the board in
@@ -329,7 +362,7 @@ export async function installCore(r: Repl, onProgress: (p: number, what: string)
     const act = activeOf(m, ch);
     const sha = (n: string) => m.files.find((f) => f.name === n)!.sha256;
     const keep = m.carts.find((c) => c.mod === act)?.files || [];      // its app's files come up to date too
-    const write = [...new Set([...m.core, ...keep])].filter((n) => ch.hashes[n] !== sha(n));
+    const write = [...new Set([...m.core, ...keep])].filter((n) => ch.hashes[n] !== sha(n) || ch.hashes[twin(n) || ""]);   // sent again if its .py is there too (the job takes that off)
     const del = others(m, ch, act);
     for (const n of write) ch.hashes[n] = sha(n);
     for (const n of del) ch.hashes[n] = null;
@@ -415,7 +448,7 @@ export async function useApp(r: Repl, cart: Cart, onProgress: (p: number, what: 
   const ch = opts.launcher === false ? null : await checkedHave(r, m, cart.files, true);
   if (ch) {
     const sha = (n: string) => m.files.find((f) => f.name === n)?.sha256 || "";
-    const write = cart.files.filter((n) => ch.hashes[n] !== sha(n));
+    const write = cart.files.filter((n) => ch.hashes[n] !== sha(n) || ch.hashes[twin(n) || ""]);    // sent again if its .py is there too (the job takes that off)
     const del = others(m, ch, cart.mod);
     for (const n of write) ch.hashes[n] = sha(n);
     for (const n of del) ch.hashes[n] = null;
@@ -438,7 +471,7 @@ export async function useApp(r: Repl, cart: Cart, onProgress: (p: number, what: 
   const screen = await deviceScreen(r, "installing", cart.name);
   await removeFiles(r, have, gone);
   const todo = await copy(r, fileInfo(m, cart.files), have, onProgress, screen);
-  const mods = todo.filter((f) => f.name.endsWith(".py")).map((f) => f.name.slice(0, -3));
+  const mods = todo.filter((f) => /\.m?py$/.test(f.name)).map((f) => f.name.replace(/\.m?py$/, ""));
   if (mods.length) await r.exec(`import sys\nfor _n in ${JSON.stringify(mods)}:\n    sys.modules.pop(_n, None)`);
   await screen?.(1);
   await writeApps(r, m, have, cart.mod);

@@ -40,9 +40,20 @@ export class Repl {
           this.check();
         }
       } catch {}
-      this.alive = false;
-      this.check(true);
+      this.gone();
     })();
+    navigator.serial?.addEventListener("disconnect", this.onGone);
+  }
+
+  // Unplugged (or its restart dropped the port): the read ends, or only the disconnect event says so.
+  private onGone = (e: Event) => { if (((e as any).port || e.target) === this.port) this.gone(); };
+  private gone() {
+    this.alive = false;
+    this.check(true);
+    navigator.serial?.removeEventListener("disconnect", this.onGone);
+    // Requests fail now, not at their timeout: a checked install's yes restarts the wedgie, and the first
+    // restart after a plug-in drops the port (install.ts job() then finds it again by its ID).
+    for (const [id, p] of this.pending) { clearTimeout(p.t); this.pending.delete(id); p.rej(new Error("wedgie unplugged")); }
   }
 
   private feedLines(s: string) {
@@ -195,6 +206,7 @@ export class Repl {
     try { this.writer?.releaseLock(); } catch {}
     try { await this.port.close(); } catch {}
     this.alive = false;
+    navigator.serial?.removeEventListener("disconnect", this.onGone);
   }
 }
 
