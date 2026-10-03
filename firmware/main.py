@@ -60,6 +60,10 @@ try:
     _a = wedgie.active()
     wedgie.lines()                      # the USB line buffer (6 KB), while the heap is whole
     loader.load(_a["mod"] if _a else "slot")    # its files load one by one under the boot logo's bar
+except SystemExit as e:                 # install mode's restart (job.resume: machine.soft_reset is a SystemExit).
+    if getattr(sys.modules.get("wedgie"), "restarting", False):   # Caught here, the reset never happened and
+        raise                                                      # the old core kept running into the slot
+    sys.print_exception(e)
 except BaseException as e:
     sys.print_exception(e)
 while True:

@@ -90,20 +90,23 @@ function job(w, title, write, del, apps, where) {
   return true;
 }
 
-const bad = (w) => w.h.out.split("\n").filter((l) => BAD.test(l) || /Error/.test(l)).slice(0, 4).join(" / ");
+// what went wrong: from the first traceback (or error line) on, so the cause is in the output
+const bad = (w) => { const L = w.h.out.split("\n"), i = L.findIndex((l) => BAD.test(l) || /Error/.test(l)); return L.slice(i, i + 8).map((l) => l.trim()).join(" / "); };
 const carts = F.carts;
 const from = arg("--from"), to = arg("--to");
 const pairs = from ? [[carts.find((c) => c.mod === from), carts.find((c) => c.mod === (to || from))]] : carts.map((c, i) => [c, carts[(i + 1) % carts.length]]);
 console.log(`firmware ${version} (${F.dir}) on a virtual RP2040, MicroPython ${"v1.29.0"}`);
 for (const [a, b] of pairs) {
   const t0 = Date.now();
-  let w = wedgie(a.mod);
+  let w;
+  try { w = wedgie(a.mod); }
+  catch (e) { check(false, `${a.mod} starts: ${e.message.slice(0, 300)}`); continue; }   // an app that can't start (F3) fails here
   const r0 = w.ram(`${a.mod} running`);
   const del = a.files.filter((n) => !b.files.includes(n) && !F.core.includes(n));
   let r = job(w, `Install ${b.name}`, b.files, del, [appEntry(F, b)], `${a.mod} -> ${b.mod}`);
   check(r === true && !BAD.test(w.h.out), `install ${b.mod} while ${a.mod} runs (${r0} B free before): ${r === true ? "done, restarted" : r} ${BAD.test(w.h.out) ? "| " + bad(w) : ""}(${Math.round((Date.now() - t0) / 1000)} s)`);
   if (args.includes("--no-update")) continue;
-  w = wedgie(a.mod);
+  w = wedgie(a.mod);       // it started a moment ago, so it starts again
   r = job(w, "Update firmware", F.core, [], null, `${a.mod}, firmware update`);
   check(r === true && !BAD.test(w.h.out), `firmware update (${F.core.length} core files) while ${a.mod} runs: ${r === true ? "done" : r} ${BAD.test(w.h.out) ? "| " + bad(w) : ""}`);
 }

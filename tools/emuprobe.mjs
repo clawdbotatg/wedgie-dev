@@ -175,7 +175,7 @@ try {
   check(/page ok/.test(pg), "ui.page draws");
 
   // an install's screen is the boot screen with the boot bar (loader.screen), not a bar of its own
-  const pr = await page.evaluate(() => window.vw.exec("import slot\nslot.stop()\nslot._prog = None\nslot.progress('Installing Hello...', 'hello.py', 0.1)\nslot.progress('Installing Hello...', 'hello.py', 0.6)\nprint('bar:', bool(slot._prog[1]))"));
+  const pr = await page.evaluate(() => window.vw.exec("import slot, job\nslot.stop()\njob._prog = None\njob.progress('Installing Hello...', 'hello.py', 0.1)\njob.progress('Installing Hello...', 'hello.py', 0.6)\nprint('bar:', bool(job._prog[1]))"));
   await page.waitForTimeout(600);
   await page.locator(".vw").screenshot({ path: `${out}/emu-installing.png` });
   check(/bar: True/.test(pr), `install screen uses the boot bar (${pr.trim()})`);

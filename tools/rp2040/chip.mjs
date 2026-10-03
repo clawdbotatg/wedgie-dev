@@ -29,6 +29,7 @@ export function boot({ uf2 = join(root, "public/mp/RPI_PICO.uf2"), flash = null,
     }
   }
   if (fs) mcu.flash.set(fs, 0xa0000);     // the littlefs image (mkfs.py): where a Pico's filesystem starts
+  const hook = flashWrites(mcu, rom);
   let cdc, connected = false;
   const pending = [];
   const attach = () => {
@@ -37,8 +38,16 @@ export function boot({ uf2 = join(root, "public/mp/RPI_PICO.uf2"), flash = null,
     const enabled = mcu.usbCtrl.onUSBEnabled;
     mcu.usbCtrl.onUSBEnabled = () => { connected = false; attach(); mcu.usbCtrl.resetDevice(); };
     void enabled;
-    cdc.onDeviceConnected = () => { connected = true; for (const b of pending.splice(0)) cdc.sendSerialByte(b); };
+    cdc.onDeviceConnected = () => { connected = true; feed(); };
     cdc.onSerialData = (b) => onData(b);
+  };
+  // rp2040js's CDC holds 512 bytes and drops the rest: a long line (the 2.6 KB signed list) lost its
+  // middle and the chip never saw its newline. Bytes wait here and go in as the FIFO empties.
+  let head = 0;
+  const feed = () => {
+    if (!connected) return;
+    while (head < pending.length && !cdc.txFIFO.full) cdc.sendSerialByte(pending[head++]);
+    if (head === pending.length) { pending.length = 0; head = 0; }
   };
   attach();
   mcu.core.PC = 0x10000000;
@@ -47,14 +56,18 @@ export function boot({ uf2 = join(root, "public/mp/RPI_PICO.uf2"), flash = null,
     get connected() { return connected; },
     write(x) {
       const b = typeof x === "string" ? Buffer.from(x) : x;
-      for (const c of b) connected ? cdc.sendSerialByte(c) : pending.push(c);
+      for (const c of b) pending.push(c);
+      feed();
     },
     /** chip time in ms */
     get ms() { return clock.nanos / 1e6; },
     /** Run the chip for ms of its own time (the Simulator's loop, without its setTimeout pacing). */
     run(ms) {
       const until = clock.nanos + ms * 1e6, cyc = 8;   // 1e9 / 125 MHz
+      let n = 0;
       while (clock.nanos < until) {
+        if (pending.length && (++n & 255) === 0) feed();
+        if (hook()) continue;
         if (mcu.core.waiting) clock.tick(Math.min(clock.nanosToNextAlarm, until - clock.nanos) || 1000);
         else clock.tick(mcu.core.executeInstruction() * cyc);
       }
@@ -119,4 +132,24 @@ function pyBytes(b) {
   let s = "b'";
   for (const c of b) s += c >= 32 && c < 127 && c !== 39 && c !== 92 ? String.fromCharCode(c) : "\\x" + c.toString(16).padStart(2, "0");
   return s + "'";
+}
+
+/** rp2040js reads flash but never writes it: nothing plays the flash chip behind the SSI, so every file
+ *  write on the chip vanished (littlefs then fails: OSError 36, and no install could finish). This does
+ *  the bootrom's two flash calls in JS instead: when the core reaches flash_range_erase ('RE') or
+ *  flash_range_program ('RP') in the ROM's function table, the flash array changes and the call returns.
+ *  Returns the hook run() checks before each instruction. */
+function flashWrites(mcu, rom) {
+  const fn = {};
+  for (let o = rom.readUInt16LE(0x14); rom.readUInt16LE(o); o += 4)
+    fn[String.fromCharCode(rom[o], rom[o + 1])] = rom.readUInt16LE(o + 2) & ~1;
+  const RE = fn.RE, RP = fn.RP, r = mcu.core.registers;
+  return () => {
+    const pc = mcu.core.PC;
+    if (pc !== RE && pc !== RP) return false;
+    if (pc === RE) mcu.flash.fill(0xff, r[0], r[0] + r[1]);                     // (addr, count, block size, cmd)
+    else for (let i = 0; i < r[2]; i++) mcu.flash[r[0] + i] &= mcu.readUint8(r[1] + i);   // (addr, data, count): bits go 1 -> 0
+    mcu.core.PC = r[14] & ~1;                                                   // return to the caller (bx lr)
+    return true;
+  };
 }
