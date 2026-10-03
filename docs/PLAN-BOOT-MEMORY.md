@@ -1,5 +1,7 @@
 # Plan: no more memory errors (2026-10-03)
 
+**The goal: NO MORE MEMORY ERRORS.** Not fewer. None, on any wedgie, in anything it does.
+
 ## What Austin wants
 
 - Installing, updating, plugging in, starting any app: never "memory allocation failed". On any wedgie.
