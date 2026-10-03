@@ -226,7 +226,10 @@ def handle(m):
         if state in ("confirm", "working", "provision"):
             send({"id": mid, "type": "busy"}); return
         import slot
-        send({"id": mid, "type": "open" if slot.let_in(str(m.get("for") or "")[:60], bool(m.get("full"))) else "refused"})
+        ok = slot.let_in(str(m.get("for") or "")[:60], bool(m.get("full")))
+        send({"id": mid, "type": "open" if ok else "refused"})
+        if ok and m.get("full") and W.SEALED:    # full control: the wallet stops, the full-access screen stays (hatch.shown)
+            raise KeyboardInterrupt
         dirty = True
     elif t in ("job", "sums"):      # a checked install: the slot's (it asks, and never hands out the REPL)
         if state in ("confirm", "working", "provision"):

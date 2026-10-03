@@ -362,9 +362,20 @@ def let_in(job="", full=False):
     ok = _asking(lambda: __import__("hatch").ask() if full else ask(job))
     if ok:
         W.set_open()
-        if not full:
+        if full:
+            _drop()
+        else:
             _band("working...", [(job[:28], INK), ("it locks again when done", MUTED)])
     return ok
+
+
+def _drop():
+    """After a full-control yes: stop the app as Ctrl-C would, so nothing draws over the full-access
+    screen. The main loop raises it (_kbd); an entry app owns the main loop, so its next screen does."""
+    global _kbd
+    _kbd = True
+    if state == "entry":
+        L._on_show = _interrupt
 
 
 def _asking(fn):
@@ -406,10 +417,7 @@ def serve(_=None):
             if W.SEALED and not W.is_open():
                 try:
                     import hatch
-                    if hatch.ctrl_c():
-                        _kbd = True     # the main loop raises it: the app stops, main.py ends, the REPL
-                        if state == "entry":        # an entry app owns the main loop (this runs in its
-                            L._on_show = _interrupt  # USB timer): its next screen raises it instead
+                    if hatch.ctrl_c():  # a yes: let_in stopped the app (_drop)
                         return
                 except Exception as e:  # out of memory: nobody gets in, the app goes on
                     sys.print_exception(e)

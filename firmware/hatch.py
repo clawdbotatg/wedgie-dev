@@ -1,8 +1,9 @@
 # The escape hatch: a computer gets the whole wedgie (the REPL, every file, the secure chip) only after
 # its person sees this red question and presses A. Asked by {"type": "open", "full": true} (wedgie.py
 # unlock) and by a Ctrl-C while sealed (main.py turns Ctrl-C off, so it arrives as a plain byte: slot.serve,
-# usbwallet.pump). A yes is any other yes (slot.let_in): Ctrl-C works until main.py runs again. Only a real
-# press answers (ui.ask). Loaded only when asked: the running app pays no heap for it.
+# usbwallet.pump). A yes stops the app and drops to the REPL (slot.let_in), under a screen that says the
+# computer has full access, until a restart or an unplug. Only a real press answers (ui.ask). Loaded only
+# when asked: the running app pays no heap for it.
 import time
 import wedgie as W
 import ui
@@ -20,9 +21,20 @@ def ask():
                 yes="full control", no="no", ms=slot.ASK_MS, scary=True)
     W.asked_ms = time.ticks_diff(ui.drawn, slot._rx)
     if ok:
-        slot._band("full control", [("this computer has it", ui.RED), ("Ctrl-C stops the app", ui.INK),
-                                    ("unplug to lock it again", ui.MUTED)])
+        shown(slot.d)
     return ok
+
+
+def shown(d):
+    """While the computer has it: the underwear, and what that means. Nothing draws over it (the app is
+    stopped: slot.let_in), so it stays up until a restart or an unplug."""
+    import loader
+    y = loader.logo(d) or 60
+    d.center_text("COMPUTER HAS", y + 12, ui.RED, 2)
+    d.center_text("FULL ACCESS", y + 34, ui.RED, 2)
+    d.center_text("didn't want that?", y + 62, ui.INK)
+    d.center_text("unplug it now", y + 76, ui.INK)
+    d.show()
 
 
 def ctrl_c():

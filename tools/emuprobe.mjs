@@ -170,18 +170,20 @@ try {
 
   // the escape hatch ({"type":"open","full":true}): the white-on-red question, and A gives full control
   // (Ctrl-C on: the same yes as any other)
-  await page.evaluate(() => window.vw.exec("import wedgie\nwedgie.SEALED = True\nwedgie._open = False"));
+  // (the yes stops the app as Ctrl-C would: slot._drop. The emulator's slot runs on a Timer, not main.py's
+  // loop, so that raise is held while this runs: slot.step is wrapped.)
+  await page.evaluate(() => window.vw.exec("import wedgie, slot\nwedgie.SEALED = True\nwedgie._open = False\n_step0 = slot.step\ndef _held0(b=True):\n    if not slot._kbd:\n        _step0(b)\nslot.step = _held0"));
   const full = page.evaluate(() => new Promise((res) => { const off = window.vw.onOutput((l) => { if (/"id": ?61/.test(l)) { off(); res(l); } }); window.vw.write(JSON.stringify({ id: 61, type: "open", full: true }) + "\n"); setTimeout(() => { off(); res(""); }, 12000); }));
   await page.waitForTimeout(1500);
   await page.locator(".vw").screenshot({ path: `${out}/emu-full.png` });
   const red = await px(3, 120);
   await page.evaluate(() => window.vw.press("A", 150));
   const fy = await full;
-  const fo = await page.evaluate(() => window.vw.exec("import wedgie\nprint('open:', wedgie.is_open())\nwedgie._open = False\nwedgie.SEALED = False"));
-  check(near(red, [227, 49, 44]), `full control: the question is red (${red})`);
-  check(/"type": ?"open"/.test(fy) && /open: True/.test(fo), `full control + A: open, Ctrl-C on (${fy.trim()} | ${fo.trim()})`);
   await page.waitForTimeout(500);
   await page.locator(".vw").screenshot({ path: `${out}/emu-full-yes.png` });
+  const fo = await page.evaluate(() => window.vw.exec("import wedgie, slot\nprint('open:', wedgie.is_open(), 'stops:', slot._kbd)\nslot._kbd = False\nslot.step = _step0\nwedgie._open = False\nwedgie.SEALED = False"));
+  check(near(red, [227, 49, 44]), `full control: the question is red (${red})`);
+  check(/"type": ?"open"/.test(fy) && /open: True stops: True/.test(fo), `full control + A: open, the app stops (${fy.trim()} | ${fo.trim()})`);
 
   // Ctrl-C on a locked wedgie (a plain byte there: main.py turns it off) asks the same red question
   // (hatch.py): A lets it in and the app stops as Ctrl-C would. One right after the slot starts is a
