@@ -1,0 +1,29 @@
+{
+  "apps": [
+    {
+      "mod": "buttons",
+      "name": "Buttons",
+      "about": "Checks every button and diagonal, then a game: hit the green one before time runs out.",
+      "files": [
+        "buttons.py"
+      ],
+      "entry": "run",
+      "fw": "0.3.5",
+      "label": "#8a8c8e",
+      "icon": [
+        "............",
+        "..kkk.......",
+        "..kgk.......",
+        "kkkgkkk..rr.",
+        "kgggggk..rr.",
+        "kkkgkkk.....",
+        "..kgk...ss..",
+        "..kkk...ss..",
+        "..........gg",
+        "..........gg",
+        "............",
+        "............"
+      ]
+    }
+  ]
+}

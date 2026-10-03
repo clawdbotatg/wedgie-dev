@@ -22,6 +22,8 @@ import { appLines } from "./release.mjs";
 const args = process.argv.slice(2);
 const arg = (k) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : null; };
 const F = firmware(arg("--fw") || undefined);
+// a second app to install over and from: Hello (tools/fixtures), a Timer app, beside the shelf's (Buttons: a loop)
+F.app({ mod: "hello", name: "Hello", files: ["hello.py"] }, { "hello.py": readFileSync(new URL("./fixtures/hello.py", import.meta.url)) });
 const LOG = arg("--log");                 // every byte the chip sends, to read after a failure
 if (LOG) writeFileSync(LOG, "");
 const version = (F.file("wedgie.py").toString().match(/VERSION = "([^"]+)"/) || [])[1];

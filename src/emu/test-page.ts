@@ -1,5 +1,5 @@
 // emu.html: a bare page around mountVirtualWedgie, for development and tools/emuprobe.mjs.
-// ?app=<mod> picks the app it runs (default hello; ?app= for none).
+// ?app=<mod> picks the app it runs (default buttons; ?app= for none).
 import { mountVirtualWedgie, type VirtualWedgie } from "./index";
 
 const $ = (s: string) => document.querySelector(s) as HTMLElement;

@@ -5,7 +5,7 @@
 //     board compiling slot.py at a fresh plug-in) and every .mpy matches its .py (tools/mpy.py --check)
 //   - a fresh plug-in with each app and with none (tools/bootprobe.mjs): no traceback, >= 16 KB free
 //   - installs and firmware updates where memory is tightest, with the core really replaced
-//     (tools/chipprobe.mjs: onto the Wallet, off the Wallet, each with an update from an older core)
+//     (tools/chipprobe.mjs: onto Buttons, off Buttons, each with an update from an older core)
 //   - checked installs against a hostile host (tools/test_job.py), the memory and style rules
 // Not covered: the virtual chip has no computer reading the WEDGIE drive at boot (macOS does: that's
 // when 0.3.13 broke), and no real board. Run tools/boardprobe.py on one before telling anyone it works.
@@ -33,8 +33,8 @@ const jobs = [
   ["test_memory", ["python3", "tools/test_memory.py"]],
   ["test_style", ["python3", "tools/test_style.py"]],
   ["mpy --check", [...UV, "tools/mpy.py", "--check"]],
-  ["chip: install the Wallet + update", ["node", "tools/chipprobe.mjs", "--from", "battery", "--to", "usbwallet"]],
-  ["chip: install over the Wallet + update", ["node", "tools/chipprobe.mjs", "--from", "usbwallet", "--to", "hello"]],
+  ["chip: install Buttons + update", ["node", "tools/chipprobe.mjs", "--from", "hello", "--to", "buttons"]],
+  ["chip: install over Buttons + update", ["node", "tools/chipprobe.mjs", "--from", "buttons", "--to", "hello"]],
   ...["none", ...carts].map((a) => [`fresh plug-in: ${a}`, ["node", "tools/bootprobe.mjs", a]]),
 ];
 

@@ -8,7 +8,8 @@ one, plug it in and put software on it, hand it to your agent.
   (the same boot screen as the device, picowallet `tools/bar` + `firmware/loader.py`); the bar fills
   by real bytes of every asset, turns green, and hands off to the site.
 - `firmware/` — the wedgie firmware: the core (boot logo, WEDGIE drive, the slot that runs its one app,
-  saves, drivers) and the apps (cartridges) listed in `firmware/carts.json`. Published to `/fw/` by `tools/fw.mjs`.
+  saves, drivers). Published to `/fw/` by `tools/fw.mjs`, with the apps: each in its own repo
+  (`clawdbotatg/wedgie-*`), listed in `community.json` at a reviewed commit and signed with the firmware.
 - `src/serial/` — WebSerial: every plugged-in wedgie, identified by its board ID (`wedgies.ts`),
   over MicroPython's raw REPL (`repl.ts`, from picowallet `factory/`); `install.ts` puts the core and
   its one app on, `files.ts` reads and writes its files and saves. `src/pages/connect.ts` is the list at /connect, `src/pages/wedgie.ts` one wedgie,

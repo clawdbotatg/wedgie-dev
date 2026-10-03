@@ -1,4 +1,4 @@
-# Buttons: checks every button, then turns it into a game.
+# Buttons: checks every button, then turns it into a game. https://wedgie.dev
 # Part 1, the check: push each one in order (N S E W, IN, A B X Y, then the diagonals SE SW NE NW).
 # The one to push is green; any key you hold goes dark, so a dead button is plain to see.
 # Part 2, the game: random buttons against the clock, faster each hit. Three misses and it's over.

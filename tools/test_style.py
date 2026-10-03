@@ -22,15 +22,7 @@ fw = os.path.join(root, "firmware")
 read = lambda *p: open(os.path.join(root, *p)).read()
 
 # Not on the guide yet: (file, rule). Each is a real debt; the run prints them.
-KNOWN = {
-    ("firmware/usbwallet.py", "raw colors"), # the Wallet's black screens
-    ("firmware/speed.py", "raw colors"),     # its timings fill with L.BLUE / L.RED (measurement, not UI)
-    ("firmware/hello.py", "kit"),
-    ("firmware/demo.py", "kit"),
-    ("firmware/battery.py", "kit"),
-    ("firmware/wire_demo.py", "kit"),
-    ("firmware/mock.py", "kit"),
-}
+KNOWN = set()
 
 bad, seen = [], set()
 

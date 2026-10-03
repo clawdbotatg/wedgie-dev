@@ -120,7 +120,7 @@ Y = no/back. Keep the joystick for movement. Show the controls on the title scre
 
 ## Fast graphics: what things cost
 
-Measured on a real wedgie (RP2040 Pico, firmware 0.2.3, 125 MHz, the Speed lab app). An RP2350 is
+Measured on a real wedgie (RP2040 Pico, firmware 0.2.3, 125 MHz). An RP2350 is
 faster on CPU work. At 40 fps you have 25 ms a frame, and **pushing the full screen takes 18 of them**,
 so the whole game is about not paying that twice.
 
@@ -208,8 +208,7 @@ The rules that follow from it:
     buffer. A 120x120 game can draw into its own small buffer and scale it up 2x with a viper loop into
     `lcd.buffer`. Split big data into files and load what the current level needs.
 12. **Measure on the real one.** `wedgie.py run` a file that times a frame with `time.ticks_us()`, or
-    `print()` the frame time now and then. The **Speed lab** app (pick it at wedgie.dev/connect) times
-    all of the above on that wedgie.
+    `print()` the frame time now and then.
 
 ## Look and feel: use the built-in kit
 

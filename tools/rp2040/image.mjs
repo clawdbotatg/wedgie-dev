@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
-import { published } from "../release.mjs";
+import { published, shelf } from "../release.mjs";
 import { cartV as fwCartV } from "../fw.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -15,7 +15,13 @@ export function firmware(fw = join(here, "..", "..", "firmware")) {
   const carts = JSON.parse(readFileSync(join(fw, "carts.json"), "utf8"));
   const all = readdirSync(fw).filter((n) => published(n, join(fw, n))).sort();      // what wedgie.dev publishes (a .mpy, not its .py)
   const claimed = new Set(carts.flatMap((c) => c.files));
-  return { dir: fw, carts, all, core: all.filter((n) => !claimed.has(n)), file: (n) => readFileSync(join(fw, n)) };
+  const core = all.filter((n) => !claimed.has(n));
+  const extra = {};       // the shelf's apps (community.json, this tree's) and any app() adds: name -> bytes
+  const F = { dir: fw, carts, all, core, extra, file: (n) => extra[n] || readFileSync(join(fw, n)) };
+  /** add an app that isn't in firmware/: its wedgie.json entry and {name: bytes} */
+  F.app = (a, files) => { carts.push(a); for (const [n, b] of Object.entries(files)) { extra[n] = b; all.push(n); } all.sort(); };
+  for (const { app, files } of shelf(core, carts.map((c) => c.mod))) F.app(app, Object.fromEntries(files.map((f) => [f.name, f.buf])));
+  return F;
 }
 /** the v in apps.json: tools/fw.mjs's own cartV over the cart's file hashes (the manifest's, exactly) */
 export const cartV = (F, c) => fwCartV(c.files.map((n) => createHash("sha256").update(F.file(n)).digest("hex")));
@@ -29,8 +35,8 @@ export function image(F, app, over = {}, drop = []) {
   const names = [...F.core, ...(c ? c.files : [])].filter((n) => !drop.includes(n));
   for (const n of Object.keys(over)) if (!names.includes(n)) names.push(n);    // over can add files (an older core's .py)
   const args = names.map((n) => {
-    if (!over[n]) return `${n}=${join(F.dir, n)}`;
-    writeFileSync(join(dir, n), over[n]);
+    if (!over[n] && !F.extra[n]) return `${n}=${join(F.dir, n)}`;
+    writeFileSync(join(dir, n), over[n] || F.extra[n]);
     return `${n}=${join(dir, n)}`;
   });
   if (c) {

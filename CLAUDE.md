@@ -24,8 +24,13 @@ what agents outside this repo read (keep it true when the firmware or the USB pr
    bump). Picking an app takes the old one's files off and soft-resets into the new one; a core update
    keeps it, but one from 0.1.x (the menu, several apps) starts with none. `apps.json` is rebuilt from what's
    really on the flash after every change (`install.ts writeApps`/`useApp`, `wedgie.py write_apps`/`use`
-   — keep the two in step, and `cartV` in fw.mjs / install.ts / wedgie.py identical). A new app = its
-   files + a carts.json entry. A module the core imports at boot must not be claimed by a cart.
+   — keep the two in step, and `cartV` in fw.mjs / install.ts / wedgie.py identical). **Apps live in their
+   own repos** (`clawdbotatg/wedgie-*`; Austin, 2026-10-03), never in firmware/ (`carts.json` is `[]`). A new
+   app on the site = `node tools/community.mjs add owner/repo`, review `git diff community/`, `node
+   tools/sign.mjs`, commit: the shelf's apps are in the signed list (`tools/release.mjs shelf()`), first
+   on the site. A new commit in their repo changes nothing until it's added again. The old built-in apps
+   are in git history before 2026-10-03; `tools/fixtures/hello.py` is a test app for the probes only.
+   A module the core imports at boot must not be claimed by a cart.
    Removed core files go in `RETIRED` (install.ts, wedgie.py) so an update deletes them.
    **App Timers are wrapped on the board** (`slot.py _Timer`): an app whose tick takes as long as its
    period (hello) otherwise starves the USB code and the site hangs on "finding it". The emulator
@@ -42,8 +47,8 @@ what agents outside this repo read (keep it true when the firmware or the USB pr
    drivers load only for a `chip` request and are dropped after (`wedgie.chip`).
 7. **The clock is set in lcd.py: 125/125 MHz** (peripherals on the CPU clock) so the screen's SPI runs
    at 62.5 MHz: 18 ms a frame instead of 46. MicroPython's default caps SPI at 24 MHz, and 150 MHz is
-   worse (37.5). Measured on an RP2040 with the Speed lab app (`firmware/speed.py`); rerun it before
-   changing clocks. `show_start()` pushes by DMA (SPI1 registers + DREQ differ RP2040/RP2350): nothing
+   worse (37.5). Measured on an RP2040 with the Speed lab app (`firmware/speed.py`, in git history before
+   2026-10-03); rerun it before changing clocks. `show_start()` pushes by DMA (SPI1 registers + DREQ differ RP2040/RP2350): nothing
    may draw into the buffer until `show_wait()`, and every other show waits for it first.
 8. **App rules live in one place**: `src/apps/appjson.mjs` (build + site) and `folder_app` in
    public/wedgie.py; `public/code.md` documents them for agents. Keep the three in step. Every app
@@ -101,7 +106,7 @@ what agents outside this repo read (keep it true when the firmware or the USB pr
    rebuild, commit both. The .mpy is what's published and signed; the .py goes to `/fw/src/` for the
    emulator only. MicroPython imports a .py before a .mpy, so a .py left beside its .mpy runs instead:
    hosts take it off only once the .mpy is on (install.ts `twin`, wedgie.py `twin`, job.py commit).
-   The Wallet must be compiled: from source it runs out of memory starting on an RP2040. So must the core:
+   The old Wallet had to be compiled: from source it ran out of memory starting on an RP2040. So must the core:
    compiling slot.py at boot ran a real board out of memory on a fresh plug-in (0.3.13; macOS reads the
    WEDGIE drive at the same moment, which the virtual chip doesn't do). A new core .py is compiled by
    default; never ship one as source. Hosts don't put .py twins in a checked job's delete (job.py's commit
@@ -126,7 +131,7 @@ python3 tools/test_memory.py                                # USB only through w
 python3 tools/test_job.py                                   # checked installs vs a hostile host (real job.py, seconds)
 uv run --with mpy-cross==1.29.0.post2 python3 tools/mpy.py --check   # the committed .mpy match their .py
 node tools/chipprobe.mjs                                    # installs on a virtual RP2040 (real heap; needs uv)
-python3 tools/boardprobe.py battery                         # a checked install on a real board (press A)
+python3 tools/boardprobe.py buttons                         # a checked install on a real board (press A)
 python3 tools/fakedevice.py                                 # a pty wedgie for public/wedgie.py
 ```
 

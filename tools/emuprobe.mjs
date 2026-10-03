@@ -1,8 +1,9 @@
 // The virtual wedgie end to end in headless Chromium: builds the site with its test page
 // (WEDGIE_EMU_TEST=1, into node_modules/.cache/emutest), serves it with `vite preview` (which sends
-// COOP/COEP), mounts the device and checks it boots straight into its one app (Hello) and that X is
-// the app's own button; saves (save.py) round-trip in the app's own folder; the USB hello says the
-// slot runs it; then no app (the "no software yet" screen), the Wallet, Demo (a busy loop), and the
+// COOP/COEP), mounts the device and checks it boots straight into its one app (Buttons, a loop that owns
+// the worker) and that X is the app's own button; then Hello (tools/fixtures/hello.py, booted as a repo
+// app: a Timer app, so the REPL stays free) for the rest: saves (save.py) round-trip in the app's own
+// folder; the USB hello says the slot runs it; then no app (the "no software yet" screen), and the
 // postMessage fallback without cross-origin isolation. Screenshots go to shots/emu-*.png.
 //   node tools/emuprobe.mjs [--no-build | --dev] [outdir]      (--dev: the `vite` dev server instead)
 import { chromium } from "playwright-core";
@@ -53,26 +54,34 @@ try {
   }), [x, y]);
   const near = (a, b, tol = 24) => a.every((v, i) => Math.abs(v - b[i]) <= tol);
   // The slot's own screens (no software yet, ended): white, the green/grey/red stripes at y 10/19/28.
-  const isBand = async () => near(await px(120, 12), [34, 196, 82]) && near(await px(120, 30), [227, 49, 44]) && near(await px(3, 120), [254, 254, 254]);
   const waitFor = async (fn, ms = 8000) => { const end = Date.now() + ms; while (Date.now() < end) { if (await fn()) return true; await page.waitForTimeout(100); } return false; };
-  // hello.py: black screen, a DARK title bar, "hello pico" in yellow.
+  // Buttons: white, its N box green (the first one to push).
+  const isButtons = async () => near(await px(70, 104), [34, 196, 82]);
+  // hello.py (tools/fixtures): black screen, a DARK title bar, "hello pico" in yellow.
+  const HELLO = (await import("node:fs")).readFileSync(join(root, "tools/fixtures/hello.py"), "utf8");
+  const bootHello = () => page.evaluate((src) => window.vw.reboot("hello", { app: { mod: "hello", name: "Hello" }, files: { "hello.py": new TextEncoder().encode(src) } }), HELLO);
   const isHello = async () => near(await px(120, 100), [0, 0, 0], 8) || near(await px(3, 60), [0, 0, 0], 8);
 
-  check(await waitFor(isHello, 15000), `boots straight into Hello, no menu (${Date.now() - t0} ms after navigation)`);
+  check(await waitFor(isButtons, 15000), `boots straight into Buttons, no menu (${Date.now() - t0} ms after navigation)`);
   const f0 = await page.evaluate(() => new Promise((res) => { let n = 0; const off = window.vw.onFrame(() => n++); setTimeout(() => { off(); res(n); }, 2000); }));
-  console.log(`     fps while Hello runs: ${(f0 / 2).toFixed(1)} (frames drawn on the page per second)`);
-  await page.locator(".vw").screenshot({ path: `${out}/emu-hello-device.png` });
-  // keyboard path: focus the device, press B (the K key) with the real keyboard; Hello shows "key: B"
+  console.log(`     fps while Buttons runs: ${(f0 / 2).toFixed(1)} (frames drawn on the page per second)`);
+  await page.locator(".vw").screenshot({ path: `${out}/emu-buttons-device.png` });
+  // keyboard path: focus the device, press B (the K key) with the real keyboard; Buttons flashes B red
   await page.locator(".vw").focus();
   await page.keyboard.down("k"); await page.waitForTimeout(100); await page.keyboard.up("k");
   await page.waitForTimeout(200);
-  await page.locator(".vw").screenshot({ path: `${out}/emu-hello-keyB.png` });
-  // pointer path: click the drawn X button. X is Hello's own button now: it keeps running.
+  await page.locator(".vw").screenshot({ path: `${out}/emu-buttons-keyB.png` });
+  // pointer path: click the drawn X button. X is the app's own button: it keeps running.
   const box = await page.locator('.vw [data-k="X"] .cap').boundingBox();
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down(); await page.waitForTimeout(120); await page.mouse.up();
   await page.waitForTimeout(600);
-  check(await isHello() && !(await isBand()), "X doesn't leave the app");
+  check(await waitFor(isButtons, 3000), "X doesn't leave the app");
+  const fb0 = await page.evaluate(() => new Promise((res) => { let k = 0; const off = window.vw.onFrame(() => k++); setTimeout(() => { off(); res(k); }, 1000); }));
+  check(fb0 > 2, `Buttons (a loop that owns the worker) keeps drawing (${fb0} frames in 1 s)`);
+
+  await bootHello();
+  check(await waitFor(isHello, 15000), "Hello (a repo app) boots");
   check((await page.evaluate(() => window.vw.exec("import slot; slot.state"))).trim() === "'running'", "the slot says Hello is running");
 
   const ex = await page.evaluate(() => window.vw.exec("1 + 1"));
@@ -110,7 +119,7 @@ try {
   check(rmv[0]?.type === "ok" && JSON.stringify(after[0]?.files) === "[]", "USB rm: the game's saves folder gone");
 
   // no app: the "no software yet" screen
-  await page.evaluate(() => window.vw.reboot(""));
+  await page.evaluate(() => window.vw.reboot("", null));
   // the wedgie's own home: the boot logo's background, its green ID, the title in ink
   const isHome = async () => near(await px(3, 120), [254, 254, 254], 12) && !near(await px(120, 30), [227, 49, 44]);
   await page.waitForTimeout(1500);
@@ -185,7 +194,7 @@ try {
   const mid = await px(BX + (BW >> 1), BY + (BH >> 1));
   await page.evaluate(() => window.vw.exec("import wedgie\nwedgie._open = False\nwedgie.SEALED = False"));
   check(/"type": ?"open"/.test(yl) && near(mid, track), `USB open + A: the boot screen, the bar drawn empty (${mid} ~ ${track}; its RAM: chipprobe, the emulator can't measure it)`);
-  await page.evaluate(() => window.vw.reboot("hello"));
+  await bootHello();
   await page.waitForTimeout(3000);
 
   // the escape hatch ({"type":"open","full":true}): the white-on-red question, and A gives full control
@@ -259,17 +268,17 @@ try {
 
   // a checked install through the real firmware (job.py, 0.3.10+): the job carries no release, so the
   // question is up at once; after A: the signed list (real signature), sums, the file, commit, restart
-  await page.evaluate(() => window.vw.reboot("hello"));
+  await bootHello();
   await page.waitForTimeout(3000);
   const req = (msg, ms = 10000) => page.evaluate(([msg, ms]) => new Promise((res) => { const off = window.vw.onOutput((l) => { if (l.includes(`"id": ${msg.id},`) || l.includes(`"id": ${msg.id}}`)) { off(); res(JSON.parse(l)); } }); window.vw.write(JSON.stringify(msg) + "\n"); setTimeout(() => { off(); res(null); }, ms); }), [msg, ms]);
   await page.evaluate(() => window.vw.exec("import slot, sys\n_a = slot.ask\ndef _ask2(*a, **k):\n    print('@asked', 'job' in sys.modules)\n    return _a(*a, **k)\nslot.ask = _ask2"));
-  const exi = await req({ id: 69, type: "sums", names: [], exists: ["hello.py", "keytest.py", "nope.py"] });
+  const exi = await req({ id: 69, type: "sums", names: [], exists: ["hello.py", "buttons.py", "nope.py"] });
   check(exi?.sums?.["hello.py"] === 1 && exi.sums["nope.py"] === null && exi.apps?.[0]?.mod === "hello", `sums (exists only) before the question: ${JSON.stringify(exi?.sums)}`);
-  const rel = await page.evaluate(() => Promise.all(["release.txt", "release.sig", "keytest.py"].map((n) => fetch("/fw/" + n).then((r) => r.text()))));
+  const rel = await page.evaluate(() => Promise.all(["release.txt", "release.sig", "buttons.py"].map((n) => fetch("/fw/" + n).then((r) => r.text()))));
   const ver = rel[0].split("\n")[1].slice(8);
   const asking = page.evaluate(() => new Promise((res) => { const t0 = performance.now(); const off = window.vw.onOutput((l) => { if (l.includes("@asked")) { off(); res([performance.now() - t0, l]); } }); setTimeout(() => { off(); res([-1, ""]); }, 10000); }));
   // the title is the signed app's name (job.py check); a list from before 0.3.12 names no apps, so no apps then
-  const go = req({ id: 70, type: "job", job: "Install Buttons", version: ver, write: ["keytest.py"], delete: ["hello.py"], apps: /^@app {2}/m.test(rel[0]) ? JSON.stringify([{ mod: "keytest", v: "x" }]) : null }, 30000);
+  const go = req({ id: 70, type: "job", job: "Install Buttons", version: ver, write: ["buttons.py"], delete: ["hello.py"], apps: /^@app {2}/m.test(rel[0]) ? JSON.stringify([{ mod: "buttons", v: "x" }]) : null }, 30000);
   const [askedMs, askedLine] = await asking;
   await page.waitForTimeout(800);
   await page.locator(".vw").screenshot({ path: `${out}/emu-job-ask.png` });
@@ -280,15 +289,15 @@ try {
   check(/@asked False/.test(askedLine), `job: asked before job.py was even loaded (${askedLine.trim()})`);
   const rok = await req({ id: 71, type: "release", release: rel[0], sig: rel[1].trim() }, 120000);
   check(rok?.type === "ok" && rok.version === ver, `job: the signed list checks out after the yes (${JSON.stringify(rok)})`);
-  const sm = await req({ id: 72, type: "sums", names: ["keytest.py"] });
-  check(sm?.type === "sums" && "keytest.py" in sm.sums, `job: sums after the yes (${JSON.stringify(sm?.sums)})`);
+  const sm = await req({ id: 72, type: "sums", names: ["buttons.py"] });
+  check(sm?.type === "sums" && "buttons.py" in sm.sums, `job: sums after the yes (${JSON.stringify(sm?.sums)})`);
   const bytes = new TextEncoder().encode(rel[2]);
   let put = null;
   for (let o = 0, i = 0; o < bytes.length; o += 1024, i++) {
-    put = await req({ id: 73 + i, type: "put", name: "keytest.py", data: Buffer.from(bytes.subarray(o, o + 1024)).toString("base64"), end: o + 1024 >= bytes.length });
+    put = await req({ id: 73 + i, type: "put", name: "buttons.py", data: Buffer.from(bytes.subarray(o, o + 1024)).toString("base64"), end: o + 1024 >= bytes.length });
     if (put?.type !== "ok") break;
   }
-  check(put?.type === "ok", `job: keytest.py sent (${JSON.stringify(put)})`);
+  check(put?.type === "ok", `job: buttons.py sent (${JSON.stringify(put)})`);
   const back = page.evaluate(() => new Promise((res) => { const all = []; const off = window.vw.onOutput((l) => { all.push(l); if (l.includes('"ready"')) { off(); res(l); } }); setTimeout(() => { off(); res("no ready: " + all.join(" / ").slice(0, 600)); }, 20000); }));
   const done = await req({ id: 90, type: "commit" });
   const ready = await back;
@@ -304,62 +313,25 @@ try {
   check(nj.join(" ") === "refused ready", `job + Y: refused, then it restarts (${nj.join(" ")})`);
   await page.waitForTimeout(2000);
 
-  // the Wallet (no chip: software key) must not crash; it has USB to itself
-  await page.evaluate(() => window.vw.reboot("usbwallet"));
-  await page.waitForTimeout(3000);
-  const wl = await page.evaluate(() => window.vw.exec("import slot; slot.app['mod'], slot.state, slot._own_usb()"));
-  check(/usbwallet', 'running', True/.test(wl), `Wallet runs, USB its own (${wl.trim()})`);
-  await page.locator(".vw").screenshot({ path: `${out}/emu-wallet.png` });
-  // its confirm screen shows a transfer from the signed fields, not the host's hints: 12.5 USDC (the raw
-  // 12500000 at 6 decimals), not the hint's "$1,000,000"; and an execute's calldata (who, how much)
-  const cf = await page.evaluate(() => window.vw.exec([
-    "import usbwallet as u",
-    "u.page = 0",
-    "usdc = [a for (c, a) in u.TOKENS if c == 8453][0]",      // USDC on Base, from the wallet's own table
-    "u.req = {'r': {'kind': 'transfer', 'chainId': 8453, 'token': usdc, 'to': '0x1111111111111111111111111111111111111111', 'amount': '12500000', 'amountFormatted': '1,000,000', 'tokenSymbol': 'ETH', 'toName': 'mom.eth', 'digest': '0x' + 'ab' * 32}}",
-    "u.draw_confirm()",
-    "print('transfer drawn', u.token_of(u.req['r']), u.eth_amount(12500000, 6))",
-  ].join("\n")));
-  await page.waitForTimeout(300);
-  await page.locator(".vw").screenshot({ path: `${out}/emu-wallet-confirm.png` });
-  const cx = await page.evaluate(() => window.vw.exec([
-    "import usbwallet as u",
-    "usdc = [a for (c, a) in u.TOKENS if c == 8453][0]",
-    "u.req = {'r': {'kind': 'execute', 'chainId': 8453, 'target': usdc, 'value': 10**18, 'data': '0x095ea7b3' + '0' * 24 + '22' * 20 + 'f' * 64, 'digest': '0x' + 'cd' * 32}}",
-    "u.draw_confirm()",
-    "print('execute drawn')",
-  ].join("\n")));
-  await page.waitForTimeout(300);
-  await page.locator(".vw").screenshot({ path: `${out}/emu-wallet-approve.png` });
-  check(/transfer drawn \('USDC', 6\) 12\.5/.test(cf) && /execute drawn/.test(cx), `Wallet confirm: amounts from the signed fields (${cf.trim()} | ${cx.trim()})`);
-  // signing: the boot screen ("Signing", the chip under it), the bar empty: not the old WORKING screen
-  await page.evaluate(() => window.vw.exec("import usbwallet as u\nu.state = 'working'\nu.draw()"));
-  await page.waitForTimeout(300);
-  await page.locator(".vw").screenshot({ path: `${out}/emu-wallet-signing.png` });
-  const ws = await px(BX + (BW >> 1), BY + (BH >> 1));
-  check(near(ws, track), `Wallet signing: the boot screen, the bar empty (${ws})`);
-  await page.evaluate(() => window.vw.exec("import usbwallet as u\nu.req = None\nu.state = 'home'\nu.dirty = True"));
-
   // installs free the RAM an app left behind first (install.ts FREE_PY): only lcd stays, and code after it
   // imports what it needs
   const freePy = (await import("node:fs")).readFileSync(join(root, "src/serial/install.ts"), "utf8").match(/const FREE_PY = `([\s\S]*?)`;/)[1];
   const fr = await page.evaluate((code) => window.vw.exec(code + "\nimport sys, gc\nprint(sorted(k for k in sys.modules if k[0] != '_' and k != 'micropython'), len([k for k in globals() if not k.startswith('__')]))\nimport wedgie\nprint(wedgie.VERSION)"), freePy);
   check(/\['lcd', 'splash'\] 2\s+0\.[2-9]/.test(fr), `freeing RAM before an install: ${fr.trim().replace(/\n/g, " | ")}`);
 
-  // Demo: an entry (demo.run) that owns the CPU. Frames must still reach the page, and X is its own
-  // (the scene before), not a way out.
-  await page.evaluate(() => window.vw.reboot("demo"));
+  // Buttons: an entry (buttons.run) that owns the CPU. Frames must still reach the page, and X is its
+  // own button, not a way out.
+  await page.evaluate(() => window.vw.reboot("buttons", null));
   await page.waitForTimeout(2500);
   const fd = await page.evaluate(() => new Promise((res) => { let k = 0; const off = window.vw.onFrame(() => k++); setTimeout(() => { off(); res(k); }, 2000); }));
-  console.log(`     fps while Demo (busy loop) runs: ${(fd / 2).toFixed(1)}`);
-  check(fd > 4, "Demo (busy loop) keeps drawing");
+  console.log(`     fps while Buttons (busy loop) runs: ${(fd / 2).toFixed(1)}`);
+  check(fd > 4, "Buttons (busy loop) keeps drawing");
   await page.evaluate(() => window.vw.press("X", 150));
   await page.waitForTimeout(800);
-  const fx = await page.evaluate(() => new Promise((res) => { let k = 0; const off = window.vw.onFrame(() => k++); setTimeout(() => { off(); res(k); }, 1000); }));
-  check(fx > 2 && !(await isBand()), "X in Demo: still Demo");
-  await page.locator(".vw").screenshot({ path: `${out}/emu-demo.png` });
+  check(await waitFor(isButtons, 3000), "X in Buttons: still Buttons");
+  await page.locator(".vw").screenshot({ path: `${out}/emu-buttons.png` });
 
-  await page.evaluate(() => window.vw.reboot("hello"));
+  await bootHello();
   check(await waitFor(isHello, 15000), "reboot back into Hello");
   const log = await page.locator("#log").textContent();
   check(!/Traceback/.test(log), "no Python tracebacks on the console" + (/Traceback/.test(log) ? ":\n" + log : ""));
@@ -377,7 +349,9 @@ try {
   await p2.goto(`http://localhost:${port}/emu.html`);
   check(!(await p2.evaluate(() => self.crossOriginIsolated)), "fallback page is not isolated");
   await p2.waitForFunction(() => document.body.dataset.ready === "1", null, { timeout: 30000 });
-  await p2.waitForTimeout(500);
+  const H2 = HELLO;
+  await p2.evaluate((src) => window.vw.reboot("hello", { app: { mod: "hello", name: "Hello" }, files: { "hello.py": new TextEncoder().encode(src) } }), H2);
+  await p2.waitForTimeout(1500);
   await p2.evaluate(async () => { await window.vw.press("A", 150); });
   await p2.waitForTimeout(800);
   const fb = await p2.evaluate(() => window.vw.exec("import hello; hello.last"));

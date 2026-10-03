@@ -141,7 +141,7 @@ export async function mount(el: HTMLElement, opts: VirtualWedgieOptions): Promis
     worker.onmessage = onMsg;
     worker.onerror = (e) => { for (const cb of outCbs) cb("virtual wedgie worker: " + e.message); booted?.reject(new Error(e.message)); booted = null; };
     const p = new Promise<void>((resolve, reject) => { booted = { resolve, reject }; });
-    worker.postMessage({ type: "boot", keys: keyBuf, serial: serialSab, fwBase: opts.fwBase || "/fw/", app: opts.extra ? opts.extra.app.mod : opts.app ?? "hello", extra: opts.extra, uid: uidBytes(opts.uid) });
+    worker.postMessage({ type: "boot", keys: keyBuf, serial: serialSab, fwBase: opts.fwBase || "/fw/", app: opts.extra ? opts.extra.app.mod : opts.app ?? "buttons", extra: opts.extra, uid: uidBytes(opts.uid) });
     return p;
   }
 

@@ -133,7 +133,7 @@ Get the host tool (one file; needs `pip install pyserial`):
     python3 wedgie.py install .            make the app in this folder's wedgie.json the app it runs
     python3 wedgie.py install app.py --name "My app"    make one file the app it runs (it restarts into it)
     python3 wedgie.py apps                 the apps on wedgie.dev, and which one it runs
-    python3 wedgie.py use usbwallet        make that the app it runs (the old one comes off; saves stay)
+    python3 wedgie.py use buttons          make that the app it runs (the old one comes off; saves stay)
     python3 wedgie.py uninstall            uninstall its app
     python3 wedgie.py ls                   every file, saves included
     python3 wedgie.py saves [backup f.json | restore f.json]
@@ -267,47 +267,12 @@ The wedgie's `apps.json` names its app: `[{"mod", "name", "entry"?, "usb"?, "abo
 install`). An app from a repo or folder lists its `files`, so whatever switches away takes them off.
 Firmware 0.1.x had a menu and kept several; updating to 0.2 takes them off and it starts with no app.
 
-Apps now: `hello` (bouncing box, the template), `keytest` (buttons), `demo` (balls/cube/plasma speed
-test), `mock` (nine wallet screens), `wire_demo` (clear-signs a signed transaction request),
-`battery` (Waveshare Pico-UPS-B hat), `speed` (Speed lab: times each graphics trick on that board),
-`usbwallet` (the USB hardware wallet; needs an ATECC608). Source:
-/fw/<file> or https://github.com/clawdbotatg/wedgie-dev/tree/main/firmware (`carts.json` is the
-catalog). Read `hello.py` and `lcd.py` first. A new app = its files in firmware/ + an entry in
-firmware/carts.json (name, files, label color, 12x12 pixel icon, `chip` if it needs one); push and
-it's on the site. Anyone else's app lives in their own GitHub repo with a `wedgie.json`
-(https://wedgie.dev/code.md); people add it on their wedgie's page, and `community.json` in this repo
-lists the ones on everyone's shelf, each pinned to the commit that was read.
-
-## Talk to it directly
-
-Everything wedgie.py does is JSON lines over the wedgie's USB serial port. No driver, no tool needed.
-
-1. **Find its port.** macOS: `/dev/cu.usbmodem*`. Linux: `/dev/ttyACM*` (or `/dev/serial/by-id/*wedgie*`).
-   Windows: a `COM` port (USB vendor 0x2e8a, product name "wedgie"). Several boards: ask each for hello
-   and match its `uid`. Just plugged in? Wait 2 s: the port drops once while the WEDGIE drive appears.
-2. **Only one program can hold the port.** If it's busy, the wedgie.dev tab or mpremote has it: ask your
-   person to close it.
-3. **Ask it what it is** (115200 baud, one JSON object per line, answers carry your `id`):
-
-```python
-import serial, json, time                    # pip install pyserial
-s = serial.Serial("/dev/cu.usbmodem1101", 115200, timeout=0.2)
-s.write(b'{"id": 1, "type": "hello"}\n')
-end = time.time() + 3
-while time.time() < end:
-    for line in s.read(65536).decode(errors="replace").splitlines():
-        if line.startswith("{") and '"id": 1' in line:
-            print(json.loads(line))          # version, running app, chip, sealed/open, free RAM...
-```
-
-4. Lines that don't start with `{` are logs (an app's `print()`). No answer at all: the app has USB to
-   itself (the Wallet speaks its own protocol and still answers `hello` and `open`), it's on the "wedgie
-   broke" screen (press A there for full control), or it isn't wedgie firmware (`wedgie.py update`).
-
-What you can do without anyone pressing anything: `hello`, `shot` (its screen), `press` (a button, as if
-pressed: it can drive an app, never answer a question), `chip` (prove the secure chip works), `ls`, and
-`get`/`rm` inside `/saves/` only. Anything else (other files, the REPL, the secure chip's keys, installs)
-needs your person to press **A on the wedgie's own screen**: tell them before you ask. The requests:
+Apps live in their own GitHub repos (`clawdbotatg/wedgie-*` for ours), each with a `wedgie.json`
+(https://wedgie.dev/code.md). The ones on everyone's shelf are listed in `community.json` in this repo,
+each pinned to the commit that was read, copied into `community/` and signed with the firmware
+(`node tools/community.mjs add owner/repo`, review `git diff community/`, `node tools/sign.mjs`, commit).
+Today: Buttons (`clawdbotatg/wedgie-buttons`). People can also add any repo on their wedgie's page
+(not signed: it asks for full access).
 
 ## The USB protocol (what wedgie.py speaks)
 
