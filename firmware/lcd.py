@@ -60,12 +60,30 @@ def _copy16(src, i0: int, dst, q0: int, n: int):
         j += 1
 
 
+@micropython.viper
+def _pairs565(src, o: int, dst, nb: int):
+    """nb framebuffer bytes from byte o (two pixels each) -> dst from its start: the fast path, whole
+    rows or any even-aligned run."""
+    s = ptr8(src)
+    d = ptr16(dst)
+    l = ptr16(_LUT)
+    k = 0
+    while k < nb:
+        b = s[o + k]
+        d[2 * k] = l[b >> 4]
+        d[2 * k + 1] = l[b & 15]
+        k += 1
+
+
 def rows565(x0, y, n, m, f=None):
     """m rows of n pixels from x0, y as RGB565 into _ROWS (the art over them, from f when it's open)."""
-    i = 0
-    while i < m:
-        _to565(_BUF, (y + i) * 240 + x0, _ROWS, i * n, n)
-        i += 1
+    if n == 240:                        # full rows sit one after another: one call for all of them
+        _pairs565(_BUF, y * 120, _ROWS, m * 120)
+    else:
+        i = 0
+        while i < m:
+            _to565(_BUF, (y + i) * 240 + x0, _ROWS, i * n, n)
+            i += 1
     a = _art
     if f is None or a is None:
         return
