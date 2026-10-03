@@ -39,17 +39,17 @@ def band(d, y=10):
         d.fill_rect(0, y + i * 9, 240, 5, c)
 
 
-def title(d, s, y=48, lines=2):
+def title(d, s, y=48, lines=2, c=INK):
     """A big title, wrapped onto up to `lines` lines (falls back to small text when it won't fit).
     Returns the y under it."""
     t = wrap(s, COLS_BIG)
     if len(t) <= lines:
         for i, x in enumerate(t):
-            d.center_text(x, y + i * 24, INK, 2)
+            d.center_text(x, y + i * 24, c, 2)
         return y + len(t) * 24
     t = wrap(s, COLS_SMALL)[:lines + 1]
     for i, x in enumerate(t):
-        d.center_text(x, y + i * 14, INK)
+        d.center_text(x, y + i * 14, c)
     return y + len(t) * 14
 
 
@@ -80,21 +80,28 @@ def buttons(d, yes="yes", no="no"):
 drawn = 0       # ticks_ms when the last ask() finished drawing its question (the slot reports it)
 
 
-def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None):
+def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None, scary=False):
     """A yes/no question: A yes, Y no, no answer in `ms` is a no. Only real presses count (a press
-    sent over USB can't answer). True for yes."""
+    sent over USB can't answer). True for yes. scary: white on red, for a yes that hands over
+    everything (full control: slot.let_in)."""
     k = keys or L.Keys(physical=True)
     k.pressed()                             # a key already down doesn't count
-    d.fill(WHITE)
-    band(d)
-    y = max(title(d, question, 48, 2) + 12, 108)
+    bg, fg = (RED, WHITE) if scary else (WHITE, INK)
+    d.fill(bg)
+    if scary:
+        d.center_text("! WARNING !", 14, WHITE, 2)
+    else:
+        band(d)
+    y = max(title(d, question, 48, 2, fg) + 12, 108)
     for s in lines:
         for x in wrap(s):
             if y > 168:
                 break
-            d.center_text(x, y, INK)
+            d.center_text(x, y, fg)
             y += 14
     buttons(d, yes, no)
+    if scary:                               # the no bar is red on red: a white line keeps it a button
+        d.fill_rect(0, 212, 240, 2, WHITE)
     d.show()
     global drawn
     drawn = time.ticks_ms()

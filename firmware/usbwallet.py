@@ -149,7 +149,21 @@ def pump():
     """Read what the host sent, one message per call. Never blocks: the poll says whether a byte
     is there (on the board) and an empty read says there is none (in the emulator). Lines come in
     through the one line reader (wedgie.lines): never a string grown a char at a time."""
-    line = W.lines().pump(_poll)
+    global dirty
+    R = W.lines()
+    line = R.pump(_poll)
+    if R.intr:                  # a Ctrl-C while sealed: the red question (hatch.py), not mid-signing
+        R.intr = False
+        if W.SEALED and not W.is_open() and state not in ("confirm", "working", "provision"):
+            try:
+                import hatch
+                ok = hatch.ctrl_c()
+            except Exception as e:  # out of memory: nobody gets in, the wallet goes on
+                sys.print_exception(e)
+                ok = False
+            if ok:
+                raise KeyboardInterrupt
+            dirty = True
     if line is False:
         send({"type": "error", "error": "line too long"})
     elif line and line.strip():
@@ -190,7 +204,7 @@ def handle(m):
         if state in ("confirm", "working", "provision"):
             send({"id": mid, "type": "busy"}); return
         import slot
-        send({"id": mid, "type": "open" if slot.let_in(str(m.get("for") or "")[:60]) else "refused"})
+        send({"id": mid, "type": "open" if slot.let_in(str(m.get("for") or "")[:60], bool(m.get("full"))) else "refused"})
         dirty = True
     elif t in ("job", "sums"):      # a checked install: the slot's (it asks, and never hands out the REPL)
         if state in ("confirm", "working", "provision"):

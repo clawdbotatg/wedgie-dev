@@ -305,6 +305,16 @@ hello says `"open": true` and Ctrl-C (0x03) stops the app and drops to the REPL 
 one job: once the app starts again (`exec(open("main.py").read())` or a soft reset) it's locked. Tell your person to press A before you send it. wedgie.py
 and wedgie.dev do all this for you. Older firmware has no lock: Ctrl-C works right away.
 
+**Full control (0.3.12+): `{"type":"open","full":true}`**, or `python3 wedgie.py unlock`. For when your
+person wants this computer to have the wedgie and its secure chip outright (mpremote, a REPL session,
+debugging) and not for one job. The wedgie asks in white on red ("FULL CONTROL?"); A says yes, and the
+yes is the same as above: Ctrl-C works until the app starts again or it's unplugged. A plain Ctrl-C
+asks the same question (0.3.12+; not in the first 3 s after it starts): mpremote's own Ctrl-C puts it on
+the screen, and after A the app stops and the REPL takes what mpremote sent. mpremote gives up after
+about 10 s, so if the person was slower, run it again: the wedgie is open by then. Tell your person to
+expect the red screen before you try. If mpremote says "could not enter raw repl" and nothing showed,
+the firmware is older: use `wedgie.py update`, or `wedgie.py unlock` on 0.3.12+.
+
 ### Plugging in, and resets (read this before scripting a wedgie)
 
 About a second after power-up the wedgie adds its WEDGIE USB drive (the underwear on the desktop),

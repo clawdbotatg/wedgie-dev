@@ -52,6 +52,9 @@ what agents outside this repo read (keep it true when the firmware or the USB pr
    `Keys(physical=True)`). A yes is for one job: main.py locks it again when it next starts. Every REPL path on a host goes
    through `letIn` (install.ts takeOver, format.ts) or `let_in` (public/wedgie.py enter). Never add a
    way in that skips the press, and never let a USB `press` answer it.
+   The escape hatch (`firmware/hatch.py`, 0.3.12+): `{"type":"open","full":true}` (`wedgie.py unlock`) or
+   a plain Ctrl-C while locked shows a red FULL CONTROL? question; A = the same yes. Ctrl-C in the first
+   3 s after the slot starts is ignored (a connecting host's leftover bytes).
 10. **One progress screen: the boot screen.** Anything with progress on a wedgie (install, update,
    anything slow) shows the boot logo and the boot bar: `loader.screen(title, what)` returns the bar,
    `bar.to(0..1)` fills it, `loader.what(text)` changes the line under it. Never draw another bar

@@ -94,7 +94,8 @@ GAP = 10            # ms: a tick this soon after the last one ended, with no ser
 _breath = True      # serve() has run since the last app tick
 _last = 0           # when the last app tick ended
 _timers = []        # every app Timer, so stop() can end them all
-_kbd = False        # a Ctrl-C landed inside an app tick: the main loop raises it
+_kbd = False        # a Ctrl-C landed inside an app tick (or one was let in: hatch.ctrl_c): the main loop raises it
+_started = 0        # ticks_ms when init ran
 _paused = False     # the "let this computer in?" screen is up: no app ticks draw over it
 
 
@@ -235,8 +236,8 @@ def _handle(m):
     elif t in ("stop", "home"):         # home: what hosts for 0.1.x send before taking the REPL
         stop()
         W.send({"id": mid, "type": "ok"})
-    elif t == "open":
-        ok = let_in(str(m.get("for") or "")[:60])
+    elif t == "open":                   # full: the escape hatch (any computer, any code: let_in)
+        ok = let_in(str(m.get("for") or "")[:60], bool(m.get("full")))
         W.send({"id": mid, "type": "open" if ok else "refused", "asked_ms": W.asked_ms})
         if not ok:
             _restart()
@@ -338,17 +339,19 @@ def _there(names):
     return out
 
 
-def let_in(job=""):
+def let_in(job="", full=False):
     """{"type": "open"}: may this computer have the REPL? Asks the person, unless they already said
     yes for this job (or nothing is sealed: the emulator). Yes turns Ctrl-C on (wedgie.set_open) until
-    main.py starts again. False only after a no: the caller restarts it (_restart)."""
+    main.py starts again. False only after a no: the caller restarts it (_restart).
+    full ({"type": "open", "full": true}, or a Ctrl-C: hatch.py): the escape hatch, the red question."""
     if not W.SEALED or W.is_open():
         W.set_open()
         return True
-    ok = _asking(lambda: ask(job))
+    ok = _asking(lambda: __import__("hatch").ask() if full else ask(job))
     if ok:
         W.set_open()
-        _band("working...", [(job[:28], INK), ("it locks again when done", MUTED)])
+        if not full:
+            _band("working...", [(job[:28], INK), ("it locks again when done", MUTED)])
     return ok
 
 
@@ -381,11 +384,21 @@ def serve(_=None):
     """Read what the host sent; handle each full line. Never blocks. A line comes in through the one
     line reader (wedgie.lines: one buffer, made at boot); a host request that fails answers an error
     and the app keeps running (it never reaches main.py's "wedgie broke")."""
-    global _breath
+    global _breath, _kbd
     _breath = True
     R = W.lines()
     for _ in range(8):
         line = R.pump(_poll)
+        if R.intr:                      # a Ctrl-C while sealed: the escape hatch's red question (hatch.py)
+            R.intr = False
+            if W.SEALED and not W.is_open():
+                try:
+                    import hatch
+                    if hatch.ctrl_c():
+                        _kbd = True     # the main loop raises it: the app stops, main.py ends, the REPL
+                        return
+                except Exception as e:  # out of memory: nobody gets in, the app goes on
+                    sys.print_exception(e)
         if line is None:
             return
         if line and line.strip().startswith(b"{"):
@@ -435,7 +448,8 @@ def step(board=True):
 
 
 def init():
-    global d, keys, app, state, _poll
+    global d, keys, app, state, _poll, _started
+    _started = time.ticks_ms()
     d = L.LCD()
     keys = L.Keys()
     _poll = select.poll()

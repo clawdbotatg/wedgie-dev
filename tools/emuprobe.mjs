@@ -168,6 +168,44 @@ try {
   check(nog.join(" ") === "refused ready", `USB open + Y: refused, then it restarts (${nog.join(" ")})`);
   await page.waitForTimeout(3000);
 
+  // the escape hatch ({"type":"open","full":true}): the white-on-red question, and A gives full control
+  // (Ctrl-C on: the same yes as any other)
+  await page.evaluate(() => window.vw.exec("import wedgie\nwedgie.SEALED = True\nwedgie._open = False"));
+  const full = page.evaluate(() => new Promise((res) => { const off = window.vw.onOutput((l) => { if (/"id": ?61/.test(l)) { off(); res(l); } }); window.vw.write(JSON.stringify({ id: 61, type: "open", full: true }) + "\n"); setTimeout(() => { off(); res(""); }, 12000); }));
+  await page.waitForTimeout(1500);
+  await page.locator(".vw").screenshot({ path: `${out}/emu-full.png` });
+  const red = await px(3, 120);
+  await page.evaluate(() => window.vw.press("A", 150));
+  const fy = await full;
+  const fo = await page.evaluate(() => window.vw.exec("import wedgie\nprint('open:', wedgie.is_open())\nwedgie._open = False\nwedgie.SEALED = False"));
+  check(near(red, [227, 49, 44]), `full control: the question is red (${red})`);
+  check(/"type": ?"open"/.test(fy) && /open: True/.test(fo), `full control + A: open, Ctrl-C on (${fy.trim()} | ${fo.trim()})`);
+  await page.waitForTimeout(500);
+  await page.locator(".vw").screenshot({ path: `${out}/emu-full-yes.png` });
+
+  // Ctrl-C on a locked wedgie (a plain byte there: main.py turns it off) asks the same red question
+  // (hatch.py): A lets it in and the app stops as Ctrl-C would. One right after the slot starts is a
+  // host's leftover and asks nothing. (The emulator's slot runs on a Timer, not main.py's loop, so the
+  // raise that would stop the app there is held while this runs: slot.step is wrapped.)
+  await page.evaluate(() => window.vw.exec("import slot\n_step = slot.step\ndef _held(b=True):\n    if not slot._kbd:\n        _step(b)\nslot.step = _held"));
+  const cc = (early) => page.evaluate((early) => window.vw.exec("import micropython, wedgie, slot, time\nmicropython.kbd_intr(-1)\nwedgie.SEALED = True\nwedgie._open = False\nslot._kbd = False\nslot._started = time.ticks_ms() - (0 if " + (early ? "True" : "False") + " else 5000)\nprint('armed')"), early);
+  await cc(true);
+  await page.evaluate(() => window.vw.write("\r\x03\x03"));
+  await page.waitForTimeout(1200);
+  const early = await px(3, 120);
+  await cc(false);
+  await page.evaluate(() => window.vw.write("\r\x03\x03"));
+  await page.waitForTimeout(1500);
+  const ccRed = await px(3, 120);
+  await page.locator(".vw").screenshot({ path: `${out}/emu-ctrlc.png` });
+  await page.evaluate(() => window.vw.press("A", 150));
+  await page.waitForTimeout(800);
+  const cco = await page.evaluate(() => window.vw.exec("import wedgie, slot, micropython\nprint('open:', wedgie.is_open(), 'kbd:', slot._kbd)\nslot._kbd = False\nslot.step = _step\nwedgie._open = False\nwedgie.SEALED = False\nmicropython.kbd_intr(3)"));
+  check(!near(early, [227, 49, 44]), `Ctrl-C right after the slot starts asks nothing (${early})`);
+  check(near(ccRed, [227, 49, 44]), `Ctrl-C on a locked wedgie: the red question (${ccRed})`);
+  check(/open: True kbd: True/.test(cco), `Ctrl-C + A: let in, the app stops as Ctrl-C would (${cco.trim()})`);
+  await page.waitForTimeout(500);
+
   // the look-and-feel kit (firmware/ui.py): a page, for code.md's pictures
   const pg = await page.evaluate(() => window.vw.exec("import slot, lcd, ui\nslot.stop()\nd = lcd.LCD()\nui.page(d, 'Game over', [('score 120', ui.INK), ('best 340', ui.MUTED)], 'A  play again')\nprint('page ok')"));
   await page.waitForTimeout(500);

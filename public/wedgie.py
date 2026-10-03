@@ -18,6 +18,7 @@
   python3 wedgie.py update                    install/update the wedgie firmware (only changed files; its app and saves stay)
   python3 wedgie.py ls                        files on it, saves included
   python3 wedgie.py saves [backup f.json | restore f.json]    its saves (/saves/<game>/), out to a file and back
+  python3 wedgie.py unlock                    full control (mpremote, Ctrl-C, its chip) until it restarts; asks on its screen, in red
   python3 wedgie.py debug                     a report (firmware, files, free space and RAM, error.log); asks on its screen
 
   --port /dev/cu.usbmodemXXXX  (or --id A1B2C3) picks one when several are plugged in.
@@ -470,6 +471,19 @@ def main():
         if c == "hello":
             h = wg.hello(2)
             print(json.dumps(h, indent=1) if h else "no answer: not running wedgie firmware (try: wedgie.py update)")
+        elif c == "unlock":
+            h = need_firmware(wg)
+            if not h.get("sealed") or h.get("open"):
+                print("it's open already: Ctrl-C works (mpremote too)")
+            else:
+                sys.stderr.write("press A on the wedgie (the red screen) to give this computer full control\n")
+                try:
+                    v = wg.request({"type": "open", "full": True}, 65)
+                except TimeoutError:
+                    sys.exit("nobody pressed A on the wedgie")
+                if v.get("type") != "open":
+                    sys.exit("the wedgie said no" if v.get("type") == "refused" else "the wedgie said %s" % v)
+                print("full control until it restarts or is unplugged: Ctrl-C works now (mpremote repl, mpremote cp ...)")
         elif c == "shot":
             need_firmware(wg)
             v = wg.request({"type": "shot"}, 10)

@@ -4,6 +4,8 @@
 # could run anything and make the secure chip sign anything. A computer gets the REPL only after the
 # person presses A on the wedgie ({"type": "open"}, slot.let_in); then Ctrl-C works as it always did
 # (mpremote, wedgie.dev's raw-REPL tools) until this file runs again, which locks it. The lock is in wedgie.py.
+# A Ctrl-C while locked still arrives, as a plain byte: the slot asks the escape hatch's red "FULL CONTROL?"
+# question about it (hatch.py), and a real A stops the app as Ctrl-C would. Never let anything else in.
 import micropython
 micropython.kbd_intr(-1)
 import sys, time

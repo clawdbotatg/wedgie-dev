@@ -301,6 +301,7 @@ class Lines:
         self.b = bytearray(size)
         self.n = 0
         self.over = False
+        self.intr = False       # a Ctrl-C came in (sealed: just a byte); the slot asks about it (hatch.ctrl_c)
 
     def feed(self, ch):
         """One char from USB. At a newline: the line as bytes (one copy, its own size), or False for
@@ -312,7 +313,7 @@ class Lines:
                 return False
             return bytes(memoryview(self.b)[:n])
         if ch == "\x03":                    # a Ctrl-C while sealed is just a byte: start a clean line
-            self.n, self.over = 0, False
+            self.n, self.over, self.intr = 0, False, True
             return None
         if ch == "\r" or self.over:
             return None
