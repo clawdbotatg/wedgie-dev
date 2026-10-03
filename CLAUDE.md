@@ -83,6 +83,11 @@ what agents outside this repo read (keep it true when the firmware or the USB pr
    The browser emulator CAN'T test memory: its WebAssembly heap starts at 128 MB and grows. Before firmware
    ships: `node tools/chipprobe.mjs` (the real MicroPython build on a virtual RP2040, rp2040js) and
    `python3 tools/boardprobe.py <apps>` on a real board. Plan + open items: `docs/PLAN-MEMORY.md`.
+   **Every new screen or question on a wedgie:** draw it straight over the app's screen and save nothing
+   (0.3.5 saved the 115 KB screen: slow, out of memory). A no reboots (`slot._restart`). Code that runs
+   rarely (a question, a hatch) goes in its own file, imported only when needed (`firmware/hatch.py`).
+   Measure the heap with `chipprobe.mjs --from X --to Y --no-update` before and after (`--fw` on a
+   `git archive HEAD` copy for before).
 14. Everything is MIT — never use the CC BY-NC case STLs from picowallet/instant-wallet.
 
 ## Run / check
