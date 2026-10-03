@@ -1,0 +1,29 @@
+{
+  "apps": [
+    {
+      "mod": "frog",
+      "name": "Frog",
+      "about": "Your pet frog. Hatch him, name him, feed him, play with him, and he grows.",
+      "files": [
+        "frog.py"
+      ],
+      "entry": "run",
+      "fw": "0.3.5",
+      "label": "#3fae49",
+      "icon": [
+        "............",
+        "..kkk..kkk..",
+        ".kwwwkkwwwk.",
+        ".kwkwkkwkwk.",
+        ".kgwgggggwgk",
+        "kggggggggggk",
+        "kgkgggggkggk",
+        "kggkkkkkgggk",
+        "kgggggggggk.",
+        ".kgyyyyyygk.",
+        "..kkkkkkkk..",
+        "............"
+      ]
+    }
+  ]
+}
