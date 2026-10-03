@@ -1,0 +1,29 @@
+{
+  "apps": [
+    {
+      "mod": "keypad",
+      "name": "Keypad",
+      "about": "Typing on a wedgie: a PIN pad and a keyboard. Try them, or call pin() and text() from your app.",
+      "files": [
+        "keypad/keypad.py"
+      ],
+      "entry": "run",
+      "fw": "0.3.5",
+      "label": "#1a1b1a",
+      "icon": [
+        "............",
+        ".kkk.kkk.kkk",
+        ".kwk.kwk.kwk",
+        ".kkk.kkk.kkk",
+        "............",
+        ".kkk.kkk.kkk",
+        ".kwk.kgk.kwk",
+        ".kkk.kkk.kkk",
+        "............",
+        ".kkk.kkk.kkk",
+        ".krk.kwk.kgk",
+        ".kkk.kkk.kkk"
+      ]
+    }
+  ]
+}

@@ -5,6 +5,11 @@
       "repo": "clawdbotatg/wedgie-buttons",
       "sha": "3a3697cca92b0b67387ad9e6f58e510be87147d4",
       "approved": "2026-10-03"
+    },
+    {
+      "repo": "clawdbotatg/wedgie-keypad",
+      "sha": "9f0a17a58426f6df37fa3dae34f245ac301fd896",
+      "approved": "2026-10-03"
     }
   ]
 }
