@@ -122,7 +122,7 @@ if "wedgie.py" in os.listdir():
 import json
 print("@id", json.dumps({"uid": machine.unique_id().hex(), "machine": m, "mp": os.uname().release, "files": sorted(os.listdir()), "wifi": w, "wedgie": v}))`;
 
-const STUCK = "It isn't answering. Unplug it, then hold X on the wedgie while you plug it back in (that skips its app), or hold the Pico's BOOTSEL button while plugging in and use wedgie.dev/format.";
+const STUCK = "It isn't answering. Unplug it, then hold X on the wedgie while you plug it back in (that skips its app), or hold the Pico's BOOTSEL button while plugging in and open wedgie.dev/connect.";
 
 async function identify(w: Wedgie) {
   w.state = "identifying"; w.error = undefined; emit();

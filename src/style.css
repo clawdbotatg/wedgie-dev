@@ -238,6 +238,12 @@ html, body { overflow-x: clip; }
 .connect-btn .n:empty { display: none; }
 .connect-btn .n { font-family: var(--mono); font-size: 14px; background: rgba(0,0,0,.18); border-radius: 999px; padding: 1px 8px; }
 .connect { min-height: 60vh; padding-top: 40px; }
+.setup { display: grid; gap: 12px; margin: 0 auto 24px; max-width: 640px; }
+.setup h3 { margin: 0; }
+.setup.good { box-shadow: var(--shell-shadow), 0 0 0 4px var(--mint); }
+.setup.bad { box-shadow: var(--shell-shadow), 0 0 0 4px var(--coral); }
+.setup-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.setup .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .buy { display: flex; flex-wrap: wrap; gap: 8px; }
 .part .buy .btn { align-self: auto; }
 

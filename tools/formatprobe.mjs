@@ -5,6 +5,8 @@
 // bench() like bench.py and probe.py, and re-plugs its USB when it boots the wedgie firmware.
 // Nothing may happen to a unit until Format is pressed; a used wedgie's saves must survive the wipe
 // (or not, with "wipe its saves too" ticked).
+// The connect-* scenarios run the same fake Pico through /connect's Set up card (pages/setup.ts): wipe,
+// MicroPython, the firmware, no tests.
 // Serve dist first (npx vite preview), then: node tools/formatprobe.mjs [url] [outdir]
 import { chromium } from "playwright-core";
 import { readdirSync, readFileSync } from "node:fs";
@@ -14,7 +16,7 @@ const base = process.argv[2] || "http://localhost:4173/";
 const out = process.argv[3] || "shots";
 const cache = homedir() + "/Library/Caches/ms-playwright";
 const shell = readdirSync(cache).filter((d) => d.startsWith("chromium_headless_shell-")).sort().reverse()[0];
-const browser = await chromium.launch({ executablePath: `${cache}/${shell}/chrome-headless-shell-mac-arm64/chrome-headless-shell` });
+const browser = await chromium.launch({ executablePath: `${cache}/${shell}/chrome-headless-shell-mac-arm64/chrome-headless-shell`, args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });   // /connect draws 3D wedgies
 
 function expected(file, family) {
   const d = readFileSync(file), bytes = new Map();
@@ -42,6 +44,9 @@ const scenarios = [
   { name: "no-chip", pid: 3, found: [], lines: { sda: 0, scl: 0 }, want: ["FAIL", ["pass", "pass", "fail", "pass", "pass"]], uf2: "RPI_PICO" },
   { name: "unplugged", pid: 3, found: [ATECC], unplugAt: "down", want: ["FAIL", ["pass", "pass", "pass", "fail", "skip"]], uf2: "RPI_PICO" },
   { name: "no-profile", pid: 3, noProfile: true, found: [ATECC], want: ["PASS", ALLPASS], uf2: "RPI_PICO" },
+  { name: "connect-new", page: "connect", pid: 3, found: [ATECC], uf2: "RPI_PICO" },
+  { name: "connect-pico2-w", page: "connect", pid: 15, wifi: true, found: [ATECC], uf2: "RPI_PICO2_W", flashes: 2 },
+  { name: "connect-no-prof", page: "connect", pid: 3, noProfile: true, found: [ATECC], uf2: "RPI_PICO" },
 ];
 
 let bad = 0;
@@ -245,6 +250,7 @@ for (const sc of scenarios.filter((x) => !process.env.ONLY || x.name === process
   const page = await ctx.newPage();
   const errs = [];
   page.on("pageerror", (e) => errs.push(e.message));
+  if (sc.page === "connect") { await connectRun(sc, ctx, page, errs); await ctx.close(); continue; }
   await page.goto(base + "test");     // the old name: it lands on /format
   const notes = [];
   if (sc.wipe) await page.check("#t-wipe");
@@ -305,6 +311,45 @@ for (const sc of scenarios.filter((x) => !process.env.ONLY || x.name === process
   console.log(ok ? "ok  " : "BAD ", sc.name.padEnd(12), got.status, got.cards.join(","), "|", got.details.join(" | "), "|", notes.join("; "), errs.length ? "ERRORS " + errs.join("; ") : "");
   if (sc.name === "new-pico-w") console.log("     facts:", got.facts.join(" · "));
   await ctx.close();
+}
+// /connect: a new Pico gets the Set up card; Set up wipes it and puts the firmware on, nothing before the tap.
+async function connectRun(sc, ctx, page, errs) {
+  const notes = [];
+  if (!sc.noProfile) await page.addInitScript(() => localStorage.setItem("wedgie.serial", "1"));   // tapped Connect before
+  await page.goto(base + "connect");
+  if (sc.noProfile) await page.click("#pick-new");
+  await page.waitForSelector(".setup-go", { timeout: 20000 });
+  await page.waitForTimeout(1500);
+  const before = await page.evaluate(() => ({ flashes: window.__st.flashes, maxWrite: window.__st.maxWrite, execs: window.__st.execs }));
+  if (before.flashes || before.maxWrite || before.execs) notes.push("STARTED BEFORE SET UP " + JSON.stringify(before));
+  await page.click(".setup-go");
+  for (let i = 0; i < 6; i++) {
+    // A Mac's first serial pick shows the Bluetooth note over the card: tap that first.
+    const sel = await page.waitForSelector("#bt-go, #setup-pick, .setup.good, .setup.bad", { timeout: 120000 })
+      .then(() => page.evaluate(() => ["#bt-go", "#setup-pick"].find((q) => document.querySelector(q)) || "done"), () => null);
+    if (!sel || sel === "done") break;
+    await page.click(sel);
+    await page.waitForTimeout(500);
+  }
+  await page.waitForSelector(".setup.good, .setup.bad", { timeout: 120000 }).catch(() => {});
+  const execs = await page.evaluate(() => window.__st.execs);
+  await page.waitForTimeout(3000);
+  await page.screenshot({ path: `${out}/format-${sc.name}.png`, fullPage: true });
+  const got = await page.evaluate(() => ({ card: document.querySelector(".setup")?.className, text: document.querySelector(".setup")?.innerText.replace(/\s+/g, " "),
+    st: { ...window.__st, flash: undefined }, flash: [...window.__st.flash].filter(([a, v]) => v !== 0xff && a < 0x10100000) }));
+  let ok = /good/.test(got.card || "") && got.st.installed && !errs.length && !notes.length;
+  if (!got.st.installed) notes.push("firmware not installed");
+  if (got.st.flashes !== (sc.flashes || 1)) { ok = false; notes.push("flashes " + got.st.flashes); }
+  if (!sc.noProfile && got.st.picks) { ok = false; notes.push(`${got.st.picks} taps needed`); }
+  if (sc.noProfile) notes.push(`${got.st.picks} taps`);
+  const want = expected(`public/mp/${sc.uf2}.uf2`, sc.pid === 3 ? 0xe48bff56 : 0xe48bff59), have = new Map(got.flash);
+  let wrong = 0;
+  for (const [a, v] of want) if ((have.get(a) ?? 0xff) !== v) wrong++;
+  for (const [a] of have) if (!want.has(a)) wrong++;
+  if (wrong || got.st.usbErrors.length || !got.st.wiped) { ok = false; notes.push(`flash: ${wrong} wrong bytes, usb errors ${JSON.stringify(got.st.usbErrors.slice(0, 3))}, wiped ${got.st.wiped}`); }
+  else notes.push(`${sc.uf2} exact`);
+  if (!ok) bad++;
+  console.log(ok ? "ok  " : "BAD ", sc.name.padEnd(12), "|", got.text, "|", notes.join("; "), errs.length ? "ERRORS " + errs.join("; ") : "");
 }
 await browser.close();
 process.exit(bad ? 1 : 0);
