@@ -483,13 +483,13 @@ export async function useApp(r: Repl, cart: Cart, onProgress: (p: number, what: 
   return { written: todo.length, restarted: false };
 }
 
-/** Take its app off: the app's files the core doesn't need, then an empty apps.json ("no software"). */
+/** Uninstall the app: the app's files the core doesn't need, then an empty apps.json ("no software"). */
 export async function removeApp(r: Repl) {
   startAsk();
   const m = await firmwareManifest();
   const ch = await checkedHave(r, m, [], true);
-  if (ch && await job(r, m, "Take its app off", [], others(m, ch, null), [], () => {}, !!ch.late)) return { restarted: true };
-  await takeOver(r, askHint, "Take its app off");
+  if (ch && await job(r, m, "Uninstall the app", [], others(m, ch, null), [], () => {}, !!ch.late)) return { restarted: true };
+  await takeOver(r, askHint, "Uninstall the app");
   const have = await look(r, allNames(m));
   await removeFiles(r, have, others(m, have, null));
   await writeApps(r, m, have, null);

@@ -126,7 +126,7 @@ Get the host tool (one file; needs `pip install pyserial`):
     python3 wedgie.py install app.py --name "My app"    make one file the app it runs (it restarts into it)
     python3 wedgie.py apps                 the apps on wedgie.dev, and which one it runs
     python3 wedgie.py use usbwallet        make that the app it runs (the old one comes off; saves stay)
-    python3 wedgie.py off                  take its app off
+    python3 wedgie.py uninstall            uninstall its app
     python3 wedgie.py ls                   every file, saves included
     python3 wedgie.py saves [backup f.json | restore f.json]
 

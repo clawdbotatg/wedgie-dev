@@ -365,7 +365,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     const a = m.carts.find((c) => c.mod === active());
     if (x.kind === "micropython") note.innerHTML = "Apps run on wedgie firmware. Install it above first.";
     else if (x.kind === "wedgie" && !slot()) note.innerHTML = "Update the firmware above first. From 0.2 a wedgie runs one app: it boots straight into it, and the app gets every button.";
-    else note.innerHTML = a ? `It runs <b>${esc(a.name)}</b>. Tap it to take it off, or another to switch. Saves stay.` : "Nothing on it yet. Tap one: it goes on and the wedgie restarts into it.";
+    else note.innerHTML = a ? `It runs <b>${esc(a.name)}</b>. Tap it to uninstall it, or another to switch. Saves stay.` : "Nothing on it yet. Tap one: it goes on and the wedgie restarts into it.";
     const shelf = $("#d-shelf");
     const mods = new Set(m.carts.map((c) => c.mod));
     shelf.querySelectorAll<HTMLElement>(".cart-slot").forEach((el) => { if (!mods.has(el.dataset.mod!)) el.remove(); });
@@ -438,7 +438,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     busy = "cart"; paint();
     const x = w;
     let restarted = false;
-    try { restarted = (await removeApp(r)).restarted; } catch (e: any) { status(`<b class="bad">Couldn't take it off:</b> ${esc(e?.message || e)}`); }
+    try { restarted = (await removeApp(r)).restarted; } catch (e: any) { status(`<b class="bad">Couldn't uninstall it:</b> ${esc(e?.message || e)}`); }
     if (restarted) { W.reidentify(x); release?.(); release = null; link = null; }   // it restarted itself (a checked job)
     else await backToApp(r).catch(() => {});
     busy = ""; paint(); W.touch();

@@ -169,8 +169,8 @@ out, f = run({"job": "Install Buttons", "write": ["keytest.py"], "delete": [], "
 check(json.loads(f["apps.json"])[0]["mod"] == "hello" and "done" not in types_(out), "apps with a list that names none: refused (%s)" % types_(out))
 
 # 12. taking the app off
-out, f = run({"job": "Take its app off", "write": [], "delete": ["hello.py"], "apps": "[]"}, [{"type": "commit"}])
-check(types_(out)[-2:] == ["done", "reset"] and json.loads(f["apps.json"]) == [] and "hello.py" not in f, "taking its app off goes in: %s" % types_(out))
+out, f = run({"job": "Uninstall the app", "write": [], "delete": ["hello.py"], "apps": "[]"}, [{"type": "commit"}])
+check(types_(out)[-2:] == ["done", "reset"] and json.loads(f["apps.json"]) == [] and "hello.py" not in f, "uninstalling goes in: %s" % types_(out))
 
 # 13. commit with an upload still open
 out, f = run({"job": "Install Buttons", "write": ["keytest.py"], "delete": [], "apps": json.dumps(buttons)},

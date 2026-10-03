@@ -10,7 +10,7 @@
   python3 wedgie.py press A [ms]              press a button: A B X Y up down left right press
   python3 wedgie.py apps                      the apps on wedgie.dev, and which one it runs
   python3 wedgie.py use usbwallet             make that the app it runs (the old one comes off, saves stay); it restarts into it
-  python3 wedgie.py off                       take its app off ("no software")
+  python3 wedgie.py uninstall                 uninstall its app ("no software")
   python3 wedgie.py run app.py                run a file once (output streams; Ctrl-C stops), then back to its app
   python3 wedgie.py install .                 make the app in this folder's wedgie.json the app it runs (wedgie.dev/code.md)
                                               (several apps in it: install . snake)
@@ -635,7 +635,7 @@ def main():
             remove_files(wg, have, others(m, have, None))
             write_apps(wg, m, have, None)
             wg.leave(reset=False)
-            print("its app is off; it shows \"no software\"")
+            print("its app is uninstalled; it shows \"no software\"")
         elif c == "update":
             m = manifest()
             take_over(wg)
@@ -675,7 +675,7 @@ def main():
         elif c in ("use", "cart"):
             mod = args.rest[-1] if args.rest else ""
             if c == "cart" and args.rest[:1] == ["remove"]:
-                sys.exit("wedgie.py off   takes its app off")
+                sys.exit("wedgie.py uninstall   uninstalls its app")
             m = manifest()
             cart = next((x for x in m["carts"] if x["mod"] == mod), None)
             if not cart:
