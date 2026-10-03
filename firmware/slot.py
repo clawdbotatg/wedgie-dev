@@ -188,7 +188,8 @@ def handle(line):
     else:
         try:
             m = json.loads(line)
-        except ValueError:
+        except Exception:               # bad JSON, or out of memory / too deep decoding it
+            gc.collect()
             return
     line = None
     if not isinstance(m, dict):
@@ -252,9 +253,8 @@ def _handle(m):
         _restart()                      # a no: start again
     elif t == "sums" and not m.get("names"):    # only which files are there: no job.py needed
         W.send({"id": mid, "type": "sums", "sums": _there(m.get("exists")), "apps": W.apps()})
-    elif t == "sums":
-        import job
-        W.send({"id": mid, "type": "sums", "sums": job.sums(m.get("names"), m.get("exists")), "apps": W.apps()})
+    elif t == "sums":                   # wedgie.sums: no job.py to compile on the app's heap
+        W.send({"id": mid, "type": "sums", "sums": W.sums(m.get("names"), m.get("exists")), "apps": W.apps()})
     elif t == "reboot":
         W.send({"id": mid, "type": "rebooting"})
         import machine
@@ -311,11 +311,9 @@ def _job(mid, m):
         job.run(mid, m, lambda *a: True, job.progress)
         return False
     W.save_job({"id": mid, "m": m, "asked_ms": W.asked_ms})
-    try:                                # the yes shows at once: the progress screen, the bar already moving.
-        b = ui.progress(W.doing(title).replace("...", ""), "starting")      # The restart keeps it
-        if b:                                                              # (boot.py, splash.show(keep))
-            b.to(0.02)
-    except Exception as e:              # cosmetic: the install goes on without it
+    try:                                # the yes shows at once: the install's screen (the restart keeps it:
+        ui.progress(W.doing(title).replace("...", ""), "starting", bar=False)    # splash.show(keep)). No bar
+    except Exception as e:              # here: its 9 KB failed on the Wallet's heap; install mode draws it
         print("slot: progress:", e)
     _to_job()
     return True
@@ -426,7 +424,9 @@ def serve(_=None):
         if line and line.strip().startswith(b"{"):
             try:
                 m = json.loads(line)
-            except ValueError:
+            except Exception:           # bad JSON, or out of memory / too deep decoding it: drop it, go on
+                line = None
+                gc.collect()
                 continue
             line = None                 # a job runs inside handle: don't keep its line alive under it
             handle(m)

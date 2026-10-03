@@ -41,7 +41,7 @@ await wait(() => document.querySelector("[data-fw]") && !document.querySelector(
 await page.click("[data-fw]");
 await wait(() => /Up to date/.test(document.querySelector("#d-fw")?.textContent || ""), null, 120000, "0.1.3 updated");
 let s = await screens(0);
-check(s.length >= 5 && s.every((x) => x.title === "Updating firmware") && fills(s) && s.some((x) => x.what === "slot.py"),
+check(s.length >= 5 && s.every((x) => x.title === "Updating firmware") && fills(s) && s.some((x) => x.what === "slot.mpy"),
   `update: the boot bar the whole time, 'Updating firmware', each file under it, filled (${s.length} draws: ${says(s)})`);
 
 // 1: an app, a file, saves, each over full access (0.2.9 has no checked installs)

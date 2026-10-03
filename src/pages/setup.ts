@@ -13,7 +13,13 @@ import { installCore } from "../serial/install";
 import { usbSupported, bootDevices, isBoot, pickBoot, flashMicroPython, BOOT_PIDS } from "../serial/picoboot";
 import { esc } from "../ui/device";
 
-type Job = { stage: "boot" | "flash" | "back" | "install" | "done" | "fail"; text: string; detail: string; p: number | null; since: number; wifi: boolean; pick?: "boot" | "serial" };
+// One board at a time, and always the one the person pressed Set up on: a board that restarts into boot
+// mode is the one whose USB serial is its ID, else the ONE boot-mode Pico that wasn't there before
+// (job.before), never just the first one; a board back on MicroPython is the one whose ID matches the
+// flashed Pico's USB serial, else the only new one. Two candidates: it stops and says so (codex review: it
+// wiped the wrong board).
+type Job = { stage: "boot" | "flash" | "back" | "install" | "done" | "fail"; text: string; detail: string; p: number | null; since: number; wifi: boolean; pick?: "boot" | "serial";
+  before?: USBDevice[]; serial?: string };
 let bench: Promise<string> | null = null;
 const benchPy = () => (bench ??= fetch("/device/bench.py").then((r) => { if (!r.ok) throw new Error("bench.py missing"); return r.text(); }));
 const bare = (w: W.Wedgie) => w.state === "ready" && w.kind === "micropython" && w.firmware === "nothing yet";
@@ -57,10 +63,20 @@ export function setupCard(el: HTMLElement) {
   async function look() {
     if (!alive) return;
     boots = W.armed() || usb ? await bootDevices().catch(() => []) : [];
-    if (job?.stage === "boot" && boots.length) return void flash(boots[0]);
+    if (job?.stage === "boot") {
+      const sn = job.serial?.toLowerCase();
+      const mine = sn ? boots.find((d) => d.serialNumber?.toLowerCase() === sn) : undefined;   // known: its own ID
+      if (mine) return void flash(mine);
+      const fresh = boots.filter((d) => !(job!.before || []).includes(d));
+      if (fresh.length === 1) return void flash(fresh[0]);
+      if (fresh.length > 1) return void fail(new Error("more than one Pico is in boot mode"), "Not wiped");
+    }
     if (job?.stage === "back") {
-      const w = W.wedgies().find((x) => x.state === "ready" && x.kind === "micropython" && (x.readyAt || 0) > job!.since);
+      const back = W.wedgies().filter((x) => x.state === "ready" && x.kind === "micropython" && (x.readyAt || 0) > job!.since);
+      const sn = job.serial?.toLowerCase();
+      const w = (sn && back.find((x) => x.uid?.toLowerCase() === sn)) || (back.length === 1 ? back[0] : null);
       if (w) return void install(w);
+      if (back.length > 1) return void fail(new Error("more than one board came back"), "Stopped before the firmware");
     }
     paint();
   }
@@ -74,8 +90,10 @@ export function setupCard(el: HTMLElement) {
 
   // A serial board with something else on it: opening it at 1200 baud is the standard "reboot into BOOTSEL".
   async function knock(w: W.Wedgie) {
-    set({ stage: "boot", text: "Restarting it into boot mode…", detail: "It came with something else on it. That gets wiped.", since: Date.now() });
+    const before = await bootDevices().catch(() => [] as USBDevice[]);
+    set({ stage: "boot", text: "Restarting it into boot mode…", detail: "It came with something else on it. That gets wiped.", since: Date.now(), before });
     try { await w.port.open({ baudRate: 1200 }); await w.port.close(); } catch {}
+    setTimeout(look, 300);              // in case it's in boot mode before the USB event is heard
     needPick("boot", "boot");
   }
 
@@ -84,13 +102,13 @@ export function setupCard(el: HTMLElement) {
     set({ stage: "flash", text: wifi ? "It has WiFi: WiFi MicroPython going on…" : "Wiping it, putting MicroPython on…", detail: "Don't unplug it.", p: 0, pick: undefined });
     try { await flashMicroPython(dev, (p) => set({ p }), wifi); }
     catch (e) { return fail(e, "MicroPython didn't go on"); }
-    set({ stage: "back", text: "Restarting it…", detail: "A few seconds.", p: null, since: Date.now() });
+    set({ stage: "back", text: "Restarting it…", detail: "A few seconds.", p: null, since: Date.now(), serial: dev.serialNumber || undefined });
     needPick("back", "serial");
   }
 
   async function install(w: W.Wedgie) {
     set({ stage: "install", text: "Installing the wedgie firmware…", detail: "Don't unplug it.", p: 0, pick: undefined });
-    let reboot = false;
+    let reboot = false, before: USBDevice[] = [];
     try {
       await W.withRepl(w, async (r) => {
         await r.enter({ reset: true });          // bare MicroPython: no drive, a reset is safe
@@ -100,12 +118,12 @@ export function setupCard(el: HTMLElement) {
         let b: any = null;
         r.onLine = (t, v) => { if (t === "board") b = v; };
         await r.exec("board()", 15000);
-        if (b?.wifi && !b.wbuild && !job?.wifi) { reboot = true; await r.write("import machine\nmachine.bootloader()\x04"); return; }
+        if (b?.wifi && !b.wbuild && !job?.wifi) { before = await bootDevices().catch(() => []); reboot = true; await r.write("import machine\nmachine.bootloader()\x04"); return; }
         await installCore(r, (p, what) => set({ p, detail: `${what}. Don't unplug it.` }), { launcher: false });
         await r.leave();                         // the one soft reset: it boots into the new firmware
       });
     } catch (e) { return fail(e, "The firmware didn't go on"); }
-    if (reboot) { set({ stage: "boot", wifi: true, text: "It has WiFi: restarting into boot mode…", detail: "For the WiFi build of MicroPython.", p: null, since: Date.now() }); return needPick("boot", "boot"); }
+    if (reboot) { set({ stage: "boot", wifi: true, text: "It has WiFi: restarting into boot mode…", detail: "For the WiFi build of MicroPython.", p: null, since: Date.now(), before, serial: w.uid }); look(); return needPick("boot", "boot"); }   // it may be in boot mode already
     W.reidentify(w);
     set({ stage: "done", text: `${w.short} is set up`, detail: "It's restarting on the wedgie firmware. Tap it below to pick its app.", p: null });
   }

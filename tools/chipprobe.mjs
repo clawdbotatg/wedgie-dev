@@ -11,7 +11,10 @@
 //   node tools/chipprobe.mjs [--fw <firmware dir>] [--from <app>] [--to <app>] [--no-update] [--all] [--log <file>]
 //   (needs uv: the flash image is made with littlefs-python)
 import { generateKeyPairSync, createPublicKey, sign, createHash } from "node:crypto";
-import { appendFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, writeFileSync, readFileSync, mkdtempSync, existsSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { host } from "./rp2040/chip.mjs";
 import { firmware, image, appEntry } from "./rp2040/image.mjs";
 import { appLines } from "./release.mjs";
@@ -23,12 +26,19 @@ const LOG = arg("--log");                 // every byte the chip sends, to read 
 if (LOG) writeFileSync(LOG, "");
 const version = (F.file("wedgie.py").toString().match(/VERSION = "([^"]+)"/) || [])[1];
 
-// a throwaway release key: the test image's wedgie.py trusts it, the list is signed with it
+// a throwaway release key: the test image's wedgie trusts it, the list is signed with it. wedgie ships
+// compiled (0.3.14+), so the test copy is compiled too, as tools/mpy.py does (needs uv).
 const { privateKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
 const jwk = createPublicKey(privateKey).export({ format: "jwk" });
 const hx = (b) => Buffer.from(b, "base64url").toString("hex");
 const wedgiePy = Buffer.from(F.file("wedgie.py").toString().replace(/^RELEASE_KEY = .*$/m, `RELEASE_KEY = ("${hx(jwk.x)}", "${hx(jwk.y)}")`));
-const fileOf = (n) => (n === "wedgie.py" ? wedgiePy : F.file(n));
+const KD = mkdtempSync(join(tmpdir(), "chipkey-"));
+writeFileSync(join(KD, "wedgie.py"), wedgiePy);
+execFileSync("uv", ["run", "-q", "--with", "mpy-cross==1.29.0.post2", "python3", "-c",
+  "import mpy_cross,subprocess,sys; subprocess.run([mpy_cross.mpy_cross,'-s','wedgie.py','-o',sys.argv[2],sys.argv[1]],check=True)",
+  join(KD, "wedgie.py"), join(KD, "wedgie.mpy")]);
+const wedgieMpy = readFileSync(join(KD, "wedgie.mpy"));
+const fileOf = (n) => (n === "wedgie.py" ? wedgiePy : n === "wedgie.mpy" ? wedgieMpy : F.file(n));
 const sha = (b) => createHash("sha256").update(b).digest("hex");
 const relText = `wedgie-release 1\nversion ${version}\n` + F.all.map((n) => `${sha(fileOf(n))}  ${n}\n`).join("") + appLines(F.carts);
 const sg = sign("sha256", Buffer.from(relText), { key: privateKey, dsaEncoding: "ieee-p1363" }).toString("hex");
@@ -39,12 +49,20 @@ const BAD = /MemoryError|memory allocation failed|Traceback|wedgie broke/;
 let failed = 0, leastFree = Infinity, leastWhere = "";
 const check = (ok, what) => { console.log(`${ok ? "ok  " : "FAIL"} ${what}`); if (!ok) failed++; };
 
-function wedgie(app) {
-  const h = host({ fs: image(F, app, { "wedgie.py": wedgiePy }), onData: LOG && ((b) => appendFileSync(LOG, Buffer.from(b))) });
+// old: the core as 0.3.13 and before had it, source (.py) where the release has bytecode (.mpy): a firmware
+// update then sends, commits and boots every compiled file, and the old .py must be gone after (MicroPython
+// imports a .py before a .mpy). The same files would go nowhere: their hashes match.
+const compiled = F.core.filter((n) => n.endsWith(".mpy") && existsSync(join(F.dir, n.slice(0, -4) + ".py")));
+const older = () => Object.fromEntries(compiled.map((n) => n.slice(0, -4) + ".py").map((n) => [n, fileOf(n)]));
+
+function wedgie(app, old = false) {
+  let all = "";      // everything it ever printed: h.take() clears h.out, and a failure before that must still count
+  const h = host({ fs: image(F, app, old ? older() : { "wedgie.mpy": wedgieMpy }, old ? compiled : []), onData: (b) => { all += Buffer.from(b).toString("latin1"); if (LOG) appendFileSync(LOG, Buffer.from(b)); } });
   for (const p of Object.values(KEYS)) h.chip.mcu.gpio[p].setInputValue(true);     // buttons: pulled up
   let id = 100;
   const w = {
     h,
+    get all() { return all; },
     req: (m, ms) => h.req({ ...m, id: ++id }, ms),
     press(k) {
       const p = h.chip.mcu.gpio[KEYS[k]];
@@ -79,7 +97,9 @@ function job(w, title, write, del, apps, where) {
   w.ram(where + ", after the signature");
   const s = w.req({ type: "sums", names: write }, 60000);
   if (s?.type !== "sums") return `sums: ${JSON.stringify(s)}`;
-  for (const n of write.filter((n) => s.sums[n] !== sha(fileOf(n)))) {
+  const send = write.filter((n) => s.sums[n] !== sha(fileOf(n)));
+  w.sent = send.length;
+  for (const n of send) {
     const buf = fileOf(n);
     for (let o = 0; o < Math.max(buf.length, 1); o += 1024) {
       const p = w.req({ type: "put", name: n, data: buf.subarray(o, o + 1024).toString("base64"), end: o + 1024 >= buf.length }, 30000);
@@ -95,7 +115,7 @@ function job(w, title, write, del, apps, where) {
 }
 
 // what went wrong: from the first traceback (or error line) on, so the cause is in the output
-const bad = (w) => { const L = w.h.out.split("\n"), i = L.findIndex((l) => BAD.test(l) || /Error/.test(l)); return L.slice(i, i + 8).map((l) => l.trim()).join(" / "); };
+const bad = (w) => { const L = w.all.split("\n"), i = L.findIndex((l) => BAD.test(l) || /Error/.test(l)); return L.slice(i, i + 8).map((l) => l.trim()).join(" / "); };
 const carts = F.carts;
 const from = arg("--from"), to = arg("--to");
 // default: each app over the one before it (a ring: every app goes on once, every app is the old one once).
@@ -112,11 +132,26 @@ for (const [a, b] of pairs) {
   const r0 = w.ram(`${a.mod} running`);
   const del = a.files.filter((n) => !b.files.includes(n) && !F.core.includes(n));
   let r = job(w, `Install ${b.name}`, b.files, del, [appEntry(F, b)], `${a.mod} -> ${b.mod}`);
-  check(r === true && !BAD.test(w.h.out), `install ${b.mod} while ${a.mod} runs (${r0} B free before): ${r === true ? "done, restarted" : r} ${BAD.test(w.h.out) ? "| " + bad(w) : ""}(${Math.round((Date.now() - t0) / 1000)} s)`);
+  if (r === true) {                 // it restarted into the new app, and it runs
+    const back = w.h.out.match(/\{[^\n]*"type": "ready"[^\n]*\n/);
+    if (!back || !back[0].includes(`"running": "${b.mod}"`) && !back[0].includes('"fw": "usb-1"')) r = `after the restart it runs ${back ? back[0].slice(0, 120) : "nothing"}`;
+  }
+  check(r === true && !BAD.test(w.all), `install ${b.mod} while ${a.mod} runs (${r0} B free before): ${r === true ? "done, restarted into it" : r} ${BAD.test(w.all) ? "| " + bad(w) : ""}(${Math.round((Date.now() - t0) / 1000)} s)`);
   if (args.includes("--no-update")) continue;
-  w = wedgie(a.mod);       // it started a moment ago, so it starts again
+  w = wedgie(a.mod, true);  // the same app on an older core: every core .py differs
+  const want = compiled.length;
   r = job(w, "Update firmware", F.core, [], null, `${a.mod}, firmware update`);
-  check(r === true && !BAD.test(w.h.out), `firmware update (${F.core.length} core files) while ${a.mod} runs: ${r === true ? "done" : r} ${BAD.test(w.h.out) ? "| " + bad(w) : ""}`);
+  if (r === true && w.sent !== want) r = `sent ${w.sent} files, not ${want}`;
+  if (r === true) {                 // booted on the new core: every core file is the target's now
+    w.h.chip.run(1500);
+    const olds = Object.keys(older());
+    const s = w.req({ type: "sums", names: [...F.core, ...olds] }, 60000);
+    const off = F.core.filter((n) => s?.sums?.[n] !== sha(fileOf(n)));
+    const left = olds.filter((n) => s?.sums?.[n]);
+    if (off.length) r = `after the update these aren't the new ones: ${off.join(" ")}`;
+    else if (left.length) r = `the old .py is still there (it would run instead): ${left.join(" ")}`;
+  }
+  check(r === true && !BAD.test(w.all), `firmware update (${want} core files sent, booted on them) while ${a.mod} runs: ${r === true ? "done" : r} ${BAD.test(w.all) ? "| " + bad(w) : ""}`);
 }
 console.log(`     least free heap seen: ${leastFree} bytes (${leastWhere})`);
 console.log(failed ? `${failed} FAILED` : "all checks passed");

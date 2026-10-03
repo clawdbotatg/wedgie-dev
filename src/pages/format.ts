@@ -56,6 +56,12 @@ export function format(main: HTMLElement) {
   <section class="test-page">
     <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
     <h1>Format a wedgie</h1>
+    <div class="boot-hint card" id="t-hint" hidden>
+      <div class="boot-hint-3d" id="t-hint-3d"></div>
+      <div><h3>Hold BOOTSEL, plug it in</h3>
+      <p>Press the button through the hole in the back with a paperclip. Keep holding it while you plug in the USB cable. Let go once it's in.</p>
+      <p class="fine">A brand-new Pico doesn't need this. It shows up by itself.</p></div>
+    </div>
     <div class="test-status">
       <div class="status-text" id="t-text">Plug in a wedgie</div>
       <div class="status-detail" id="t-detail">New or used. Nothing happens until you press Format.</div>
@@ -316,10 +322,18 @@ export function format(main: HTMLElement) {
   }
 
   // ---- what to do next ------------------------------------------------------------------------------
+  // Nothing plugged in (or a unit told to reboot into boot mode that hasn't shown up): how to get it there.
+  const hint = $("t-hint");
+  let hint3d: Promise<unknown> | null = null;
+  function showHint(on: boolean) {
+    hint.hidden = !on;
+    if (on && !hint3d) hint3d = import("../ui/bootsel3d").then((m) => m.mountBootsel3D($("t-hint-3d"))).catch(() => null);
+  }
   async function pick() {
-    if (busy) return;
+    if (busy) return showHint(false);
     const boot = (await bootDevices()).find((d) => !flashed.has(d));
-    if (busy) return;
+    if (busy) return showHint(false);
+    showHint(!boot && !flashedAt && !W.wedgies().some((w) => w.state !== "error" && !done(w)));
     const midway = !!(flashedAt || waitBoot);   // one unit's format is under way (its reboots come back here)
     if (boot) return void (go || midway ? flash(boot) : ask(`A Pico in boot mode (${BOOT_PIDS[boot.productId]})`));
     const ws = W.wedgies();
@@ -388,6 +402,7 @@ export function format(main: HTMLElement) {
     return;
   }
   navigator.usb.addEventListener("connect", (e) => { if (isBoot((e as USBConnectionEvent).device)) setTimeout(pick, 300); });
+  navigator.usb.addEventListener("disconnect", () => setTimeout(pick, 300));
   W.onChange(pick);
   W.arm(); // the bench is for people with a board in hand
   W.start();

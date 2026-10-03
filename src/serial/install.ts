@@ -171,10 +171,12 @@ async function copy(r: Repl, files: FileInfo[], have: Have, onProgress: (p: numb
     if (!f.url && hex(await crypto.subtle.digest("SHA-256", buf)) !== f.sha256) throw new Error("wedgie.dev was updated since this page opened. Reload the page, then try again");
     await writeFile(r, f.name, buf, { span: [done / total, (done + f.size) / total], sha: f.sha256, onChunk: (p) => onProgress(p, f.name) });
     have.hashes[f.name] = f.sha256;
-    const src = twin(f.name);           // the .mpy is on: its old source comes off (it would run instead)
-    if (src && have.hashes[src]) await removeFiles(r, have, [src]);
     done += f.size;
   }
+  // Every .mpy that's on now (just sent, or already there from a try that stopped halfway): its old
+  // source comes off, or it would run instead.
+  const srcs = files.filter((f) => have.hashes[f.name] === f.sha256 && have.hashes[twin(f.name) || ""]).map((f) => twin(f.name)!);
+  if (srcs.length) await removeFiles(r, have, srcs);
   return todo;
 }
 
@@ -243,7 +245,8 @@ const signedList = () => release ||= Promise.all(["release.txt", "release.sig"].
 async function job(r: Repl, m: Manifest, title: string, write: string[], del: string[], apps: any[] | null, onProgress: (p: number, what: string) => void, late = false): Promise<{ sent: number } | false> {
   // late: the signed list goes after the yes, so the question doesn't wait for its download. The
   // manifest lists the same files (tools/fw.mjs and tools/sign.mjs publish the same set).
-  del = [...new Set([...del, ...write.map(twin).filter((n): n is string => !!n)])];    // a written .mpy's old source
+  // A written .mpy's old .py: job.py's commit removes it (0.3.12+, the only firmware that gets checked
+  // jobs). Not in delete: 0.3.12-0.3.13 refuse to delete their core names (wedgie.py, slot.py, ...).
   const relP = signedList();
   relP.catch(() => {});
   const listed = late ? new Set(m.files.map((f) => f.name)) : new Set((await relP).text.split("\n").slice(2).map((l) => l.split("  ")[1]).filter(Boolean));
@@ -385,9 +388,11 @@ export async function installCore(r: Repl, onProgress: (p: number, what: string)
   const retired = RETIRED.filter((n) => have.files.includes(n));
   if (stale.length || retired.length) await r.exec(`import os\nfor n in ${JSON.stringify([...stale, ...retired])}:\n    os.remove(n)`);
   const fromMenu = retired.length > 0;          // 0.1.x (the menu): it starts with no app, the person picks one
-  const todo = await copy(r, fileInfo(m, m.core), have, (p, w) => onProgress(0.05 + 0.9 * p, w));
-  // One app from 0.2 on: it keeps its app; the other carts' files go (never its saves).
+  // One app from 0.2 on: it keeps its app, brought up to date with the core (an app now shipped compiled,
+  // the Wallet, gets its .mpy here; apps.json would drop it otherwise); the other carts' files go (never its saves).
   const act = fromMenu ? null : activeOf(m, have);
+  const keep = m.carts.find((c) => c.mod === act)?.files || [];
+  const todo = await copy(r, fileInfo(m, [...new Set([...m.core, ...keep])]), have, (p, w) => onProgress(0.05 + 0.9 * p, w));
   await removeFiles(r, have, others(m, have, act));
   const apps = await writeApps(r, m, have, act);
   onProgress(1, todo.length ? `${todo.length} files updated` : "already up to date");

@@ -3,7 +3,7 @@
 # interrupted; from the REPL they are plain calls:  import wedgie; wedgie.shot(); wedgie.press("A")
 import sys, os, json, machine
 
-VERSION = "0.3.13"
+VERSION = "0.3.14"
 
 # The lock. main.py turns Ctrl-C off before anything else and never ends by itself, so a computer
 # can only send the slot's JSON lines: it can't stop the app, reach the REPL, or make the secure chip
@@ -432,6 +432,35 @@ def lines(size=6144):
         gc.collect()
         _lines = Lines(size)
     return _lines
+
+
+def sums(names, exists=()):
+    """sha256 of each of names; for exists, only whether it's there (1 or None): hashing every file
+    on the flash took seconds before each question. Here, not in job.py: answering it used to import
+    job.py, and compiling that (17 KB) on an app's heap ran out of memory ("allocating 1336 bytes",
+    chipprobe, 0.3.13 with Clear sign running)."""
+    import hashlib, binascii
+    out = {}
+    for n in exists or ():
+        try:
+            os.stat(n)
+            out[n] = 1
+        except OSError:
+            out[n] = None
+    buf = bytearray(512)
+    for n in names or []:
+        try:
+            h = hashlib.sha256()
+            with open(n, "rb") as f:
+                while True:
+                    k = f.readinto(buf)
+                    if not k:
+                        break
+                    h.update(memoryview(buf)[:k])
+            out[n] = binascii.hexlify(h.digest()).decode()
+        except OSError:
+            out[n] = None
+    return out
 
 
 def shot(mid=None):

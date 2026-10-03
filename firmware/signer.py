@@ -92,6 +92,8 @@ def load():
         s.chip.wake()
         s.chip.sleep()
         return s
+    except MemoryError:     # out of memory isn't "no chip": a real wallet must never fall back to the soft key for it
+        raise
     except Exception as e:
         print("no chip (%s), using software key" % e)
         return SoftSigner()

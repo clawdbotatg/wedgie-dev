@@ -21,33 +21,12 @@
 import sys, os, json, time, gc, select, hashlib, binascii
 import wedgie as W
 
-KEEP = ("main.py", "boot.py", "wedgie.py", "slot.py", "lcd.py", "job.py", "p256.py", "loader.py")
+KEEP = ("main.py", "boot.py", "wedgie.py", "slot.py", "lcd.py", "job.py", "p256.py", "loader.py",
+        "wedgie.mpy", "slot.mpy", "lcd.mpy", "job.mpy", "p256.mpy", "loader.mpy")    # 0.3.14+: the core is compiled
 IDLE_MS = 30000
 
 
-def sums(names, exists=()):
-    """sha256 of each of names; for exists, only whether it's there (1 or None): hashing every file
-    on the flash took seconds before each question."""
-    out = {}
-    for n in exists or ():
-        try:
-            os.stat(n)
-            out[n] = 1
-        except OSError:
-            out[n] = None
-    for n in names or []:
-        try:
-            h = hashlib.sha256()
-            with open(n, "rb") as f:
-                while True:
-                    b = f.read(1024)
-                    if not b:
-                        break
-                    h.update(b)
-            out[n] = binascii.hexlify(h.digest()).decode()
-        except OSError:
-            out[n] = None
-    return out
+sums = W.sums           # it lives in wedgie.py: the slot answers sums without loading this file
 
 
 def _tmp(n):
@@ -105,22 +84,31 @@ def check(m, sig=True, tick=None):
             appf.update(a.get("files") or ())
         core = [n for n in files if n not in appf]
         now = W.active()
-        app = now and now.get("mod")    # the app it keeps, unless this job puts on another
-        if m.get("apps") is not None:
-            want = json.loads(m["apps"])
+        app = now and now.get("mod")    # the app it runs now
+        want = json.loads(m["apps"]) if m.get("apps") is not None else None
+        title = str(m.get("job"))
+        # What the person said yes to is what happens: the title decides the kind of job, and the job
+        # must be exactly that (codex 2026-10-03: "Install Buttons" with no app uninstalled Hello).
+        if title.startswith("Install "):        # puts on the signed app with that name
+            a = signed.get(want[0].get("mod")) if want else None
+            if not a or a["name"] != title[8:]:
+                raise ValueError("this job said %r but puts on %s" % (title, want and want[0].get("mod")))
+            app = a["mod"]
+            e = dict((k, a[k]) for k in ("mod", "name", "entry", "usb") if k in a)
+            e["v"] = str(want[0].get("v") or "")[:16]       # the site's: cosmetic, nothing runs them
+            e["about"] = str(want[0].get("about") or "")[:100]
+            m["apps"] = json.dumps([e])
+        elif title == "Update firmware":       # keeps the app it runs, and apps.json as it says
+            if want is not None and [x.get("mod") for x in want] != ([app] if app else []):
+                raise ValueError("a firmware update keeps the app it runs")
             if want:
-                a = signed.get(want[0].get("mod"))
-                if not a:
-                    raise ValueError("%s isn't a wedgie.dev app" % want[0].get("mod"))
-                if a["mod"] != app and str(m.get("job")) != "Install " + a["name"]:
-                    raise ValueError("this job said %r, not Install %s" % (m.get("job"), a["name"]))
-                app = a["mod"]
-                e = dict((k, a[k]) for k in ("mod", "name", "entry", "usb") if k in a)
-                e["v"] = str(want[0].get("v") or "")[:16]       # the site's: cosmetic, nothing runs them
-                e["about"] = str(want[0].get("about") or "")[:100]
-                m["apps"] = json.dumps([e])
-            else:
-                app = None
+                m["apps"] = json.dumps([dict(now, v=str(want[0].get("v") or "")[:16])])
+        elif title in ("Uninstall the app", "Take its app off"):   # no app after it, nothing written
+            if want != [] or m.get("write"):
+                raise ValueError("an uninstall only takes the app off")
+            app = None
+        else:
+            raise ValueError("not a job this wedgie knows: %r" % title)
         own = (signed.get(app) or {}).get("files") or ()
         for n in m.get("write") or []:
             if n not in core and n not in own:

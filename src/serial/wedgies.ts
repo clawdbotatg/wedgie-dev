@@ -113,7 +113,7 @@ try:
 except ImportError:
     pass
 v = None
-if "wedgie.py" in os.listdir():
+if "wedgie.py" in os.listdir() or "wedgie.mpy" in os.listdir():
     try:
         import wedgie
         v = wedgie.VERSION

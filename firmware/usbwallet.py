@@ -118,7 +118,11 @@ def load_key():
 
 def probe_chip():
     global sig, state
-    sig = S.load()
+    try:
+        sig = S.load()
+    except MemoryError:             # never "no chip" because of memory (that would mean the soft key):
+        gc.collect()                # once more on a clean heap, else it fails loudly
+        sig = S.load()
     if sig.name != "atecc608" and not SOFT_OK:
         state = "nochip"
     elif state == "nochip":
@@ -191,8 +195,10 @@ def pump():
     elif line and line.strip():
         try:
             m = json.loads(line)
-        except ValueError:
-            send({"type": "error", "error": "bad json"})
+        except Exception as e:      # bad JSON, or out of memory / too deep decoding it: answer, go on
+            line = None
+            gc.collect()
+            send({"type": "error", "error": "bad json" if isinstance(e, ValueError) else "request too big"})
             return
         line = None                 # a job runs inside handle: don't keep its line alive under it
         try:
@@ -468,18 +474,22 @@ def draw_confirm():
             d.center_text("RECOVERY", 90, L.WHITE, 2)
         elif kind == "execute":
             sel = str(r.get("data", ""))[:10]
-            title = "TOKEN TRANSFER" if sel == "0xa9059cbb" else "TOKEN APPROVAL" if sel == "0x095ea7b3" else "GENERAL CALL"
-            d.center_text(title, 66, L.WHITE, 2)
+            # The selector only says what the call LOOKS like (any contract can take these bytes): the
+            # title says "looks like", and the ETH it sends is always shown, from the signed value.
+            title = "TRANSFER?" if sel == "0xa9059cbb" else "APPROVAL?" if sel == "0x095ea7b3" else "GENERAL CALL"
+            d.center_text(title, 62, L.WHITE, 2)
             data = str(r.get("data", ""))
             if title != "GENERAL CALL" and len(data) >= 138:     # the call's own words: who and how much
                 who, n = "0x" + data[34:74], int(data[74:138], 16)
                 tk = token_of({"chainId": r.get("chainId"), "token": r.get("target", "")})
                 amt = "UNLIMITED" if n >= 2**255 else (eth_amount(n, tk[1]) + " " + tk[0]) if tk else str(n) + " raw"
-                d.center_text(amt[:28], 86, L.YELLOW)
-                d.center_text(("to " if sel == "0xa9059cbb" else "for ") + short(who), 98, L.YELLOW)
-                d.center_text(("of " + short(str(r.get("target", ""))))[:28], 110, L.GREY)
+                d.center_text(amt[:28], 80, L.YELLOW)
+                d.center_text(("to " if sel == "0xa9059cbb" else "for ") + short(who), 92, L.YELLOW)
+                d.center_text(("of " + short(str(r.get("target", ""))))[:28], 104, L.GREY)
             else:
-                d.center_text((eth_amount(r.get("value", 0)) + " ETH to " + short(r.get("target", "")))[:30], 92, L.YELLOW)
+                d.center_text("to " + short(str(r.get("target", ""))), 92, L.YELLOW)
+            v = int(r.get("value", 0) or 0)
+            d.center_text(("+ " + eth_amount(v) + " ETH")[:28], 114 if title != "GENERAL CALL" else 104, L.RED if v else L.GREY)
         else:                           # from the signed fields only (check): never the host's hints
             tk = token_of(r)
             amt = eth_amount(r.get("amount", 0), tk[1]) if tk else str(r.get("amount", ""))
@@ -505,6 +515,8 @@ def draw_confirm():
             if r.get("toName"):
                 d.center_text("name (unchecked hint):", 120, L.GREY)
                 d.center_text(str(r["toName"])[:28], 132, L.YELLOW)
+            if kind == "execute":
+                d.center_text(("sends " + eth_amount(r.get("value", 0) or 0) + " ETH")[:28], 152, L.WHITE)
             if kind == "transfer":
                 d.center_text("amount " + str(r.get("amount", ""))[:22], 152, L.WHITE)
                 d.center_text("token", 168, L.GREY)

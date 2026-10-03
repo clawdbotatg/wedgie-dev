@@ -70,7 +70,7 @@ for (const sc of scenarios.filter((x) => !process.env.ONLY || x.name === process
     if (sc.used) for (const n of ["main.py", "menu.py", "wedgiedrive.py"]) files.set(n, new Uint8Array([7]));
     if (sc.saves) { files.set("/saves/hello/best.json", enc.encode('{"score": 120}')); files.set("/saves/demo/x.bin", Uint8Array.from({ length: 5000 }, (_, i) => (i * 7) & 255)); }   // over 2 KB: the raw read comes in chunks
     st.files = files;
-    const wedgie = () => (files.has("menu.py") || files.has("slot.py")) && files.has("main.py");
+    const wedgie = () => (files.has("menu.py") || files.has("slot.py") || files.has("slot.mpy")) && files.has("main.py");    // 0.3.14+: slot.mpy
     let push = () => {}, raw = false, code = "", line = "", cur = null, curName = "", live = true;
     const answer = (stdout, err = "") => push("OK" + stdout + "\x04" + err + "\x04>");
     let port;

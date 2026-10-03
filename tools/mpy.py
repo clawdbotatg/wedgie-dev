@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Compiled apps (.mpy): every file carts.json lists as X.mpy is built here from firmware/X.py, with the
+"""Compiled firmware (.mpy): the whole core (every firmware .py no app claims, but boot.py and main.py,
+which MicroPython only runs as .py) and every file carts.json lists as X.mpy, built from firmware/X.py with the
 mpy-cross of the MicroPython wedgie.dev flashes (1.29.0, mpy v6.3), and committed. A wedgie then loads
 bytecode: compiling 23 KB of Python on an RP2040 needs a parse tree that doesn't fit (the Wallet:
 "memory allocation failed" at start, docs/PLAN-MEMORY.md F3). Bytecode only, no -march: the same file
@@ -15,20 +16,39 @@ FW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "firmware")
 VERSION = "MicroPython v1.29.0"
 
 
+BOOT = ("boot", "main")      # MicroPython runs these two only as .py: keep them tiny
+
+
+def core():
+    """The core: firmware .py files no app claims (as .py or .mpy). Compiling them on the wedgie at boot
+    ran it out of memory on a fresh plug-in (0.3.13, a real board: import slot, 1016-1816 bytes)."""
+    carts = json.load(open(os.path.join(FW, "carts.json")))
+    claimed = {n.rsplit(".", 1)[0] for c in carts for n in c["files"]}
+    return sorted(n[:-3] for n in os.listdir(FW) if n.endswith(".py") and n[:-3] not in claimed and n[:-3] not in BOOT)
+
+
 def names():
-    out = []
+    out = core()
     for c in json.load(open(os.path.join(FW, "carts.json"))):
         out += [n[:-4] for n in c["files"] if n.endswith(".mpy")]
     return sorted(set(out))
 
 
+def native(text):
+    return "@micropython.viper" in text or "@micropython.native" in text or "@micropython.asm_thumb" in text
+
+
 def build(mod, out):
     src = os.path.join(FW, mod + ".py")
-    text = open(src).read()
-    if "@micropython.viper" in text or "@micropython.native" in text or "@micropython.asm_thumb" in text:
-        sys.exit("%s.py has native code: it can't be a .mpy (list it as .py in carts.json)" % mod)
     # -s: the name in tracebacks, and no path from this machine baked in (the bytes must be the same on any computer)
-    subprocess.run([mpy_cross.mpy_cross, "-s", mod + ".py", "-o", out, src], check=True)
+    cmd = [mpy_cross.mpy_cross, "-s", mod + ".py", "-o", out, src]
+    if native(open(src).read()):
+        if mod not in core():
+            sys.exit("%s.py has native code: an app's can't be a .mpy (list it as .py in carts.json)" % mod)
+        # viper in the core (loader's bar fill): machine code for the RP2040's Cortex-M0+ (armv6m), which the
+        # RP2350's M33 runs too (MicroPython takes an older ARM arch). The emulator runs the source (fw/src).
+        cmd[1:1] = ["-march=armv6m"]
+    subprocess.run(cmd, check=True)
 
 
 def main():

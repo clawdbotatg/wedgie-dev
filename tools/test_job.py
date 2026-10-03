@@ -144,9 +144,9 @@ out, f = run({"job": "Install Buttons", "write": ["battery.py"], "delete": [], "
 check(json.loads(f["apps.json"])[0]["mod"] == "hello" and "done" not in types_(out), "'Install Buttons' putting on Battery: refused (%s)" % types_(out))
 
 # 7. deletes by another name: ./main.py, a save, a folder, a core file
-for bad in ("./main.py", "main.py", "saves", "./saves/x.json", "/main.py", "slot.py", "../x", ".hidden"):
+for bad in ("./main.py", "main.py", "saves", "./saves/x.json", "/main.py", "slot.py", "slot.mpy", "../x", ".hidden"):
     out, f = run({"job": "Install Buttons", "write": [], "delete": [bad], "apps": json.dumps(buttons)}, [{"type": "commit"}])
-    check("main.py" in f and "slot.py" in f and "done" not in types_(out), "delete %r: refused (%s)" % (bad, types_(out)))
+    check("main.py" in f and "slot.mpy" in f and "done" not in types_(out), "delete %r: refused (%s)" % (bad, types_(out)))
 
 # 8. writing another app's file in an install
 out, f = run({"job": "Install Buttons", "write": ["keytest.py", "battery.py"], "delete": [], "apps": json.dumps(buttons)},
@@ -154,8 +154,8 @@ out, f = run({"job": "Install Buttons", "write": ["keytest.py", "battery.py"], "
 check("battery.py" not in f and "done" not in types_(out), "an install writing another app's file: refused (%s)" % types_(out))
 
 # 9. an update keeps the app it runs and may write the core + that app's files
-out, f = run({"job": "Update firmware", "write": ["slot.py", "hello.py"], "delete": [], "apps": json.dumps([{"mod": "hello"}])},
-             puts("slot.py", read("slot.py")) + puts("hello.py", read("hello.py")) + [{"type": "commit"}])
+out, f = run({"job": "Update firmware", "write": ["slot.mpy", "hello.py"], "delete": [], "apps": json.dumps([{"mod": "hello"}])},
+             puts("slot.mpy", read("slot.mpy")) + puts("hello.py", read("hello.py")) + [{"type": "commit"}])
 check(types_(out)[-2:] == ["done", "reset"] and json.loads(f["apps.json"])[0]["mod"] == "hello", "an update keeping its app goes in: %s" % types_(out))
 
 # 10. "Update firmware" switching the app: refused
@@ -176,6 +176,26 @@ check(types_(out)[-2:] == ["done", "reset"] and json.loads(f["apps.json"]) == []
 out, f = run({"job": "Install Buttons", "write": ["keytest.py"], "delete": [], "apps": json.dumps(buttons)},
              puts("keytest.py", kt, chunk=len(kt))[:1] and [{"type": "put", "name": "keytest.py", "data": base64.b64encode(kt[:100]).decode(), "end": False}, {"type": "commit"}])
 check("done" not in types_(out), "commit while an upload is open: refused (%s)" % types_(out))
+
+# 14. the title binds the kind of job (codex 2026-10-03)
+out, f = run({"job": "Install Buttons", "write": [], "delete": ["hello.py"], "apps": "[]"}, [{"type": "commit"}])
+check("hello.py" in f and "done" not in types_(out), "'Install Buttons' that uninstalls: refused (%s)" % types_(out))
+out, f = run({"job": "Install Buttons", "write": ["hello.py"], "delete": [], "apps": json.dumps([{"mod": "hello"}])},
+             puts("hello.py", read("hello.py")) + [{"type": "commit"}])
+check("done" not in types_(out), "'Install Buttons' putting on the Hello it runs: refused (%s)" % types_(out))
+out, f = run({"job": "Install Hello", "write": ["hello.py"], "delete": [], "apps": json.dumps([{"mod": "hello"}])},
+             puts("hello.py", read("hello.py")) + [{"type": "commit"}])
+check(types_(out)[-2:] == ["done", "reset"], "'Install Hello' reinstalling the Hello it runs goes in: %s" % types_(out))
+out, f = run({"job": "Uninstall the app", "write": ["keytest.py"], "delete": ["hello.py"], "apps": "[]"},
+             puts("keytest.py", kt) + [{"type": "commit"}])
+check("keytest.py" not in f and "hello.py" in f and "done" not in types_(out), "an uninstall that writes a file: refused (%s)" % types_(out))
+out, f = run({"job": "Uninstall the app", "write": [], "delete": ["hello.py"], "apps": "[]"}, [{"type": "commit"}])
+check(types_(out)[-2:] == ["done", "reset"] and "hello.py" not in f, "'Uninstall the app' goes in: %s" % types_(out))
+out, f = run({"job": "Make it faster", "write": [], "delete": [], "apps": None}, [{"type": "commit"}])
+check("done" not in types_(out), "a job title it doesn't know: refused (%s)" % types_(out))
+out, f = run({"job": "Update firmware", "write": ["slot.mpy"], "delete": [], "apps": None},
+             puts("slot.mpy", read("slot.mpy")) + [{"type": "commit"}])
+check(types_(out)[-2:] == ["done", "reset"] and json.loads(f["apps.json"])[0]["mod"] == "hello", "an update with no apps keeps apps.json: %s" % types_(out))
 
 print("all ok" if not fails else "%d FAILED" % fails)
 sys.exit(1 if fails else 0)

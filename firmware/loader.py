@@ -212,10 +212,12 @@ def logo(d):
         return None
 
 
-def screen(title="", what=""):
+def screen(title="", what="", bar=True):
     """The boot screen with the boot bar, for anything with progress (an install, an update): the logo,
     title over it, what under the bar, the bar empty. Returns the bar (bar.to(0..1) fills it) or None
-    without bar.bin. The one progress bar a wedgie shows: don't draw another."""
+    without bar.bin. The one progress bar a wedgie shows: don't draw another.
+    bar=False: the screen only, nothing allocated (the bar's pieces take 9 KB in one block: on an app's
+    heap that failed, the Wallet's at the yes; the install draws it after its clean restart)."""
     import ui
     d = lcd.LCD()
     logo(d)
@@ -225,6 +227,8 @@ def screen(title="", what=""):
     if what:
         d.center_text(what[:ui.COLS_SMALL], 214, ui.MUTED)
     d.show()
+    if not bar:
+        return None
     try:
         with open("bar.bin", "rb") as f:
             return _Bar(f)

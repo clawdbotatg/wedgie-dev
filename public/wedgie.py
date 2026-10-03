@@ -366,8 +366,10 @@ def copy(wg, m, names, have):
         wg.put(f["name"], data, (done / total, (done + f["size"]) / total))
         done += f["size"]
         have["hashes"][f["name"]] = f["sha256"]
-        if twin(f["name"]) and have["hashes"].get(twin(f["name"])):     # the .mpy is on: its old source comes off
-            remove_files(wg, have, [twin(f["name"])])
+    # every .mpy that's on now (just sent, or already there from a try that stopped halfway): its old
+    # source comes off, or it would run instead
+    remove_files(wg, have, [twin(f["name"]) for f in m["files"] if f["name"] in names and twin(f["name"])
+                            and have["hashes"].get(f["name"]) == f["sha256"] and have["hashes"].get(twin(f["name"]))])
     return todo
 
 
@@ -513,7 +515,8 @@ def job(wg, title, write, delete, apps):
     files one chunk at a time, checks each against the list, then puts them in place and restarts."""
     rel = urllib.request.urlopen(SITE + "/fw/release.txt").read().decode()
     sig = urllib.request.urlopen(SITE + "/fw/release.sig").read().decode().strip()
-    delete = sorted(set(delete) | {twin(n) for n in write if twin(n)})     # a written .mpy's old source
+    # a written .mpy's old .py: job.py's commit removes it (0.3.12+). Not in delete: 0.3.12-0.3.13 refuse
+    # to delete their core names (wedgie.py, slot.py, ...)
     sys.stderr.write("press A on the wedgie: %s?\n" % title)
     try:
         v = wg.request({"type": "job", "job": title, "release": rel, "sig": sig, "write": write, "delete": delete,
@@ -737,8 +740,9 @@ def main():
             for n in [n[:-3] + ".mpy" for n in names if n.endswith(".py")] + RETIRED:
                 if n in have["files"] and n not in names:       # stale bytecode MicroPython would import first; retired core files
                     wg.exec("import os\nos.remove(%r)" % n)
-            todo = copy(wg, m, set(m["core"]), have)
-            act = None if from_menu else active_of(m, have)     # one app from 0.2 on: it keeps its app
+            act = None if from_menu else active_of(m, have)     # one app from 0.2 on: it keeps its app, up to date
+            keep = next((c["files"] for c in m["carts"] if c["mod"] == act), [])   # (the Wallet gets its .mpy here)
+            todo = copy(wg, m, set(m["core"]) | set(keep), have)
             remove_files(wg, have, others(m, have, act))
             write_apps(wg, m, have, act)
             wg.leave()      # the new firmware only runs after a soft reset (see "Plugging in" above)

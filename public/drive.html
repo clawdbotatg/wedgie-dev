@@ -1,0 +1,53 @@
+<!doctype html>
+<!-- A phone test of the writable WEDGIE drive (branch drive-inbox): send = share a .txt, "Save to Files",
+     pick the WEDGIE drive; the wedgie reads its lines as USB requests (firmware/inbox.py). Read = pick
+     any file on the drive and show it. No Web Serial: this is how an iPhone talks to a wedgie. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>wedgie drive test</title>
+<style>
+  body { font: 18px/1.4 -apple-system, system-ui, sans-serif; margin: 0 auto; padding: 16px; max-width: 520px; background: #fff; color: #1a1a1a; }
+  h1 { font-size: 22px; margin: 8px 0 4px; }
+  p { color: #666; margin: 4px 0 12px; }
+  textarea { width: 100%; box-sizing: border-box; font: 15px ui-monospace, monospace; padding: 8px; border: 1px solid #ccc; border-radius: 8px; }
+  button, label.btn { display: block; width: 100%; box-sizing: border-box; margin: 8px 0 24px; padding: 14px; font: 600 18px -apple-system, system-ui, sans-serif; text-align: center; border: 0; border-radius: 10px; background: #1f9d55; color: #fff; }
+  label.btn { background: #333; }
+  pre { white-space: pre-wrap; word-break: break-all; background: #f4f4f4; padding: 10px; border-radius: 8px; font-size: 14px; }
+  #msg { color: #c0392b; }
+</style>
+</head>
+<body>
+<h1>1. Phone → wedgie</h1>
+<p>Tap Send, then <b>Save to Files</b>, then pick the <b>WEDGIE</b> drive. The wedgie should ask "Let this computer in?" (press B).</p>
+<textarea id="text" rows="3">{"type":"open"}</textarea>
+<button id="send">Send to wedgie</button>
+
+<h1>2. Wedgie → phone</h1>
+<p>Tap Read, then <b>Browse</b>, then the <b>WEDGIE</b> drive, and pick a file (README.txt).</p>
+<label class="btn">Read from wedgie<input id="pick" type="file" hidden></label>
+<div id="msg"></div>
+<pre id="out" hidden></pre>
+<script>
+const $ = (id) => document.getElementById(id);
+$("send").onclick = async () => {
+  $("msg").textContent = "";
+  const f = new File([$("text").value.trim() + "\n"], "wedgie.txt", { type: "text/plain" });
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [f] })) return await navigator.share({ files: [f] });
+    const a = document.createElement("a");          // no file sharing: a plain download
+    a.href = URL.createObjectURL(f); a.download = f.name; a.click();
+  } catch (e) { if (e.name !== "AbortError") $("msg").textContent = "couldn't share: " + e.message; }
+};
+$("pick").onchange = async () => {
+  const f = $("pick").files[0];
+  if (!f) return;
+  const t = await f.slice(0, 20000).text();
+  $("out").hidden = false;
+  $("out").textContent = f.name + " (" + f.size + " bytes)\n\n" + t;
+  $("pick").value = "";
+};
+</script>
+</body>
+</html>
