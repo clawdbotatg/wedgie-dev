@@ -8,7 +8,7 @@ import { homedir } from "node:os";
 const url = process.argv[2] || "http://localhost:4173/";
 const cache = homedir() + "/Library/Caches/ms-playwright";
 const shell = readdirSync(cache).filter((d) => d.startsWith("chromium_headless_shell-")).sort().reverse()[0];
-const b = await chromium.launch({ executablePath: `${cache}/${shell}/chrome-headless-shell-mac-arm64/chrome-headless-shell`, args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
+const b = await chromium.launch({ executablePath: `${cache}/${shell}/${process.platform === "linux" ? "chrome-headless-shell-linux64" : "chrome-headless-shell-mac-arm64"}/chrome-headless-shell`, args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
 const p = await (await b.newContext({ viewport: { width: 1360, height: 900 } })).newPage();
 await p.goto(url);
 await p.waitForFunction(() => !document.getElementById("wl"));

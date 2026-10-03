@@ -12,6 +12,11 @@ import { join } from "node:path";
 import { releaseText, root } from "./release.mjs";
 
 const keyPath = join(homedir(), ".wedgie", "release-key.pem");
+if (!existsSync(keyPath) && !/^RELEASE_KEY = \(""/m.test(readFileSync(join(root, "firmware/wedgie.py"), "utf8"))) {
+  // every wedgie out there trusts the key already in wedgie.py: a new one here would lock them all out
+  console.error(`sign: no ${keyPath} on this machine, and firmware/wedgie.py already has a release key. Sign on the machine that has the key.`);
+  process.exit(1);
+}
 if (!existsSync(keyPath)) {
   mkdirSync(join(homedir(), ".wedgie"), { recursive: true, mode: 0o700 });
   const { privateKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });

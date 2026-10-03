@@ -94,6 +94,7 @@ try:
     import wedgie
     import loader
     _a = wedgie.active()
+    wedgie.lines()
     loader.load(_a["mod"] if _a else "slot")
     import slot
     slot.start()

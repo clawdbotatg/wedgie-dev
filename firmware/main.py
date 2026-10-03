@@ -35,6 +35,10 @@ def stuck(e):
                 wedgie.set_open()
             except Exception:
                 micropython.kbd_intr(3)
+            try:            # A has to look like it did something: the REPL itself draws nothing
+                ui.page(d, "computer let in", [("it can fix this now:", ui.INK), ("wedgie.dev/connect", ui.GREEN_D), ("", ui.MUTED), ("unplug it to start over", ui.MUTED)])
+            except Exception:
+                pass
             return True
         if b.value() == 0:
             return False
@@ -46,8 +50,15 @@ try:
     import wedgie
     wedgie.SEALED = True
     wedgie._open = False                # a yes was for one job; this is a fresh start
+    _j = wedgie.take_job()
+    if _j:                              # install mode: a yes to a job, then this restart (slot._job).
+        wedgie.lines()                  # Nothing else loads: the same clean heap for every install
+        import job
+        job.resume(_j)                  # ends in a restart, whatever happens
+    del _j
     import loader
     _a = wedgie.active()
+    wedgie.lines()                      # the USB line buffer (6 KB), while the heap is whole
     loader.load(_a["mod"] if _a else "slot")    # its files load one by one under the boot logo's bar
 except BaseException as e:
     sys.print_exception(e)

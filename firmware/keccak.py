@@ -47,5 +47,5 @@ def keccak256(data):
         _f(A)
     out = b""
     for i in range(4):
-        out += A[i % 5][i // 5].to_bytes(8, "little")
+        out += A[i % 5][i // 5].to_bytes(8, "little")   # small: 4 lanes, 32 bytes
     return out

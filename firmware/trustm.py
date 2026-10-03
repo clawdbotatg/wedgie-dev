@@ -153,7 +153,7 @@ class Session:
     def get(self, oid, offset=None, length=None):
         d = oid.to_bytes(2, "big")
         if length is not None:
-            d += offset.to_bytes(2, "big") + length.to_bytes(2, "big")
+            d += offset.to_bytes(2, "big") + length.to_bytes(2, "big")   # small: 4 bytes, once
         return self.command(0x01, 0x00, d)
 
     def metadata(self, oid):
@@ -179,7 +179,7 @@ class Session:
         out = b""
         while True:
             part = self.get(oid, len(out), step)
-            out += part
+            out += part   # small: a ~1 KB certificate in 200-byte parts: a few copies, only on a chip check
             if len(part) < step:
                 return out
 

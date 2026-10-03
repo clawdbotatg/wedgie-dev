@@ -69,7 +69,18 @@ what agents outside this repo read (keep it true when the firmware or the USB pr
    115 KB of it the framebuffer: a firmware change that allocates more is unproven until a real board runs
    it. Say so; never call it tested because the emulator passed. Offer Austin simple tradeoffs early
    ("a no can reboot it" made 0.3.9 easy).
-13. Everything is MIT — never use the CC BY-NC case STLs from picowallet/instant-wallet.
+13. **Never run out of RAM on a real board ("wedgie broke: memory allocation failed").** MicroPython never
+   moves a block, so ~75 KB of heap gets chopped into pieces and a 1.3 KB string has nowhere to go.
+   0.3.6 (slot.py) and 0.3.11 (job.py, the same bug 0.3.9 fixed only in slot.py) both died of a USB line
+   grown a char at a time. The rules: USB is read only through `wedgie.lines()` (one buffer made at boot);
+   a str/bytes grown with `+=` says why it stays small (`# small:`); a host request never crashes the app
+   (slot.handle / the Wallet answer an error, `slot.failed`); after a yes to a job the app is unloaded
+   (`slot._free`). `python3 tools/test_memory.py` enforces the first two. **A memory bug is fixed
+   everywhere in one release:** grep every firmware file for the pattern and add it to test_memory.py.
+   The browser emulator CAN'T test memory: its WebAssembly heap starts at 128 MB and grows. Before firmware
+   ships: `node tools/chipprobe.mjs` (the real MicroPython build on a virtual RP2040, rp2040js) and
+   `python3 tools/boardprobe.py <apps>` on a real board. Plan + open items: `docs/PLAN-MEMORY.md`.
+14. Everything is MIT — never use the CC BY-NC case STLs from picowallet/instant-wallet.
 
 ## Run / check
 
@@ -84,6 +95,9 @@ node tools/emuprobe.mjs <outdir>                            # the virtual wedgie
 node tools/codeprobe.mjs http://localhost:4173 <outdir> ~/clawd/wedgie-starter   # /code: emulator, saves, repos
 python3 tools/test_drive.py                                 # the WEDGIE drive's SCSI answers
 python3 tools/test_style.py                                 # one palette, one progress bar (firmware/ui.py)
+python3 tools/test_memory.py                                # USB only through wedgie.lines(), no growing strings
+node tools/chipprobe.mjs                                    # installs on a virtual RP2040 (real heap; needs uv)
+python3 tools/boardprobe.py battery                         # a checked install on a real board (press A)
 python3 tools/fakedevice.py                                 # a pty wedgie for public/wedgie.py
 ```
 

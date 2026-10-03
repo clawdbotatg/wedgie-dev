@@ -85,6 +85,36 @@ def check(m, sig=True):
     return version, files
 
 
+_prog = None     # (title, the boot bar) while the job runs
+
+
+def progress(title, what, p):
+    """The screen during a job: the boot screen and the boot bar (loader.screen)."""
+    global _prog
+    import ui, loader
+    if not _prog or _prog[0] != title:
+        _prog = (title, ui.progress(title.replace("...", ""), what))
+    else:
+        loader.what(what)
+    if _prog[1]:
+        _prog[1].to(max(0, min(1, p)))
+
+
+def resume(j):
+    """Install mode (main.py, before anything else loads): the job the person said yes to before the
+    restart (wedgie.take_job). Then a restart, whatever happened: into the new files after a commit,
+    into the old ones otherwise."""
+    import machine
+    W.asked_ms = j.get("asked_ms")
+    try:
+        run(j.get("id"), j.get("m") or {}, lambda *a: True, progress)
+    except Exception as e:
+        W.failed(j.get("id"), e)
+    time.sleep_ms(100)
+    W.restarting = True
+    machine.soft_reset()
+
+
 def run(mid, m, ask, show=None):
     """Ask, then check and take the files. ask(job, note) -> bool is the slot's yes/no screen (the slot
     asks a 0.3.10+ job itself before loading this, and passes a yes); show(title, what, p) draws the
@@ -125,24 +155,20 @@ def run(mid, m, ask, show=None):
     h, f, cur = None, None, None
     poll = select.poll()
     poll.register(sys.stdin, select.POLLIN)
-    buf, last = "", time.ticks_ms()
+    R = W.lines()                           # the one line reader: never a string grown per char (wedgie.Lines)
+    last, qid = time.ticks_ms(), mid
+    gc.collect()
     try:
         while time.ticks_diff(time.ticks_ms(), last) < IDLE_MS:
-            if not poll.poll(50):
+            line = R.pump(poll, 50)
+            if not line:
                 continue
-            ch = sys.stdin.read(1)
-            if ch != "\n":
-                if ch not in "\r\x03":
-                    buf += ch
-                if len(buf) > 8192:
-                    buf = ""
-                continue
-            line, buf = buf, ""
             last = time.ticks_ms()
             try:
                 q = json.loads(line)
             except ValueError:
                 continue
+            line = None
             qid, t = q.get("id"), q.get("type")
             if t == "release":
                 show(title, "checking the signature", 0)
@@ -154,6 +180,8 @@ def run(mid, m, ask, show=None):
                 except ValueError as e:
                     W.send({"id": qid, "type": "error", "error": str(e)})
                     return
+                m.pop("release", None)      # the 2.6 KB list: files has what's needed from it
+                gc.collect()
                 show(title, "starting", 0)
                 last = time.ticks_ms()
                 W.send({"id": qid, "type": "ok", "version": version})
@@ -176,13 +204,15 @@ def run(mid, m, ask, show=None):
                     if f:
                         f.close()
                     f, h, cur = open(_tmp(n), "wb"), hashlib.sha256(), n
-                b = binascii.a2b_base64((q.get("data") or "").encode())
+                end = q.get("end")
+                b = binascii.a2b_base64((q.pop("data", None) or "").encode())
+                q = None
                 f.write(b)
                 h.update(b)
                 chunks += 1
                 if chunks % 6 == 1:
                     show(title, n, (len(got) + 0.5) / max(1, len(write)))
-                if q.get("end"):
+                if end:
                     f.close()
                     f, cur = None, None
                     got[n] = binascii.hexlify(h.digest()).decode()
@@ -226,6 +256,8 @@ def run(mid, m, ask, show=None):
                 return
             elif t == "hello":
                 W.send(W.hello(qid, job=True))
+    except Exception as e:                  # out of memory, a full flash...: nothing changed, it restarts
+        W.failed(qid, e)
     finally:
         if f:
             f.close()

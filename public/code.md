@@ -141,6 +141,11 @@ so the whole game is about not paying that twice.
 
 The rules that follow from it:
 
+0. **Never grow a string or bytes with `+=` in a loop.** Each `+=` copies the whole thing, and on an
+   RP2040 the copies chop the heap into pieces too small for the next one: "memory allocation failed"
+   with plenty of RAM free in total. Collect parts in a list and `"".join` them once, or write into a
+   `bytearray` made once at start. Make big buffers at import, while the heap is in one piece.
+
 1. **Push the frame by DMA.** `lcd.show_start()` returns at once and sends the frame while your code
    runs; `lcd.show_wait()` before you draw again. Do input, game logic and `gc.collect()` between
    them. Never draw while a frame is going out (it tears). `show()`, `show(y0, y1)` and `show_rect`

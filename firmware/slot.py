@@ -37,8 +37,6 @@ mod = None          # its module, once imported
 state = "empty"     # empty | running | entry (an entry to call) | ended | error
 _poll = None
 _rx = 0             # ticks_ms when the line being handled arrived
-_buf = ""           # the line coming in: its last few chars here, full 256-char pieces in _parts
-_parts = []         # (str += per char copied the whole line every char; a list of chars needed a 13 KB block: 0.3.6 died of it)
 _serve_t = None     # the background Timer that answers USB while an entry app owns the CPU
 
 
@@ -46,22 +44,6 @@ def _band(title, lines, hint=""):
     ui.page(d, title, lines, hint, show=False)
     d.text(W.short(), 240 - 8 * 6 - 6, 42, MUTED)
     d.show()
-
-
-_prog = None     # (title, the boot bar) while a checked install runs
-
-
-def progress(title, what, p):
-    """The screen during a checked install (job.py): the boot screen and the boot bar (loader.screen),
-    drawn the moment A is pressed, so a yes never looks like nothing happened."""
-    global _prog
-    import loader
-    if not _prog or _prog[0] != title:
-        _prog = (title, ui.progress(title.replace("...", ""), what))
-    else:
-        loader.what(what)
-    if _prog[1]:
-        _prog[1].to(max(0, min(1, p)))
 
 
 def empty():
@@ -194,15 +176,34 @@ def stop():
 
 
 def handle(line):
+    """One host request: a JSON line (bytes or str) or the dict from one (the Wallet passes that, so no
+    copy of the line stays alive under a job). Whatever goes wrong in it (out of memory too) is answered
+    as an error to that request and logged; it never stops the app."""
     global _rx
     _rx = time.ticks_ms()               # a question's time is counted from here (wedgie.asked_ms)
     W.asked_ms = None
-    try:
-        m = json.loads(line)
-    except ValueError:
-        return
+    if isinstance(line, dict):
+        m = line
+    else:
+        try:
+            m = json.loads(line)
+        except ValueError:
+            return
+    line = None
     if not isinstance(m, dict):
         return
+    try:
+        _handle(m)
+    except (KeyboardInterrupt, SystemExit):
+        raise
+    except Exception as e:
+        failed(m.get("id"), e)
+
+
+failed = W.failed
+
+
+def _handle(m):
     mid, t = m.get("id"), m.get("type")
     if t == "hello":
         W.send(W.hello(mid, running=app["mod"] if app and state in ("running", "entry") else None))
@@ -240,8 +241,12 @@ def handle(line):
         if not ok:
             _restart()
     elif t == "job":                    # a checked install (job.py): signed files only, no REPL
-        _asking(lambda: _job(mid, m))
-        _restart()                      # it ended before its commit (a no, a bad file): start again
+        try:
+            if _asking(lambda: _job(mid, m)):
+                return                  # a yes: it restarts into install mode (_to_job)
+        except Exception as e:
+            failed(mid, e)
+        _restart()                      # a no: start again
     elif t == "sums" and not m.get("names"):    # only which files are there: no job.py needed
         W.send({"id": mid, "type": "sums", "sums": _there(m.get("exists")), "apps": W.apps()})
     elif t == "sums":
@@ -276,19 +281,42 @@ def ask(job="", note=""):
 
 
 def _job(mid, m):
-    """A checked install. 0.3.10+ hosts send the signed list after the yes: the question goes up from
-    code already loaded, and job.py (9 KB to compile: a few hundred ms on an RP2040) loads only after
-    a yes, under the progress screen. Older hosts send it with the job: job.py checks it, then asks."""
-    if "release" in m:
-        import job
-        return job.run(mid, m, ask, progress)
+    """A checked install: ask (from code already loaded: the question is up at once), and on a yes save
+    the job and restart into install mode (wedgie.save_job, main.py, job.resume): job.py then runs on a
+    clean heap with no app in it, so every install has the same memory however fragmented the app left
+    it. True after a yes. Older hosts (0.3.0-0.3.9) send the signed list with the job: job.py checks it
+    there too."""
     title = str(m.get("job") or "Update")[:60]
-    if not ask(title, "checked: wedgie.dev release " + str(m.get("version") or "")[:12]):
+    v = m.get("version")
+    if not v and "release" in m:
+        v = str(m["release"]).split("\n")[1][8:]
+    if not ask(title, "checked: wedgie.dev release " + str(v or "")[:12]):
         W.send({"id": mid, "type": "refused", "asked_ms": W.asked_ms})
+        return False
+    if not W.SEALED:                    # the emulator: its flash is new at every restart, so no install
+        import job                      # mode there; the job runs in place (its heap is big anyway)
+        job.run(mid, m, lambda *a: True, job.progress)
+        return False
+    W.save_job({"id": mid, "m": m, "asked_ms": W.asked_ms})
+    _to_job()
+    return True
+
+
+def _to_job():
+    """Restart into install mode, keeping USB (a soft reset: the host stays connected and waits for the
+    job's go). From the main loop that's now. An entry app (Demo) owns the main loop and this runs in
+    its USB timer, where a soft reset is swallowed: the app's next screen does it (lcd._on_show), and
+    a hard reset a second later if it never draws again."""
+    import machine
+    W.restarting = True
+    stop()
+    if state == "entry" and not _own_usb():
+        def now(*_):
+            machine.soft_reset()
+        L._on_show = now
+        _RealTimer(-1).init(period=1500, mode=_RealTimer.ONE_SHOT, callback=lambda t: machine.reset())
         return
-    progress(title.replace("Install", "Installing").replace("Update", "Updating") + "...", "starting", 0)
-    import job
-    job.run(mid, m, lambda *a: True, progress)      # asked already
+    machine.soft_reset()
 
 
 def _there(names):
@@ -320,9 +348,8 @@ def let_in(job=""):
 
 def _asking(fn):
     """Run a question (and a job) with the app's ticks paused."""
-    global _paused, _prog
+    global _paused
     _paused = True
-    _prog = None
     try:
         return fn()
     finally:
@@ -345,33 +372,29 @@ def _restart():
 
 
 def serve(_=None):
-    """Read what the host sent; handle each full line. Never blocks."""
-    global _buf, _parts, _breath
+    """Read what the host sent; handle each full line. Never blocks. A line comes in through the one
+    line reader (wedgie.lines: one buffer, made at boot); a host request that fails answers an error
+    and the app keeps running (it never reaches main.py's "wedgie broke")."""
+    global _breath
     _breath = True
-    for _ in range(4096):
-        if not _poll.poll(0):
+    R = W.lines()
+    for _ in range(8):
+        line = R.pump(_poll)
+        if line is None:
             return
-        ch = sys.stdin.read(1)
-        if not ch:
-            return
-        if ch == "\n":
-            line = "".join(_parts) + _buf if _parts else _buf
-            _buf, _parts = "", []
-            if line.strip().startswith("{"):
-                handle(line)
-        elif ch == "\x03":              # a Ctrl-C while sealed is just a byte: start a clean line
-            _buf, _parts = "", []
-        elif ch != "\r":
-            _buf += ch
-            if len(_buf) >= 256:
-                _parts.append(_buf)
-                _buf = ""
-                if len(_parts) > 24:    # over 6 KB: not a line we take (a job is 3.2 KB)
-                    _parts = []
+        if line and line.strip().startswith(b"{"):
+            try:
+                m = json.loads(line)
+            except ValueError:
+                continue
+            line = None                 # a job runs inside handle: don't keep its line alive under it
+            handle(m)
 
 
 def _own_usb():
-    return bool(app and app.get("usb"))
+    """The app reads USB itself (the Wallet), once it's running: one that failed to start doesn't, so
+    the slot answers (or nothing would, and only holding X at power-up would get a computer back in)."""
+    return bool(app and app.get("usb") and state in ("running", "entry"))
 
 
 def step(board=True):
@@ -415,7 +438,7 @@ def init():
     if app and keys.pins["X"].value() == 0:    # X held while plugging in: start without the app (a way
         app = None                              # back in when an app won't let USB work)
         print("slot: X held, app skipped")
-    if not _own_usb():
+    if not (app and app.get("usb")):      # the Wallet says its own ready
         W.send(W.hello(None, type="ready", running=app and app["mod"]))
     if app:
         open_app()

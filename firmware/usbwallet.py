@@ -23,7 +23,7 @@ except ImportError:
 FW = "usb-1"
 NAME = getattr(secrets, "DEVICE_NAME", "wedgie wallet") if secrets else "wedgie wallet"
 SOFT_OK = bool(getattr(secrets, "ALLOW_SOFT_KEY", False)) if secrets else False
-MAX_LINE = 16384
+MAX_LINE = 6144     # wedgie.lines(): the one buffer, made at boot (16 KB left too little to start this app)
 VAULT = (getattr(secrets, "EXPECTED_VAULT", "") or "") if secrets else ""   # the account this chip controls
 
 d = None
@@ -39,7 +39,6 @@ dirty = True
 qx = qy = ""
 address = ""
 host = {}           # last `state` line from the website: balance and vault, display hints only
-_buf = ""
 _poll = None
 _timer = None
 _last_key = 0
@@ -148,36 +147,29 @@ def check(r):
 
 def pump():
     """Read what the host sent, one message per call. Never blocks: the poll says whether a byte
-    is there (on the board) and an empty read says there is none (in the emulator)."""
-    global _buf
-    for _ in range(MAX_LINE):
-        if not _poll.poll(0):
+    is there (on the board) and an empty read says there is none (in the emulator). Lines come in
+    through the one line reader (wedgie.lines): never a string grown a char at a time."""
+    line = W.lines().pump(_poll)
+    if line is False:
+        send({"type": "error", "error": "line too long"})
+    elif line and line.strip():
+        try:
+            m = json.loads(line)
+        except ValueError:
+            send({"type": "error", "error": "bad json"})
             return
-        ch = sys.stdin.read(1)
-        if not ch:
-            return
-        if ch == "\n":
-            line, _buf = _buf, ""
-            if line.strip():
-                handle_line(line)
-            return
-        if ch == "\x03":       # a Ctrl-C while sealed is just a byte: start a clean line
-            _buf = ""
-            continue
-        _buf += ch
-        if len(_buf) > MAX_LINE:
-            _buf = ""
-            send({"type": "error", "error": "line too long"})
-            return
+        line = None                 # a job runs inside handle: don't keep its line alive under it
+        try:
+            handle(m)
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception as e:      # out of memory too: answer it, keep the wallet running
+            import slot
+            slot.failed(m.get("id") if isinstance(m, dict) else None, e)
 
 
-def handle_line(line):
+def handle(m):
     global dirty
-    try:
-        m = json.loads(line)
-    except ValueError:
-        send({"type": "error", "error": "bad json"})
-        return
     if not isinstance(m, dict):
         send({"type": "error", "error": "not an object"})
         return
@@ -204,7 +196,7 @@ def handle_line(line):
         if state in ("confirm", "working", "provision"):
             send({"id": mid, "type": "busy"}); return
         import slot
-        slot.handle(line)
+        slot.handle(m)
         dirty = True
     elif t == "reboot":     # a clean restart from the host; mpremote's reset can wedge the Mac's port
         send({"id": mid, "type": "rebooting"})

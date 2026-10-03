@@ -8,7 +8,7 @@ const url = process.argv[2] || "http://localhost:4173/";
 const out = process.argv[3] || "shots";
 const cache = homedir() + "/Library/Caches/ms-playwright";
 const shell = readdirSync(cache).filter((d) => d.startsWith("chromium_headless_shell-")).sort().reverse()[0];
-const exe = `${cache}/${shell}/chrome-headless-shell-mac-arm64/chrome-headless-shell`;
+const exe = `${cache}/${shell}/${process.platform === "linux" ? "chrome-headless-shell-linux64" : "chrome-headless-shell-mac-arm64"}/chrome-headless-shell`;
 const browser = await chromium.launch({ executablePath: exe });
 
 for (const [name, vp, mobile] of [["desktop", { width: 1360, height: 860 }, false], ["phone", { width: 390, height: 844 }, true]]) {

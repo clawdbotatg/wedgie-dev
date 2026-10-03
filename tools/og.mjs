@@ -10,7 +10,7 @@ const url = process.argv[cover ? 3 : 2] || `http://localhost:5173/tools/${cover 
 const out = `public/img/${cover ? "cover" : "og"}.png`;
 const cache = homedir() + "/Library/Caches/ms-playwright";
 const shell = readdirSync(cache).filter((d) => d.startsWith("chromium_headless_shell-")).sort().reverse()[0];
-const browser = await chromium.launch({ executablePath: `${cache}/${shell}/chrome-headless-shell-mac-arm64/chrome-headless-shell`, args: ["--use-angle=metal"] });
+const browser = await chromium.launch({ executablePath: `${cache}/${shell}/${process.platform === "linux" ? "chrome-headless-shell-linux64" : "chrome-headless-shell-mac-arm64"}/chrome-headless-shell`, args: ["--use-angle=metal"] });
 const page = await browser.newPage({ viewport: cover ? { width: 1500, height: 500 } : { width: 1200, height: 630 }, deviceScaleFactor: cover ? 2 : 1 });
 const errs = [];
 page.on("pageerror", (e) => errs.push(e.message));

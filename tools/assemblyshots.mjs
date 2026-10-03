@@ -6,7 +6,7 @@ const url = process.argv[2] || "http://localhost:4173/";
 const vp = { width: +(process.argv[3] || 1360), height: +(process.argv[4] || 860) };
 const cache = homedir() + "/Library/Caches/ms-playwright";
 const shell = readdirSync(cache).filter((d) => d.startsWith("chromium_headless_shell-")).sort().reverse()[0];
-const b = await chromium.launch({ executablePath: `${cache}/${shell}/chrome-headless-shell-mac-arm64/chrome-headless-shell`, args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
+const b = await chromium.launch({ executablePath: `${cache}/${shell}/${process.platform === "linux" ? "chrome-headless-shell-linux64" : "chrome-headless-shell-mac-arm64"}/chrome-headless-shell`, args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
 const p = await (await b.newContext({ viewport: vp, deviceScaleFactor: 1.5, isMobile: vp.width < 600 })).newPage();
 const errs = []; p.on("pageerror", (e) => errs.push(e.message)); p.on("console", (m) => m.type() === "error" && errs.push(m.text()));
 await p.goto(url); await p.waitForFunction(() => !document.getElementById("wl"));

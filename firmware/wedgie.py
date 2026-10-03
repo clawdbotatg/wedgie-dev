@@ -3,7 +3,7 @@
 # interrupted; from the REPL they are plain calls:  import wedgie; wedgie.shot(); wedgie.press("A")
 import sys, os, json, machine
 
-VERSION = "0.3.11"
+VERSION = "0.3.12"
 
 # The lock. main.py turns Ctrl-C off before anything else and never ends by itself, so a computer
 # can only send the slot's JSON lines: it can't stop the app, reach the REPL, or make the secure chip
@@ -23,12 +23,16 @@ RELEASE_KEY = ("75467e0970a70909082a39594e9c29e8c6e42cf3663ab9ae31dbbb8babc522f3
 def release_ok(text, sig):
     """text: the signed list (tools/release.mjs), sig: "r s" in hex. True if our key signed it.
     Pure-Python P-256 (p256.py): a few seconds on an RP2040, once per job."""
+    import gc
     try:
         import p256, hashlib
         r, s = (int(x, 16) for x in sig.split())
         return p256.verify(int(RELEASE_KEY[0], 16), int(RELEASE_KEY[1], 16), hashlib.sha256(text).digest(), r, s)
     except Exception:
         return False
+    finally:
+        sys.modules.pop("p256", None)       # once per job: give its code and its big numbers back
+        gc.collect()
 
 
 def release_files(text):
@@ -118,8 +122,10 @@ _chip = None        # what the last chip() found: "ATECC608", "OPTIGA Trust M", 
 
 
 def _ram():
-    """Bytes of heap free right now (wedgie.dev shows it; the emulator's heap is set from real boards)."""
+    """Bytes of heap free after a collect (wedgie.dev shows it). Without the collect it counted garbage
+    as used: a real board said 4 KB with ~60 KB really there."""
     import gc
+    gc.collect()
     return gc.mem_free()
 
 
@@ -247,7 +253,7 @@ def rand(n=32):
         try:
             out = b""
             while len(out) < n:
-                out += h.run(0x1B, 0x01, 0, resp_len=32, wait_ms=25) if kind == "atecc" else h.random(max(8, min(256, n - len(out))))
+                out += h.run(0x1B, 0x01, 0, resp_len=32, wait_ms=25) if kind == "atecc" else h.random(max(8, min(256, n - len(out))))   # small: n bytes, 32 at a time (callers ask for 32 or so)
             return out[:n]
         except Exception:
             _rng = None
@@ -280,6 +286,112 @@ def rand_below(n):
 
 def send(obj):
     print(json.dumps(obj))
+
+
+# ---- USB lines: the ONE way firmware reads what a host sends -------------------------------------
+# A line is collected into one bytearray made once, while the heap is still in one piece. Never a
+# string grown a char at a time: each += copies the whole line, so a 1.4 KB line makes a thousand
+# copies and chops the RP2040's ~75 KB of heap into pieces too small for the next one. slot.py had
+# that (0.3.6 died of it, 0.3.9 fixed it); job.py still had it and 0.3.11 broke on a real board in
+# the middle of installing Battery ("memory allocation failed, allocating 1336 bytes"). Every reader
+# (slot, job, the Wallet) goes through lines(); tools/test_memory.py fails the build on any other
+# sys.stdin.read, and on any string grown with += that doesn't say why it stays small.
+class Lines:
+    def __init__(self, size):
+        self.b = bytearray(size)
+        self.n = 0
+        self.over = False
+
+    def feed(self, ch):
+        """One char from USB. At a newline: the line as bytes (one copy, its own size), or False for
+        one that didn't fit (dropped whole). Otherwise None."""
+        if ch == "\n":
+            n, over = self.n, self.over
+            self.n, self.over = 0, False
+            if over:
+                return False
+            return bytes(memoryview(self.b)[:n])
+        if ch == "\x03":                    # a Ctrl-C while sealed is just a byte: start a clean line
+            self.n, self.over = 0, False
+            return None
+        if ch == "\r" or self.over:
+            return None
+        o = ord(ch)
+        bs = (o,) if o < 128 else ch.encode()
+        if self.n + len(bs) > len(self.b):
+            self.over = True
+            return None
+        for c in bs:
+            self.b[self.n] = c
+            self.n += 1
+        return None
+
+    def pump(self, poll, wait=0):
+        """Read USB until a line is done (bytes, or False: too long) or nothing more is waiting (None).
+        wait: ms to wait for the first char."""
+        while poll.poll(wait):
+            wait = 0
+            ch = sys.stdin.read(1)
+            if not ch:
+                return None
+            r = self.feed(ch)
+            if r is not None:
+                return r
+        return None
+
+
+_lines = None
+
+
+# ---- install mode -----------------------------------------------------------------------------
+# A yes to a checked install (slot._job) saves the job here and restarts; main.py finds it and runs
+# job.resume() before anything else loads: no app, no slot, the same clean heap for every install.
+# The app that was running chopped the heap into pieces nobody can predict (0.3.12 tests: Battery
+# went in, then the Wallet died reading the 2.6 KB signed list). The file is deleted before the job
+# runs, so a job that crashes can't loop.
+JOB = "_job.json"
+
+
+def save_job(d):
+    with open(JOB, "w") as f:
+        json.dump(d, f)
+
+
+def take_job():
+    try:
+        with open(JOB) as f:
+            d = json.load(f)
+    except (OSError, ValueError):
+        d = None
+    try:
+        os.remove(JOB)
+    except OSError:
+        pass
+    return d
+
+
+def failed(mid, e):
+    """A host request broke: tell the host, keep the reason in error.log, free what it left behind."""
+    import gc
+    sys.print_exception(e)
+    try:
+        with open("error.log", "w") as f:
+            sys.print_exception(e, f)
+    except Exception:
+        pass
+    gc.collect()
+    send({"id": mid, "type": "error", "error": "%s: %s" % (type(e).__name__, e)})
+
+
+def lines(size=6144):
+    """The shared line reader (made the first time; a bigger size makes a bigger one)."""
+    global _lines
+    if _lines is None or len(_lines.b) < size:
+        _lines = None
+        import gc
+        gc.collect()
+        _lines = Lines(size)
+    return _lines
 
 
 def shot(mid=None):
