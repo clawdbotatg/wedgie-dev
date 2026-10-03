@@ -217,6 +217,7 @@ async function checkedHave(r: Repl, m: Manifest, hash?: string[], late: boolean 
   const h = await r.hello(700).catch(() => null);
   if (!h?.jobs) return null;
   if (h.uid) uidOf.set(r, h.uid);
+  if (h.bin) binOf.set(r, h.bin);
   // Before 0.3.12 a job ran on the app's chopped-up heap and job.py grew each USB line a char at a time:
   // installs ran out of memory on real boards (0.3.6, 0.3.11). They get there once through full access
   // (Austin, 2026-10-02: one "full access" question is fine); 0.3.12+ installs on a clean heap.
@@ -235,6 +236,7 @@ async function checkedHave(r: Repl, m: Manifest, hash?: string[], late: boolean 
 }
 
 const uidOf = new WeakMap<Repl, string>();     // its board ID, to find it again if a job's restart drops the port
+const binOf = new WeakMap<Repl, number>();      // 0.3.15+: the most raw bytes one put takes (hello "bin")
 let release: Promise<{ text: string; sig: string }> | null = null;
 const signedList = () => release ||= Promise.all(["release.txt", "release.sig"].map((n) => fetch("/fw/" + n, { cache: "no-cache" }).then((x) => x.text())))
   .then(([text, sig]) => ({ text, sig: sig.trim() }));
@@ -263,7 +265,8 @@ async function job(r: Repl, m: Manifest, title: string, write: string[], del: st
   // the job goes first; the page's "Press A" modal loads while the wedgie asks
   const site = performance.now() - (askStart || performance.now()), sent = Date.now();
   const asked = r.request({ type: "job", job: title, ...(rel ? { release: rel.text, sig: rel.sig } : { version: m.version }), write, delete: del, apps: apps && JSON.stringify(apps),
-    bytes: write.reduce((t, n) => t + (m.files.find((f) => f.name === n)?.size || 0), 0) }, 120000);    // the wedgie's bar weighs the file part by it
+    bytes: write.reduce((t, n) => t + (m.files.find((f) => f.name === n)?.size || 0), 0),    // the wedgie's bar weighs the file part by it
+    ...(binOf.get(r) ? { raw: true } : {}) }, 120000);
   asked.catch(() => {});
   const close = (await import("../ui/askmodal")).askModal(title, true);
   let v: any;
@@ -286,6 +289,7 @@ async function job(r: Repl, m: Manifest, title: string, write: string[], del: st
     const h = await r2.hello(1500).catch(() => null);
     if (!h?.job) throw new Error("the wedgie restarted without the install (did someone press Y?)");
     if (lastAsk) lastAsk.wedgie = h.asked_ms ?? null;      // the go that carried it went out on the old port
+    if (h.bin) binOf.set(r2, h.bin);
     return rest(r2);
   });
   if (v.type === "refused") throw new Error("the wedgie said no (Y on its screen)");
@@ -308,11 +312,16 @@ async function job(r: Repl, m: Manifest, title: string, write: string[], del: st
     }
     const total = files.reduce((t, f) => t + f.buf.length, 0) || 1;
     let done = 0;
+    // 0.3.15+ (hello "bin"): raw bytes after a short line, up to 4 KB a put. Reading a base64 line a char at a
+    // time cost the wedgie ~1 s a KB; a raw 4 KB read takes ~37 ms. Older firmware: base64 lines, 1 KB.
+    const bin = binOf.get(r) || 0, size = bin ? Math.min(bin, 4096) : CHUNK;
     for (const { n, buf } of files) {
-      for (let o = 0; o < Math.max(buf.length, 1); o += CHUNK) {
-        const a = await r.request({ type: "put", name: n, data: b64(buf.subarray(o, o + CHUNK)), end: o + CHUNK >= buf.length }, 15000);
+      for (let o = 0; o < Math.max(buf.length, 1); o += size) {
+        const part = buf.subarray(o, o + size), end = o + size >= buf.length;
+        const a = bin ? await r.requestRaw({ type: "put", name: n, end }, part, 15000)
+          : await r.request({ type: "put", name: n, data: b64(part), end }, 15000);
         if (a.type !== "ok") throw new Error(`the wedgie stopped: ${a.error || a.type}`);
-        done += Math.min(CHUNK, buf.length - o);
+        done += part.length;
         onProgress(done / total, n);
       }
     }

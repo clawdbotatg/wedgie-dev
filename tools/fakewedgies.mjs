@@ -33,6 +33,8 @@ export function fakeWedgies(specs) {
     const st = { files, launched: null, presses: [], shots: 0, resets: 0, drops: 0, chips: 0, interrupts: 0, resetHook: null, mark: files.has("wedgiedrive.py") || files.has("wedgiedrive.mpy"), driveOn: files.has("wedgiedrive.py") || files.has("wedgiedrive.mpy") };
     let push = () => {};
     let raw = false, code = "", line = "", cur = null, curName = "";
+    const h_bin = () => cmpV(version() || "0", "0.3.15") >= 0;
+    let rawPut = null;     // a raw put (0.3.15+) whose bytes are still coming: { msg, buf, got }
     const has = (m) => st.files.has(m + ".py") || st.files.has(m + ".mpy");     // 0.3.14+: the core is compiled
     const slot = () => has("slot") && st.files.has("main.py");
     const wedgie = () => st.files.has("main.py") && (has("menu") || has("slot"));
@@ -74,6 +76,7 @@ export function fakeWedgies(specs) {
       if (sealed()) Object.assign(h, { sealed: true, open: !!st.open });
       if (cmpV(version() || "0", "0.3.0") >= 0 && slot()) h.jobs = cmpV(version(), "0.3.10") >= 0 ? 2 : 1;
       if (cmpV(version() || "0", "0.3.11") >= 0 && slot()) h.ram = 52000;
+      if (cmpV(version() || "0", "0.3.15") >= 0 && slot()) h.bin = 4096;     // raw puts (job.py RAW)
       return JSON.stringify(h);
     };
     const answer = (stdout) => push("OK" + stdout + "\x04\x04>");
@@ -232,7 +235,20 @@ export function fakeWedgies(specs) {
       const readable = new ReadableStream({ start(c) { push = (s) => { try { c.enqueue(enc.encode(s)); } catch {} }; st.fail = (e) => { try { c.error(e); } catch {} }; } });
       const writable = new WritableStream({ write(chunk) {
         if (st.dead) return;               // no MicroPython on it: nothing ever answers
-        for (const ch of dec.decode(chunk)) {
+        // byte by byte: a raw put's bytes are taken as they are; the rest is text (read as latin1, decoded
+        // as UTF-8 once a line or a REPL block is whole)
+        const u8 = (s) => Uint8Array.from(s, (c) => c.charCodeAt(0));
+        for (const b of chunk) {
+          if (rawPut) {
+            rawPut.buf[rawPut.got++] = b;
+            if (rawPut.got === rawPut.buf.length) {
+              const p = rawPut; rawPut = null;
+              if (p.msg.refuse) push(JSON.stringify({ id: p.msg.id, type: "error", error: "no raw puts here" }) + "\r\n");
+              else onJson({ ...p.msg, data: btoa(String.fromCharCode(...p.buf)) });
+            }
+            continue;
+          }
+          const ch = String.fromCharCode(b);
           if (ch === "\x03" && sealed() && !st.open && !raw) { line = ""; st.sealedBytes = (st.sealedBytes || 0) + 1; continue; }
           if (ch === "\x03") { raw = false; line = ""; st.interrupts++; st.stopped = true; continue; }
           if (ch === "\x01") { raw = true; code = ""; push("raw REPL; CTRL-B to exit\r\n>"); continue; }
@@ -241,11 +257,23 @@ export function fakeWedgies(specs) {
             if (ch === "\x04") { softReset(); continue; }
             // Repl.leave({ reset: false }) types exec(open("main.py").read()) + CR: the launcher starts again, home
             if (ch === "\r") { if (line.startsWith("exec(open(")) { line = ""; st.launched = null; st.stopped = false; st.open = false; st.relaunches = (st.relaunches || 0) + 1; } continue; }
-            if (ch === "\n") { const l = line; line = ""; if (l.startsWith("{")) { try { onJson(JSON.parse(l)); } catch {} } continue; }
+            if (ch === "\n") {
+              const l = dec.decode(u8(line)); line = "";
+              if (!l.startsWith("{")) continue;
+              let m; try { m = JSON.parse(l); } catch { continue; }
+              if (m.type === "put" && typeof m.n === "number") {
+                if (!(st.job && slot() && h_bin())) m = { ...m, refuse: true };    // its bytes are still taken off the line
+                else st.rawPuts = (st.rawPuts || 0) + 1;
+                if (m.n > 0) { rawPut = { msg: m, buf: new Uint8Array(m.n), got: 0 }; continue; }
+                if (m.refuse) { push(JSON.stringify({ id: m.id, type: "error", error: "no raw puts here" }) + "\r\n"); continue; }
+                m = { ...m, data: "" };
+              }
+              onJson(m); continue;
+            }
             line += ch; continue;
           }
           if (ch !== "\x04") { code += ch; continue; }
-          const c = code; code = ""; execRaw(c);
+          const c = dec.decode(u8(code)); code = ""; execRaw(c);
         }
       } });
       return { readable, writable };

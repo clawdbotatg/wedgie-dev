@@ -3,7 +3,7 @@
 # interrupted; from the REPL they are plain calls:  import wedgie; wedgie.shot(); wedgie.press("A")
 import sys, os, json, machine
 
-VERSION = "0.3.14"
+VERSION = "0.3.15"
 
 # The lock. main.py turns Ctrl-C off before anything else and never ends by itself, so a computer
 # can only send the slot's JSON lines: it can't stop the app, reach the REPL, or make the secure chip
@@ -153,6 +153,8 @@ def hello(mid=None, **extra):
          "micropython": os.uname().release, "apps": [x["mod"] for x in a],
          "carts": [{"mod": x["mod"], "v": x.get("v")} for x in a], "free": free(), "chip": _chip, "slot": 1,
          "sealed": SEALED, "open": is_open(), "jobs": 2, "ram": _ram()}
+    if SEALED:              # a job takes raw puts of up to this many bytes (0.3.15+; job.py RAW). Not in the
+        d["bin"] = 4096     # emulator: its job runs in place and its stdin is the page's
     if mid is not None:
         d["id"] = mid
     d.update(extra)
@@ -339,6 +341,14 @@ class Lines:
             self.b[self.n] = c
             self.n += 1
         return None
+
+    def raw(self, mv):
+        """Exactly len(mv) raw bytes, right after the line just read (a raw put, job.py), in one C loop
+        (stdin.buffer.readinto): 4 KB in ~37 ms on an RP2040, where the same as a base64 line read a char
+        at a time took ~4 s. Ctrl-C is off while sealed, so any byte value comes through."""
+        got, n = 0, len(mv)
+        while got < n:
+            got += sys.stdin.buffer.readinto(mv[got:min(n, got + 512)]) or 0
 
     def pump(self, poll, wait=0):
         """Read USB until a line is done (bytes, or False: too long) or nothing more is waiting (None).

@@ -301,7 +301,10 @@ go on with `release`, `sums`, `put`, `commit` there. The signed list (`/fw/relea
 `@app  <json>` lines: the wedgie writes apps.json from those, never from your `apps` (only each
 entry's `mod` counts). `"job": "Install X"` must put on the signed app named X; any other job keeps
 the app it runs. A job writes only the core and that app's files, deletes only plain top-level
-names outside the core, and a file sent again starts over unchecked. Older firmware: update it
+names outside the core, and a file sent again starts over unchecked. 0.3.15+ (hello `"bin": 4096`):
+send file data raw, not base64: `{"type":"put","name":n,"n":<bytes>,"end":bool}` then exactly that
+many raw bytes (up to 4096) right after its newline. About 10x faster: the wedgie reads a base64 line a
+character at a time (~1 s a KB) but raw bytes in one go. Older firmware: update it
 through full access (`open`) first. Compiled app files (`.mpy`, e.g. the Wallet's) replace their
 `.py`: delete a `.py` only once its `.mpy` is on, since MicroPython runs the `.py` first. Lines that don't start with `{` are logs (an app's
 print()). Raw REPL (Ctrl-A) is how files get written. `exec(open("main.py").read())` starts the app

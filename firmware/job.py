@@ -147,14 +147,17 @@ def progress(title, what, p):
 # running again after the restart, the P-256 check, the sums, the commit. Re-measure on a real board.
 RESTART, SIG, SUMS, COMMIT = 1600, 3100, 500, 300
 PER_KB = 400        # one 1 KB put: reading its 1.4 KB line a char at a time, json, base64, sha, flash
+PER_KB_RAW = 60     # a raw put (0.3.15+): a short header line, then 4 KB read in one go, sha, flash (chipprobe: 45 KB in 2.6 s)
+RAW = 4096          # the most bytes one raw put carries (hello "bin")
+
 
 
 class Plan:
     """Where on the bar each part of a job starts. nbytes: what the host will send (the job's "bytes";
     older hosts don't say, so 6 KB a file is assumed)."""
-    def __init__(self, nbytes):
+    def __init__(self, nbytes, raw=False):
         self.files = max(1, nbytes)
-        parts = (("restart", RESTART), ("sig", SIG), ("sums", SUMS), ("files", self.files * PER_KB // 1024), ("commit", COMMIT))
+        parts = (("restart", RESTART), ("sig", SIG), ("sums", SUMS), ("files", self.files * (PER_KB_RAW if raw else PER_KB) // 1024), ("commit", COMMIT))
         total = sum(ms for _, ms in parts)
         self.at0, at = {}, 0
         for k, ms in parts:
@@ -203,7 +206,7 @@ def run(mid, m, ask, show=None):
         W.send({"id": mid, "type": "refused"})
         return
     title = W.doing(title)
-    plan = Plan(m.get("bytes") or 6144 * len(write))
+    plan = Plan(m.get("bytes") or 6144 * len(write), bool(m.get("raw")))
     sig_tick = lambda f: show(title, None, plan.at("sig", f))
     if late:
         files = None
@@ -224,6 +227,8 @@ def run(mid, m, ask, show=None):
     poll = select.poll()
     poll.register(sys.stdin, select.POLLIN)
     R = W.lines()                           # the one line reader: never a string grown per char (wedgie.Lines)
+    buf = bytearray(RAW)                    # raw puts land here: made once, on install mode's clean heap
+    bv = memoryview(buf)
     last, qid = time.ticks_ms(), mid
     gc.collect()
     try:
@@ -281,7 +286,15 @@ def run(mid, m, ask, show=None):
                     got.pop(n, None)
                     f, h, cur = open(_tmp(n), "wb"), hashlib.sha256(), n
                 end = q.get("end")
-                b = binascii.a2b_base64((q.pop("data", None) or "").encode())
+                k = q.get("n")
+                if k is not None:           # raw (0.3.15+): k bytes follow this line, no base64
+                    if not isinstance(k, int) or k < 0 or k > RAW:
+                        W.send({"id": qid, "type": "error", "error": "a raw put is 0..%d bytes" % RAW})
+                        return
+                    b = bv[:k]
+                    R.raw(b)
+                else:
+                    b = binascii.a2b_base64((q.pop("data", None) or "").encode())
                 q = None
                 f.write(b)
                 h.update(b)

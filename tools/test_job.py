@@ -58,11 +58,23 @@ def release(apps=True):
 class Host:
     """What the job reads (W.lines) and sends (W.send)."""
     def __init__(self, msgs):
-        self.q = [json.dumps(dict(m, id=100 + i)).encode() for i, m in enumerate(msgs)]
+        self.q, i = [], 0
+        for m in msgs:                  # a raw put: its header line, then its bytes (wedgie.Lines.raw)
+            if isinstance(m, bytes):
+                self.q.append(("raw", m))
+            else:
+                self.q.append(json.dumps(dict(m, id=100 + i)).encode())
+                i += 1
         self.out = []
 
     def pump(self, poll, wait=0):
+        while self.q and isinstance(self.q[0], tuple):      # bytes nobody read: a raw put the job refused
+            self.q.pop(0)
         return self.q.pop(0) if self.q else None
+
+    def raw(self, mv):
+        kind, b = self.q.pop(0)
+        mv[:] = b
 
 
 def puts(name, data, chunk=1024):
@@ -196,6 +208,27 @@ check("done" not in types_(out), "a job title it doesn't know: refused (%s)" % t
 out, f = run({"job": "Update firmware", "write": ["slot.mpy"], "delete": [], "apps": None},
              puts("slot.mpy", read("slot.mpy")) + [{"type": "commit"}])
 check(types_(out)[-2:] == ["done", "reset"] and json.loads(f["apps.json"])[0]["mod"] == "hello", "an update with no apps keeps apps.json: %s" % types_(out))
+
+# 15. raw puts (0.3.15+): a header line with n, then n bytes
+def raw_puts(name, data, chunk=4096):
+    out = []
+    for o in range(0, max(len(data), 1), chunk):
+        part = data[o:o + chunk]
+        out += [{"type": "put", "name": name, "n": len(part), "end": o + chunk >= len(data)}, part]
+    return out
+big = read("slot.mpy")
+out, f = run({"job": "Update firmware", "write": ["slot.mpy"], "delete": [], "apps": None, "raw": True},
+             raw_puts("slot.mpy", big) + [{"type": "commit"}])
+check(types_(out)[-2:] == ["done", "reset"] and f.get("slot.mpy") == big, "raw puts (%d bytes, 4 KB each) go in: %s" % (len(big), types_(out)))
+out, f = run({"job": "Update firmware", "write": ["slot.mpy"], "delete": [], "apps": None},
+             [{"type": "put", "name": "slot.mpy", "n": 9000, "end": True}, b"x" * 9000, {"type": "commit"}])
+check("done" not in types_(out), "a raw put over 4 KB: refused (%s)" % types_(out))
+out, f = run({"job": "Update firmware", "write": ["slot.mpy"], "delete": [], "apps": None},
+             raw_puts("slot.mpy", big[:-1] + b"!") + [{"type": "commit"}])
+check(f.get("slot.mpy") == read("slot.mpy") and "done" not in types_(out), "raw bytes that don't match the signed list: refused (%s)" % types_(out))
+out, f = run({"job": "Update firmware", "write": ["slot.mpy"], "delete": [], "apps": None},
+             [{"type": "put", "name": "slot.mpy", "n": -1, "end": True}, {"type": "commit"}])
+check("done" not in types_(out), "a raw put with n -1: refused (%s)" % types_(out))
 
 print("all ok" if not fails else "%d FAILED" % fails)
 sys.exit(1 if fails else 0)

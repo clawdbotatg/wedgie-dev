@@ -127,6 +127,22 @@ class Wedgie:
                 continue
             return v
 
+    def request_raw(self, msg, raw, timeout=15.0):
+        """A request whose line is followed by raw bytes (a raw put: n = len(raw); firmware 0.3.15+)."""
+        mid = self.id
+        self.id += 1
+        self.s.reset_input_buffer()
+        self.buf = b""
+        self.s.write((json.dumps(dict(msg, id=mid, n=len(raw))) + "\n").encode() + bytes(raw))
+        for line in self._lines(lambda l: False, timeout):
+            if line.startswith("{"):
+                try:
+                    v = json.loads(line)
+                except ValueError:
+                    continue
+                if v.get("id") == mid:
+                    return v
+
     def hello(self, timeout=1.0):
         try:
             return self.request({"type": "hello"}, timeout)
@@ -517,10 +533,12 @@ def job(wg, title, write, delete, apps):
     sig = urllib.request.urlopen(SITE + "/fw/release.sig").read().decode().strip()
     # a written .mpy's old .py: job.py's commit removes it (0.3.12+). Not in delete: 0.3.12-0.3.13 refuse
     # to delete their core names (wedgie.py, slot.py, ...)
+    h0 = wg.hello(1.5) or {}
+    bin_ = h0.get("bin") or 0           # 0.3.15+: raw bytes, 4 KB a put (base64 lines cost it ~1 s a KB)
     sys.stderr.write("press A on the wedgie: %s?\n" % title)
     try:
         v = wg.request({"type": "job", "job": title, "release": rel, "sig": sig, "write": write, "delete": delete,
-                        "apps": None if apps is None else json.dumps(apps)}, 120)
+                        "apps": None if apps is None else json.dumps(apps), "raw": bool(bin_)}, 120)
     except (serial.SerialException, OSError):
         # 0.3.12+: a yes restarts it into install mode, and the first restart since it was plugged in drops
         # the port. Find it again; in install mode its hello says job (the go went out on the old port).
@@ -533,6 +551,7 @@ def job(wg, title, write, delete, apps):
                 break
         if not (h and h.get("job")):
             sys.exit("the wedgie restarted without the install (did someone press Y?)")
+        bin_ = h.get("bin") or 0
         v = {"type": "go"}
     if v.get("type") == "refused":
         sys.exit("the wedgie said no (Y on its screen)")
@@ -541,8 +560,11 @@ def job(wg, title, write, delete, apps):
     for i, n in enumerate(write):
         data = urllib.request.urlopen(SITE + "/fw/" + n).read()
         print("[%d/%d] %s" % (i + 1, len(write), n))
-        for o in range(0, max(len(data), 1), 1024):
-            r = wg.request({"type": "put", "name": n, "data": base64.b64encode(data[o:o + 1024]).decode(), "end": o + 1024 >= len(data)}, 15)
+        size = min(bin_, 4096) if bin_ else 1024
+        for o in range(0, max(len(data), 1), size):
+            part, end = data[o:o + size], o + size >= len(data)
+            r = (wg.request_raw({"type": "put", "name": n, "end": end}, part) if bin_ else
+                 wg.request({"type": "put", "name": n, "data": base64.b64encode(part).decode(), "end": end}, 15))
             if r.get("type") != "ok":
                 sys.exit("the wedgie stopped: %s" % (r.get("error") or r))
     r = wg.request({"type": "commit"}, 30)

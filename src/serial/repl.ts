@@ -102,8 +102,8 @@ export class Repl {
     });
   }
 
-  async write(s: string) {
-    const bytes = new TextEncoder().encode(s);
+  async write(s: string | Uint8Array) {
+    const bytes = typeof s === "string" ? new TextEncoder().encode(s) : s;
     for (let i = 0; i < bytes.length; i += 256) {
       await this.writer!.write(bytes.slice(i, i + 256));
       if (bytes.length > 256) await sleep(5);
@@ -120,6 +120,16 @@ export class Repl {
       const t = window.setTimeout(() => { this.pending.delete(id); rej(new Error("wedgie did not answer")); }, ms);
       this.pending.set(id, { parts: [], res, rej, t });
       this.write(JSON.stringify({ ...msg, id }) + "\n").catch(rej);
+    });
+  }
+
+  /** A request whose line is followed by raw bytes (a raw put: msg.n = raw.length, firmware 0.3.15+). */
+  requestRaw(msg: Record<string, unknown>, raw: Uint8Array, ms = 5000): Promise<any> {
+    const id = this.nextId++;
+    return new Promise((res, rej) => {
+      const t = window.setTimeout(() => { this.pending.delete(id); rej(new Error("wedgie did not answer")); }, ms);
+      this.pending.set(id, { parts: [], res, rej, t });
+      this.write(JSON.stringify({ ...msg, n: raw.length, id }) + "\n").then(() => this.write(raw)).catch(rej);
     });
   }
 
