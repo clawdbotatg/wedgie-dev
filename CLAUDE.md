@@ -55,16 +55,20 @@ what agents outside this repo read (keep it true when the firmware or the USB pr
    The escape hatch (`firmware/hatch.py`, 0.3.12+): `{"type":"open","full":true}` (`wedgie.py unlock`) or
    a plain Ctrl-C while locked shows a red FULL CONTROL? question; A = the same yes. Ctrl-C in the first
    3 s after the slot starts is ignored (a connecting host's leftover bytes).
-10. **One progress screen: the boot screen.** Anything with progress on a wedgie (install, update,
-   anything slow) shows the boot logo and the boot bar: `loader.screen(title, what)` returns the bar,
-   `bar.to(0..1)` fills it, `loader.what(text)` changes the line under it. Never draw another bar
-   (0.3.2 did; Austin, 2026-09-30). The site's picture of the wedgie screen should match it.
-11. **One look: `firmware/ui.py`.** The palette (`ui.WHITE/INK/MUTED/GREEN/GREEN_D/GREY/RED`) and the
-   system screens' pieces (`ui.page`, `ui.ask`, `ui.band`, `ui.wrap`, `ui.progress`) live there only.
-   Every system screen uses them; apps are told to (`public/code.md` "Look and feel", the /code card,
-   pictures in `public/img/look/` from emuprobe). The page's drawings of wedgie screens take colors from
-   `src/ui/palette.ts`. `python3 tools/test_style.py` fails on a re-typed palette color, a second
-   bar.bin reader, or palette.ts drifting from ui.py.
+10. **The style guide is `docs/STYLE.md`, and it's enforced.** Busy = the boot loader: anything a wedgie is
+   doing shows the boot logo, a title saying what ("Updating firmware"), the boot bar filling, the step
+   under it. Never "working...", never another bar (0.3.2 drew one; /connect's fallback showed "working..."
+   for a whole update: Austin, 2026-09-30 and 2026-10-03). Firmware: `ui.progress`. Hosts: `files.ts
+   writeFile` / `wedgie.py put` are the only file writers, move the wedgie's bar, and refuse to write unless
+   `busy()` put the screen up (`takeOver` / `take_over` do, titled from the job). Put a rule in shared code
+   every path must use, never in one caller.
+11. **One look: `firmware/ui.py`.** The palette and the three screens (`ui.page`, `ui.ask`, `ui.progress`)
+   live there only; every system screen and every app's own UI uses them (`public/code.md` "Look and
+   feel", pictures in `public/img/look/` from emuprobe); the page's drawings take colors from
+   `src/ui/palette.ts`. `python3 tools/test_style.py` fails on a re-typed palette color, lcd's raw colors,
+   busy words on a screen, an app drawing text without `ui`, a second bar.bin reader, a host writing files
+   outside the one writer, a job with no title, palette.ts drifting. Its `KNOWN` list (what isn't on the
+   guide yet) may only shrink. `node tools/busyprobe.mjs` checks every /connect full-access path draws it.
 12. **Anything slow on a wedgie: trace click to screen first.** List every step (host requests, what
    the wedgie reads, imports/compiles, hashing, flash writes, drawing), estimate each, and fix them all in
    one release. Fixing the first cause found and shipping took five releases for the install question
@@ -108,7 +112,8 @@ node tools/updateprobe.mjs http://localhost:4173 <outdir>   # /update, plug-in-a
 node tools/emuprobe.mjs <outdir>                            # the virtual wedgie
 node tools/codeprobe.mjs http://localhost:4173 <outdir> ~/clawd/wedgie-starter   # /code: emulator, saves, repos
 python3 tools/test_drive.py                                 # the WEDGIE drive's SCSI answers
-python3 tools/test_style.py                                 # one palette, one progress bar (firmware/ui.py)
+python3 tools/test_style.py                                 # the style guide (docs/STYLE.md): palette, busy = boot loader, one writer
+node tools/busyprobe.mjs http://localhost:4173              # every /connect full-access job shows the boot bar, titled
 python3 tools/test_memory.py                                # USB only through wedgie.lines(), no growing strings
 python3 tools/test_job.py                                   # checked installs vs a hostile host (real job.py, seconds)
 uv run --with mpy-cross==1.29.0.post2 python3 tools/mpy.py --check   # the committed .mpy match their .py

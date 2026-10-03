@@ -144,6 +144,7 @@ for (const sc of scenarios.filter((x) => !process.env.ONLY || x.name === process
         const ls = [...files.keys()].filter((k) => k.startsWith(m[1] + "/")).map((k) => [k, files.get(k).length]);
         return answer("@ls " + JSON.stringify({ files: ls, free: 600000 }) + "\r\n");
       }
+      if (c.includes('print("@sha"') && (m = c.match(/with open\("([^"]+)", "rb"\)/))) return answer("@sha " + JSON.stringify(await sha(files.get(m[1]))) + "\r\n");   // files.ts writeFile's check
       if ((m = c.match(/with open\("([^"]+)", "rb"\) as _f:/))) {       // one @b line per 2048 bytes, like files.ts's read loop
         const u8 = files.get(m[1]); let o = "";
         for (let i = 0; i < u8.length; i += 2048) { let s = ""; for (const b of u8.subarray(i, i + 2048)) s += String.fromCharCode(b); o += "@b " + JSON.stringify(btoa(s)) + "\r\n"; }

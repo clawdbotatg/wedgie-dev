@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """A pretend wedgie on a pseudo-terminal, for testing public/wedgie.py without hardware.
 Raw-REPL code runs in real CPython inside a temp dir (so file writes, hashes, renames are real);
+_ins(title, what, p) lines (the host's busy screen, docs/STYLE.md) go to stderr as "screen ...".
 JSON lines get the firmware's answers (hello, shot, press, stop) once main.py + slot.py (0.1.x: menu.py) exist.
   python3 tools/fakedevice.py        prints the pty path, then serves until killed
   SEALED=yes|no  a sealed wedgie (0.2.5+): Ctrl-C is a plain byte until {"type": "open"}, which the
@@ -29,6 +30,11 @@ def hello(mid, t="hello"):
 def run(code):
     if code == "":
         out("OK\r\nMPY: soft reboot\r\nraw REPL; CTRL-B to exit\r\n>"); return
+    if "def _free():" in code or "def _ins(" in code:   # the host's RAM freeing (it would wipe CPython's own modules) and its screen code
+        out("OK\x04\x04>"); return
+    if code.startswith("_ins("):                       # the boot screen and bar the host draws: printed, for checks
+        sys.stderr.write("screen " + code + "\n"); sys.stderr.flush()
+        out("OK\x04\x04>"); return
     buf, err = io.StringIO(), ""
     try:
         with contextlib.redirect_stdout(buf):

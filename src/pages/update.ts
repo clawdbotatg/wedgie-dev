@@ -69,7 +69,7 @@ export function update(main: HTMLElement) {
     let restarting = false;
     try {
       await W.withRepl(w, async (r) => {
-        const res = await installCore(r, (p, what) => { j.p = p * (0.9); j.what = what; paint(); }, { screen: true });
+        const res = await installCore(r, (p, what) => { j.p = p * (0.9); j.what = what; paint(); });
         if (res.untouched) return;                           // up to date: nothing asked, it keeps running
         if (res.restarted) { restarting = true; return; }     // a checked install (0.3.0+): its app too, and it restarted itself
         for (const c of res.outdated) await useApp(r, c, (p) => { j.p = 0.9 + 0.1 * p; paint(); }, { launcher: false });

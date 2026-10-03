@@ -226,6 +226,7 @@ export function format(main: HTMLElement) {
           const kept = backup(b.uid);
           if (kept && !($("t-wipe") as HTMLInputElement).checked) {
             status("Putting its saves back…", "Don't unplug it.");
+            await FS.busy(r, "Putting saves back");
             const n = await FS.restore(r, kept);
             try { localStorage.removeItem(SAVES(b.uid)); } catch {}
             fact("Saves", `${n} file${n === 1 ? "" : "s"} put back`);

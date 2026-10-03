@@ -23,6 +23,7 @@
 import type { Repl } from "./repl";
 import { waitBack, withRepl, type Wedgie } from "./wedgies";
 import { cmpVersion } from "../apps/appjson.mjs";
+import { busy, progress, writeFile } from "./files";
 
 /** url: where to fetch it, when it isn't /fw/<name> (an app from a repo someone added). */
 export type FileInfo = { name: string; size: number; sha256: string; url?: string };
@@ -109,12 +110,18 @@ _free()`;
 /** Stop what the wedgie runs and take its raw REPL, without a soft reset, with its RAM freed. The app is
  *  stopped properly first (on 0.1.x its Timer would otherwise keep drawing over everything; 0.2 stops
  *  it on Ctrl-C too). 0.2.5+ is sealed: the person lets this computer in first (letIn). */
-export async function takeOver(r: Repl, ask = askHint, job = "") {
+export async function takeOver(r: Repl, ask = askHint, job = "", title = doing(job)) {
   await letIn(r, ask, job);
   await r.request({ type: "stop" }, 800).catch(() => {});
   await r.enter({ reset: false });
   await r.exec(FREE_PY, 10000).catch(() => {});
+  await busy(r, title);          // the wedgie's screen says what this computer is doing until it lets go
 }
+
+/** What the wedgie's screen says while a job runs: its question's words as doing ("Install Buttons" ->
+ *  "Installing Buttons", "Update firmware to 0.3.12" -> "Updating firmware"). */
+export const doing = (job: string) => job.replace(/ to \S+$/, "")
+  .replace(/^(Update|Install|Uninstall|Save|Run)\b/, (v) => ({ Update: "Updating", Install: "Installing", Uninstall: "Uninstalling", Save: "Saving", Run: "Running" } as Record<string, string>)[v]) || "This computer has it";
 
 export const ASK_TEXT = "Press A on the wedgie to let this computer in";
 /** Where a page shows ASK_TEXT while the wedgie waits for its person ("" when they answered). */
@@ -150,34 +157,19 @@ export async function letIn(r: Repl, ask: (s: string) => void = askHint, job = "
   throw new Error(`the wedgie said ${v.error || v.type}`);
 }
 
-async function copy(r: Repl, files: FileInfo[], have: Have, onProgress: (p: number, what: string) => void, screen?: (p: number) => Promise<void>) {
+async function copy(r: Repl, files: FileInfo[], have: Have, onProgress: (p: number, what: string) => void) {
   const todo = files.filter((f) => have.hashes[f.name] !== f.sha256)
     .sort((a, b) => (a.name === "main.py" ? 1 : b.name === "main.py" ? -1 : 0));
   const total = todo.reduce((n, f) => n + f.size, 0) || 1;
-  let done = 0, drawn = -1;
-  const at = async (p: number, what: string) => {
-    onProgress(p, what);
-    if (screen && p - drawn >= 0.12) { drawn = p; await screen(p); }
-  };
+  let done = 0;
   for (const f of todo) {
-    await at(done / total, f.name);
+    onProgress(done / total, f.name);
     const res = await fetch(f.url || "/fw/" + f.name, { cache: "no-cache" });
     if (!res.ok) throw new Error(`${f.name}: couldn't fetch it (${res.status})`);
     const buf = new Uint8Array(await res.arrayBuffer());
     // A deploy since this page loaded: the manifest it read is older than the files it gets now.
     if (!f.url && hex(await crypto.subtle.digest("SHA-256", buf)) !== f.sha256) throw new Error("wedgie.dev was updated since this page opened. Reload the page, then try again");
-    const tmp = "_wedgie.tmp";
-    await r.exec(`import binascii\n_f = open(${JSON.stringify(tmp)}, "wb")`);
-    for (let i = 0; i < buf.length; i += CHUNK) {
-      await r.exec(`_f.write(binascii.a2b_base64(${JSON.stringify(b64(buf.subarray(i, i + CHUNK)))}))`);
-      await at((done + Math.min(buf.length, i + CHUNK)) / total, f.name);
-    }
-    await r.exec("_f.close()");
-    let check: string | null = null;
-    r.onLine = (t, v) => { if (t === "sha") check = v; };
-    await r.exec(`print("@sha", json.dumps(_h(${JSON.stringify(tmp)})))`, 20000); // _h from HASHES, still defined
-    if (check !== f.sha256) throw new Error(`${f.name} didn't copy cleanly; try again`);
-    await r.exec(`import os\ntry:\n    os.remove(${JSON.stringify(f.name)})\nexcept OSError:\n    pass\nos.rename(${JSON.stringify(tmp)}, ${JSON.stringify(f.name)})`);
+    await writeFile(r, f.name, buf, { span: [done / total, (done + f.size) / total], sha: f.sha256, onChunk: (p) => onProgress(p, f.name) });
     have.hashes[f.name] = f.sha256;
     done += f.size;
   }
@@ -192,7 +184,7 @@ async function copy(r: Repl, files: FileInfo[], have: Have, onProgress: (p: numb
  *  real hashes so a changed file shows as an update, or the person's own app as it was), or none. */
 async function writeApps(r: Repl, m: Manifest, have: Have, only: string | null) {
   const list = await appsFor(m, have, only);
-  await r.exec(`import json, os\n_f = open("apps.json", "w")\n_f.write(${JSON.stringify(JSON.stringify(list))})\n_f.close()\ntry:\n    os.sync()\nexcept AttributeError:\n    pass`);
+  await writeFile(r, "apps.json", new TextEncoder().encode(JSON.stringify(list)), { span: [1, 1], what: "" });
   return list;
 }
 /** What apps.json should say once `only` is the app (have: the files as they'll be). */
@@ -360,7 +352,7 @@ const fileInfo = (m: Manifest, names: string[]) => names.map((n) => m.files.find
 
 /** Install or update the firmware core (not the carts; the ones already on it stay). Leaves the board in
  *  raw REPL; the caller reboots it (the new core only runs after one). */
-export async function installCore(r: Repl, onProgress: (p: number, what: string) => void, opts: { launcher?: boolean; screen?: boolean } = {}) {
+export async function installCore(r: Repl, onProgress: (p: number, what: string) => void, opts: { launcher?: boolean } = {}) {
   startAsk();
   const m = await firmwareManifest();
   const ch = opts.launcher === false ? null : await checkedHave(r, m, undefined, "update");
@@ -386,7 +378,7 @@ export async function installCore(r: Repl, onProgress: (p: number, what: string)
     }
   }
   onProgress(0, "stopping what it runs");
-  if (opts.launcher === false) await r.enter({ reset: false });   // a board already in the raw REPL (/format's bench)
+  if (opts.launcher === false) { await r.enter({ reset: false }); await busy(r, "Installing firmware"); }   // a board already in the raw REPL (/format's bench)
   else await takeOver(r, (s) => { askHint(s); if (s) onProgress(0, s); }, `Update firmware to ${m.version}`);
   onProgress(0.02, "checking what's on it");
   const have = await look(r, allNames(m));
@@ -394,57 +386,17 @@ export async function installCore(r: Repl, onProgress: (p: number, what: string)
     .filter((n) => have.files.includes(n) && !m.files.some((f) => f.name === n));
   const retired = RETIRED.filter((n) => have.files.includes(n));
   if (stale.length || retired.length) await r.exec(`import os\nfor n in ${JSON.stringify([...stale, ...retired])}:\n    os.remove(n)`);
-  const screen = opts.screen ? await deviceScreen(r, "updating", `wedgie ${m.version}`) : undefined;
   const fromMenu = retired.length > 0;          // 0.1.x (the menu): it starts with no app, the person picks one
   // One app from 0.2 on: it keeps its app, brought up to date with the core (an app now shipped compiled,
   // the Wallet, gets its .mpy here; apps.json would drop it otherwise); the other carts' files go (never its saves).
   const act = fromMenu ? null : activeOf(m, have);
   const keep = m.carts.find((c) => c.mod === act)?.files || [];
-  const todo = await copy(r, fileInfo(m, [...new Set([...m.core, ...keep])]), have, (p, w) => onProgress(0.05 + 0.9 * p, w), screen);
+  const todo = await copy(r, fileInfo(m, [...new Set([...m.core, ...keep])]), have, (p, w) => onProgress(0.05 + 0.9 * p, w));
   await removeFiles(r, have, others(m, have, act));
   const apps = await writeApps(r, m, have, act);
   onProgress(1, todo.length ? `${todo.length} files updated` : "already up to date");
   const outdated = m.carts.filter((c) => apps.some((a) => a.mod === c.mod && a.v !== c.v));
   return { version: m.version, written: todo.length, outdated, restarted: false, untouched: false };
-}
-
-// The wedgie's own screen while software goes on: the boot screen and the boot bar (loader.screen, 0.3.3+).
-// Older firmware has no loader.screen: it gets the old drawing below.
-const INSERT_PY = `_ld = None
-try:
-    import loader as _ld
-except ImportError:
-    pass
-if _ld and hasattr(_ld, "screen"):
-    _bar = None
-    def _ins(title, name, p):
-        global _bar
-        if _bar is None:
-            _bar = _ld.screen(title, name) or False
-        if _bar:
-            _bar.to(p)
-else:
-    import lcd as _L
-    _d = _L.LCD()
-    def _ins(title, name, p):
-        W, I, M = _L.color(254, 254, 254), _L.color(26, 27, 26), _L.color(120, 123, 120)
-        _d.fill(W)
-        for y, c in ((10, _L.color(34, 196, 82)), (19, _L.color(169, 170, 171)), (28, _L.color(227, 49, 44))):
-            _d.fill_rect(0, y, 240, 5, c)
-        _d.center_text(title, 92, M, 2)
-        _d.center_text(name, 120, I, 2)
-        _d.rect(30, 160, 180, 14, _L.color(200, 200, 196))
-        _d.fill_rect(32, 162, int(176 * p), 10, _L.color(34, 196, 82))
-        _d.show()`;
-
-/** Draw on the wedgie's own screen while we work (needs its lcd.py; a board without one shows nothing). */
-async function deviceScreen(r: Repl, title: string, name: string) {
-  try {
-    await r.exec(INSERT_PY, 8000);
-    const draw = async (p: number) => { await r.exec(`_ins(${JSON.stringify(title)}, ${JSON.stringify(name.slice(0, 14))}, ${p.toFixed(2)})`, 8000).catch(() => {}); };
-    await draw(0);
-    return draw;
-  } catch { return undefined; }
 }
 
 /** Make `cart` the app it runs: the old app's files come off, its files that differ go on, apps.json
@@ -467,7 +419,7 @@ export async function useApp(r: Repl, cart: Cart, onProgress: (p: number, what: 
     }
   }
   onProgress(0, "opening the slot");
-  if (opts.launcher === false) await r.enter({ reset: false });
+  if (opts.launcher === false) { await r.enter({ reset: false }); await busy(r, `Installing ${cart.name}`); }
   else await takeOver(r, (s) => { askHint(s); if (s) onProgress(0, s); }, `Install ${cart.name}`);
   const have = await look(r, allNames(m));
   const size = (n: string) => m.files.find((x) => x.name === n)?.size ?? 0;   // 0: an old repo app's file (not in m); it frees its room anyway
@@ -476,12 +428,11 @@ export async function useApp(r: Repl, cart: Cart, onProgress: (p: number, what: 
   const freed = gone.reduce((t, f) => t + size(f), 0);
   const free = await r.exec(`import os\n_s = os.statvfs("/")\nprint(_s[0] * _s[3])`).then((s) => parseInt(s.trim())).catch(() => NaN);
   if (free + freed < need + FLOOR) throw new Error(`not enough room: it needs ${Math.ceil(need / 1024)} KB and ${Math.floor((free + freed - FLOOR) / 1024)} KB is free. Delete some saves or files first.`);
-  const screen = await deviceScreen(r, "installing", cart.name);
   await removeFiles(r, have, gone);
-  const todo = await copy(r, fileInfo(m, cart.files), have, onProgress, screen);
+  const todo = await copy(r, fileInfo(m, cart.files), have, onProgress);
   const mods = todo.filter((f) => /\.m?py$/.test(f.name)).map((f) => f.name.replace(/\.m?py$/, ""));
   if (mods.length) await r.exec(`import sys\nfor _n in ${JSON.stringify(mods)}:\n    sys.modules.pop(_n, None)`);
-  await screen?.(1);
+  await progress(r, 1, "");
   await writeApps(r, m, have, cart.mod);
   onProgress(1, todo.length ? "in" : "already in");
   return { written: todo.length, restarted: false };

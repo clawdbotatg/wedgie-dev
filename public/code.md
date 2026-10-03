@@ -239,8 +239,10 @@ import loader; loader.what("enemies")                          # the line under 
   `ui.COLS_BIG`). `ui.wrap(text, n)` breaks words into lines; `ui.title(d, text, y)` draws a big one.
 - **Buttons mean the same everywhere:** A (green) is yes / go / again, Y (red) is no / back. Put the
   hint at the bottom in `ui.MUTED` ("A  play again"), as `ui.page` does.
-- **Slow things show `ui.progress`**, never a bar of your own. It draws straight to the screen (not
-  your framebuffer) and costs about 9 KB of RAM while it's up; your next `d.show()` covers it.
+- **Slow things show `ui.progress`**, never a bar of your own and never "loading..." or "please wait".
+  Its title says what you're doing ("Loading level 3"), the line under the bar the step ("tiles"). It
+  draws straight to the screen (not your framebuffer) and costs about 9 KB of RAM while it's up; your
+  next `d.show()` covers it.
 - An app that uses `ui` needs `"fw": "0.3.5"` in its wedgie.json entry.
 
 ## Saves (and starting at level 8)
