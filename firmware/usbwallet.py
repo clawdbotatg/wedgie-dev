@@ -70,11 +70,33 @@ def short(a):
     return a[:6] + "..." + a[-4:] if len(a) > 14 else a
 
 
-def eth_amount(wei):
+def eth_amount(wei, dec=18):
     wei = int(wei)
-    whole, frac = wei // 10**18, wei % 10**18
-    s = ("%018d" % frac).rstrip("0")
+    whole, frac = wei // 10**dec, wei % 10**dec
+    s = (("%0" + str(dec) + "d") % frac).rstrip("0") if dec else ""
     return "%d.%s" % (whole, s[:6]) if s else "%d" % whole
+
+
+# Tokens whose symbol and decimals the wallet knows itself: the confirm screen shows a transfer's amount
+# from the signed raw amount with these, never the host's amountFormatted/tokenSymbol (those can say
+# anything). (chain id, address) -> (symbol, decimals). secrets.EXPECTED_TOKEN + EXPECTED_DECIMALS /
+# EXPECTED_SYMBOL add one.
+TOKENS = {
+    (1, "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"): ("USDC", 6),
+    (8453, "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"): ("USDC", 6),
+    (84532, "0x036cbd53842c5426634e7929541ec2318f3dcf7e"): ("USDC", 6),
+}
+
+
+def token_of(r):
+    """(symbol, decimals) for the request's token, or None: unknown."""
+    t = str(r.get("token", "")).lower()
+    if secrets and getattr(secrets, "EXPECTED_DECIMALS", None) is not None and t == str(getattr(secrets, "EXPECTED_TOKEN", "")).lower():
+        return (getattr(secrets, "EXPECTED_SYMBOL", "token"), int(secrets.EXPECTED_DECIMALS))
+    try:
+        return TOKENS.get((int(r.get("chainId")), t))
+    except (TypeError, ValueError):
+        return None
 
 
 # --- key and address ---------------------------------------------------------------------------
@@ -445,13 +467,22 @@ def draw_confirm():
             sel = str(r.get("data", ""))[:10]
             title = "TOKEN TRANSFER" if sel == "0xa9059cbb" else "TOKEN APPROVAL" if sel == "0x095ea7b3" else "GENERAL CALL"
             d.center_text(title, 66, L.WHITE, 2)
-            d.center_text((eth_amount(r.get("value", 0)) + " ETH to " + short(r.get("target", "")))[:30], 92, L.YELLOW)
-        else:
-            amt = "$" + str(r.get("amountFormatted", r.get("amount", "")))
+            data = str(r.get("data", ""))
+            if title != "GENERAL CALL" and len(data) >= 138:     # the call's own words: who and how much
+                who, n = "0x" + data[34:74], int(data[74:138], 16)
+                tk = token_of({"chainId": r.get("chainId"), "token": r.get("target", "")})
+                amt = "UNLIMITED" if n >= 2**255 else (eth_amount(n, tk[1]) + " " + tk[0]) if tk else str(n) + " raw"
+                d.center_text(amt[:28], 86, L.YELLOW)
+                d.center_text(("to " if sel == "0xa9059cbb" else "for ") + short(who), 98, L.YELLOW)
+                d.center_text(("of " + short(str(r.get("target", ""))))[:28], 110, L.GREY)
+            else:
+                d.center_text((eth_amount(r.get("value", 0)) + " ETH to " + short(r.get("target", "")))[:30], 92, L.YELLOW)
+        else:                           # from the signed fields only (check): never the host's hints
+            tk = token_of(r)
+            amt = eth_amount(r.get("amount", 0), tk[1]) if tk else str(r.get("amount", ""))
             d.center_text(amt[:14], 64, L.WHITE, 3 if len(amt) <= 9 else 2)
-            d.center_text((str(r.get("tokenSymbol", "")) + " to")[:30], 92, L.GREY)
-            who = r.get("toName") or short(r.get("to", ""))
-            d.center_text(str(who)[:14], 104, L.YELLOW, 2)
+            d.center_text(((tk[0] + " to") if tk else "UNKNOWN TOKEN, raw units, to")[:30], 92, L.GREY if tk else L.YELLOW)
+            d.center_text(short(str(r.get("to", ""))), 104, L.YELLOW, 2)
         # the fingerprint: the digest this wallet computed, as a blockie and 8 hex
         blockies.draw(d, r["digest"].lower(), 8, 122, 8)
         d.text("digest", 90, 124, L.GREY)
@@ -469,7 +500,7 @@ def draw_confirm():
                 d.center_text(line, y, L.WHITE, 2)
                 y += 18
             if r.get("toName"):
-                d.center_text("name hint:", 120, L.GREY)
+                d.center_text("name (unchecked hint):", 120, L.GREY)
                 d.center_text(str(r["toName"])[:28], 132, L.YELLOW)
             if kind == "transfer":
                 d.center_text("amount " + str(r.get("amount", ""))[:22], 152, L.WHITE)

@@ -550,20 +550,20 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     }).join("") || `<p class="fine">No files.</p>`;
     box.querySelectorAll<HTMLElement>("[data-fs-open]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); viewFile(a.dataset.fsOpen!); }));
     box.querySelectorAll<HTMLButtonElement>("[data-fs-dl]").forEach((b) => (b.onclick = async () => {
-      const bytes = await withFiles("Reading it", (r, lv) => FS.get(r, b.dataset.fsDl!, lv));
+      const bytes = await withFiles("Reading it", (r, lv) => FS.get(r, b.dataset.fsDl!, lv), !FS.isSave(b.dataset.fsDl!));
       if (bytes) FS.download(b.dataset.fsDl!.split("/").pop()!, bytes);
     }));
     box.querySelectorAll<HTMLButtonElement>("[data-fs-rm]").forEach((b) => (b.onclick = async () => {
       const p = b.dataset.fsRm!;
       if (confirmFs !== p) { confirmFs = p; paintFiles(); return; }
       confirmFs = "";
-      await withFiles("Deleting it", (r, lv) => FS.rm(r, p, lv));
+      await withFiles("Deleting it", (r, lv) => FS.rm(r, p, lv), !FS.isSave(p));
       if (fsOpen === p) { fsOpen = ""; $("#d-fs-view").hidden = true; }
       await loadFiles();
     }));
   }
   async function viewFile(p: string) {
-    const bytes = await withFiles("Reading it", (r, lv) => FS.get(r, p, lv));
+    const bytes = await withFiles("Reading it", (r, lv) => FS.get(r, p, lv), !FS.isSave(p));
     if (!bytes) return;
     fsOpen = p;
     const v = $("#d-fs-view");

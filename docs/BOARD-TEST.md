@@ -7,7 +7,9 @@ Use a test wedgie, not the one with your wallet on it. Each step: press A on the
 1. On the Mac (it has the release key): `node tools/sign.mjs`, commit `release/`, push the branch.
 2. On omen: `git pull`, then `npm run build && npx vite preview --port 4173 --host`.
 3. Plug the test wedgie into omen. It shows up as `/dev/ttyACM0`.
-4. Put 0.3.12 on it: `WEDGIE_SITE=http://localhost:4173 python3 public/wedgie.py update`.
+4. Put 0.3.11 on it first (from wedgie.dev), then update to 0.3.12 from the preview:
+   `WEDGIE_SITE=http://localhost:4173 python3 public/wedgie.py update`. Older firmware updates over full
+   access (it asks "let this computer in?"): the 0.3.11 to 0.3.12 path must work, it's how every wedgie gets it.
 
 ## Installs
 
@@ -28,5 +30,10 @@ Use a test wedgie, not the one with your wallet on it. Each step: press A on the
 10. Unplug, plug in, wait 5 s. Run `mpremote connect /dev/ttyACM0 repl`. The red screen comes up.
     Press A within 10 s: you get the `>>>` prompt. If mpremote gave up first, run it again.
 11. Unplug and plug in again: Ctrl-C does nothing until you press A on the red screen.
+
+## The lock
+
+12. On /connect, Developer, the file list: opening or deleting `main.py` asks on the wedgie first (A).
+    A save opens and deletes without asking.
 
 Pass = every step finishes, nothing says "wedgie broke", and nothing gets in without an A press.

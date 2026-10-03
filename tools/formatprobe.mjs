@@ -63,7 +63,7 @@ for (const sc of scenarios.filter((x) => !process.env.ONLY || x.name === process
     // ---- serial: MicroPython, a wedgie once main.py + slot.py (0.2; menu.py before) are on it ----
     const files = new Map([["boot.py", new Uint8Array([1])]]);
     if (sc.used) for (const n of ["main.py", "menu.py", "wedgiedrive.py"]) files.set(n, new Uint8Array([7]));
-    if (sc.saves) { files.set("/saves/hello/best.json", enc.encode('{"score": 120}')); files.set("/saves/demo/x.bin", new Uint8Array([1, 2, 3])); }
+    if (sc.saves) { files.set("/saves/hello/best.json", enc.encode('{"score": 120}')); files.set("/saves/demo/x.bin", Uint8Array.from({ length: 5000 }, (_, i) => (i * 7) & 255)); }   // over 2 KB: the raw read comes in chunks
     st.files = files;
     const wedgie = () => (files.has("menu.py") || files.has("slot.py")) && files.has("main.py");
     let push = () => {}, raw = false, code = "", line = "", cur = null, curName = "", live = true;
@@ -120,9 +120,12 @@ for (const sc of scenarios.filter((x) => !process.env.ONLY || x.name === process
         return answer("@chipwork " + JSON.stringify({ kind: "atecc", msg: hex(m), sha: await sha(m), random: ["ffff0000".repeat(8), "ffff0000".repeat(8)], serial: ATECC_SERIAL, configLocked: true, dataLocked: true }) + "\r\n");
       }
       if (c.includes("@hashes")) {
-        const names = JSON.parse(c.match(/for n in (\[.*?\])\}/)[1]), h = {};
+        const names = JSON.parse(c.match(/^_n = (\[.*\])$/m)[1]), h = {};
+        let apps = [];
+        try { apps = JSON.parse(new TextDecoder().decode(files.get("apps.json"))); } catch {}
+        for (const a of apps) if (Array.isArray(a?.files)) names.push(...a.files.filter((f) => typeof f === "string"));   // as install.ts asks
         for (const n of names) h[n] = files.has(n) ? await sha(files.get(n)) : null;
-        return answer("@hashes " + JSON.stringify({ hashes: h, files: [...files.keys()] }) + "\r\n");
+        return answer("@hashes " + JSON.stringify({ hashes: h, files: [...files.keys()], apps }) + "\r\n");
       }
       let m;
       if ((m = c.match(/_f = open\("([^"]+)", "wb"\)/))) { cur = []; curName = m[1]; return answer(""); }
@@ -136,7 +139,11 @@ for (const sc of scenarios.filter((x) => !process.env.ONLY || x.name === process
         const ls = [...files.keys()].filter((k) => k.startsWith(m[1] + "/")).map((k) => [k, files.get(k).length]);
         return answer("@ls " + JSON.stringify({ files: ls, free: 600000 }) + "\r\n");
       }
-      if ((m = c.match(/with open\("([^"]+)", "rb"\) as _f:/))) { let s = ""; for (const b of files.get(m[1])) s += String.fromCharCode(b); return answer("@b " + JSON.stringify(btoa(s)) + "\r\n"); }
+      if ((m = c.match(/with open\("([^"]+)", "rb"\) as _f:/))) {       // one @b line per 2048 bytes, like files.ts's read loop
+        const u8 = files.get(m[1]); let o = "";
+        for (let i = 0; i < u8.length; i += 2048) { let s = ""; for (const b of u8.subarray(i, i + 2048)) s += String.fromCharCode(b); o += "@b " + JSON.stringify(btoa(s)) + "\r\n"; }
+        return answer(o);
+      }
       if ((m = c.match(/@sha", json\.dumps\(_h\("([^"]+)"\)\)/))) return answer("@sha " + JSON.stringify(await sha(files.get(m[1]))) + "\r\n");
       if ((m = c.match(/os\.rename\("([^"]+)", "([^"]+)"\)/))) { files.set(m[2], files.get(m[1])); files.delete(m[1]); if (wedgie()) st.installed = true; return answer(""); }
       answer("");
@@ -266,7 +273,9 @@ for (const sc of scenarios.filter((x) => !process.env.ONLY || x.name === process
       await page.waitForTimeout(500);
     }
   }
-  await page.waitForFunction(() => /^(PASS|FAIL)$/.test(document.getElementById("t-text")?.textContent || ""), null, { timeout: 90000 });
+  await page.waitForFunction(() => /^(PASS|FAIL)$/.test(document.getElementById("t-text")?.textContent || "") || /Not wiped/.test(document.body.textContent), null, { timeout: 90000 });
+  const notWiped = await page.evaluate(() => (document.body.textContent.match(/Not wiped: [^.\n]*/) || [""])[0]);
+  if (notWiped) notes.push(notWiped);
   const execs = await page.evaluate(() => window.__st.execs);
   await page.waitForTimeout(3000);   // the finished unit re-plugs its USB: nothing may start again
   await page.screenshot({ path: `${out}/format-${sc.name}.png`, fullPage: true });
@@ -283,6 +292,8 @@ for (const sc of scenarios.filter((x) => !process.env.ONLY || x.name === process
     const sv = await page.evaluate(() => [...window.__st.files.keys()].filter((k) => k.startsWith("/saves/")).sort().join(","));
     const kept = await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("wedgie.saves.")).length);
     const want = sc.wipe ? "" : "/saves/demo/x.bin,/saves/hello/best.json";
+    const big = await page.evaluate(() => { const b = window.__st.files.get("/saves/demo/x.bin"); return b ? b.length === 5000 && b.every((x, i) => x === ((i * 7) & 255)) : null; });
+    if (!sc.wipe && !big) { ok = false; notes.push("the 5000-byte save came back wrong"); }
     if (sv !== want || kept) { ok = false; notes.push(`saves after: [${sv}], ${kept} left in the browser`); }
     else notes.push(sc.wipe ? "saves wiped" : "saves kept");
   }

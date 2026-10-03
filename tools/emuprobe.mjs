@@ -206,6 +206,16 @@ try {
   check(/open: True kbd: True/.test(cco), `Ctrl-C + A: let in, the app stops as Ctrl-C would (${cco.trim()})`);
   await page.waitForTimeout(500);
 
+  // locked, no yes: live get / rm reach saves only (deleting main.py, the file that locks it, would make the
+  // next boot an open REPL; reading any file could read a key)
+  await page.evaluate(() => window.vw.exec("import wedgie\nwedgie.SEALED = True\nwedgie._open = False"));
+  const lget = await ask({ id: 62, type: "get", path: "/main.py" });
+  const lrm = await ask({ id: 63, type: "rm", path: "main.py" });
+  const ldot = await ask({ id: 64, type: "rm", path: "/saves/../main.py" });
+  const lsv = await ask({ id: 65, type: "ls", path: "/" });
+  await page.evaluate(() => window.vw.exec("import wedgie\nwedgie.SEALED = False"));
+  check([lget, lrm, ldot].every((v) => v[0]?.type === "error") && lsv[0]?.files.some(([p]) => p === "/main.py"), `locked: get / rm outside /saves/ refused, main.py still there (${[lget, lrm, ldot].map((v) => v[0]?.type).join(" ")})`);
+
   // the look-and-feel kit (firmware/ui.py): a page, for code.md's pictures
   const pg = await page.evaluate(() => window.vw.exec("import slot, lcd, ui\nslot.stop()\nd = lcd.LCD()\nui.page(d, 'Game over', [('score 120', ui.INK), ('best 340', ui.MUTED)], 'A  play again')\nprint('page ok')"));
   await page.waitForTimeout(500);
@@ -271,6 +281,29 @@ try {
   const wl = await page.evaluate(() => window.vw.exec("import slot; slot.app['mod'], slot.state, slot._own_usb()"));
   check(/usbwallet', 'running', True/.test(wl), `Wallet runs, USB its own (${wl.trim()})`);
   await page.locator(".vw").screenshot({ path: `${out}/emu-wallet.png` });
+  // its confirm screen shows a transfer from the signed fields, not the host's hints: 12.5 USDC (the raw
+  // 12500000 at 6 decimals), not the hint's "$1,000,000"; and an execute's calldata (who, how much)
+  const cf = await page.evaluate(() => window.vw.exec([
+    "import usbwallet as u",
+    "u.page = 0",
+    "usdc = [a for (c, a) in u.TOKENS if c == 8453][0]",      // USDC on Base, from the wallet's own table
+    "u.req = {'r': {'kind': 'transfer', 'chainId': 8453, 'token': usdc, 'to': '0x1111111111111111111111111111111111111111', 'amount': '12500000', 'amountFormatted': '1,000,000', 'tokenSymbol': 'ETH', 'toName': 'mom.eth', 'digest': '0x' + 'ab' * 32}}",
+    "u.draw_confirm()",
+    "print('transfer drawn', u.token_of(u.req['r']), u.eth_amount(12500000, 6))",
+  ].join("\n")));
+  await page.waitForTimeout(300);
+  await page.locator(".vw").screenshot({ path: `${out}/emu-wallet-confirm.png` });
+  const cx = await page.evaluate(() => window.vw.exec([
+    "import usbwallet as u",
+    "usdc = [a for (c, a) in u.TOKENS if c == 8453][0]",
+    "u.req = {'r': {'kind': 'execute', 'chainId': 8453, 'target': usdc, 'value': 0, 'data': '0x095ea7b3' + '0' * 24 + '22' * 20 + 'f' * 64, 'digest': '0x' + 'cd' * 32}}",
+    "u.draw_confirm()",
+    "print('execute drawn')",
+  ].join("\n")));
+  await page.waitForTimeout(300);
+  await page.locator(".vw").screenshot({ path: `${out}/emu-wallet-approve.png` });
+  check(/transfer drawn \('USDC', 6\) 12\.5/.test(cf) && /execute drawn/.test(cx), `Wallet confirm: amounts from the signed fields (${cf.trim()} | ${cx.trim()})`);
+  await page.evaluate(() => window.vw.exec("import usbwallet as u\nu.req = None\nu.state = 'home'\nu.dirty = True"));
 
   // installs free the RAM an app left behind first (install.ts FREE_PY): only lcd stays, and code after it
   // imports what it needs

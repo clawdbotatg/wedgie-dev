@@ -222,6 +222,8 @@ def _handle(m):
         W.shot(mid)
     elif t == "ls":                     # every file under path: [[path, bytes], ...]; dirs end in /
         W.send({"id": mid, "type": "ls", "files": W.ls(m.get("path") or "/"), "free": W.free()})
+    elif t in ("get", "rm") and not _saves_only(m.get("path")):
+        W.send({"id": mid, "type": "error", "error": "locked: only /saves/ without a yes on its screen (open)"})
     elif t == "get":
         try:
             W.get(m.get("path"), mid)
@@ -260,6 +262,15 @@ def _handle(m):
         machine.reset()
     else:
         W.send({"id": mid, "type": "error", "error": "unknown type"})
+
+
+def _saves_only(p):
+    """get / rm with no yes on the screen: saves only. Anything else could read a key or delete main.py,
+    the file that locks it (the next boot would be an open REPL). Once open (let_in), anything."""
+    if not W.SEALED or W.is_open():
+        return True
+    p = str(p or "")
+    return p.startswith("/saves/") and ".." not in p.split("/")
 
 
 ASK_MS = 60000      # no answer to "let this computer in?" in a minute is a no

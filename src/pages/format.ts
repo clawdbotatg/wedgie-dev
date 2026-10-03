@@ -126,12 +126,20 @@ export function format(main: HTMLElement) {
       if (w.uid && wipe) try { localStorage.removeItem(SAVES(w.uid)); } catch {}
       else if (w.uid) {
         status("Copying its saves…", "They go back on after the wipe.");
-        const b = await FS.saves(r, false).catch(() => null);      // firmware before 0.2 has no saves
+        // Saves that can't be copied off stop the wipe (only "wipe its saves too" wipes them). No /saves
+        // folder at all (firmware before 0.2) is the one "nothing to copy" that isn't a failure.
+        const stop = (why: string) => { status("Not wiped: " + why, "Its saves are still on it. Tick “wipe its saves too” to wipe anyway.", "bad"); buttons(""); throw new Error(why); };
+        const b = await FS.saves(r, false).catch(async () => {
+          const there = await r.exec(`import os\ntry:\n    os.stat("/saves")\n    print("yes")\nexcept OSError:\n    print("no")`, 5000).catch(() => "?");
+          return there.trim() === "no" ? null : stop("couldn't read its saves");
+        });
         const n = b ? Object.keys(b.files).length : 0;
         if (b && n) {
           b.id = w.short; b.at = new Date().toISOString();
-          try { localStorage.setItem(SAVES(w.uid), JSON.stringify(b)); fact("Saves", `${n} file${n > 1 ? "s" : ""} copied off`); }
-          catch { fact("Saves", "couldn't copy them off (browser storage full)"); }
+          try { localStorage.setItem(SAVES(w.uid), JSON.stringify(b)); }
+          catch { stop("this browser has no room for its saves"); }
+          if (localStorage.getItem(SAVES(w.uid)) !== JSON.stringify(b)) stop("its saves didn't stay in this browser");
+          fact("Saves", `${n} file${n > 1 ? "s" : ""} copied off`);
         }
         status("Restarting it into boot mode…", "To wipe it and set it up fresh.");
       }

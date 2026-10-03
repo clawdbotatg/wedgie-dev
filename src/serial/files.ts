@@ -31,6 +31,10 @@ export async function ls(r: Repl, path = "/", live = true): Promise<Listing> {
   return { files: entries(got.files), free: got.free ?? null };
 }
 
+/** A locked wedgie reads and deletes only saves over live USB (firmware/slot.py saves_only); anything
+ *  else goes through the raw REPL, which its person lets in with A. */
+export const isSave = (p: string) => p.startsWith("/saves/") && !p.split("/").includes("..");
+
 export async function get(r: Repl, path: string, live = true): Promise<Uint8Array> {
   if (live) {
     const v = await r.request({ type: "get", path }, 8000);
@@ -40,7 +44,11 @@ export async function get(r: Repl, path: string, live = true): Promise<Uint8Arra
   const parts: string[] = [];
   r.onLine = (t, v) => { if (t === "b") parts.push(v); };
   await r.exec(`import binascii, json\nwith open(${JSON.stringify(path)}, "rb") as _f:\n    while True:\n        _b = _f.read(2048)\n        if not _b:\n            break\n        print("@b", json.dumps(binascii.b2a_base64(_b).decode().strip()))`, 60000);
-  return unb64(parts.join(""));
+  const chunks = parts.map(unb64);          // each line is its own base64 (2048 bytes pads): decode apart
+  const out = new Uint8Array(chunks.reduce((t, c) => t + c.length, 0));
+  let o = 0;
+  for (const c of chunks) { out.set(c, o); o += c.length; }
+  return out;
 }
 
 export async function rm(r: Repl, path: string, live = true) {
