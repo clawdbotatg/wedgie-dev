@@ -475,9 +475,6 @@ body.test-mode .top, body.test-mode .foot { display: none; }
 .repo-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 15px; }
 .repo-list li.bad { color: #b0231f; font-size: 14px; }
 .cart-needs[hidden] { display: none; }
-.cart-out { -webkit-appearance: none; appearance: none; border: 0; background: none; font: 800 13px var(--font); color: var(--muted); padding: 4px 2px; cursor: pointer; align-self: flex-start; text-decoration: underline; text-underline-offset: 3px; }
-.cart-out.sure { color: #c22621; }
-.cart-out[hidden] { display: none; }
 
 /* ---- /update: the update bench, a card per wedgie ---- */
 .upd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; width: min(100%, 980px); }
