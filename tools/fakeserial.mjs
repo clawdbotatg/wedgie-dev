@@ -157,9 +157,15 @@ f = await files(2);
 check(!f.includes("dodge.py") && f.includes(WALLET) && f.includes(KECCAK), "switched again: the repo app's files gone by apps.json's list, both of Vault's on");
 check(JSON.stringify((await appsOn(2)).map((a) => [a.mod, a.usb])) === '[["vault",true]]', "apps.json: Vault, which has USB to itself");
 check((await files(2)).includes("/saves/buttons/best.json"), "switching apps never touched the saves");
+// take a repo app off: its files come off by apps.json's list (the manifest doesn't know them)
+await page.click('#d-shelf .cart-slot[data-mod="vault"] .cart');
+await wait(() => JSON.parse(new TextDecoder().decode(window.__ports[2]._st.files.get("apps.json"))).length === 0, null, 15000, "Vault off");
+f = await files(2);
+check(!f.includes(WALLET) && !f.includes(KECCAK), "taking a repo app off: both of its files gone");
+await wait(() => document.querySelector('#d-shelf .cart-slot[data-mod="buttons"] .cart:not(:disabled)'), null, 15000, "back after taking Vault off");
 await pickApp("buttons", "Buttons on again");
 f = await files(2);
-check(!f.includes(WALLET) && !f.includes(KECCAK) && f.includes("buttons.py"), "switched back: both of Vault's files gone, Buttons on");
+check(f.includes("buttons.py"), "Buttons on again");
 
 // take it off
 await page.click('#d-shelf .cart-slot[data-mod="buttons"] .cart');   // a tap on the app on it takes it off
@@ -169,7 +175,7 @@ check(!f.includes("buttons.py") && (f.includes("slot.py") || f.includes("slot.mp
 await wait(() => /Nothing on it yet/.test(document.querySelector("#d-carts-note").textContent), null, 10000, "the page: nothing on it");
 
 const asks = await st(2, "asks");
-check(asks === 5 && !(await st(2, "open")), `sealed: every job asked (Buttons, Dodge, Vault, Buttons, taking it off: ${asks}), locked again after each`);
+check(asks === 6 && !(await st(2, "open")), `sealed: every job asked (Buttons, Dodge, Vault, taking it off, Buttons, taking it off: ${asks}), locked again after each`);
 
 // a no changes nothing
 await page.evaluate(() => { window.__ports[2]._st.person = { say: "no", ms: 300 }; });

@@ -345,6 +345,11 @@ function activeOf(m: Manifest, have: Have): string | null {
   return null;
 }
 /** Every app file on it (a cart's, or one apps.json lists for a repo app) that neither the core nor `keep` needs. */
+/** Files apps.json lists (a repo app's) that `have` wasn't asked about. */
+function unasked(have: Have) {
+  return withTwins((have.apps || []).flatMap((a) => (Array.isArray(a?.files) ? a.files : []))).filter((n) => !(n in have.hashes));
+}
+
 function others(m: Manifest, have: Have, keep: string | null) {
   const listed = (have.apps || []).filter((a) => Array.isArray(a?.files));
   const filesOf = (mod: string | null) => m.carts.find((c) => c.mod === mod)?.files || listed.find((a) => a.mod === mod)?.files || [];
@@ -449,13 +454,21 @@ export async function useApp(r: Repl, cart: Cart, onProgress: (p: number, what: 
 }
 
 /** Uninstall the app: the app's files the core doesn't need, then an empty apps.json ("no software"). */
-export async function removeApp(r: Repl) {
+export async function removeApp(r: Repl, opts: { manifest?: Manifest } = {}) {
   startAsk();
-  const m = await firmwareManifest();
+  const m = opts.manifest || await firmwareManifest();
   const ch = await checkedHave(r, m, [], true);
+  if (ch) {
+    // a repo app's files are in its apps.json entry, not the manifest: ask about them too, or they stay
+    const extra = unasked(ch);
+    const v = extra.length ? await r.request({ type: "sums", names: [], exists: extra }, 30000).catch(() => null) : null;
+    if (v?.sums) Object.assign(ch.hashes, v.sums);
+  }
   if (ch && await job(r, m, "Uninstall the app", [], others(m, ch, null), [], () => {}, !!ch.late)) return { restarted: true };
   await takeOver(r, askHint, "Uninstall the app");
   const have = await look(r, allNames(m));
+  const extra = unasked(have);
+  if (extra.length) Object.assign(have.hashes, (await look(r, extra)).hashes);
   await removeFiles(r, have, others(m, have, null));
   await writeApps(r, m, have, null);
   return { restarted: false };

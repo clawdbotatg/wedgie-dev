@@ -438,7 +438,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     busy = "cart"; paint();
     const x = w;
     let restarted = false;
-    try { restarted = (await removeApp(r)).restarted; } catch (e: any) { status(`<b class="bad">Couldn't uninstall it:</b> ${esc(e?.message || e)}`); }
+    try { restarted = (await removeApp(r, { manifest: view() })).restarted; } catch (e: any) { status(`<b class="bad">Couldn't uninstall it:</b> ${esc(e?.message || e)}`); }
     if (restarted) { W.reidentify(x); release?.(); release = null; link = null; }   // it restarted itself (a checked job)
     else await backToApp(r).catch(() => {});
     busy = ""; paint(); W.touch();
