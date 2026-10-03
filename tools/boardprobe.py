@@ -29,12 +29,19 @@ class W:
         self.buf = b""
 
     def req(self, m, wait=30):
+        """The answer, None after `wait` s, or {"type": "lost"} when the port went away (a restart)."""
         self.id += 1
         m = dict(m, id=self.id)
-        self.s.write((json.dumps(m) + "\n").encode())
+        try:
+            self.s.write((json.dumps(m) + "\n").encode())
+        except (serial.SerialException, OSError):
+            return {"type": "lost"}
         end = time.time() + wait
         while time.time() < end:
-            self.buf += self.s.read(4096)
+            try:
+                self.buf += self.s.read(4096)
+            except (serial.SerialException, OSError):
+                return {"type": "lost"}
             while b"\n" in self.buf:
                 line, self.buf = self.buf.split(b"\n", 1)
                 t = line.decode(errors="replace").strip()
@@ -64,6 +71,24 @@ def install(mod):
     apps = [{"mod": cart["mod"], "name": cart["name"], "v": cart["v"], **({"entry": cart["entry"]} if cart.get("entry") else {}), **({"usb": True} if cart.get("usb") else {})}]
     print("   press A on the wedgie: Install %s?" % cart["name"])
     g = w.req({"type": "job", "job": "Install " + cart["name"], "version": man["version"], "write": cart["files"], "delete": others, "apps": json.dumps(apps)}, 70)
+    if g and g.get("type") == "lost":
+        # 0.3.12: the yes restarts it into install mode, and the first restart since a plug-in drops the
+        # port (the WEDGIE drive goes). Open it again and ask the job (hello says job), as the site does.
+        print("   the port dropped at the restart; finding it again")
+        w.s.close()
+        hh = None
+        for _ in range(40):
+            time.sleep(0.5)
+            try:
+                w = W()
+            except (serial.SerialException, OSError, IndexError):
+                continue
+            hh = w.req({"type": "hello"}, 2)
+            if hh and hh.get("type") == "hello":
+                break
+        if not (hh and hh.get("job")):
+            return "after the yes: no job on it (%s)" % hh
+        g = {"type": "go", "asked_ms": hh.get("asked_ms")}
     if not g or g.get("type") != "go":
         return "job: %s" % g
     print("   yes (question up in %s ms)" % g.get("asked_ms"))

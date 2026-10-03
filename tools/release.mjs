@@ -2,6 +2,9 @@
 //   wedgie-release 1
 //   version 0.2.9
 //   <sha256>  <name>        one line per file tools/fw.mjs publishes, sorted by name
+//   @app  <json>            one per app in firmware/carts.json (0.3.12+): mod, name, entry, usb, files. A checked job's apps.json is built from these (firmware/job.py check),
+//                           and it may write only the core and its app's files. Older firmware reads the
+//                           line as a file named by the JSON, which nothing ever writes.
 import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join, dirname } from "node:path";
@@ -22,5 +25,13 @@ export function releaseText() {
     if (!published(name, p)) continue;
     t += `${createHash("sha256").update(readFileSync(p)).digest("hex")}  ${name}\n`;
   }
-  return t;
+  return t + appLines(JSON.parse(readFileSync(join(src, "carts.json"), "utf8")));
+}
+
+/** The "@app" lines for carts (firmware/carts.json entries). No double space can occur in them. Short:
+ *  the whole list rides one USB line to the wedgie (6 KB, wedgie.lines). */
+export function appLines(carts) {
+  return [...carts].sort((a, b) => (a.mod < b.mod ? -1 : 1)).map((c) => "@app  " + JSON.stringify({
+    mod: c.mod, name: c.name, ...(c.entry ? { entry: c.entry } : {}), ...(c.usb ? { usb: true } : {}), files: c.files,
+  }) + "\n").join("");
 }

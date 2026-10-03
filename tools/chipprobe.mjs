@@ -2,18 +2,19 @@
 // very MicroPython build wedgie.dev flashes, its real ~230 KB heap: tools/rp2040/chip.mjs), and this
 // drives it the way the site does (src/serial/install.ts job(): hello, sums, the job, A pressed on its
 // buttons, the signed list, sums, the files in 1024-byte chunks, commit, the restart):
-//   - every app installed over every other app's running copy (from each app to the next);
+//   - every app installed over another app's running copy (each over the one before it; --all: every pair);
 //   - a full firmware update (every core file) while each app runs;
 // A MemoryError, a traceback, "wedgie broke" or any error answer fails it. It prints the least free heap
 // seen (hello's ram, asked mid-job). The release list is signed with a throwaway key put in the test
 // image's wedgie.py, so the real P-256 check (and its memory) runs too. The browser emulator can't do
 // this: its heap starts at 128 MB and grows on demand.
-//   node tools/chipprobe.mjs [--fw <firmware dir>] [--from <app>] [--to <app>] [--no-update] [--log <file>]
+//   node tools/chipprobe.mjs [--fw <firmware dir>] [--from <app>] [--to <app>] [--no-update] [--all] [--log <file>]
 //   (needs uv: the flash image is made with littlefs-python)
 import { generateKeyPairSync, createPublicKey, sign, createHash } from "node:crypto";
 import { appendFileSync, writeFileSync } from "node:fs";
 import { host } from "./rp2040/chip.mjs";
 import { firmware, image, appEntry } from "./rp2040/image.mjs";
+import { appLines } from "./release.mjs";
 
 const args = process.argv.slice(2);
 const arg = (k) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : null; };
@@ -29,7 +30,7 @@ const hx = (b) => Buffer.from(b, "base64url").toString("hex");
 const wedgiePy = Buffer.from(F.file("wedgie.py").toString().replace(/^RELEASE_KEY = .*$/m, `RELEASE_KEY = ("${hx(jwk.x)}", "${hx(jwk.y)}")`));
 const fileOf = (n) => (n === "wedgie.py" ? wedgiePy : F.file(n));
 const sha = (b) => createHash("sha256").update(b).digest("hex");
-const relText = `wedgie-release 1\nversion ${version}\n` + F.all.map((n) => `${sha(fileOf(n))}  ${n}\n`).join("");
+const relText = `wedgie-release 1\nversion ${version}\n` + F.all.map((n) => `${sha(fileOf(n))}  ${n}\n`).join("") + appLines(F.carts);
 const sg = sign("sha256", Buffer.from(relText), { key: privateKey, dsaEncoding: "ieee-p1363" }).toString("hex");
 const relSig = sg.slice(0, 64) + " " + sg.slice(64);
 
@@ -97,7 +98,11 @@ function job(w, title, write, del, apps, where) {
 const bad = (w) => { const L = w.h.out.split("\n"), i = L.findIndex((l) => BAD.test(l) || /Error/.test(l)); return L.slice(i, i + 8).map((l) => l.trim()).join(" / "); };
 const carts = F.carts;
 const from = arg("--from"), to = arg("--to");
-const pairs = from ? [[carts.find((c) => c.mod === from), carts.find((c) => c.mod === (to || from))]] : carts.map((c, i) => [c, carts[(i + 1) % carts.length]]);
+// default: each app over the one before it (a ring: every app goes on once, every app is the old one once).
+// --all: every app over every other (56 installs, ~40 min).
+const pairs = from ? [[carts.find((c) => c.mod === from), carts.find((c) => c.mod === (to || from))]]
+  : args.includes("--all") ? carts.flatMap((a) => carts.filter((b) => b !== a).map((b) => [a, b]))
+  : carts.map((c, i) => [c, carts[(i + 1) % carts.length]]);
 console.log(`firmware ${version} (${F.dir}) on a virtual RP2040, MicroPython ${"v1.29.0"}`);
 for (const [a, b] of pairs) {
   const t0 = Date.now();

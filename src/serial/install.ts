@@ -22,6 +22,7 @@
 // (it must, to run the new core), and then the wedgie comes back as a new port (wedgies.ts).
 import type { Repl } from "./repl";
 import { waitBack, withRepl, type Wedgie } from "./wedgies";
+import { cmpVersion } from "../apps/appjson.mjs";
 
 /** url: where to fetch it, when it isn't /fw/<name> (an app from a repo someone added). */
 export type FileInfo = { name: string; size: number; sha256: string; url?: string };
@@ -222,7 +223,10 @@ async function checkedHave(r: Repl, m: Manifest, hash?: string[], late: boolean 
   const h = await r.hello(700).catch(() => null);
   if (!h?.jobs) return null;
   if (h.uid) uidOf.set(r, h.uid);
-  if (h.version === "0.3.6") return null;    // 0.3.6 runs out of memory reading a long line (a job, sums): full access instead
+  // Before 0.3.12 a job ran on the app's chopped-up heap and job.py grew each USB line a char at a time:
+  // installs ran out of memory on real boards (0.3.6, 0.3.11). They get there once through full access
+  // (Austin, 2026-10-02: one "full access" question is fine); 0.3.12+ installs on a clean heap.
+  if (!h.version || cmpVersion(h.version, "0.3.12") < 0) return null;
   if (h.jobs >= 2 && (late === true || (late === "update" && h.version !== m.version))) {
     const v = await r.request({ type: "sums", names: [], exists: allNames(m) }, 30000).catch(() => null);
     if (v?.sums) return { hashes: v.sums, files: Object.keys(v.sums).filter((n) => v.sums[n]), apps: v.apps || [], late: true };

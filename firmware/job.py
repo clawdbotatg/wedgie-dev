@@ -62,26 +62,77 @@ def _clean(names):
             pass
 
 
+_OK = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-."
+
+
+def _plain(n):
+    """A file at the top of the flash, by its one real name: no folders, no ./ or ../ (./main.py was
+    main.py to os.remove, past every check on the name)."""
+    return isinstance(n, str) and 0 < len(n) <= 64 and n[0] != "." and all(c in _OK for c in n)
+
+
 def rules(m):
     """What a job may ask for before its list is checked: raises ValueError."""
     for n in m.get("delete") or []:
-        if n in KEEP or n.startswith("/") or n.startswith("saves"):
+        if not _plain(n) or n in KEEP or n.startswith("saves") or n in ("apps.json", "error.log"):
             raise ValueError("can't delete %s" % n)
+    for n in m.get("write") or []:
+        if not _plain(n):
+            raise ValueError("can't write %s" % n)
     if m.get("apps") is not None:
-        json.loads(m["apps"])
+        a = json.loads(m["apps"])
+        if not isinstance(a, list) or len(a) > 1 or not all(isinstance(x, dict) for x in a):
+            raise ValueError("a job puts on one app at most")
 
 
 def check(m, sig=True, tick=None):
-    """The job's files against its signed list: (version, {name: sha}) or raises ValueError. sig=False
-    skips the signature (pure-Python P-256: 2.2 s on an RP2040), which run() checks after the yes."""
+    """The job against its signed list: (version, {name: sha}) or raises ValueError. sig=False skips the
+    signature (pure-Python P-256: 2.2 s on an RP2040), which run() checks after the yes.
+    Signed too (0.3.12+): which app it puts on and what it may touch. The host says only which signed
+    app (its mod); apps.json is written from the signed "@app" line (a host once named wedgie.set_open
+    as an app's entry: Ctrl-C on at the next boot). "Install X" must put on the signed app named X; a
+    job that doesn't change the app (an update, taking it off) keeps the one it runs. It writes only the
+    core and that app's files, and deletes nothing of the core."""
     rel = m.get("release") or ""
     if sig and (not W.RELEASE_KEY[0] or not W.release_ok(rel.encode(), m.get("sig") or "", tick)):
         raise ValueError("not signed by wedgie.dev")
     version, files = W.release_files(rel)
+    rules(m)
+    signed = W.release_apps(rel)
+    if signed:                          # (a list from before 0.3.12 has none: files only, as then)
+        appf = set()
+        for a in signed.values():
+            appf.update(a.get("files") or ())
+        core = [n for n in files if n not in appf]
+        now = W.active()
+        app = now and now.get("mod")    # the app it keeps, unless this job puts on another
+        if m.get("apps") is not None:
+            want = json.loads(m["apps"])
+            if want:
+                a = signed.get(want[0].get("mod"))
+                if not a:
+                    raise ValueError("%s isn't a wedgie.dev app" % want[0].get("mod"))
+                if a["mod"] != app and str(m.get("job")) != "Install " + a["name"]:
+                    raise ValueError("this job said %r, not Install %s" % (m.get("job"), a["name"]))
+                app = a["mod"]
+                e = dict((k, a[k]) for k in ("mod", "name", "entry", "usb") if k in a)
+                e["v"] = str(want[0].get("v") or "")[:16]       # the site's: cosmetic, nothing runs them
+                e["about"] = str(want[0].get("about") or "")[:100]
+                m["apps"] = json.dumps([e])
+            else:
+                app = None
+        own = (signed.get(app) or {}).get("files") or ()
+        for n in m.get("write") or []:
+            if n not in core and n not in own:
+                raise ValueError("%s isn't part of this job" % n)
+        for n in m.get("delete") or []:
+            if n in core or n in own:
+                raise ValueError("can't delete %s" % n)
+    elif m.get("apps") is not None:
+        raise ValueError("this signed list names no apps")
     for n in m.get("write") or []:
         if n not in files:
             raise ValueError("%s isn't in the signed list" % n)
-    rules(m)
     return version, files
 
 
@@ -236,9 +287,10 @@ def run(mid, m, ask, show=None):
                 if n not in write:
                     W.send({"id": qid, "type": "error", "error": "%s isn't in this job" % n})
                     return
-                if n != cur:
-                    if f:
-                        f.close()
+                if n != cur:                # a new upload: whatever was checked under this name isn't any more
+                    if f:                   # (a finished file sent again was committed as the new bytes,
+                        f.close()           # unchecked: codex 2026-10-02)
+                    got.pop(n, None)
                     f, h, cur = open(_tmp(n), "wb"), hashlib.sha256(), n
                 end = q.get("end")
                 b = binascii.a2b_base64((q.pop("data", None) or "").encode())
@@ -259,6 +311,9 @@ def run(mid, m, ask, show=None):
             elif t == "commit":
                 if files is None:
                     W.send({"id": qid, "type": "error", "error": "the signed list comes first"})
+                    return
+                if cur is not None:
+                    W.send({"id": qid, "type": "error", "error": "%s isn't finished" % cur})
                     return
                 show(title, "restarting...", plan.at("commit"))
                 missing = [n for n in write if n not in got and there.get(n) != files[n]]

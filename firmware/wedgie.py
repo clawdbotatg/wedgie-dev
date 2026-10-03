@@ -36,16 +36,29 @@ def release_ok(text, sig, tick=None):
 
 
 def release_files(text):
-    """{name: sha256} from a signed list, and its version."""
+    """{name: sha256} from a signed list, and its version. "@app" lines are the apps (release_apps)."""
     lines = text.decode().split("\n") if isinstance(text, bytes) else text.split("\n")
     if lines[0] != "wedgie-release 1" or not lines[1].startswith("version "):
         raise ValueError("not a release list")
     files = {}
     for l in lines[2:]:
-        if l:
+        if l and l[0] != "@":
             h, n = l.split("  ", 1)
             files[n] = h
     return lines[1][8:], files
+
+
+def release_apps(text):
+    """{mod: {mod, name, entry, usb, files}} from a signed list's "@app  <json>" lines (0.3.12+:
+    a job's apps.json comes from these, never from the host). Firmware before 0.3.12 reads such a line
+    as a file named by the JSON, which no job ever writes."""
+    lines = text.decode().split("\n") if isinstance(text, bytes) else text.split("\n")
+    out = {}
+    for l in lines[2:]:
+        if l.startswith("@app  "):
+            a = json.loads(l[6:])
+            out[a["mod"]] = a
+    return out
 
 
 def is_open():

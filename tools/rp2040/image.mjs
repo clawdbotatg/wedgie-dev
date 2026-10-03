@@ -7,6 +7,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import { published } from "../release.mjs";
+import { cartV as fwCartV } from "../fw.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 /** A firmware folder (default: firmware/ in this tree): its files, core and carts. */
@@ -16,12 +17,8 @@ export function firmware(fw = join(here, "..", "..", "firmware")) {
   const claimed = new Set(carts.flatMap((c) => c.files));
   return { dir: fw, carts, all, core: all.filter((n) => !claimed.has(n)), file: (n) => readFileSync(join(fw, n)) };
 }
-/** the v in apps.json (fw.mjs cartV: the hash of the cart's files) */
-export function cartV(F, c) {
-  const h = createHash("sha256");
-  for (const n of c.files) h.update(n + "\0" + createHash("sha256").update(F.file(n)).digest("hex") + "\n");
-  return h.digest("hex").slice(0, 12);
-}
+/** the v in apps.json: tools/fw.mjs's own cartV over the cart's file hashes (the manifest's, exactly) */
+export const cartV = (F, c) => fwCartV(c.files.map((n) => createHash("sha256").update(F.file(n)).digest("hex")));
 export const appEntry = (F, c) => ({ mod: c.mod, name: c.name, ...(c.entry ? { entry: c.entry } : {}), ...(c.usb ? { usb: true } : {}), v: cartV(F, c) });
 
 /** bytes of a littlefs image with F's core + app (a cart's mod, or null for none). over: {name: bytes}

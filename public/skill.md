@@ -292,7 +292,18 @@ from the request arriving to the question on its screen. A no restarts the wedgi
 its `ready` line after `refused`. 0.3.12+: a request that fails on the wedgie (out of memory too)
 answers `{"type":"error","error":"..."}` and the app keeps running; one that fails inside a checked
 install ends the job (nothing changed) and the wedgie restarts. A line over 6 KB
-is dropped. Lines that don't start with `{` are logs (an app's
+is dropped.
+
+Checked installs (`job`, hello `"jobs": 2`) on 0.3.12+: a yes restarts the wedgie into install mode
+(a clean heap), and the first restart since it was plugged in drops the USB port, so the `go` can be
+lost. Find it again by its board ID; in install mode its hello says `"job": true` (and `asked_ms`):
+go on with `release`, `sums`, `put`, `commit` there. The signed list (`/fw/release.txt`) has
+`@app  <json>` lines: the wedgie writes apps.json from those, never from your `apps` (only each
+entry's `mod` counts). `"job": "Install X"` must put on the signed app named X; any other job keeps
+the app it runs. A job writes only the core and that app's files, deletes only plain top-level
+names outside the core, and a file sent again starts over unchecked. Older firmware: update it
+through full access (`open`) first. Compiled app files (`.mpy`, e.g. the Wallet's) replace their
+`.py`: delete a `.py` only once its `.mpy` is on, since MicroPython runs the `.py` first. Lines that don't start with `{` are logs (an app's
 print()). Raw REPL (Ctrl-A) is how files get written. `exec(open("main.py").read())` starts the app
 again. An app with `"usb": true` (the Wallet) has the port to itself and speaks its own protocol; it
 answers `open` too.

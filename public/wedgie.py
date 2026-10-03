@@ -315,7 +315,10 @@ def copy(wg, m, names, have):
     todo = sorted([f for f in m["files"] if f["name"] in names and have["hashes"].get(f["name"]) != f["sha256"]], key=lambda f: f["name"] == "main.py")
     for i, f in enumerate(todo):
         print("[%d/%d] %s" % (i + 1, len(todo), f["name"]))
-        wg.put(f["name"], urllib.request.urlopen(SITE + "/fw/" + f["name"]).read())
+        data = urllib.request.urlopen(SITE + "/fw/" + f["name"]).read()
+        if hashlib.sha256(data).hexdigest() != f["sha256"]:      # what the manifest says, or nothing goes on
+            sys.exit("%s isn't what wedgie.dev's manifest says (a deploy since? run it again)" % f["name"])
+        wg.put(f["name"], data)
         have["hashes"][f["name"]] = f["sha256"]
         if twin(f["name"]) and have["hashes"].get(twin(f["name"])):     # the .mpy is on: its old source comes off
             remove_files(wg, have, [twin(f["name"])])
@@ -414,7 +417,11 @@ def checked(wg, m):
     h = wg.hello(1.5) or {}
     if not h.get("jobs") or not m.get("signed"):
         return None
-    names = sorted(set(m["core"]) | {n for c in m["carts"] for n in c["files"]})
+    # before 0.3.12 a job could run out of memory on a real board (it ran on the app's heap, and read each
+    # USB line a char at a time): those take full access once, then install on a clean heap (install.ts)
+    if tuple(int(x) for x in (h.get("version") or "0").split(".")[:3] if x.isdigit()) < (0, 3, 12):
+        return None
+    names = sorted(with_twins(set(m["core"]) | {n for c in m["carts"] for n in c["files"]}))
     v = wg.request({"type": "sums", "names": names}, 30)
     return {"hashes": v["sums"], "apps": v.get("apps") or [], "files": [n for n, s in v["sums"].items() if s]}
 

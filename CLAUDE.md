@@ -88,7 +88,13 @@ what agents outside this repo read (keep it true when the firmware or the USB pr
    rarely (a question, a hatch) goes in its own file, imported only when needed (`firmware/hatch.py`).
    Measure the heap with `chipprobe.mjs --from X --to Y --no-update` before and after (`--fw` on a
    `git archive HEAD` copy for before).
-14. Everything is MIT — never use the CC BY-NC case STLs from picowallet/instant-wallet.
+14. **Compiled apps (.mpy).** A cart file listed as `X.mpy` in carts.json is built from `firmware/X.py` by
+   `tools/mpy.py` (mpy-cross 1.29.0, pinned; same bytes on any computer) and committed: change the .py,
+   rebuild, commit both. The .mpy is what's published and signed; the .py goes to `/fw/src/` for the
+   emulator only. MicroPython imports a .py before a .mpy, so a .py left beside its .mpy runs instead:
+   hosts take it off only once the .mpy is on (install.ts `twin`, wedgie.py `twin`, job.py commit).
+   The Wallet must be compiled: from source it runs out of memory starting on an RP2040.
+15. Everything is MIT — never use the CC BY-NC case STLs from picowallet/instant-wallet.
 
 ## Run / check
 
@@ -104,6 +110,8 @@ node tools/codeprobe.mjs http://localhost:4173 <outdir> ~/clawd/wedgie-starter  
 python3 tools/test_drive.py                                 # the WEDGIE drive's SCSI answers
 python3 tools/test_style.py                                 # one palette, one progress bar (firmware/ui.py)
 python3 tools/test_memory.py                                # USB only through wedgie.lines(), no growing strings
+python3 tools/test_job.py                                   # checked installs vs a hostile host (real job.py, seconds)
+uv run --with mpy-cross==1.29.0.post2 python3 tools/mpy.py --check   # the committed .mpy match their .py
 node tools/chipprobe.mjs                                    # installs on a virtual RP2040 (real heap; needs uv)
 python3 tools/boardprobe.py battery                         # a checked install on a real board (press A)
 python3 tools/fakedevice.py                                 # a pty wedgie for public/wedgie.py
