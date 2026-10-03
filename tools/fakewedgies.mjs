@@ -112,7 +112,7 @@ export function fakeWedgies(specs) {
       if (!wedgie()) return push(">>> " + JSON.stringify(msg) + "\r\n{'x': 1}\r\n>>> ");
       const id = msg.id, v = version();
       const ok = () => push(JSON.stringify({ id, type: "ok" }) + "\r\n");
-      if (msg.type === "hello") return push((st.job ? hello(id).replace(/}$/, ', "job": true}') : hello(id)) + "\r\n");   // 0.3.12+: a job is running (install mode)
+      if (msg.type === "hello") return push((st.job ? hello(id).replace(/}$/, `, "job": true${st.job.asked_ms != null ? ', "asked_ms": ' + st.job.asked_ms : ""}}`) : hello(id)) + "\r\n");   // 0.3.12+: a job is running (install mode: job.py's hello)
       if (msg.type === "launch") { if (!apps().some((a) => a.mod === msg.app)) return push(JSON.stringify({ id, type: "error", error: "no such app" }) + "\r\n"); st.launched = msg.app; return ok(); }
       if (msg.type === "home" || msg.type === "stop") { st.launched = null; if (slot()) st.stopped = true; return ok(); }
       if (slot() && msg.type === "ls") return push(JSON.stringify({ id, type: "ls", files: lsAll(msg.path || "/"), free: 600000 }) + "\r\n");
@@ -211,15 +211,15 @@ export function fakeWedgies(specs) {
       if (drop && st.resetHook) {
         if (im) {                       // job.resume runs anyway; its go goes to a port the host lost
           st.lostGo = (st.lostGo || 0) + 1;
-          st.job = { m: im.m, listed: im.listed, got: new Map() };
+          st.job = { m: im.m, listed: im.listed, got: new Map(), asked_ms: im.asked_ms };
         }
         st.drops++; st.resetHook(); return;
       }
-      if (im) return setTimeout(() => { st.job = { m: im.m, listed: im.listed, got: new Map() }; push(JSON.stringify({ id: im.id, type: "go", asked_ms: im.asked_ms }) + "\r\n"); }, 300);
+      if (im) return setTimeout(() => { st.job = { m: im.m, listed: im.listed, got: new Map() }; st.job.asked_ms = im.asked_ms; push(JSON.stringify({ id: im.id, type: "go", asked_ms: im.asked_ms }) + "\r\n"); }, 300);
       if (wedgie()) setTimeout(() => push(hello(null, "ready") + "\r\n"), 300);
     }
     function streams() {
-      const readable = new ReadableStream({ start(c) { push = (s) => { try { c.enqueue(enc.encode(s)); } catch {} }; } });
+      const readable = new ReadableStream({ start(c) { push = (s) => { try { c.enqueue(enc.encode(s)); } catch {} }; st.fail = (e) => { try { c.error(e); } catch {} }; } });
       const writable = new WritableStream({ write(chunk) {
         if (st.dead) return;               // no MicroPython on it: nothing ever answers
         for (const ch of dec.decode(chunk)) {
@@ -258,6 +258,7 @@ export function fakeWedgies(specs) {
   window.__plug = (i, on) => { const p = ports[i]; p._st.dropped = !on; if (on && p._st.files.has("wedgiedrive.py")) p._st.mark = p._st.driveOn = true; if (on) { plugged.add(p); t.dispatchEvent(Object.assign(new Event("connect"), { port: p })); } else { plugged.delete(p); t.dispatchEvent(Object.assign(new Event("disconnect"), { port: p })); } };
   for (const p of ports) p._st.resetHook = () => {
     p._st.dropped = true;
+    p._st.fail?.(new DOMException("The device has been lost.", "NetworkError"));   // Chrome errors the open port's reads
     setTimeout(() => t.dispatchEvent(Object.assign(new Event("disconnect"), { port: p })), 1500);   // macOS tells the page late
     setTimeout(() => { p._st.dropped = false; t.dispatchEvent(Object.assign(new Event("connect"), { port: p })); }, 5000);
   };
