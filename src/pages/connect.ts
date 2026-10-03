@@ -3,7 +3,7 @@
 // /connect/<ID> (pages/wedgie.ts): hardware, firmware update, its app, saves. Both are one page app, so
 // going between them never reloads (a reload would close every port and identify every wedgie again).
 import { esc } from "../ui/device";
-import { place3D, idScreen } from "../ui/place3d";
+import { place3D, idScreen, baseColor } from "../ui/place3d";
 import * as W from "../serial/wedgies";
 import { firmwareManifest, type Manifest } from "../serial/install";
 import * as F from "../ui/facts";
@@ -68,7 +68,7 @@ function list(main: HTMLElement, go: (path: string) => void) {
       for (const w of ws) {
         let el = rows.querySelector<HTMLAnchorElement>(`.wrow[data-key="${w.key}"]`);
         const hw = F.hardware(w), fw = F.firmware(w, manifest), pl = F.playing(w, manifest);
-        const sig = [w.state, w.short, hw.html, fw.html, pl.html].join("|");
+        const sig = [w.state, w.short, w.chip?.type, hw.html, fw.html, pl.html].join("|");
         if (!el) {
           el = document.createElement("a");
           el.className = "wrow";
@@ -85,7 +85,7 @@ function list(main: HTMLElement, go: (path: string) => void) {
         el.dataset.sig = sig;
         if (w.short) { el.href = `/connect/${w.short}`; el.dataset.id = w.short; }
         el.classList.toggle("off", w.state !== "ready");
-        (el as any)._w3d.then((x: any) => x?.setScreen(screenFor(w)));
+        (el as any)._w3d.then((x: any) => { x?.setScreen(screenFor(w)); x?.setColor("base", baseColor(w.chip?.type)); });
         el.querySelector(".idtag")!.innerHTML = w.state === "identifying" ? "finding…" : w.state === "error" ? "can't talk" : esc(w.short);
         el.querySelector(".light")!.className = `light ${F.overall(w, manifest)}`;
         el.querySelector('[data-f="hw"]')!.innerHTML = hw.html;

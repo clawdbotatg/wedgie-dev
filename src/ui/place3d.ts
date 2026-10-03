@@ -11,6 +11,10 @@ export const pageShown = new Promise<void>((r) => {
   check();
 });
 
+// A real wedgie's base is printed in the color of its chip: black for an OPTIGA Trust M, grey for
+// an ATECC608, no chip, or one not checked yet. (setColor("base", baseColor(chip)))
+export const baseColor = (chip?: string | null) => (chip === "OPTIGA Trust M" ? 0x1c1c1e : 0x9a9da1);
+
 export function place3D(el: HTMLElement, opts: Wedgie3DOptions & { fallback?: Screen; demo?: string; boot?: boolean; eager?: boolean } = {}): Promise<Wedgie3D | null> {
   if (!el.firstChild) el.innerHTML = deviceSvg(opts.fallback || { kind: "off" });
   // demo: a clickable pretend wedgie (a few apps, hard-coded) instead of a still screen

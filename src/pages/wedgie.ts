@@ -13,7 +13,7 @@
 // running main.py (Repl.leave({ reset: false })), which keeps the port. Picking another app ends with
 // a soft reset (a fresh heap for it); 0.1.3+ keeps the port through that too.
 import { esc, KEYS, type Screen } from "../ui/device";
-import { place3D, idScreen as idCanvas, colorScreen } from "../ui/place3d";
+import { place3D, idScreen as idCanvas, colorScreen, baseColor } from "../ui/place3d";
 import type { Wedgie3D } from "../ui/wedgie3d";
 import * as W from "../serial/wedgies";
 import { pyStr, type Repl } from "../serial/repl";
@@ -233,7 +233,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
   place3D($(".wd-3d"), {
     screen: tex(shown),
     onKey: (k, down) => { if (down && mirrorOn && wedgie() && link && !busy) link.request({ type: "press", key: k }).catch(() => {}); },
-  }).then((x) => { w3 = x; x?.setScreen(tex(shown)); });
+  }).then((x) => { w3 = x; x?.setScreen(tex(shown)); x?.setColor("base", baseColor(w?.chip?.type)); });
 
   const cx = canvas.getContext("2d")!, img = cx.createImageData(240, 240);
   async function mirror() {
@@ -300,6 +300,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
       return;
     }
     const x = w!;
+    w3?.setColor("base", baseColor(x.chip?.type));
     $("#d-light").className = `light ${F.overall(x, m)}`;
     $("#d-hint").textContent = mirrorOn && wedgie() && link ? "Its real screen. Click its buttons (or press arrows, Enter, A, B, X, Y) to press the real ones." : "";
     const mb = $<HTMLButtonElement>('[data-act="mirror"]');
