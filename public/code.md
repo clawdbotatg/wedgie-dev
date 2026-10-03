@@ -27,7 +27,8 @@ The Trust M secure chip from an app: https://wedgie.dev/trustm.md
 3. Keep writing; they keep playing. Ask what they see. A traceback in Output is yours to fix.
 4. On their real wedgie (plugged in with USB):
 
-       curl -O https://wedgie.dev/wedgie.py        # needs: pip install pyserial
+       curl -O https://wedgie.dev/wedgie.py        # needs pyserial: pip install pyserial, or run it as
+                                                    # uv run --with pyserial python3 wedgie.py ...
        python3 wedgie.py install .                  # this folder's app becomes the app it runs
        python3 wedgie.py shot s.png                 # the real screen as a PNG: READ IT
        python3 wedgie.py press A                    # press a button (A B X Y up down left right press)
@@ -36,7 +37,9 @@ The Trust M secure chip from an app: https://wedgie.dev/trustm.md
    Only one program can hold the wedgie's USB port: if wedgie.py says busy, close the wedgie's page on
    wedgie.dev. The emulator is not the real speed; **check frame times on the real wedgie** (below).
 5. Put the folder on GitHub (public). Anyone can then add it on their wedgie's page at
-   wedgie.dev/connect (Software, **Apps from a GitHub repo**, `owner/repo`).
+   wedgie.dev/connect (Software, **Apps from a GitHub repo**, `owner/repo`). Such an app isn't signed by
+   wedgie.dev, so it installs with full access: it can do anything on that wedgie, including replacing
+   the keys in its Trust M's spare key slots. Say so in your README.
 
 ## wedgie.json
 
@@ -77,7 +80,10 @@ The Trust M secure chip from an app: https://wedgie.dev/trustm.md
 
 ## The template
 
-A game is an `entry` loop at a fixed frame rate. This is the shape to keep (the full game with
+**Use this shape for every app and game:** an `entry` loop at a fixed frame rate, in a folder with a
+`wedgie.json` that names the entry. (A Timer app, which starts itself at import, also works, but has
+nothing this lacks. Don't install a loop like this as one bare file with `wedgie.py install app.py`: with
+no wedgie.json there's no `entry`, and a loop that starts at import keeps USB from answering.) This is the shape to keep (the full game with
 sprites and saves is https://github.com/clawdbotatg/wedgie-starter/blob/main/dodge/dodge.py):
 
 ```python
@@ -138,7 +144,7 @@ so the whole game is about not paying that twice.
 | Plain Python pixel loop | 6.8 us per pixel (a full screen: 0.4 s) |
 | `@micropython.viper` pixel loop | 0.26 us per pixel (26x faster) |
 | `gc.collect()` | 8 ms |
-| RAM free for a game (RP2040, framebuffer taken) | ~80 KB |
+| RAM free for a game (RP2040, framebuffer taken) | ~60-70 KB (hello's `ram`) |
 
 The rules that follow from it:
 
@@ -204,7 +210,7 @@ The rules that follow from it:
    for the screen (its divider lands at 37.5 MHz).
 10. **Pace it.** A fixed frame time, sleeping the rest (the template). No tearing signal is wired to
     the Pico, so steady pacing is what keeps motion smooth. Move things by whole pixels per frame.
-11. **RAM is ~80 KB on an RP2040** after the 115 KB screen buffer. Don't allocate a second full-screen
+11. **RAM is ~60-70 KB on an RP2040** after the 115 KB screen buffer. Don't allocate a second full-screen
     buffer. A 120x120 game can draw into its own small buffer and scale it up 2x with a viper loop into
     `lcd.buffer`. Split big data into files and load what the current level needs.
 12. **Measure on the real one.** `wedgie.py run` a file that times a frame with `time.ticks_us()`, or
@@ -298,8 +304,9 @@ for i in range(51, 0, -1):          # a fair shuffle: Fisher-Yates, every swap f
 - MicroPython, not CPython: `math random struct json time array framebuf micropython gc`,
   `time.ticks_ms()`, `ticks_diff()`, `sleep_ms()`. No real clock, no files outside the flash, no pip.
 - Sound: none built in. Free pins for extras: GP0 GP1 GP6 GP7 GP14 GP22 GP26 GP27 GP28.
-- The secure chip (ATECC608 or Trust M): random numbers above; keys and signing for wallets and
-  crypto games in /skill.md. Never lock it or make keys on it unless the person asks; both are permanent.
+- The secure chip (ATECC608 or Trust M): random numbers above. Keys and signing: a Trust M through
+  `import optiga` (trustm.md); an ATECC608 through `atecc.ATECC608` (skill.md, "From Python"). Never lock
+  a chip or make keys on it unless the person asks; locking is permanent.
 
 ## Before you say it's done
 

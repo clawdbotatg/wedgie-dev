@@ -51,8 +51,8 @@ Other wedgie docs: making apps https://wedgie.dev/code.md, the hardware and USB 
 - **Errors** raise `optiga.Error` with `.code` (the table at the end). `except optiga.Error as e:`.
 - **Two chip versions.** V1 does everything here except AES, HMAC, HKDF, Brainpool and P-521 curves,
   and `aes_*`/`hmac`/`mac`; those are V3. A V1 answers them with error `0x0A` (AES, HMAC) or `0x03`
-  (HKDF, the other curves). The Trust M on Austin's wedgie is a V1 (Adafruit 4351, firmware build 0809):
-  plan for V1.
+  (HKDF, the other curves). The Trust M tested so far (an Adafruit 4351, chip firmware build 0809) is a
+  V1: plan for V1.
 - **The security event counter.** Using a stored private key, or deriving from a stored secret, counts
   as a "security event". More than about one every 5 seconds for a while and the chip slows itself down
   (up to seconds a call). Normal use never gets there; a loop that signs as fast as it can does. While
