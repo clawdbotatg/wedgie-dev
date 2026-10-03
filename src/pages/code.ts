@@ -116,6 +116,17 @@ export function code(main: HTMLElement) {
       </ul>
       <p class="fine">The details: <a href="/code.md">code.md</a>, "Look and feel".</p>
     </div>
+
+    <div class="card code-fast">
+      <h3>The secure chip</h3>
+      <p class="fine">A wedgie with an OPTIGA Trust M gives apps all of it through <code>import optiga</code>:</p>
+      <ul>
+        <li><b>Keys that never leave the chip.</b> Make one, sign with it (P-256 in 140 ms), check signatures.</li>
+        <li><b>Shared secrets</b> (ECDH), key derivation, SHA-256, RSA, true random numbers.</li>
+        <li><b>Counters that only go up</b> and storage that survives a wipe.</li>
+      </ul>
+      <p class="fine">Every call, with examples, timings and the few that lock the chip for good: <a href="/trustm.md">trustm.md</a>.</p>
+    </div>
   </section>`;
   const $ = <T extends HTMLElement = HTMLElement>(s: string) => main.querySelector(s) as T;
   const note = $("#c-note"), outEl = $("#c-out");

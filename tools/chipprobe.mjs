@@ -8,7 +8,7 @@
 // seen (hello's ram, asked mid-job). The release list is signed with a throwaway key put in the test
 // image's wedgie.py, so the real P-256 check (and its memory) runs too. The browser emulator can't do
 // this: its heap starts at 128 MB and grows on demand.
-//   node tools/chipprobe.mjs [--fw <firmware dir>] [--from <app>] [--to <app>] [--no-update] [--all] [--log <file>]
+//   node tools/chipprobe.mjs [--fw <firmware dir>] [--from <app>] [--to <app>] [--no-update] [--all] [--b64] [--log <file>]
 //   (needs uv: the flash image is made with littlefs-python)
 import { generateKeyPairSync, createPublicKey, sign, createHash } from "node:crypto";
 import { appendFileSync, writeFileSync, readFileSync, mkdtempSync, existsSync } from "node:fs";
@@ -63,7 +63,7 @@ function wedgie(app, old = false) {
   const w = {
     h,
     get all() { return all; },
-    req: (m, ms) => h.req({ ...m, id: ++id }, ms),
+    req: (m, ms, raw) => h.req({ ...m, id: ++id }, ms, raw),
     press(k) {
       const p = h.chip.mcu.gpio[KEYS[k]];
       p.setInputValue(false); h.chip.run(150); p.setInputValue(true); h.chip.run(50);
@@ -83,9 +83,10 @@ function wedgie(app, old = false) {
 function job(w, title, write, del, apps, where) {
   const h = w.req({ type: "hello" });
   if (!h?.jobs) return `hello: ${JSON.stringify(h)}`;
+  const bin = args.includes("--b64") ? 0 : h.bin || 0;      // 0.3.16+: raw 4 KB puts, as the site sends them
   const ex = w.req({ type: "sums", names: [], exists: F.all }, 30000);
   if (!ex?.sums) return `sums before the job: ${JSON.stringify(ex)}`;
-  w.h.chip.write(JSON.stringify({ type: "job", job: title, version, write, delete: del, apps: apps && JSON.stringify(apps), bytes: write.reduce((t, n) => t + fileOf(n).length, 0), id: 900 }) + "\n");
+  w.h.chip.write(JSON.stringify({ type: "job", job: title, version, write, delete: del, apps: apps && JSON.stringify(apps), bytes: write.reduce((t, n) => t + fileOf(n).length, 0), raw: !!bin, id: 900 }) + "\n");
   w.h.chip.run(800);                // the question is up
   w.press("A");
   let g = null;
@@ -99,14 +100,18 @@ function job(w, title, write, del, apps, where) {
   if (s?.type !== "sums") return `sums: ${JSON.stringify(s)}`;
   const send = write.filter((n) => s.sums[n] !== sha(fileOf(n)));
   w.sent = send.length;
+  const t0 = w.h.chip.ms, kb = send.reduce((t, n) => t + fileOf(n).length, 0) / 1024;
   for (const n of send) {
     const buf = fileOf(n);
-    for (let o = 0; o < Math.max(buf.length, 1); o += 1024) {
-      const p = w.req({ type: "put", name: n, data: buf.subarray(o, o + 1024).toString("base64"), end: o + 1024 >= buf.length }, 30000);
+    const size = bin ? Math.min(bin, 4096) : 1024;
+    for (let o = 0; o < Math.max(buf.length, 1); o += size) {
+      const part = buf.subarray(o, o + size), end = o + size >= buf.length;
+      const p = bin ? w.req({ type: "put", name: n, end }, 30000, part) : w.req({ type: "put", name: n, data: part.toString("base64"), end }, 30000);
       if (p?.type !== "ok") return `put ${n} @${o}: ${JSON.stringify(p)}`;
     }
     w.ram(`${where}, after ${n}`);
   }
+  w.put = `${kb.toFixed(0)} KB in ${((w.h.chip.ms - t0) / 1000).toFixed(1)} s on the chip, ${bin ? "raw" : "base64"}`;
   w.h.take();
   const d = w.req({ type: "commit" }, 30000);
   if (d?.type !== "done") return `commit: ${JSON.stringify(d)}`;
@@ -151,7 +156,7 @@ for (const [a, b] of pairs) {
     if (off.length) r = `after the update these aren't the new ones: ${off.join(" ")}`;
     else if (left.length) r = `the old .py is still there (it would run instead): ${left.join(" ")}`;
   }
-  check(r === true && !BAD.test(w.all), `firmware update (${want} core files sent, booted on them) while ${a.mod} runs: ${r === true ? "done" : r} ${BAD.test(w.all) ? "| " + bad(w) : ""}`);
+  check(r === true && !BAD.test(w.all), `firmware update (${want} core files sent, booted on them) while ${a.mod} runs: ${r === true ? "done, " + w.put : r} ${BAD.test(w.all) ? "| " + bad(w) : ""}`);
 }
 console.log(`     least free heap seen: ${leastFree} bytes (${leastWhere})`);
 console.log(failed ? `${failed} FAILED` : "all checks passed");

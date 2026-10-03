@@ -117,8 +117,9 @@ export function host(opts = {}) {
       self.exec(code + "f.close()\n", 60000);
     },
     /** A JSON request to the slot; the answer whose id matches, or null. */
-    req(msg, ms = 20000) {
-      chip.write(JSON.stringify(msg) + "\n");
+    req(msg, ms = 20000, raw = null) {
+      chip.write(JSON.stringify(raw ? { ...msg, n: raw.length } : msg) + "\n");
+      if (raw) chip.write(raw);              // a raw put: the bytes right after the line (0.3.16+)
       let got = null;
       const re = new RegExp(`\\{[^\\n]*"id": ${msg.id}[,}][^\\n]*\\n`);
       self.until((b) => { const m = b.match(re); if (m) { try { got = JSON.parse(m[0]); } catch { got = { type: "junk", line: m[0] }; } return true; } return false; }, ms);

@@ -108,6 +108,7 @@ check((await files(2)).includes("hello.py"), "hello.py is on it");
 const a1 = await appsOn(2);
 check(a1?.length === 1 && a1[0].mod === "hello" && /^[0-9a-f]{12}$/.test(a1[0].v), "apps.json: just hello, with its version: " + JSON.stringify(a1));
 check((await st(2, "jobs")) >= 1 && (await st(2, "interrupts")) === 0, "a checked install (0.3.0+): the wedgie did it itself, no Ctrl-C, no REPL");
+check((await st(2, "rawPuts")) >= 1, `0.3.16+: the files went as raw puts (${await st(2, "rawPuts")})`);
 check(/Question on its screen in \d+ ms \(site \d+, wedgie 42\)/.test(await page.getAttribute("#d-status", "data-ask") || ""), "0.3.11+: the status says how long the question took (site + wedgie): " + (await page.getAttribute("#d-status", "data-ask")));
 check(/Memory<\/dt><dd>51 KB free/.test(await page.innerHTML("#d-hw")), "0.3.11+: Hardware shows its free memory");
 check((await st(2, "lateJobs")) >= 1 && (await st(2, "hashAtAsk")) === hashed0 && (await st(2, "hashed")) > hashed0, "0.3.10+: the job asked before any file was hashed (the signed list and the sums come after the yes)");

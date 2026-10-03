@@ -227,7 +227,7 @@ pulled plug keeps the last good save. Save at checkpoints, not every frame (flas
 - Pins, if you need them: screen SPI1 DC=8 CS=9 SCK=10 MOSI=11 RST=12 BL=13; buttons (active low,
   pull-up) A=15 B=17 X=19 Y=21 up=2 down=18 left=16 right=20 press=3. Free GPIOs: 0 1 6 7 14 22 26 27 28.
 - Secure chip on I2C0 SDA=GP4 SCL=GP5: ATECC608 at 0x60 (`signer.py`/`atecc.py`), Trust M at 0x30
-  (`trustm.py`). The chip's breakout has a spare STEMMA QT port: other I2C boards daisy-chain on the
+  (`trustm.py`; apps use every Trust M feature through `optiga`, 0.3.17+: https://wedgie.dev/trustm.md). The chip's breakout has a spare STEMMA QT port: other I2C boards daisy-chain on the
   same bus with no new wires. NEVER lock an ATECC608 or generate a key on it unless the person asks
   explicitly; both are permanent and can brick the chip for its current use.
 - `import wedgie`: `wedgie.uid()`, `wedgie.short()`, `wedgie.board()`, `wedgie.VERSION`;
@@ -301,7 +301,10 @@ go on with `release`, `sums`, `put`, `commit` there. The signed list (`/fw/relea
 `@app  <json>` lines: the wedgie writes apps.json from those, never from your `apps` (only each
 entry's `mod` counts). `"job": "Install X"` must put on the signed app named X; any other job keeps
 the app it runs. A job writes only the core and that app's files, deletes only plain top-level
-names outside the core, and a file sent again starts over unchecked. Older firmware: update it
+names outside the core, and a file sent again starts over unchecked. 0.3.16+ (hello `"bin": 4096`):
+send file data raw, not base64: `{"type":"put","name":n,"n":<bytes>,"end":bool}` then exactly that
+many raw bytes (up to 4096) right after its newline. About 10x faster: the wedgie reads a base64 line a
+character at a time (~1 s a KB) but raw bytes in one go. Older firmware: update it
 through full access (`open`) first. Compiled app files (`.mpy`, e.g. the Wallet's) replace their
 `.py`: delete a `.py` only once its `.mpy` is on, since MicroPython runs the `.py` first. Lines that don't start with `{` are logs (an app's
 print()). Raw REPL (Ctrl-A) is how files get written. `exec(open("main.py").read())` starts the app

@@ -2,7 +2,7 @@
   {"mod": "hello", "name": "Hello", "about": "A bouncing box. The smallest complete app: start here.",
    "files": ["hello.py"], "label": "#22c452",
    "icon": ["............", ".kkkkkkkkkk.", ".k........k.", ".k.gggg...k.", ".k.gggg...k.", ".k.gggg...k.", ".k.gggg...k.", ".k........k.", ".k........k.", ".kkkkkkkkkk.", "............", "............"]},
-  {"mod": "keytest", "name": "Buttons", "about": "Every button on screen; each lights up as you press it.",
+  {"mod": "keytest", "name": "Buttons", "entry": "run", "fw": "0.3.5", "about": "Checks every button and diagonal, then a game: hit the green one before time runs out.",
    "files": ["keytest.py"], "label": "#8a8c8e",
    "icon": ["............", "..kkk.......", "..kgk.......", "kkkgkkk..rr.", "kgggggk..rr.", "kkkgkkk.....", "..kgk...ss..", "..kkk...ss..", "..........gg", "..........gg", "............", "............"]},
   {"mod": "demo", "name": "Demo", "entry": "run", "about": "Graphics speed test: balls, a cube, plasma. A next scene, X the one before.",
