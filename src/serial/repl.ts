@@ -14,6 +14,8 @@ export class Repl {
   private writer?: WritableStreamDefaultWriter<Uint8Array>;
   private reader?: ReadableStreamDefaultReader<Uint8Array>;
   alive = false;
+  /** What the wedgie's screen says this computer is doing (files.ts busy): set while it has the REPL. */
+  busy: { title: string; what: string; p: number; ok: boolean } | null = null;
   onLine: ((tag: string, v: any) => void) | null = null;
   onJson: ((v: any) => void) | null = null;
   onText: ((s: string) => void) | null = null;
@@ -193,6 +195,7 @@ export class Repl {
   // reset: false starts the wedgie's app again by running main.py, with no soft reset (so the port
   // stays up); use it after tests. A reset boots new firmware, or a newly picked app, with a fresh heap.
   async leave(opts: { reset?: boolean } = {}) {
+    this.busy = null;
     try {
       await this.write("\x02"); await sleep(50);
       if (opts.reset === false) await this.write('exec(open("main.py").read())\r');

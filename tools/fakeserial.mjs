@@ -10,7 +10,7 @@
 // first boot on the new firmware does, the others don't. The page must find it again either way.
 // Serve dist first (npx vite preview), then: node tools/fakeserial.mjs [url] [outdir] [phone]
 import { chromium } from "playwright-core";
-import { readdirSync, readFileSync, existsSync } from "node:fs";
+import { readdirSync, readFileSync, existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { fakeWedgies } from "./fakewedgies.mjs";
@@ -45,6 +45,14 @@ if (!man.signed) {
 const WALLET = man.carts.find((c) => c.mod === "usbwallet").files.find((n) => n.startsWith("usbwallet."));   // .mpy when compiled (tools/mpy.py)
 const KECCAK = man.carts.find((c) => c.mod === "usbwallet").files.find((n) => n.startsWith("keccak."));
 const page = await ctx.newPage();
+page.setDefaultTimeout(90000);          // software 3D (swiftshader) on a busy box: a tap can wait 10-30 s for the page to answer
+// On Linux's headless shell a Playwright screenshot leaves the page deaf to the next tap (it never
+// finishes); a plain CDP capture doesn't. The Mac keeps Playwright's.
+const cdp = process.platform === "linux" ? await ctx.newCDPSession(page) : null;
+const shoot = async (o) => {
+  if (!cdp) return page.screenshot(o);
+  writeFileSync(o.path, Buffer.from((await cdp.send("Page.captureScreenshot", { format: "png" })).data, "base64"));   // the viewport only (a full-page capture breaks taps too)
+};
 const errs = [];
 page.on("pageerror", (e) => errs.push(e.message));
 const st = (i, k) => page.evaluate(([i, k]) => window.__ports[i]._st[k], [i, k]);
@@ -67,7 +75,7 @@ const FW = JSON.parse(readFileSync(new URL("../public/fw/manifest.json", import.
 check((await rowText(OLD)).includes("update ready: " + FW), "0.1.3: update ready on the list");
 check(/Firmware\s*none yet install/.test(await rowText(BARE)), "bare board: no firmware, install on the list");
 check(/Software\s*nothing yet pick one/.test(await rowText(NEW)), "0.2 with no app: nothing yet, pick one");
-await page.screenshot({ path: `${out}/connect-list${phone ? "-phone" : ""}.png` });
+await shoot({ path: `${out}/connect-list${phone ? "-phone" : ""}.png` });
 
 // ---- one wedgie: tap its row, its page at /connect/<ID> -------------------------------------------------
 await page.click(`.wrow[data-id="${NEW}"]`);
@@ -82,7 +90,7 @@ check(/ATECC608 working/.test(await page.textContent("#d-hw")), "detail: hardwar
 check(/Up to date/.test(await page.textContent("#d-fw")), "detail: firmware up to date");
 await wait(() => /Hello/.test(document.querySelector("#d-saves")?.textContent || ""), null, 10000, "its saves listed");
 check(/1 file · 1 KB/.test(await page.textContent("#d-saves")) && (await st(2, "interrupts")) === 0, "saves: Hello's, read live (nothing stopped)");
-await page.screenshot({ path: `${out}/connect-wedgie${phone ? "-phone" : ""}.png`, fullPage: true });
+await shoot({ path: `${out}/connect-wedgie${phone ? "-phone" : ""}.png`, fullPage: true });
 
 // pick one: it goes on (the wedgie's screen says so), the wedgie restarts into it, the page finds it again
 const shelfOn = (mod) => `document.querySelector('#d-shelf .cart-slot[data-mod="${mod}"] .cart.playing') && /on it|running/.test(document.querySelector('#d-shelf .cart-slot[data-mod="${mod}"] .cart-state').textContent) && document.querySelector('#d-shelf .cart-slot:not([data-mod="${mod}"]) .cart:not(:disabled)')`;
@@ -92,7 +100,7 @@ await page.click(`#d-shelf .cart-slot[data-mod="hello"] .cart`);
 await wait(() => /Press A on the wedgie/.test(document.querySelector("#d-status")?.textContent || ""), null, 5000, "sealed: the page says to press A on the wedgie");
 await wait(() => document.querySelector(".ask-a .ask-3d"), null, 5000, "sealed: the Press A modal is up");
 await page.waitForTimeout(2500);
-await page.screenshot({ path: `${out}/connect-ask${phone ? "-phone" : ""}.png` });
+await shoot({ path: `${out}/connect-ask${phone ? "-phone" : ""}.png` });
 await wait(new Function(`return ${shelfOn("hello")}`), null, 30000, "Hello on, running");
 check((await st(2, "asks")) === 1, "sealed: it asked its person once");
 check(!(await page.$(".ask-a")), "the Press A modal is gone once it answered");
@@ -173,6 +181,8 @@ await wait(() => /No saves yet/.test(document.querySelector("#d-saves-note").tex
 await page.setInputFiles("#d-saves-in", bundlePath);
 await wait(() => window.__ports[2]._st.files.has("/saves/hello/best.json") && new TextDecoder().decode(window.__ports[2]._st.files.get("/saves/hello/best.json")) === '{"score": 120}', null, 15000, "saves put back");
 await wait(() => /1 save file put back/.test(document.querySelector("#d-saves-note").textContent), null, 10000, "the page says it put them back");
+const busyOn = async (i, title) => ((await st(i, "screens")) || []).filter((x) => x.title === title);
+check((await busyOn(2, "Putting saves back")).some((x) => x.what === "saves/hello/best.json"), "its screen: the boot bar, 'Putting saves back', the file under it (docs/STYLE.md)");
 
 // Developer: the files
 await page.click('[data-fs="refresh"]');
@@ -184,10 +194,11 @@ await page.click('[data-fs-rm="/junk.txt"]');
 await wait(() => !window.__ports[2]._st.files.has("junk.txt") && !document.querySelector('[data-fs-open="/junk.txt"]'), null, 10000, "a file deleted");
 await page.setInputFiles("#d-fs-in", { name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("hi from the page") });
 await wait(() => window.__ports[2]._st.files.has("/notes.txt") && document.querySelector('[data-fs-open="/notes.txt"]'), null, 15000, "a file uploaded");
+check((await busyOn(2, "Uploading")).some((x) => x.what === "notes.txt" && x.p === 1), "its screen: the boot bar, 'Uploading', notes.txt, filled");
 await page.focus(".wd-3d canvas.w3d").catch(() => {});
 await page.keyboard.press("a");
 await wait(() => window.__ports[2]._st.presses.includes("A"), null, 5000, "A on the 3D wedgie pressed the real A");
-await page.screenshot({ path: `${out}/connect-carts${phone ? "-phone" : ""}.png`, fullPage: true })
+await shoot({ path: `${out}/connect-carts${phone ? "-phone" : ""}.png`, fullPage: true })
   .catch(async (e) => console.log(`     (screenshot skipped: ${e.message.split("\n")[0]}; page ${await page.evaluate(() => document.documentElement.scrollHeight)} px tall)`));
 
 // ---- back to the list (no reload), then the 0.1.3 wedgie: its update keeps its first app ---------------
@@ -199,6 +210,10 @@ check(/Update the firmware/.test(await page.textContent("#d-carts-note")), "0.1.
 await page.click("[data-fw]");
 await wait((id) => /Up to date/.test(document.querySelector("#d-fw")?.textContent || "") && location.pathname === `/connect/${id}`, OLD, 120000, `0.1.3 → ${CUR}, came back by its ID`);
 check((await st(1, "resets")) === 1 && (await st(1, "drops")) === 1, "one soft reset, at the end; its port dropped and it came back by its ID");
+// Full access (no checked install on 0.1.3): the page copies the files, so the page draws the wedgie's screen.
+const up = (await st(1, "screens")) || [];
+check(up.length >= 5 && up.every((x) => x.title === "Updating firmware") && up.some((x) => x.p === 1) && up.every((x, i) => !i || x.p >= up[i - 1].p),
+  `its screen the whole update: the boot bar, 'Updating firmware', filling to the end, file by file (${up.length} draws, titles ${[...new Set(up.map((x) => x.title))]})`);
 const a3 = await appsOn(1), f3 = await files(1);
 check(JSON.stringify(a3) === "[]", "no app yet (nobody picked one): " + JSON.stringify(a3));
 check(!f3.includes("hello.py") && !f3.includes("keytest.py") && !f3.includes("menu.py") && f3.includes("slot.py"), "its old apps and the menu gone, the slot on");

@@ -93,6 +93,7 @@ export function fakeWedgies(specs) {
         if ((m = c.match(/os\.rename\("([^"]+)", "([^"]+)"\)/))) { st.files.set(m[2], st.files.get(m[1])); st.files.delete(m[1]); }
         return answer("");
       }
+      if (c.includes('print("@sha"') && (m = c.match(/with open\("([^"]+)", "rb"\)/))) return answer("@sha " + JSON.stringify(await sha(st.files.get(m[1]))) + "\r\n");   // files.ts writeFile's check
       if ((m = c.match(/@sha", json\.dumps\(_h\("([^"]+)"\)\)/))) return answer("@sha " + JSON.stringify(await sha(st.files.get(m[1]))) + "\r\n");
       if ((m = c.match(/os\.rename\("([^"]+)", "([^"]+)"\)/))) { st.files.set(m[2], st.files.get(m[1])); st.files.delete(m[1]); return answer(""); }
       if ((m = c.match(/for _n in (\[.*?\]):\n    (try:\n        )?os\.remove\(_n\)/)) || (m = c.match(/for n in (\[.*?\]):\n    os\.remove\(n\)/))) { for (const n of JSON.parse(m[1])) st.files.delete(n); return answer(""); }
@@ -105,7 +106,13 @@ export function fakeWedgies(specs) {
       }
       if ((m = c.match(/wedgie\.rm\("([^"]+)"\)/))) { rmAll(m[1]); return answer(""); }
       if (c.includes("os.statvfs")) return answer("600000\r\n");
-      if (c.startsWith("_ins(")) { st.inserting = (st.inserting || 0) + 1; return answer(""); }
+      // The boot screen and bar a computer puts up while it has the REPL (files.ts busy/progress): every
+      // _ins(title, what, p) is kept, so a probe can check the wedgie said what was happening.
+      if ((m = c.match(/^_ins\((".*?"), (".*?"), ([\d.]+)\)/))) {
+        st.inserting = (st.inserting || 0) + 1;
+        (st.screens ||= []).push({ title: JSON.parse(m[1]), what: JSON.parse(m[2]), p: +m[3] });
+        return answer("");
+      }
       answer("");
     }
     async function onJson(msg) {

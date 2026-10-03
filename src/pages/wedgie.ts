@@ -17,7 +17,7 @@ import { place3D, idScreen as idCanvas, colorScreen, baseColor } from "../ui/pla
 import type { Wedgie3D } from "../ui/wedgie3d";
 import * as W from "../serial/wedgies";
 import { pyStr, type Repl } from "../serial/repl";
-import { installCore, useApp, removeApp, takeOver, setAskHint, firmwareManifest, lastAsk, type Cart, type Manifest } from "../serial/install";
+import { installCore, useApp, removeApp, takeOver, setAskHint, askHint, firmwareManifest, lastAsk, type Cart, type Manifest } from "../serial/install";
 import * as FS from "../serial/files";
 import { cartHtml } from "../ui/cart";
 import { bootScreen } from "../ui/bootscreen";
@@ -453,7 +453,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     const r = link, lv = liveFs() && !write;
     busy = what; paint();
     try {
-      if (!lv) await takeOver(r);
+      if (!lv) await takeOver(r, askHint, what);
       return await fn(r, lv);
     } catch (e: any) {
       tstatus("");
@@ -620,7 +620,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     busy = name; paint();
     const r = link;
     try {
-      if (wedgie()) await takeOver(r); else await r.enter({ reset: true });   // bare MicroPython: no drive, a reset is safe
+      if (wedgie()) await takeOver(r, askHint, name); else await r.enter({ reset: true });   // bare MicroPython: no drive, a reset is safe
       if (opts.probe !== false) await r.exec(await W.probe(), 10000);
       await fn(r);
     } catch (e: any) {
@@ -693,18 +693,10 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
       const name = ($<HTMLInputElement>("#d-appname").value || "").trim() || "sketch";
       const mod = name.toLowerCase().replace(/[^a-z0-9_]/g, "_").replace(/^[^a-z_]/, "_$&").slice(0, 20);
       act("Save", async (r) => {
-        const src = editor.value;
-        await r.exec(`_f = open(${pyStr(mod + ".py")}, "w")`);
-        for (let i = 0; i < src.length; i += 1024) await r.exec(`_f.write(${pyStr(src.slice(i, i + 1024))})`);
-        await r.exec(`_f.close()
-import json, sys
-json.dump([{"mod": ${pyStr(mod)}, "name": ${pyStr(name.slice(0, 12))}, "about": "yours"}], open("apps.json", "w"))
-sys.modules.pop(${pyStr(mod)}, None)
-import os
-try:
-    os.sync()
-except AttributeError:
-    pass`);
+        const enc = new TextEncoder();
+        await FS.writeFile(r, mod + ".py", enc.encode(editor.value), { span: [0, 0.9] });
+        await FS.writeFile(r, "apps.json", enc.encode(JSON.stringify([{ mod, name: name.slice(0, 12), about: "yours" }])), { span: [0.9, 1], what: "" });
+        await r.exec(`import sys\nsys.modules.pop(${pyStr(mod)}, None)`);
         out.textContent = `Saved as ${mod}.py; it's the wedgie's app now, and it boots into it.`;
       }, { probe: false });
     },

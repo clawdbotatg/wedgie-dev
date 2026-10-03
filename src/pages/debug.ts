@@ -36,7 +36,7 @@ export function debug(main: HTMLElement) {
       const code = await fetch("/device/debug.py", { cache: "no-cache" }).then((r) => r.text());
       await W.withRepl(w, async (r) => {
         r.onLine = (t, v) => { if (t === "debug") got = v; };
-        await takeOver(r, (s) => { if (s) $("g-text").innerHTML = `<b>${esc(s)}.</b> It asks: Debug and read logs?`; }, "Debug and read logs");
+        await takeOver(r, (s) => { if (s) $("g-text").innerHTML = `<b>${esc(s)}.</b> It asks: Debug and read logs?`; }, "Debug and read logs", "Debugging");
         $("g-text").textContent = "Reading it…";
         await r.exec(code, 30000);
         await r.leave({ reset: false });       // its app again; main.py locks it

@@ -36,7 +36,7 @@ reconnects USB, so a wedgie you just plugged in shows up, vanishes and shows up 
 same ID). Wait a couple of seconds after plugging in; pick it by --id, not by port, in scripts. A soft
 reset doesn't re-add the drive on 0.1.3+, but the first one after updating from older firmware does.
 """
-import sys, os, time, json, base64, hashlib, zlib, struct, argparse, urllib.request
+import sys, os, re, time, json, base64, hashlib, zlib, struct, argparse, urllib.request
 
 try:
     import serial
@@ -203,20 +203,64 @@ class Wedgie:
         """Out of raw mode and back to its app. reset=True soft-resets (after writing firmware or a new app;
         the port stays on 0.1.3+, but the first soft reset after updating from older firmware drops it);
         False just runs main.py again, port stays up."""
+        self._busy = None
         self.s.write(b"\x02")
         time.sleep(0.05)
         self.s.write(b"\x04" if reset else b'exec(open("main.py").read())\r')
 
-    def put(self, name, data):
+    # The wedgie's screen while this computer has its REPL: the boot screen and the boot bar, titled with
+    # what it's doing (docs/STYLE.md; the site's files.ts busy/writeFile do the same). put() is the one
+    # way a file is written, moves the bar, and refuses to write without it.
+    _busy = None
+
+    def busy(self, title, what=""):
+        """Put the boot screen up, titled with what this computer is doing. take_over() does."""
+        if self._busy is None:
+            try:
+                self.exec(BUSY_PY, 8)
+                ok = True
+            except (RuntimeError, TimeoutError):
+                ok = False
+            self._busy = {"ok": ok}
+        self._busy.update(title=title, what=what, p=0.0)
+        self._draw()
+
+    def progress(self, p, what=None):
+        """Move the bar (0..1, forward only) and change the line under it; drawn only when it moved a step."""
+        b = self._busy
+        if b is None:
+            raise RuntimeError("nothing on the wedgie's screen says what's happening: call busy() first")
+        what = b["what"] if what is None else what
+        if what == b["what"] and (p <= b["p"] or (p - b["p"] < 0.08 and p < 1)):
+            return
+        b["p"], b["what"] = max(b["p"], p), what
+        self._draw()
+
+    def _draw(self):
+        b = self._busy
+        if b["ok"]:
+            try:
+                self.exec("_ins(%s, %s, %.2f)" % (json.dumps(b["title"]), json.dumps(b["what"][:28]), b["p"]), 8)
+            except (RuntimeError, TimeoutError):
+                pass
+
+    def put(self, name, data, span=(0, 1), what=None):
+        """Write a file: folders made, a temp file, checked, renamed into place. The bar goes span[0]..span[1]."""
+        a, z = span
+        what = name.lstrip("/") if what is None else what
+        self.progress(a, what)
+        dirs = ["/" + "/".join(name.split("/")[1:i + 1]) for i in range(1, len(name.split("/")) - 1)]
         tmp = "_wedgie.tmp"
-        self.exec("import binascii, os, hashlib\n_f = open(%r, 'wb')" % tmp)
+        self.exec("import binascii, os, hashlib\nfor _d in %r:\n    try:\n        os.mkdir(_d)\n    except OSError:\n        pass\n_f = open(%r, 'wb')" % (dirs, tmp))
         for i in range(0, len(data), 1024):          # small writes: little RAM in one piece (RP2040)
             self.exec("_f.write(binascii.a2b_base64(%r))" % base64.b64encode(data[i:i + 1024]).decode())
+            self.progress(a + (z - a) * min(len(data), i + 1024) / len(data), what)
         self.exec("_f.close()")
         got = self.exec("h = hashlib.sha256()\nwith open(%r, 'rb') as f:\n    while True:\n        b = f.read(1024)\n        if not b: break\n        h.update(b)\nprint(binascii.hexlify(h.digest()).decode())" % tmp).strip()
         if got != hashlib.sha256(data).hexdigest():
             raise RuntimeError("%s did not copy cleanly" % name)
         self.exec("try:\n    os.remove(%r)\nexcept OSError:\n    pass\nos.rename(%r, %r)" % (name, tmp, name))
+        self.progress(z, what)
 
     def sync(self):
         self.exec("import os\ntry:\n    os.sync()\nexcept AttributeError:\n    pass")
@@ -313,12 +357,14 @@ def look(wg, m):
 
 def copy(wg, m, names, have):
     todo = sorted([f for f in m["files"] if f["name"] in names and have["hashes"].get(f["name"]) != f["sha256"]], key=lambda f: f["name"] == "main.py")
+    total, done = sum(f["size"] for f in todo) or 1, 0
     for i, f in enumerate(todo):
         print("[%d/%d] %s" % (i + 1, len(todo), f["name"]))
         data = urllib.request.urlopen(SITE + "/fw/" + f["name"]).read()
         if hashlib.sha256(data).hexdigest() != f["sha256"]:      # what the manifest says, or nothing goes on
             sys.exit("%s isn't what wedgie.dev's manifest says (a deploy since? run it again)" % f["name"])
-        wg.put(f["name"], data)
+        wg.put(f["name"], data, (done / total, (done + f["size"]) / total))
+        done += f["size"]
         have["hashes"][f["name"]] = f["sha256"]
         if twin(f["name"]) and have["hashes"].get(twin(f["name"])):     # the .mpy is on: its old source comes off
             remove_files(wg, have, [twin(f["name"])])
@@ -337,7 +383,7 @@ def write_apps(wg, m, have, only):
         out.append(a)
     elif not c and only:
         out += [a for a in have.get("apps", []) if a.get("mod") == only][:1]
-    wg.exec("import json\n_f = open('apps.json', 'w')\n_f.write(%r)\n_f.close()" % json.dumps(out))
+    wg.put("apps.json", json.dumps(out).encode(), (1, 1), "")
     wg.sync()
     return out
 
@@ -392,6 +438,42 @@ def remove_files(wg, have, names):
     for n in names:
         wg.exec("import os, sys\ntry:\n    os.remove(%r)\nexcept OSError:\n    pass\nsys.modules.pop(%r, None)" % (n, n.rsplit(".", 1)[0]))
         have["hashes"][n] = None
+
+
+# The boot screen and bar while this computer has the REPL (Wedgie.busy). The same text as BUSY_PY in
+# src/serial/files.ts: tools/test_style.py fails if they differ.
+BUSY_PY = """_ld = None
+try:
+    import loader as _ld
+except ImportError:
+    pass
+_bs = [None, None, None]
+if _ld and hasattr(_ld, "screen"):
+    def _ins(title, what, p):
+        if _bs[0] != title:
+            _bs[2] = None
+            import gc
+            gc.collect()
+            _bs[0], _bs[1] = title, what
+            _bs[2] = _ld.screen(title, what) or False
+        elif _bs[1] != what:
+            _bs[1] = what
+            _ld.what(what)
+        if _bs[2]:
+            _bs[2].to(p)
+else:
+    import lcd as _L
+    _d = _L.LCD()
+    def _ins(title, what, p):
+        W, I, M = _L.color(254, 254, 254), _L.color(26, 27, 26), _L.color(120, 123, 120)
+        _d.fill(W)
+        for y, c in ((10, _L.color(34, 196, 82)), (19, _L.color(169, 170, 171)), (28, _L.color(227, 49, 44))):
+            _d.fill_rect(0, y, 240, 5, c)
+        _d.center_text(title, 92, M, 2)
+        _d.center_text(what[:28], 120, I)
+        _d.rect(30, 160, 180, 14, _L.color(200, 200, 196))
+        _d.fill_rect(32, 162, int(176 * p), 10, _L.color(34, 196, 82))
+        _d.show()"""
 
 
 FREE_PY = """def _free():
@@ -473,9 +555,19 @@ def cart_entry(cart):
     return a
 
 
-def take_over(wg, job=""):
+def doing(job):
+    """What the wedgie's screen says while a job runs: its question's words as doing ("Install Buttons" ->
+    "Installing Buttons"; install.ts doing, the same)."""
+    t = re.sub(r" to \S+$", "", job)
+    t = re.sub(r"^(Update|Install|Uninstall|Save|Run)\b", lambda v: {"Update": "Updating", "Install": "Installing",
+               "Uninstall": "Uninstalling", "Save": "Saving", "Run": "Running"}[v.group(1)], t)
+    return t or "This computer has it"
+
+
+def take_over(wg, job, title=None):
     """Stop its app and take the raw REPL, with its RAM freed: Ctrl-C leaves the app loaded, and on an
-    RP2040 a copy then fails with MemoryError. lcd stays (its 115 KB framebuffer)."""
+    RP2040 a copy then fails with MemoryError. lcd stays (its 115 KB framebuffer). Its screen then says
+    what this computer is doing (title, or the job as doing) until it lets go."""
     wg.let_in(job)                              # sealed: its person says yes first (job: what its screen asks)
     try:
         wg.request({"type": "stop"}, 1)        # stop its app first (0.1.x: "home"; its Timer would keep drawing)
@@ -486,6 +578,7 @@ def take_over(wg, job=""):
         wg.exec(FREE_PY)
     except RuntimeError:
         pass
+    wg.busy(title or doing(job))
 
 
 # ---- commands ------------------------------------------------------------------------------
@@ -558,13 +651,13 @@ def main():
         elif c in ("launch", "home"):
             sys.exit("a wedgie runs one app now (firmware 0.2+):  wedgie.py use <app>   (wedgie.py apps lists them)")
         elif c == "ls":
-            take_over(wg)
+            take_over(wg, "List its files", "Listing files")
             print(wg.exec("import os\ndef _w(d):\n    for n in sorted(os.listdir(d)):\n        p = d.rstrip('/') + '/' + n\n        s = os.stat(p)\n        if s[0] & 0x4000:\n            print('%7s  %s/' % ('', p)); _w(p)\n        else:\n            print('%7d  %s' % (s[6], p))\n_w('/')\n_s = os.statvfs('/')\nprint('%7d  free' % (_s[0] * _s[3]))"))
             wg.leave(reset=False)
         elif c == "saves":
-            take_over(wg)
-            got = json.loads(wg.exec("import os, json, binascii\n_o = {}\ntry:\n    _gs = os.listdir('/saves')\nexcept OSError:\n    _gs = []\nfor _g in _gs:\n    for _n in os.listdir('/saves/' + _g):\n        with open('/saves/%s/%s' % (_g, _n), 'rb') as _f:\n            _o['/saves/%s/%s' % (_g, _n)] = binascii.b2a_base64(_f.read()).decode().strip()\nprint(json.dumps(_o))", 60))
             sub = args.rest[0] if args.rest else ""
+            take_over(wg, "Put saves back" if sub == "restore" else "Read saves", "Putting saves back" if sub == "restore" else "Reading saves")
+            got = json.loads(wg.exec("import os, json, binascii\n_o = {}\ntry:\n    _gs = os.listdir('/saves')\nexcept OSError:\n    _gs = []\nfor _g in _gs:\n    for _n in os.listdir('/saves/' + _g):\n        with open('/saves/%s/%s' % (_g, _n), 'rb') as _f:\n            _o['/saves/%s/%s' % (_g, _n)] = binascii.b2a_base64(_f.read()).decode().strip()\nprint(json.dumps(_o))", 60))
             if sub == "backup" and len(args.rest) == 2:
                 json.dump({"wedgie-saves": 1, "files": got}, open(args.rest[1], "w"))
                 print("%d save files -> %s" % (len(got), args.rest[1]))
@@ -575,7 +668,6 @@ def main():
                     parts = p.split("/")
                     if len(parts) != 4 or parts[1] != "saves" or ".." in parts:
                         continue
-                    wg.exec("import os\nfor _d in ('/saves', '/saves/%s'):\n    try:\n        os.mkdir(_d)\n    except OSError:\n        pass" % parts[2])
                     wg.put(p, base64.b64decode(data))
                     n += 1
                 wg.sync()
@@ -607,14 +699,14 @@ def main():
             path = args.rest[0][:-len("wedgie.json")] or "." if args.rest[0].endswith("wedgie.json") else args.rest[0]
             m = manifest()
             entry, files = folder_app(path, args.rest[1] if len(args.rest) > 1 else None, m)
-            take_over(wg)
+            take_over(wg, "Install " + entry["name"])
             have = look(wg, m)
             remove_files(wg, have, [n for n in others(m, have, None) if n not in files])     # the old app's files
-            for n, b in sorted(files.items()):
-                if have["hashes"].get(n) != hashlib.sha256(b).hexdigest():
-                    print("  " + n)
-                    wg.put(n, b)
-            wg.exec("import json\njson.dump(%r, open('apps.json', 'w'))" % [entry])
+            todo = [(n, b) for n, b in sorted(files.items()) if have["hashes"].get(n) != hashlib.sha256(b).hexdigest()]
+            for i, (n, b) in enumerate(todo):
+                print("  " + n)
+                wg.put(n, b, (i / len(todo), (i + 1) / len(todo)))
+            wg.put("apps.json", json.dumps([entry]).encode(), (1, 1), "")
             wg.sync()
             wg.leave()      # a fresh heap for it
             print("%s is the app it runs now (saves in /saves/%s stay)" % (entry["name"], entry["mod"]))
@@ -622,15 +714,15 @@ def main():
             path = args.rest[0]
             mod = os.path.splitext(os.path.basename(path))[0]
             name = (args.name or mod)[:12]
-            take_over(wg)
+            take_over(wg, "Install " + name)
             wg.put(mod + ".py", open(path, "rb").read())
-            wg.exec("import json\njson.dump([{'mod': %r, 'name': %r, 'about': 'installed with wedgie.py'}], open('apps.json', 'w'))" % (mod, name))
+            wg.put("apps.json", json.dumps([{"mod": mod, "name": name, "about": "installed with wedgie.py"}]).encode(), (1, 1), "")
             wg.sync()
             wg.leave()
             print("installed %s as %r; it's the app it runs now" % (mod, name))
         elif c in ("off", "uninstall"):
             m = manifest()
-            take_over(wg)
+            take_over(wg, "Uninstall the app")
             have = look(wg, m)
             remove_files(wg, have, others(m, have, None))
             write_apps(wg, m, have, None)
@@ -638,7 +730,7 @@ def main():
             print("its app is uninstalled; it shows \"no software\"")
         elif c == "update":
             m = manifest()
-            take_over(wg)
+            take_over(wg, "Update firmware to " + m["version"])
             have = look(wg, m)
             names = [f["name"] for f in m["files"]]
             from_menu = any(n in have["files"] for n in RETIRED)     # 0.1.x: it starts with no app
@@ -653,7 +745,7 @@ def main():
             print("wedgie %s: %s" % (m["version"], "%d files updated" % len(todo) if todo else "already up to date"))
         elif c == "debug":
             code = urllib.request.urlopen(SITE + "/device/debug.py").read().decode()
-            take_over(wg, "Debug and read logs")
+            take_over(wg, "Debug and read logs", "Debugging")
             out = wg.exec(code, 30)
             wg.leave(reset=False)       # its app again, locked
             line = next((l for l in out.splitlines() if l.startswith("@debug ")), None)
@@ -662,7 +754,7 @@ def main():
             print(json.dumps(json.loads(line[7:]), indent=1))
         elif c in ("apps", "carts"):
             m = manifest()
-            take_over(wg)
+            take_over(wg, "List its apps", "Listing apps")
             have = look(wg, m)
             wg.leave(reset=False)
             act = active_of(m, have)
@@ -687,7 +779,7 @@ def main():
                     others(m, have, cart["mod"]), [cart_entry(cart)])
                 print("%s is the app it runs now (checked install; saves stay)" % cart["name"])
                 return
-            take_over(wg)
+            take_over(wg, "Install " + cart["name"])
             have = look(wg, m)
             size = {f["name"]: f["size"] for f in m["files"]}
             gone = others(m, have, cart["mod"])
