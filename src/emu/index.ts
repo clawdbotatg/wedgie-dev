@@ -17,7 +17,7 @@ export type WedgieKey = "A" | "B" | "X" | "Y" | "up" | "down" | "left" | "right"
 export interface VirtualWedgieOptions {
   /** Where the firmware manifest lives (default "/fw/", from tools/fw.mjs). */
   fwBase?: string;
-  /** The app it runs (a cartridge's mod, default "hello"; "" for none). The wedgie runs one app. */
+  /** The app it runs (a cartridge's mod, default "buttons"; "" for none). The wedgie runs one app. */
   app?: string;
   /** An app that isn't in the manifest (one from a GitHub repo, src/apps/repos.ts): its files go on the
    *  flash too and it's the app it runs. */

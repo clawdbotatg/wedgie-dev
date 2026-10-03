@@ -1,5 +1,5 @@
 # hello: the smallest complete sketch for the Pico wallet. A box bounces, every key press shows up.
-# Emulator: tools/emu run hello       Pico: ./tools/pico cp emu/sketches/hello.py :hello.py exec 'import hello'
+# A test fixture now (tools/emuprobe.mjs boots it as a repo app): a Timer app, so the REPL stays free.
 # Pattern: draw into the framebuffer, lcd.show() pushes it (about 38 ms), a Timer ticks so the REPL
 # stays free. Every button is the app's: A bounces the box back.
 import time

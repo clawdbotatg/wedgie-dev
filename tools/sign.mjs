@@ -2,7 +2,8 @@
 // puts in the manifest), as "sha256  name" lines, signed with the release key (P-256). A wedgie checks
 // the signature with RELEASE_KEY in firmware/wedgie.py (wedgie.release_ok) before it trusts a file list,
 // so a computer can't pass off other files as "Buttons" or "firmware 0.2.9" (docs/SECURITY-ROADMAP.md).
-//   node tools/sign.mjs        writes release/firmware.txt + release/firmware.sig; run before every push
+//   node tools/sign.mjs        runs the release gate (tools/gate.mjs), then writes release/firmware.txt +
+//                              release/firmware.sig; run before every push
 //                              that changes firmware/ (fw.mjs marks the manifest unsigned otherwise)
 // The key is ~/.wedgie/release-key.pem, made on first run. It never goes in git, Vercel or a skill.
 import { readFileSync, writeFileSync, existsSync, mkdirSync, chmodSync } from "node:fs";
@@ -36,6 +37,14 @@ const line = `RELEASE_KEY = ("${qx}", "${qy}")`;
 if (!w.includes(line)) {
   writeFileSync(wp, w.replace(/^RELEASE_KEY = .*$/m, line));
   console.log("wrote RELEASE_KEY into firmware/wedgie.py");
+}
+// The gate (tools/gate.mjs) first, every time: no signature for firmware that hasn't passed it. No flag
+// skips it (Austin, 2026-10-03: no more memory errors reaching a wedgie).
+{
+  const { spawnSync } = await import("node:child_process");
+  console.log("running the release gate (tools/gate.mjs, ~10 min); nothing is signed unless it passes");
+  const g = spawnSync("node", [join(root, "tools/gate.mjs")], { cwd: root, stdio: "inherit" });
+  if (g.status !== 0) { console.error("not signed: the gate failed"); process.exit(1); }
 }
 const text = releaseText();
 const sig = sign("sha256", Buffer.from(text), { key: priv, dsaEncoding: "ieee-p1363" }).toString("hex");

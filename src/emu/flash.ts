@@ -6,7 +6,7 @@ export type Manifest = { version: string; files: { name: string; size: number; s
 type App = { mod: string; name?: string; entry?: string; usb?: boolean; about?: string; v?: string };
 
 /** extra: an app from outside the manifest (a GitHub repo's): its files, and it's the app it runs. */
-export async function loadFlash(base = "/fw/", app = "hello", extra?: { app: App; files: Record<string, Uint8Array> }) {
+export async function loadFlash(base = "/fw/", app = "buttons", extra?: { app: App; files: Record<string, Uint8Array> }) {
   const manifest: Manifest = await (await fetch(base + "manifest.json", { cache: "no-cache" })).json();
   const files: Record<string, string | Uint8Array> = {};
   await Promise.all(manifest.files.map(async (f) => {

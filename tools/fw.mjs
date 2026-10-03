@@ -13,9 +13,8 @@ import { readdirSync, readFileSync, writeFileSync, mkdirSync, rmSync, copyFileSy
 import { createHash } from "node:crypto";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { checkAppJson, parseRepo } from "../src/apps/appjson.mjs";
 
-import { published, releaseText } from "./release.mjs";
+import { published, releaseText, shelf } from "./release.mjs";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const sha = (buf) => createHash("sha256").update(buf).digest("hex");
 /** A cart's version: the same function as cartV in src/serial/install.ts. */
@@ -47,25 +46,18 @@ export function buildFirmware() {
   });
   const inCarts = new Set(carts.flatMap((c) => c.files));
   const core = files.map((f) => f.name).filter((n) => !inCarts.has(n));
-  for (const e of JSON.parse(readFileSync(join(root, "community.json"), "utf8")).repos) {
-    const p = parseRepo(e.repo), dir = join(root, "community", p.owner, p.repo);
-    let have = "";
-    try { have = readFileSync(join(dir, ".sha"), "utf8").trim(); } catch {}
-    if (have !== e.sha) throw new Error(`community/${e.repo} isn't at ${e.sha.slice(0, 7)}: run node tools/community.mjs`);
-    const { apps, errors } = checkAppJson(JSON.parse(readFileSync(join(dir, "wedgie.json"), "utf8")), core, carts.map((c) => c.mod));
-    if (errors.length) throw new Error(`community/${e.repo}/wedgie.json:\n  ${errors.join("\n  ")}`);
-    for (const { paths, ...a } of apps.filter((a) => !e.apps || e.apps.includes(a.mod))) {
-      const hashes = [];
-      a.files.forEach((name, i) => {
-        if (byName.has(name)) throw new Error(`community/${e.repo}: ${name} is already published by another app`);
-        const buf = readFileSync(join(dir, paths[i]));
-        writeFileSync(join(out, name), buf);
-        const f = { name, size: buf.length, sha256: sha(buf) };
-        files.push(f); byName.set(name, f); hashes.push(f.sha256);
-      });
-      carts.push({ ...a, repo: e.repo, sha: e.sha, v: cartV(hashes), size: a.files.reduce((s, n) => s + byName.get(n).size, 0) });
+  const shelfCarts = [];
+  for (const { app: a, files: fs } of shelf(core, carts.map((c) => c.mod))) {
+    const hashes = [];
+    for (const { name, buf } of fs) {
+      if (byName.has(name)) throw new Error(`community/${a.repo}: ${name} is already published by another app`);
+      writeFileSync(join(out, name), buf);
+      const f = { name, size: buf.length, sha256: sha(buf) };
+      files.push(f); byName.set(name, f); hashes.push(f.sha256);
     }
+    shelfCarts.push({ ...a, v: cartV(hashes), size: a.files.reduce((s, n) => s + byName.get(n).size, 0) });
   }
+  carts.unshift(...shelfCarts);        // the shelf's apps first on the site
   // The signed file list (tools/sign.mjs). signed: it covers exactly these files; a wedgie refuses a
   // checked install from an unsigned manifest.
   let signed = false;

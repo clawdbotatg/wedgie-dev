@@ -36,10 +36,15 @@ import job           # noqa: E402
 D = 0x1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDE
 QX, QY = p256.pubkey(D)
 W.RELEASE_KEY = ("%064x" % QX, "%064x" % QY)
-carts = json.load(open(os.path.join(FW, "carts.json")))
+# Three small apps of the test's own (the real ones live in their own repos now): the cases need an app
+# that runs, one to install, and a third whose files the install mustn't touch.
+APPS = {"hello.py": b"print('hello')\n", "keytest.py": b"def run():\n    pass\n", "battery.py": b"print('battery')\n"}
+carts = [{"mod": "hello", "name": "Hello", "files": ["hello.py"]},
+         {"mod": "keytest", "name": "Buttons", "entry": "run", "files": ["keytest.py"]},
+         {"mod": "battery", "name": "Battery", "files": ["battery.py"]}]
 sha = lambda b: hashlib.sha256(b).hexdigest()
-read = lambda n: open(os.path.join(FW, n), "rb").read()
-names = sorted(n for n in os.listdir(FW) if n.endswith((".py", ".mpy", ".bin")) and not (n.endswith(".py") and os.path.exists(os.path.join(FW, n[:-3] + ".mpy"))))
+read = lambda n: APPS[n] if n in APPS else open(os.path.join(FW, n), "rb").read()
+names = sorted([n for n in os.listdir(FW) if n.endswith((".py", ".mpy", ".bin")) and not (n.endswith(".py") and os.path.exists(os.path.join(FW, n[:-3] + ".mpy")))] + list(APPS))
 
 
 def release(apps=True):
@@ -94,7 +99,7 @@ def run(job_msg, msgs, rel_apps=True, app="hello"):
                 shutil.copy(os.path.join(FW, n), n)
         c = next(c for c in carts if c["mod"] == app)
         for n in c["files"]:
-            shutil.copy(os.path.join(FW, n), n)
+            open(n, "wb").write(read(n))
         open("apps.json", "w").write(json.dumps([{"mod": app, "name": c["name"]}]))
         rel, sig = release(rel_apps)
         h = Host([{"type": "release", "release": rel, "sig": sig}] + msgs)

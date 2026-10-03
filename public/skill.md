@@ -1,6 +1,6 @@
 ---
 name: wedgie
-description: Write, install and debug apps on a wedgie (Raspberry Pi Pico + Waveshare Pico-LCD-1.3 240x240 screen, joystick, A/B/X/Y, secure chip on I2C, running MicroPython + wedgie firmware) over USB. Use for "make an app/game for my wedgie", "put this on my wedgie", "what's on my wedgie's screen", "update my wedgie", "why won't my wedgie ...".
+description: Everything about a wedgie (Raspberry Pi Pico + Waveshare Pico-LCD-1.3 240x240 screen, joystick, A/B/X/Y, secure chip on I2C, running MicroPython + wedgie firmware) - what it is, building one, talking to it directly over USB (find its port, hello, screen, buttons, files, the lock and the A press, full control), wedgie.py, apps, updates, the secure chip. Use for "my wedgie is plugged in", "make an app/game for my wedgie", "put this on my wedgie", "what's on my wedgie's screen", "update my wedgie", "sign with my wedgie", "why won't my wedgie ...".
 ---
 
 # Wedgie
@@ -10,6 +10,14 @@ RP2350), a Waveshare Pico-LCD-1.3 hat (240x240 screen, 5-way joystick, A/B/X/Y),
 (ATECC608 or Infineon Trust M) wedged between the boards on I2C. It runs MicroPython plus wedgie
 firmware: a boot logo, one app it boots straight into, saves that outlast apps, and a USB protocol.
 Everything is MIT: https://wedgie.dev
+
+**Everything about a wedgie, in three guides** (this one first):
+- https://wedgie.dev/skill.md (this): the hardware, talking to it over USB, wedgie.py, firmware, the lock.
+- https://wedgie.dev/code.md: making apps and games (the app format, fast graphics, saves, the emulator).
+- https://wedgie.dev/trustm.md: the Trust M secure chip from an app (keys, signatures, ECDH, RSA, counters).
+A plugged-in wedgie (0.3.18+) carries all three as **SKILL.md** on its WEDGIE drive.
+
+**A wedgie is plugged in and you want to talk to it now:** read "Talk to it directly" below.
 
 ## Why "wedgie" (read this, it explains the build)
 
@@ -125,7 +133,7 @@ Get the host tool (one file; needs `pip install pyserial`):
     python3 wedgie.py install .            make the app in this folder's wedgie.json the app it runs
     python3 wedgie.py install app.py --name "My app"    make one file the app it runs (it restarts into it)
     python3 wedgie.py apps                 the apps on wedgie.dev, and which one it runs
-    python3 wedgie.py use usbwallet        make that the app it runs (the old one comes off; saves stay)
+    python3 wedgie.py use buttons          make that the app it runs (the old one comes off; saves stay)
     python3 wedgie.py uninstall            uninstall its app
     python3 wedgie.py ls                   every file, saves included
     python3 wedgie.py saves [backup f.json | restore f.json]
@@ -192,8 +200,8 @@ start()
 A game can use a `while` loop with `time.sleep_ms()` instead: give it an entry the firmware calls, in
 apps.json `{"mod": "game", "name": "Game", "entry": "run"}` (`wedgie.py install` writes timer-style
 apps; add `entry` by hand for loop-style ones). The firmware still answers USB while it loops. If the
-entry returns, the screen says it ended and A starts it again. An app that talks on USB itself (the
-Wallet) says `"usb": true`, and the firmware leaves stdin to it.
+entry returns, the screen says it ended and A starts it again. An app that talks on USB itself (a
+wallet) says `"usb": true`, and the firmware leaves stdin to it.
 
 ### Saves
 
@@ -259,23 +267,19 @@ The wedgie's `apps.json` names its app: `[{"mod", "name", "entry"?, "usb"?, "abo
 install`). An app from a repo or folder lists its `files`, so whatever switches away takes them off.
 Firmware 0.1.x had a menu and kept several; updating to 0.2 takes them off and it starts with no app.
 
-Apps now: `hello` (bouncing box, the template), `keytest` (buttons), `demo` (balls/cube/plasma speed
-test), `mock` (nine wallet screens), `wire_demo` (clear-signs a signed transaction request),
-`battery` (Waveshare Pico-UPS-B hat), `speed` (Speed lab: times each graphics trick on that board),
-`usbwallet` (the USB hardware wallet; needs an ATECC608). Source:
-/fw/<file> or https://github.com/clawdbotatg/wedgie-dev/tree/main/firmware (`carts.json` is the
-catalog). Read `hello.py` and `lcd.py` first. A new app = its files in firmware/ + an entry in
-firmware/carts.json (name, files, label color, 12x12 pixel icon, `chip` if it needs one); push and
-it's on the site. Anyone else's app lives in their own GitHub repo with a `wedgie.json`
-(https://wedgie.dev/code.md); people add it on their wedgie's page, and `community.json` in this repo
-lists the ones on everyone's shelf, each pinned to the commit that was read.
+Apps live in their own GitHub repos (`clawdbotatg/wedgie-*` for ours), each with a `wedgie.json`
+(https://wedgie.dev/code.md). The ones on everyone's shelf are listed in `community.json` in this repo,
+each pinned to the commit that was read, copied into `community/` and signed with the firmware
+(`node tools/community.mjs add owner/repo`, review `git diff community/`, `node tools/sign.mjs`, commit).
+Today: Buttons (`clawdbotatg/wedgie-buttons`). People can also add any repo on their wedgie's page
+(not signed: it asks for full access).
 
 ## The USB protocol (what wedgie.py speaks)
 
 While its app runs, the firmware (`slot.py`) answers one JSON line per request on the USB serial port
 (vendor 0x2e8a, 115200), without interrupting anything:
 
-    {"id":1,"type":"hello"}              -> {"id":1,"type":"hello","fw":"wedgie-0.2.0","slot":1,"uid":...,"board":...,"carts":[{mod,v}],"running":...,"free":...}
+    {"id":1,"type":"hello"}              -> {"id":1,"type":"hello","fw":"wedgie-0.3.19","slot":1,"uid":...,"board":...,"carts":[{mod,v}],"running":...,"free":...}
     {"id":2,"type":"shot"}               -> {"id":2,"type":"shot","i":0,"n":38,"fmt":"rgb565be","data":"<base64>"} x n
     {"id":3,"type":"press","key":"A"}    -> {"id":3,"type":"ok"}
     {"id":4,"type":"chip"}               -> the chip proven working: ATECC608 hashes random bytes,
@@ -283,8 +287,11 @@ While its app runs, the firmware (`slot.py`) answers one JSON line per request o
     {"id":5,"type":"ls","path":"/saves"} -> {"type":"ls","files":[[path, bytes], ...],"free":N}  (folders end in /)
     {"id":6,"type":"get","path":"/saves/hello/best.json"} -> {"type":"file","i":0,"n":N,"size":S,"data":"<base64>"} x n
     {"id":7,"type":"rm","path":"..."}    -> {"type":"ok","free":N}   (a folder goes with everything in it)
+                                            get / rm: only /saves/ while locked (0.3.12+); anything else
+                                            answers an error until the person lets you in (open)
     {"id":8,"type":"stop"}  /  {"id":9,"type":"reboot"}
     {"id":10,"type":"open"}              -> {"type":"open"} or {"type":"refused"}  (asks the person; below)
+    {"id":11,"type":"open","full":true}  -> the same, asked in red: full control (below)
 
 `running` is the app on screen (null: none). 0.3.11+: hello also says `"ram"` (bytes of heap free),
 and the answer to a question (`open`, and a checked install's `go` / `refused`) says `"asked_ms"`: ms
@@ -305,10 +312,10 @@ names outside the core, and a file sent again starts over unchecked. 0.3.16+ (he
 send file data raw, not base64: `{"type":"put","name":n,"n":<bytes>,"end":bool}` then exactly that
 many raw bytes (up to 4096) right after its newline. About 10x faster: the wedgie reads a base64 line a
 character at a time (~1 s a KB) but raw bytes in one go. Older firmware: update it
-through full access (`open`) first. Compiled app files (`.mpy`, e.g. the Wallet's) replace their
+through full access (`open`) first. Compiled app files (`.mpy`) replace their
 `.py`: delete a `.py` only once its `.mpy` is on, since MicroPython runs the `.py` first. Lines that don't start with `{` are logs (an app's
 print()). Raw REPL (Ctrl-A) is how files get written. `exec(open("main.py").read())` starts the app
-again. An app with `"usb": true` (the Wallet) has the port to itself and speaks its own protocol; it
+again. An app with `"usb": true` (a wallet) has the port to itself and speaks its own protocol; it
 answers `open` too.
 
 **A wedgie is locked (0.2.5+; hello says `"sealed": true`).** Ctrl-C does nothing, so no computer

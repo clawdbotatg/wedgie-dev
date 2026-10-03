@@ -98,7 +98,7 @@ export function code(main: HTMLElement) {
         <li><b>Viper for pixel loops.</b> Plain Python is 6.8 us a pixel (0.4 s a screen); <code>@micropython.viper</code> is 26x faster.</li>
         <li><b>Nothing new in the loop.</b> A garbage collection costs 8 ms. Reuse lists, build text only when it changes.</li>
       </ul>
-      <p class="fine">All of it, with numbers and code: <a href="/code.md">code.md</a>. The <b>Speed lab</b> app times each trick on your own wedgie.</p>
+      <p class="fine">All of it, with numbers and code: <a href="/code.md">code.md</a>.</p>
     </div>
 
     <div class="card code-fast code-look">

@@ -1,5 +1,5 @@
 // /build: pick a wedgie — its app, its Pico, up to two I2C boards wedged inside, the color of every printed part —
-// and the URL becomes that wedgie (/build?app=usbwallet&pico=nulllab&chip=atecc&chip2=none&lid=white&...). Anyone with the link
+// and the URL becomes that wedgie (/build?app=buttons&pico=nulllab&chip=atecc&chip2=none&lid=white&...). Anyone with the link
 // sees the same one and can buy it or build it from the list below. The price is its parts plus $30. Firmware is always the latest.
 import "./build.css";
 import { esc } from "../ui/device";
@@ -48,7 +48,7 @@ const PARTS = [
   { key: "stick", part: "joystick", name: "Joystick", stl: "joystick.stl", def: "darkgrey", case: false },
 ] as const;
 const fits = (p: { case: boolean }, c: Color) => !!c.petg || (!p.case && !!c.pla);
-const DEF_APP = "hello";
+const DEF_APP = "buttons";
 // Pico boards that fit today's case (made for the pink NULLLAB board; see docs/BUILD-ROADMAP.md for the
 // ones that don't yet). price: one board, from the cheapest multipack. tested: fit-tested in the case.
 const PICOS = [
@@ -171,14 +171,14 @@ const GROUPS = [...new Set(CHIPS.map((c) => c.group))];
 const chipOf = (key: string) => CHIPS.find((c) => c.key === key);
 // What each app looks like on the preview's screen.
 const SCREENS: Record<string, string[]> = {
-  hello: ["hello"], keytest: ["buttons"], demo: ["demo", "demo-2"], mock: ["wallet-home", "wallet-chart", "wallet-send", "wallet-receive"],
+  buttons: ["buttons"], hello: ["hello"], keytest: ["buttons"], demo: ["demo", "demo-2"], mock: ["wallet-home", "wallet-chart", "wallet-send", "wallet-receive"],
   wire_demo: ["clear-sign"], usbwallet: ["wallet-home", "wallet-send", "wallet-signing", "wallet-receive"],
 };
 // Ready-made wedgies: each is just a /build link, like any shared one.
 const PRESETS = [
-  { name: "Wallet", q: "app=usbwallet&pico=nulllab&chip=atecc&chip2=none&lid=white&base=black&a=green&b=darkgrey&x=darkgrey&y=red&stick=darkgrey" },
-  { name: "Game", q: "app=demo&pico=nulllab&chip=none&chip2=none&lid=purple&base=black&a=yellow&b=skyblue&x=mint&y=magenta&stick=yellow" },
-  { name: "Plain", q: "app=hello&pico=nulllab&chip=none&chip2=none&lid=white&base=black&a=green&b=darkgrey&x=darkgrey&y=red&stick=darkgrey" },
+  { name: "Wallet", q: "app=buttons&pico=nulllab&chip=atecc&chip2=none&lid=white&base=black&a=green&b=darkgrey&x=darkgrey&y=red&stick=darkgrey" },
+  { name: "Game", q: "app=buttons&pico=nulllab&chip=none&chip2=none&lid=purple&base=black&a=yellow&b=skyblue&x=mint&y=magenta&stick=yellow" },
+  { name: "Plain", q: "app=buttons&pico=nulllab&chip=none&chip2=none&lid=white&base=black&a=green&b=darkgrey&x=darkgrey&y=red&stick=darkgrey" },
 ];
 
 type Build = { app: string; pico: string; chips: string[]; colors: Record<string, string> };   // chips: two CHIPS keys or "none"
