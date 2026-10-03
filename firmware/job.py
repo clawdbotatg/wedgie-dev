@@ -21,7 +21,8 @@
 import sys, os, json, time, gc, select, hashlib, binascii
 import wedgie as W
 
-KEEP = ("main.py", "boot.py", "wedgie.py", "slot.py", "lcd.py", "job.py", "p256.py", "loader.py")
+KEEP = ("main.py", "boot.py", "wedgie.py", "slot.py", "lcd.py", "job.py", "p256.py", "loader.py",
+        "wedgie.mpy", "slot.mpy", "lcd.mpy", "job.mpy", "p256.mpy", "loader.mpy")    # 0.3.14+: the core is compiled
 IDLE_MS = 30000
 
 

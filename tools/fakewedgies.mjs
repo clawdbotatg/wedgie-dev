@@ -30,11 +30,12 @@ export function fakeWedgies(specs) {
     // driveOn: the drive is up (added at this power-up). A soft reset takes it off again, and that
     // changes USB too: the first soft reset after a plug-in drops the port as well (seen on a real
     // RP2040 wedgie 2026-09-29: the page lost it after every firmware update). While dropped, open() fails.
-    const st = { files, launched: null, presses: [], shots: 0, resets: 0, drops: 0, chips: 0, interrupts: 0, resetHook: null, mark: files.has("wedgiedrive.py"), driveOn: files.has("wedgiedrive.py") };
+    const st = { files, launched: null, presses: [], shots: 0, resets: 0, drops: 0, chips: 0, interrupts: 0, resetHook: null, mark: files.has("wedgiedrive.py") || files.has("wedgiedrive.mpy"), driveOn: files.has("wedgiedrive.py") || files.has("wedgiedrive.mpy") };
     let push = () => {};
     let raw = false, code = "", line = "", cur = null, curName = "";
-    const slot = () => st.files.has("slot.py") && st.files.has("main.py");
-    const wedgie = () => st.files.has("main.py") && (st.files.has("menu.py") || st.files.has("slot.py"));
+    const has = (m) => st.files.has(m + ".py") || st.files.has(m + ".mpy");     // 0.3.14+: the core is compiled
+    const slot = () => has("slot") && st.files.has("main.py");
+    const wedgie = () => st.files.has("main.py") && (has("menu") || has("slot"));
     // 0.2: the app it runs (null while stopped by Ctrl-C, or with none on it)
     const sealed = () => slot() && cmpV(version() || "0", "0.2.5") >= 0;
     const h_jobs = () => cmpV(version() || "0", "0.3.0") >= 0 && slot();
@@ -60,7 +61,9 @@ export function fakeWedgies(specs) {
       for (let i = 0; i < n; i++) { let s = ""; for (const b of u8.subarray(i * 3072, (i + 1) * 3072)) s += String.fromCharCode(b); o += JSON.stringify({ id, type, i, n, size: u8.length, data: btoa(s) }) + "\r\n"; }
       return o;
     };
-    const version = () => (st.files.has("wedgie.py") ? (dec.decode(st.files.get("wedgie.py")).match(/VERSION = "([^"]+)"/) || [])[1] || "0.1.0" : null);
+    // its VERSION: the source line, or in a compiled wedgie.mpy the first x.y.z string (the version is its only one)
+    const version = () => (st.files.has("wedgie.py") ? (dec.decode(st.files.get("wedgie.py")).match(/VERSION = "([^"]+)"/) || [])[1] || "0.1.0"
+      : st.files.has("wedgie.mpy") ? (new TextDecoder("latin1").decode(st.files.get("wedgie.mpy")).match(/\d+\.\d+\.\d+/) || [])[0] || "0.1.0" : null);
     const apps = () => { try { return JSON.parse(dec.decode(st.files.get("apps.json"))); } catch { return []; } };
     const hello = (id, type = "hello") => {
       const v = version(), h = { id, type, name: "wedgie", fw: "wedgie-" + v, version: v, uid, short: uid.slice(-6).toUpperCase(),
@@ -211,9 +214,9 @@ export function fakeWedgies(specs) {
     }
     function softReset() {
       st.resets++; st.launched = null; st.stopped = false; st.open = false;
-      const drop = st.files.has("wedgiedrive.py") && (!st.mark || st.driveOn);
-      st.driveOn = st.files.has("wedgiedrive.py") && !st.mark;    // the new boot.py adds it only without a mark
-      st.mark = st.files.has("wedgiedrive.py");
+      const drop = has("wedgiedrive") && (!st.mark || st.driveOn);
+      st.driveOn = has("wedgiedrive") && !st.mark;    // the new boot.py adds it only without a mark
+      st.mark = has("wedgiedrive");
       const im = st.installMode; st.installMode = null;
       if (drop && st.resetHook) {
         if (im) {                       // job.resume runs anyway; its go goes to a port the host lost
@@ -262,7 +265,7 @@ export function fakeWedgies(specs) {
   window.__ports = ports;
   const t = new EventTarget();
   const plugged = new Set(ports);
-  window.__plug = (i, on) => { const p = ports[i]; p._st.dropped = !on; if (on && p._st.files.has("wedgiedrive.py")) p._st.mark = p._st.driveOn = true; if (on) { plugged.add(p); t.dispatchEvent(Object.assign(new Event("connect"), { port: p })); } else { plugged.delete(p); t.dispatchEvent(Object.assign(new Event("disconnect"), { port: p })); } };
+  window.__plug = (i, on) => { const p = ports[i]; p._st.dropped = !on; if (on && (p._st.files.has("wedgiedrive.py") || p._st.files.has("wedgiedrive.mpy"))) p._st.mark = p._st.driveOn = true; if (on) { plugged.add(p); t.dispatchEvent(Object.assign(new Event("connect"), { port: p })); } else { plugged.delete(p); t.dispatchEvent(Object.assign(new Event("disconnect"), { port: p })); } };
   for (const p of ports) p._st.resetHook = () => {
     p._st.dropped = true;
     p._st.fail?.(new DOMException("The device has been lost.", "NetworkError"));   // Chrome errors the open port's reads

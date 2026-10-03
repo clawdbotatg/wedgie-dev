@@ -515,7 +515,8 @@ def job(wg, title, write, delete, apps):
     files one chunk at a time, checks each against the list, then puts them in place and restarts."""
     rel = urllib.request.urlopen(SITE + "/fw/release.txt").read().decode()
     sig = urllib.request.urlopen(SITE + "/fw/release.sig").read().decode().strip()
-    delete = sorted(set(delete) | {twin(n) for n in write if twin(n)})     # a written .mpy's old source
+    # a written .mpy's old .py: job.py's commit removes it (0.3.12+). Not in delete: 0.3.12-0.3.13 refuse
+    # to delete their core names (wedgie.py, slot.py, ...)
     sys.stderr.write("press A on the wedgie: %s?\n" % title)
     try:
         v = wg.request({"type": "job", "job": title, "release": rel, "sig": sig, "write": write, "delete": delete,

@@ -92,12 +92,18 @@ what agents outside this repo read (keep it true when the firmware or the USB pr
    rarely (a question, a hatch) goes in its own file, imported only when needed (`firmware/hatch.py`).
    Measure the heap with `chipprobe.mjs --from X --to Y --no-update` before and after (`--fw` on a
    `git archive HEAD` copy for before).
-14. **Compiled apps (.mpy).** A cart file listed as `X.mpy` in carts.json is built from `firmware/X.py` by
+14. **Compiled firmware (.mpy), 0.3.14+: the whole core** (every firmware .py no app claims, except boot.py and
+   main.py; loader.py with -march=armv6m for its viper) **and app files listed as `X.mpy`** in carts.json are
+   built from `firmware/X.py` by
    `tools/mpy.py` (mpy-cross 1.29.0, pinned; same bytes on any computer) and committed: change the .py,
    rebuild, commit both. The .mpy is what's published and signed; the .py goes to `/fw/src/` for the
    emulator only. MicroPython imports a .py before a .mpy, so a .py left beside its .mpy runs instead:
    hosts take it off only once the .mpy is on (install.ts `twin`, wedgie.py `twin`, job.py commit).
-   The Wallet must be compiled: from source it runs out of memory starting on an RP2040.
+   The Wallet must be compiled: from source it runs out of memory starting on an RP2040. So must the core:
+   compiling slot.py at boot ran a real board out of memory on a fresh plug-in (0.3.13; macOS reads the
+   WEDGIE drive at the same moment, which the virtual chip doesn't do). A new core .py is compiled by
+   default; never ship one as source. Hosts don't put .py twins in a checked job's delete (job.py's commit
+   removes them; 0.3.12-0.3.13 refuse to delete their KEEP names).
 15. Everything is MIT — never use the CC BY-NC case STLs from picowallet/instant-wallet.
 
 ## Run / check

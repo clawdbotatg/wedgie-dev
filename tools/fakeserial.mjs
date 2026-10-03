@@ -129,7 +129,7 @@ check((await files(2)).includes("/saves/hello/best.json"), "switching apps never
 await page.click('#d-shelf .cart-slot[data-mod="usbwallet"] .cart');   // a tap on the app on it takes it off
 await wait(() => JSON.parse(new TextDecoder().decode(window.__ports[2]._st.files.get("apps.json"))).length === 0, null, 15000, "Wallet off");
 f = await files(2);
-check(!f.includes(WALLET) && !f.includes(KECCAK) && f.includes("slot.py"), "its files gone, the core stays");
+check(!f.includes(WALLET) && !f.includes(KECCAK) && (f.includes("slot.py") || f.includes("slot.mpy")), "its files gone, the core stays");
 await wait(() => /Nothing on it yet/.test(document.querySelector("#d-carts-note").textContent), null, 10000, "the page: nothing on it");
 
 const asks = await st(2, "asks");
@@ -216,7 +216,7 @@ check(up.length >= 5 && up.every((x) => x.title === "Updating firmware") && up.s
   `its screen the whole update: the boot bar, 'Updating firmware', filling to the end, file by file (${up.length} draws, titles ${[...new Set(up.map((x) => x.title))]})`);
 const a3 = await appsOn(1), f3 = await files(1);
 check(JSON.stringify(a3) === "[]", "no app yet (nobody picked one): " + JSON.stringify(a3));
-check(!f3.includes("hello.py") && !f3.includes("keytest.py") && !f3.includes("menu.py") && f3.includes("slot.py"), "its old apps and the menu gone, the slot on");
+check(!f3.includes("hello.py") && !f3.includes("keytest.py") && !f3.includes("menu.py") && (f3.includes("slot.py") || f3.includes("slot.mpy")), "its old apps and the menu gone, the slot on");
 await wait(() => /Nothing on it yet/.test(document.querySelector("#d-carts-note")?.textContent || ""), null, 10000, "the page: nothing on it yet");
 check(await st(1, "chips") >= 1, "after the update the chip is checked too");
 
@@ -238,7 +238,7 @@ await wait(() => document.querySelector("[data-fw]") && !document.querySelector(
 await page.click("[data-fw]");
 await wait(() => /Up to date/.test(document.querySelector("#d-fw")?.textContent || ""), null, 120000, "bare board installed");
 const f0 = await files(0);
-check(f0.includes("slot.py") && f0.includes("save.py") && !f0.includes("menu.py") && !f0.includes("hello.py"), "the core only, no apps: " + f0.length + " files");
+check(f0.includes("slot.mpy") && f0.includes("save.mpy") && !f0.includes("menu.py") && !f0.includes("hello.py"), "the core only, no apps: " + f0.length + " files");
 check(JSON.stringify(await appsOn(0)) === "[]", "no app yet");
 check((await st(0, "drops")) === 1, "its first boot added the WEDGIE drive (port dropped, came back, found by its ID)");
 check(errs.length === 0, errs.length ? "page errors: " + errs.join(" | ") : "no page errors");

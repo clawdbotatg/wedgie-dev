@@ -12,8 +12,8 @@ import sys, time
 
 
 def stuck(e):
-    """The slot broke. A (a real press: these are the pins) lets the computer in to fix it, B tries
-    again. True: let it in."""
+    """The slot broke. A asks the escape hatch's red FULL CONTROL question (a real press: ui.ask reads the
+    pins), and its A lets the computer in to fix it; B, or a no, tries again. True: let it in."""
     try:
         with open("error.log", "w") as f:
             sys.print_exception(e, f)
@@ -23,7 +23,7 @@ def stuck(e):
     try:
         import lcd, ui
         d = lcd.LCD()
-        ui.page(d, "wedgie broke", [("%s" % e, ui.RED), ("", ui.MUTED), ("A  let the computer in", ui.INK), ("B  try again", ui.INK)])
+        ui.page(d, "wedgie broke", [("%s" % e, ui.RED), ("", ui.MUTED), ("A  give a computer full control", ui.INK), ("B  try again", ui.INK)])
     except Exception:
         pass
     from machine import Pin
@@ -32,15 +32,25 @@ def stuck(e):
         time.sleep_ms(20)
     while True:
         if a.value() == 0:
+            try:            # the escape hatch's red question (hatch.py). If it can't even draw, A on "wedgie broke" stands
+                if not ui.ask(d, "FULL CONTROL?", ["This computer could run any code and make the chip sign anything: send your money.",
+                                                   "Didn't ask for this? Press Y."], yes="full control", no="no", scary=True):
+                    return False
+            except Exception:
+                pass
             try:
                 import wedgie
                 wedgie.set_open()
             except Exception:
                 micropython.kbd_intr(3)
-            try:            # A has to look like it did something: the REPL itself draws nothing
-                ui.page(d, "computer let in", [("it can fix this now:", ui.INK), ("wedgie.dev/connect", ui.GREEN_D), ("", ui.MUTED), ("unplug it to start over", ui.MUTED)])
+            try:            # what a yes means stays on the screen: the REPL itself draws nothing
+                import hatch
+                hatch.shown(d)
             except Exception:
-                pass
+                try:
+                    ui.page(d, "COMPUTER HAS FULL ACCESS", [("it can fix this now", ui.INK), ("didn't want that? unplug it now", ui.RED)])
+                except Exception:
+                    pass
             return True
         if b.value() == 0:
             return False

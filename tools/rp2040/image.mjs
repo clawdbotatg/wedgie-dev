@@ -23,10 +23,12 @@ export const appEntry = (F, c) => ({ mod: c.mod, name: c.name, ...(c.entry ? { e
 
 /** bytes of a littlefs image with F's core + app (a cart's mod, or null for none). over: {name: bytes}
  *  replaces files (a test key in wedgie.py). */
-export function image(F, app, over = {}) {
+export function image(F, app, over = {}, drop = []) {
   const c = F.carts.find((x) => x.mod === app);
   const dir = mkdtempSync(join(tmpdir(), "wedgie-fs-"));
-  const args = [...F.core, ...(c ? c.files : [])].map((n) => {
+  const names = [...F.core, ...(c ? c.files : [])].filter((n) => !drop.includes(n));
+  for (const n of Object.keys(over)) if (!names.includes(n)) names.push(n);    // over can add files (an older core's .py)
+  const args = names.map((n) => {
     if (!over[n]) return `${n}=${join(F.dir, n)}`;
     writeFileSync(join(dir, n), over[n]);
     return `${n}=${join(dir, n)}`;

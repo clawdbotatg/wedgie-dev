@@ -44,7 +44,7 @@ await page.screenshot({ path: `${out}/update-bench.png` });
 check(/ done/.test(await card("5A2C29")) && /Updated ✓/.test(await card("5A2C29")), "bare board: updated, green");
 check((await st(0, "drops")) === 1, "bare board: its port dropped at its first boot and it was found again by its ID");
 check(/ done/.test(await card("152A2F")) && (await st(1, "drops")) === 1 && (await st(1, "resets")) === 1, "0.1.3: updated with one soft reset; its port dropped (the drive came off) and it was found again");
-const f1 = await page.evaluate(() => { const f = window.__ports[1]._st.files; return { hello: f.has("hello.py"), keytest: f.has("keytest.py"), mine: f.has("mine.py"), menu: f.has("menu.py"), slot: f.has("slot.py"), apps: JSON.parse(new TextDecoder().decode(f.get("apps.json"))).map((a) => a.mod) }; });
+const f1 = await page.evaluate(() => { const f = window.__ports[1]._st.files; return { hello: f.has("hello.py"), keytest: f.has("keytest.py"), mine: f.has("mine.py"), menu: f.has("menu.py"), slot: f.has("slot.mpy"), apps: JSON.parse(new TextDecoder().decode(f.get("apps.json"))).map((a) => a.mod) }; });
 check(JSON.stringify(f1.apps) === "[]" && !f1.hello && !f1.keytest && f1.mine && !f1.menu && f1.slot, "0.1.3 → 0.2: no app yet; the carts and the menu gone, the person's own file kept: " + JSON.stringify(f1));
 check((await st(1, "inserting")) >= 2, "its own screen showed the update");
 check(/ done/.test(await card("3D9F01")), "0.1.4 with different files: updated");

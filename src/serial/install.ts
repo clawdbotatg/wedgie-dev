@@ -245,7 +245,8 @@ const signedList = () => release ||= Promise.all(["release.txt", "release.sig"].
 async function job(r: Repl, m: Manifest, title: string, write: string[], del: string[], apps: any[] | null, onProgress: (p: number, what: string) => void, late = false): Promise<{ sent: number } | false> {
   // late: the signed list goes after the yes, so the question doesn't wait for its download. The
   // manifest lists the same files (tools/fw.mjs and tools/sign.mjs publish the same set).
-  del = [...new Set([...del, ...write.map(twin).filter((n): n is string => !!n)])];    // a written .mpy's old source
+  // A written .mpy's old .py: job.py's commit removes it (0.3.12+, the only firmware that gets checked
+  // jobs). Not in delete: 0.3.12-0.3.13 refuse to delete their core names (wedgie.py, slot.py, ...).
   const relP = signedList();
   relP.catch(() => {});
   const listed = late ? new Set(m.files.map((f) => f.name)) : new Set((await relP).text.split("\n").slice(2).map((l) => l.split("  ")[1]).filter(Boolean));
