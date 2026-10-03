@@ -34,6 +34,16 @@ await ctx.addInitScript(fakeWedgies, [
 
 let bad = 0;
 const check = (ok, what) => { console.log(ok ? "ok  " : "FAIL", what); if (!ok) bad++; };
+// Unsigned firmware (a release not signed yet: tools/sign.mjs, on Austin's Mac): the site would skip the
+// checked install. The fakes don't check signatures, so serve it as signed to test the release's own flow.
+const man = JSON.parse(readFileSync(new URL("../public/fw/manifest.json", import.meta.url), "utf8"));
+if (!man.signed) {
+  console.log("· the manifest is unsigned: serving it as signed (the fakes don't check the signature)");
+  await ctx.route("**/fw/manifest.json", (r) => r.fulfill({ contentType: "application/json", body: JSON.stringify({ ...man, signed: true }) }));
+  await ctx.route("**/fw/release.txt", (r) => r.fulfill({ contentType: "text/plain", body: `wedgie-release 1\nversion ${man.version}\n` + [...man.files].sort((a, b) => a.name < b.name ? -1 : 1).map((f) => `${f.sha256}  ${f.name}\n`).join("") }));
+}
+const WALLET = man.carts.find((c) => c.mod === "usbwallet").files.find((n) => n.startsWith("usbwallet."));   // .mpy when compiled (tools/mpy.py)
+const KECCAK = man.carts.find((c) => c.mod === "usbwallet").files.find((n) => n.startsWith("keccak."));
 const page = await ctx.newPage();
 const errs = [];
 page.on("pageerror", (e) => errs.push(e.message));
@@ -93,7 +103,9 @@ check((await st(2, "jobs")) >= 1 && (await st(2, "interrupts")) === 0, "a checke
 check(/Question on its screen in \d+ ms \(site \d+, wedgie 42\)/.test(await page.getAttribute("#d-status", "data-ask") || ""), "0.3.11+: the status says how long the question took (site + wedgie): " + (await page.getAttribute("#d-status", "data-ask")));
 check(/Memory<\/dt><dd>51 KB free/.test(await page.innerHTML("#d-hw")), "0.3.11+: Hardware shows its free memory");
 check((await st(2, "lateJobs")) >= 1 && (await st(2, "hashAtAsk")) === hashed0 && (await st(2, "hashed")) > hashed0, "0.3.10+: the job asked before any file was hashed (the signed list and the sums come after the yes)");
-check((await st(2, "resets")) === 1 && (await st(2, "drops")) === 1, "one soft reset into it; the first one since the plug-in dropped the port, and the page found it again");
+const im = CUR.split(".").map(Number).reduce((a, x) => a * 100 + x, 0) >= 312;    // 0.3.12+: install mode (a restart at the yes)
+if (im) check((await st(2, "lostGo")) === 1, "0.3.12+: install mode's restart dropped the port (the first soft reset since the plug-in), and the page found the job again");
+check((await st(2, "resets")) === (im ? 2 : 1) && (await st(2, "drops")) === 1, `${im ? "two soft resets (install mode, then into it)" : "one soft reset into it"}; the first one since the plug-in dropped the port, and the page found it again (resets ${await st(2, "resets")}, drops ${await st(2, "drops")})`);
 
 // switch: the old app's files come off; a shared file stays only while something needs it
 await pickApp("wire_demo", "Clear sign on");
@@ -101,7 +113,7 @@ let f = await files(2);
 check(!f.includes("hello.py") && f.includes("wire_demo.py") && f.includes("cbor.py"), "switched: hello.py gone, wire_demo on");
 await pickApp("usbwallet", "Wallet on");
 f = await files(2);
-check(!f.includes("wire_demo.py") && !f.includes("cbor.py") && f.includes("usbwallet.py"), "switched again: its own files gone");
+check(!f.includes("wire_demo.py") && !f.includes("cbor.py") && f.includes(WALLET), "switched again: its own files gone");
 check(JSON.stringify((await appsOn(2)).map((a) => [a.mod, a.usb])) === '[["usbwallet",true]]', "apps.json: the Wallet, which has USB to itself");
 check((await files(2)).includes("/saves/hello/best.json"), "switching apps never touched the saves");
 
@@ -111,7 +123,7 @@ check(/Take Wallet off\?/.test(await page.textContent('#d-shelf .cart-slot[data-
 await page.click('#d-shelf .cart-slot[data-mod="usbwallet"] .cart-out');
 await wait(() => JSON.parse(new TextDecoder().decode(window.__ports[2]._st.files.get("apps.json"))).length === 0, null, 15000, "Wallet off");
 f = await files(2);
-check(!f.includes("usbwallet.py") && !f.includes("keccak.py") && f.includes("slot.py"), "its files gone, the core stays");
+check(!f.includes(WALLET) && !f.includes(KECCAK) && f.includes("slot.py"), "its files gone, the core stays");
 await wait(() => /Nothing on it yet/.test(document.querySelector("#d-carts-note").textContent), null, 10000, "the page: nothing on it");
 
 const asks = await st(2, "asks");
@@ -203,9 +215,9 @@ check(/Wallet needs an ATECC608 chip\. This wedgie has no chip\./.test(await pag
 check(!(await page.evaluate(() => document.querySelector('#d-shelf .cart-slot[data-mod="hello"]').classList.contains("nochip"))), "an app with no chip needs isn't faded");
 await page.click(`${wl} .cart`);
 await page.waitForTimeout(800);
-check(/Tap it again to put it on anyway/.test(await page.textContent(`${wl} .cart-needs`)) && !(await files(1)).includes("usbwallet.py"), "first tap: a warning, nothing installed");
+check(/Tap it again to put it on anyway/.test(await page.textContent(`${wl} .cart-needs`)) && !(await files(1)).includes(WALLET), "first tap: a warning, nothing installed");
 await page.click(`${wl} .cart`);
-await wait(() => window.__ports[1]._st.files.has("usbwallet.py") && JSON.parse(new TextDecoder().decode(window.__ports[1]._st.files.get("apps.json")))[0]?.mod === "usbwallet", null, 30000, "second tap: on anyway");
+await wait((WALLET) => window.__ports[1]._st.files.has(WALLET) && JSON.parse(new TextDecoder().decode(window.__ports[1]._st.files.get("apps.json")))[0]?.mod === "usbwallet", WALLET, 30000, "second tap: on anyway");
 
 // ---- the bare board: install the core, it comes back a wedgie with no app yet ---------------------------
 await page.click(".back");

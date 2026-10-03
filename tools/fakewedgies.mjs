@@ -12,6 +12,9 @@
 // 0.2.5+ is sealed: Ctrl-C is a plain byte until {"type": "open"} is answered yes by the pretend person
 // (person: { say: "yes" | "no", ms }, default yes after 300 ms; _st.asks counts the questions). A yes lasts
 // until main.py starts again (a soft reset or exec(main.py)): one job.
+// 0.3.12+ install mode: a yes to a job soft-resets first and says go after the restart (_st.jobRestarts);
+// if that reset drops the port (the first since a plug-in), the go is lost (_st.lostGo) but the job runs
+// on: a host finds the wedgie again by its ID, and hello says "job": true.
 export function fakeWedgies(specs) {
 
   localStorage.setItem("wedgie.serial", "1"); // this browser tapped Connect before (see btprobe.mjs for a new one)
@@ -109,7 +112,7 @@ export function fakeWedgies(specs) {
       if (!wedgie()) return push(">>> " + JSON.stringify(msg) + "\r\n{'x': 1}\r\n>>> ");
       const id = msg.id, v = version();
       const ok = () => push(JSON.stringify({ id, type: "ok" }) + "\r\n");
-      if (msg.type === "hello") return push(hello(id) + "\r\n");
+      if (msg.type === "hello") return push((st.job ? hello(id).replace(/}$/, ', "job": true}') : hello(id)) + "\r\n");   // 0.3.12+: a job is running (install mode)
       if (msg.type === "launch") { if (!apps().some((a) => a.mod === msg.app)) return push(JSON.stringify({ id, type: "error", error: "no such app" }) + "\r\n"); st.launched = msg.app; return ok(); }
       if (msg.type === "home" || msg.type === "stop") { st.launched = null; if (slot()) st.stopped = true; return ok(); }
       if (slot() && msg.type === "ls") return push(JSON.stringify({ id, type: "ls", files: lsAll(msg.path || "/"), free: 600000 }) + "\r\n");
@@ -141,6 +144,11 @@ export function fakeWedgies(specs) {
         return setTimeout(() => {
           const asked_ms = cmpV(version() || "0", "0.3.11") >= 0 ? 42 : undefined;
           if (p.say === "no") return push(JSON.stringify({ id, type: "refused", asked_ms }) + "\r\n");
+          if (cmpV(version() || "0", "0.3.12") >= 0) {     // install mode: the yes restarts it first (slot._to_job),
+            st.installMode = { id, m: msg, listed, asked_ms };  // then job.resume says go (before the slot is up)
+            st.jobRestarts = (st.jobRestarts || 0) + 1;
+            return softReset();
+          }
           st.job = { m: msg, listed, got: new Map() };
           push(JSON.stringify({ id, type: "go", asked_ms }) + "\r\n");
         }, p.ms ?? 300);
@@ -199,7 +207,15 @@ export function fakeWedgies(specs) {
       const drop = st.files.has("wedgiedrive.py") && (!st.mark || st.driveOn);
       st.driveOn = st.files.has("wedgiedrive.py") && !st.mark;    // the new boot.py adds it only without a mark
       st.mark = st.files.has("wedgiedrive.py");
-      if (drop && st.resetHook) { st.drops++; st.resetHook(); return; }
+      const im = st.installMode; st.installMode = null;
+      if (drop && st.resetHook) {
+        if (im) {                       // job.resume runs anyway; its go goes to a port the host lost
+          st.lostGo = (st.lostGo || 0) + 1;
+          st.job = { m: im.m, listed: im.listed, got: new Map() };
+        }
+        st.drops++; st.resetHook(); return;
+      }
+      if (im) return setTimeout(() => { st.job = { m: im.m, listed: im.listed, got: new Map() }; push(JSON.stringify({ id: im.id, type: "go", asked_ms: im.asked_ms }) + "\r\n"); }, 300);
       if (wedgie()) setTimeout(() => push(hello(null, "ready") + "\r\n"), 300);
     }
     function streams() {
