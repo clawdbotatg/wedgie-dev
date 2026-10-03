@@ -13,7 +13,7 @@ fa1d25c589c0f6b3c891ff440bc09f738309c4743c98a20bb7c710d204492add  hatch.mpy
 bfc0cd8aa4cb4d5c96505ab045942b8ac91de7383101f1fe4f0f5117ae34eff5  hello.py
 8ae1d4d91c4b8f4d1642ff205bd41e02631d636c0fdc9418515c14f961da59eb  job.mpy
 5939c2537776f7d9011731f24cfa9e16d67cac7ec8068b8485d8ebd4d0061872  keccak.mpy
-a7976d61cc43b7afd74fb592013bc7fd9d7a6be58ba6795f7fa8e2df0b07b783  keytest.py
+b9319f40de11fbd447f26cc8dfb7261a32c36a2954550413d76f4f5076fd2f60  keytest.py
 b41ecc601673d325705a088ba5b6a1969a32ee63d076e549d3d92d9434466f56  lcd.mpy
 69dc3609dd198473ff0276fd162ec2ed277af7e6419ef6257aad809406da47ad  loader.mpy
 cb2cd953508b9be62f720c17f44bc08e7934802b441a5b8af8932d1751d45290  logo.bin
@@ -39,7 +39,7 @@ d104d860b5c5476dceca111b94146968693abd0a5b46e3ea813e72db76d85c4a  wedgie.mpy
 @app  {"mod":"battery","name":"Battery","files":["battery.py"]}
 @app  {"mod":"demo","name":"Demo","entry":"run","files":["demo.py"]}
 @app  {"mod":"hello","name":"Hello","files":["hello.py"]}
-@app  {"mod":"keytest","name":"Buttons","files":["keytest.py"]}
+@app  {"mod":"keytest","name":"Buttons","entry":"run","files":["keytest.py"]}
 @app  {"mod":"mock","name":"Wallet look","files":["mock.py","mock_qr.bin"]}
 @app  {"mod":"speed","name":"Speed lab","entry":"run","files":["speed.py"]}
 @app  {"mod":"usbwallet","name":"Wallet","entry":"run","usb":true,"files":["usbwallet.mpy","eip712.mpy","keccak.mpy","signer.mpy","blockies.mpy"]}

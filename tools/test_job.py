@@ -127,7 +127,7 @@ out, f = run({"job": "Install Buttons", "write": ["keytest.py"], "delete": ["hel
              puts("keytest.py", kt) + [{"type": "commit"}])
 a = json.loads(f.get("apps.json", b"[]"))
 check(types_(out)[-2:] == ["done", "reset"] and f.get("keytest.py") == kt and "hello.py" not in f, "a good install goes in: %s" % types_(out))
-check(a and a[0].get("mod") == "keytest" and a[0].get("name") == "Buttons" and "entry" not in a[0], "apps.json comes from the signed list: %s" % a)
+check(a and a[0].get("mod") == "keytest" and a[0].get("name") == "Buttons" and a[0].get("entry") == "run", "apps.json comes from the signed list: %s" % a)
 
 # 2. a finished, checked file sent again with other bytes, left open, then commit
 evil = b"import wedgie; wedgie.set_open()\n"
@@ -148,7 +148,7 @@ check(json.loads(f["apps.json"])[0]["mod"] == "hello" and "done" not in types_(o
 out, f = run({"job": "Install Buttons", "write": ["keytest.py"], "delete": [], "apps": json.dumps([{"mod": "keytest", "entry": "set_open"}])},
              puts("keytest.py", kt) + [{"type": "commit"}])
 a = json.loads(f["apps.json"])
-check("entry" not in a[0], "the host's entry is never written: %s" % a)
+check(a[0].get("entry") == "run", "the host's entry is never written: %s" % a)
 
 # 6. the title says one app, the job puts on another
 out, f = run({"job": "Install Buttons", "write": ["battery.py"], "delete": [], "apps": json.dumps([{"mod": "battery"}])},
