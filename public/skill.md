@@ -200,8 +200,8 @@ start()
 A game can use a `while` loop with `time.sleep_ms()` instead: give it an entry the firmware calls, in
 apps.json `{"mod": "game", "name": "Game", "entry": "run"}` (`wedgie.py install` writes timer-style
 apps; add `entry` by hand for loop-style ones). The firmware still answers USB while it loops. If the
-entry returns, the screen says it ended and A starts it again. An app that talks on USB itself (the
-Wallet) says `"usb": true`, and the firmware leaves stdin to it.
+entry returns, the screen says it ended and A starts it again. An app that talks on USB itself (a
+wallet) says `"usb": true`, and the firmware leaves stdin to it.
 
 ### Saves
 
@@ -279,7 +279,7 @@ Today: Buttons (`clawdbotatg/wedgie-buttons`). People can also add any repo on t
 While its app runs, the firmware (`slot.py`) answers one JSON line per request on the USB serial port
 (vendor 0x2e8a, 115200), without interrupting anything:
 
-    {"id":1,"type":"hello"}              -> {"id":1,"type":"hello","fw":"wedgie-0.3.18","slot":1,"uid":...,"board":...,"carts":[{mod,v}],"running":...,"free":...}
+    {"id":1,"type":"hello"}              -> {"id":1,"type":"hello","fw":"wedgie-0.3.19","slot":1,"uid":...,"board":...,"carts":[{mod,v}],"running":...,"free":...}
     {"id":2,"type":"shot"}               -> {"id":2,"type":"shot","i":0,"n":38,"fmt":"rgb565be","data":"<base64>"} x n
     {"id":3,"type":"press","key":"A"}    -> {"id":3,"type":"ok"}
     {"id":4,"type":"chip"}               -> the chip proven working: ATECC608 hashes random bytes,
@@ -312,10 +312,10 @@ names outside the core, and a file sent again starts over unchecked. 0.3.16+ (he
 send file data raw, not base64: `{"type":"put","name":n,"n":<bytes>,"end":bool}` then exactly that
 many raw bytes (up to 4096) right after its newline. About 10x faster: the wedgie reads a base64 line a
 character at a time (~1 s a KB) but raw bytes in one go. Older firmware: update it
-through full access (`open`) first. Compiled app files (`.mpy`, e.g. the Wallet's) replace their
+through full access (`open`) first. Compiled app files (`.mpy`) replace their
 `.py`: delete a `.py` only once its `.mpy` is on, since MicroPython runs the `.py` first. Lines that don't start with `{` are logs (an app's
 print()). Raw REPL (Ctrl-A) is how files get written. `exec(open("main.py").read())` starts the app
-again. An app with `"usb": true` (the Wallet) has the port to itself and speaks its own protocol; it
+again. An app with `"usb": true` (a wallet) has the port to itself and speaks its own protocol; it
 answers `open` too.
 
 **A wedgie is locked (0.2.5+; hello says `"sealed": true`).** Ctrl-C does nothing, so no computer
