@@ -396,6 +396,8 @@ def serve(_=None):
                     import hatch
                     if hatch.ctrl_c():
                         _kbd = True     # the main loop raises it: the app stops, main.py ends, the REPL
+                        if state == "entry":        # an entry app owns the main loop (this runs in its
+                            L._on_show = _interrupt  # USB timer): its next screen raises it instead
                         return
                 except Exception as e:  # out of memory: nobody gets in, the app goes on
                     sys.print_exception(e)
@@ -408,6 +410,12 @@ def serve(_=None):
                 continue
             line = None                 # a job runs inside handle: don't keep its line alive under it
             handle(m)
+
+
+def _interrupt():
+    """lcd._on_show after a yes to a Ctrl-C while an entry app runs: stop it as Ctrl-C would."""
+    L._on_show = None
+    raise KeyboardInterrupt
 
 
 def _own_usb():

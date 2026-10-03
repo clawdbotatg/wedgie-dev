@@ -472,7 +472,9 @@ def main():
             h = wg.hello(2)
             print(json.dumps(h, indent=1) if h else "no answer: not running wedgie firmware (try: wedgie.py update)")
         elif c == "unlock":
-            h = need_firmware(wg)
+            h = wg.hello(2)                     # the slot's hello, or an app's own (the Wallet: fw "usb-1")
+            if not h:
+                sys.exit("no answer: not running wedgie firmware (plain MicroPython: Ctrl-C already works)")
             if not h.get("sealed") or h.get("open"):
                 print("it's open already: Ctrl-C works (mpremote too)")
             else:

@@ -23,8 +23,8 @@ Use a test wedgie, not the one with your wallet on it. Each step: press A on the
 
 ## The escape hatch
 
-9. `python3 public/wedgie.py unlock`. You should see a red FULL CONTROL? screen. Press Y: it restarts,
-   still locked. Run it again and press A: `mpremote connect /dev/ttyACM0 exec "print(1)"` prints 1.
+9. `python3 public/wedgie.py unlock`. You should see a red FULL CONTROL? screen. Press Y: still locked
+   (it restarts; the Wallet just goes back to its screen). Do this once with the Wallet running too. Run it again and press A: `mpremote connect /dev/ttyACM0 exec "print(1)"` prints 1.
 10. Unplug, plug in, wait 5 s. Run `mpremote connect /dev/ttyACM0 repl`. The red screen comes up.
     Press A within 10 s: you get the `>>>` prompt. If mpremote gave up first, run it again.
 11. Unplug and plug in again: Ctrl-C does nothing until you press A on the red screen.
