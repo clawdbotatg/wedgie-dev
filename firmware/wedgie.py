@@ -3,7 +3,7 @@
 # interrupted; from the REPL they are plain calls:  import wedgie; wedgie.shot(); wedgie.press("A")
 import sys, os, json, machine
 
-VERSION = "0.3.13"
+VERSION = "0.3.14"
 
 # The lock. main.py turns Ctrl-C off before anything else and never ends by itself, so a computer
 # can only send the slot's JSON lines: it can't stop the app, reach the REPL, or make the secure chip
@@ -372,8 +372,10 @@ def save_job(d):
 
 
 def doing(job):
-    """A job's title on its progress screen: "Install Buttons" -> "Installing Buttons..."."""
-    return str(job or "Update")[:60].replace("Install", "Installing").replace("Update", "Updating") + "..."
+    """A job's title on its progress screen: "Install Buttons" -> "Installing Buttons...", "Update firmware
+    to 0.3.14" -> "Updating firmware..." (the site's install.ts doing, the same words)."""
+    t = str(job or "Update")[:60].split(" to ")[0]
+    return t.replace("Uninstall", "Uninstalling").replace("Install", "Installing").replace("Update", "Updating") + "..."
 
 
 def take_job():

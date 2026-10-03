@@ -587,14 +587,6 @@ def draw_newkey():
     d.show()
 
 
-def draw_msg(title, color, body):
-    d.fill(L.BLACK)
-    d.fill_rect(0, 0, 240, 26, color)
-    d.center_text(title, 5, L.WHITE, 2)
-    d.center_text(body[:30], 100, L.WHITE)
-    d.show()
-
-
 def draw_nochip():
     import atecc
     d.fill(L.BLACK)
@@ -619,7 +611,11 @@ def draw():
     elif state == "newkey":
         draw_newkey()
     elif state == "working":
-        draw_msg("WORKING", L.BLUE, "signing on " + str(sig.name) if req else "the chip is making your key")
+        import ui                   # loaded already (the slot): nothing to compile here
+        if req:
+            ui.progress("Signing", "on the " + str(sig.name), False)
+        else:
+            ui.progress("Making your key", "in the chip", False)
     else:
         draw_home()
 

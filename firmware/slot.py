@@ -365,7 +365,7 @@ def let_in(job="", full=False):
         if full:
             _drop()
         else:
-            _band("working...", [(job[:28], INK), ("it locks again when done", MUTED)])
+            ui.progress(W.doing(job).replace("...", ""), "the computer is starting", False)   # the app is still loaded: no bar's RAM (the computer fills it)
     return ok
 
 

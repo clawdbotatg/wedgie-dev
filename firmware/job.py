@@ -315,7 +315,7 @@ def run(mid, m, ask, show=None):
                 if cur is not None:
                     W.send({"id": qid, "type": "error", "error": "%s isn't finished" % cur})
                     return
-                show(title, "restarting...", plan.at("commit"))
+                show(title, "restarting", plan.at("commit"))
                 missing = [n for n in write if n not in got and there.get(n) != files[n]]
                 if missing:
                     W.send({"id": qid, "type": "error", "error": "not sent: " + " ".join(missing)})
