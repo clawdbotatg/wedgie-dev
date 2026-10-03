@@ -320,8 +320,10 @@ def copy(wg, m, names, have):
             sys.exit("%s isn't what wedgie.dev's manifest says (a deploy since? run it again)" % f["name"])
         wg.put(f["name"], data)
         have["hashes"][f["name"]] = f["sha256"]
-        if twin(f["name"]) and have["hashes"].get(twin(f["name"])):     # the .mpy is on: its old source comes off
-            remove_files(wg, have, [twin(f["name"])])
+    # every .mpy that's on now (just sent, or already there from a try that stopped halfway): its old
+    # source comes off, or it would run instead
+    remove_files(wg, have, [twin(f["name"]) for f in m["files"] if f["name"] in names and twin(f["name"])
+                            and have["hashes"].get(f["name"]) == f["sha256"] and have["hashes"].get(twin(f["name"]))])
     return todo
 
 
@@ -645,8 +647,9 @@ def main():
             for n in [n[:-3] + ".mpy" for n in names if n.endswith(".py")] + RETIRED:
                 if n in have["files"] and n not in names:       # stale bytecode MicroPython would import first; retired core files
                     wg.exec("import os\nos.remove(%r)" % n)
-            todo = copy(wg, m, set(m["core"]), have)
-            act = None if from_menu else active_of(m, have)     # one app from 0.2 on: it keeps its app
+            act = None if from_menu else active_of(m, have)     # one app from 0.2 on: it keeps its app, up to date
+            keep = next((c["files"] for c in m["carts"] if c["mod"] == act), [])   # (the Wallet gets its .mpy here)
+            todo = copy(wg, m, set(m["core"]) | set(keep), have)
             remove_files(wg, have, others(m, have, act))
             write_apps(wg, m, have, act)
             wg.leave()      # the new firmware only runs after a soft reset (see "Plugging in" above)

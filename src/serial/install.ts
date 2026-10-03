@@ -179,10 +179,12 @@ async function copy(r: Repl, files: FileInfo[], have: Have, onProgress: (p: numb
     if (check !== f.sha256) throw new Error(`${f.name} didn't copy cleanly; try again`);
     await r.exec(`import os\ntry:\n    os.remove(${JSON.stringify(f.name)})\nexcept OSError:\n    pass\nos.rename(${JSON.stringify(tmp)}, ${JSON.stringify(f.name)})`);
     have.hashes[f.name] = f.sha256;
-    const src = twin(f.name);           // the .mpy is on: its old source comes off (it would run instead)
-    if (src && have.hashes[src]) await removeFiles(r, have, [src]);
     done += f.size;
   }
+  // Every .mpy that's on now (just sent, or already there from a try that stopped halfway): its old
+  // source comes off, or it would run instead.
+  const srcs = files.filter((f) => have.hashes[f.name] === f.sha256 && have.hashes[twin(f.name) || ""]).map((f) => twin(f.name)!);
+  if (srcs.length) await removeFiles(r, have, srcs);
   return todo;
 }
 
@@ -394,9 +396,11 @@ export async function installCore(r: Repl, onProgress: (p: number, what: string)
   if (stale.length || retired.length) await r.exec(`import os\nfor n in ${JSON.stringify([...stale, ...retired])}:\n    os.remove(n)`);
   const screen = opts.screen ? await deviceScreen(r, "updating", `wedgie ${m.version}`) : undefined;
   const fromMenu = retired.length > 0;          // 0.1.x (the menu): it starts with no app, the person picks one
-  const todo = await copy(r, fileInfo(m, m.core), have, (p, w) => onProgress(0.05 + 0.9 * p, w), screen);
-  // One app from 0.2 on: it keeps its app; the other carts' files go (never its saves).
+  // One app from 0.2 on: it keeps its app, brought up to date with the core (an app now shipped compiled,
+  // the Wallet, gets its .mpy here; apps.json would drop it otherwise); the other carts' files go (never its saves).
   const act = fromMenu ? null : activeOf(m, have);
+  const keep = m.carts.find((c) => c.mod === act)?.files || [];
+  const todo = await copy(r, fileInfo(m, [...new Set([...m.core, ...keep])]), have, (p, w) => onProgress(0.05 + 0.9 * p, w), screen);
   await removeFiles(r, have, others(m, have, act));
   const apps = await writeApps(r, m, have, act);
   onProgress(1, todo.length ? `${todo.length} files updated` : "already up to date");

@@ -218,6 +218,13 @@ try {
   await page.evaluate(() => window.vw.exec("import wedgie\nwedgie.SEALED = False"));
   check([lget, lrm, ldot].every((v) => v[0]?.type === "error") && lsv[0]?.files.some(([p]) => p === "/main.py"), `locked: get / rm outside /saves/ refused, main.py still there (${[lget, lrm, ldot].map((v) => v[0]?.type).join(" ")})`);
 
+  // a request that blows up while it's decoded (too deep: MemoryError / RecursionError on a board) is
+  // dropped; the slot goes on answering
+  await page.evaluate(() => window.vw.write('{"id": 66, "a": ' + "[".repeat(2900) + "]".repeat(2900) + "}\n"));
+  await page.waitForTimeout(500);
+  const deepHello = await ask({ id: 67, type: "hello" });
+  check(deepHello[0]?.type === "hello", `a request too deep to decode is dropped, hello still answers (${deepHello[0]?.type})`);
+
   // the look-and-feel kit (firmware/ui.py): a page, for code.md's pictures
   const pg = await page.evaluate(() => window.vw.exec("import slot, lcd, ui\nslot.stop()\nd = lcd.LCD()\nui.page(d, 'Game over', [('score 120', ui.INK), ('best 340', ui.MUTED)], 'A  play again')\nprint('page ok')"));
   await page.waitForTimeout(500);
@@ -298,7 +305,7 @@ try {
   const cx = await page.evaluate(() => window.vw.exec([
     "import usbwallet as u",
     "usdc = [a for (c, a) in u.TOKENS if c == 8453][0]",
-    "u.req = {'r': {'kind': 'execute', 'chainId': 8453, 'target': usdc, 'value': 0, 'data': '0x095ea7b3' + '0' * 24 + '22' * 20 + 'f' * 64, 'digest': '0x' + 'cd' * 32}}",
+    "u.req = {'r': {'kind': 'execute', 'chainId': 8453, 'target': usdc, 'value': 10**18, 'data': '0x095ea7b3' + '0' * 24 + '22' * 20 + 'f' * 64, 'digest': '0x' + 'cd' * 32}}",
     "u.draw_confirm()",
     "print('execute drawn')",
   ].join("\n")));

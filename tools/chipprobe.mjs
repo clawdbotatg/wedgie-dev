@@ -39,12 +39,19 @@ const BAD = /MemoryError|memory allocation failed|Traceback|wedgie broke/;
 let failed = 0, leastFree = Infinity, leastWhere = "";
 const check = (ok, what) => { console.log(`${ok ? "ok  " : "FAIL"} ${what}`); if (!ok) failed++; };
 
-function wedgie(app) {
-  const h = host({ fs: image(F, app, { "wedgie.py": wedgiePy }), onData: LOG && ((b) => appendFileSync(LOG, Buffer.from(b))) });
+// old: every core .py a byte different from the target (as after a release), so a firmware update really
+// sends, commits and boots every one of them (the same files went nowhere: their hashes matched).
+const OLD = "\n# an older build\n";
+const older = () => Object.fromEntries(F.core.filter((n) => n.endsWith(".py")).map((n) => [n, Buffer.concat([fileOf(n), Buffer.from(OLD)])]));
+
+function wedgie(app, old = false) {
+  let all = "";      // everything it ever printed: h.take() clears h.out, and a failure before that must still count
+  const h = host({ fs: image(F, app, old ? older() : { "wedgie.py": wedgiePy }), onData: (b) => { all += Buffer.from(b).toString("latin1"); if (LOG) appendFileSync(LOG, Buffer.from(b)); } });
   for (const p of Object.values(KEYS)) h.chip.mcu.gpio[p].setInputValue(true);     // buttons: pulled up
   let id = 100;
   const w = {
     h,
+    get all() { return all; },
     req: (m, ms) => h.req({ ...m, id: ++id }, ms),
     press(k) {
       const p = h.chip.mcu.gpio[KEYS[k]];
@@ -79,7 +86,9 @@ function job(w, title, write, del, apps, where) {
   w.ram(where + ", after the signature");
   const s = w.req({ type: "sums", names: write }, 60000);
   if (s?.type !== "sums") return `sums: ${JSON.stringify(s)}`;
-  for (const n of write.filter((n) => s.sums[n] !== sha(fileOf(n)))) {
+  const send = write.filter((n) => s.sums[n] !== sha(fileOf(n)));
+  w.sent = send.length;
+  for (const n of send) {
     const buf = fileOf(n);
     for (let o = 0; o < Math.max(buf.length, 1); o += 1024) {
       const p = w.req({ type: "put", name: n, data: buf.subarray(o, o + 1024).toString("base64"), end: o + 1024 >= buf.length }, 30000);
@@ -95,7 +104,7 @@ function job(w, title, write, del, apps, where) {
 }
 
 // what went wrong: from the first traceback (or error line) on, so the cause is in the output
-const bad = (w) => { const L = w.h.out.split("\n"), i = L.findIndex((l) => BAD.test(l) || /Error/.test(l)); return L.slice(i, i + 8).map((l) => l.trim()).join(" / "); };
+const bad = (w) => { const L = w.all.split("\n"), i = L.findIndex((l) => BAD.test(l) || /Error/.test(l)); return L.slice(i, i + 8).map((l) => l.trim()).join(" / "); };
 const carts = F.carts;
 const from = arg("--from"), to = arg("--to");
 // default: each app over the one before it (a ring: every app goes on once, every app is the old one once).
@@ -112,11 +121,23 @@ for (const [a, b] of pairs) {
   const r0 = w.ram(`${a.mod} running`);
   const del = a.files.filter((n) => !b.files.includes(n) && !F.core.includes(n));
   let r = job(w, `Install ${b.name}`, b.files, del, [appEntry(F, b)], `${a.mod} -> ${b.mod}`);
-  check(r === true && !BAD.test(w.h.out), `install ${b.mod} while ${a.mod} runs (${r0} B free before): ${r === true ? "done, restarted" : r} ${BAD.test(w.h.out) ? "| " + bad(w) : ""}(${Math.round((Date.now() - t0) / 1000)} s)`);
+  if (r === true) {                 // it restarted into the new app, and it runs
+    const back = w.h.out.match(/\{[^\n]*"type": "ready"[^\n]*\n/);
+    if (!back || !back[0].includes(`"running": "${b.mod}"`) && !back[0].includes('"fw": "usb-1"')) r = `after the restart it runs ${back ? back[0].slice(0, 120) : "nothing"}`;
+  }
+  check(r === true && !BAD.test(w.all), `install ${b.mod} while ${a.mod} runs (${r0} B free before): ${r === true ? "done, restarted into it" : r} ${BAD.test(w.all) ? "| " + bad(w) : ""}(${Math.round((Date.now() - t0) / 1000)} s)`);
   if (args.includes("--no-update")) continue;
-  w = wedgie(a.mod);       // it started a moment ago, so it starts again
+  w = wedgie(a.mod, true);  // the same app on an older core: every core .py differs
+  const want = Object.keys(older()).length;
   r = job(w, "Update firmware", F.core, [], null, `${a.mod}, firmware update`);
-  check(r === true && !BAD.test(w.h.out), `firmware update (${F.core.length} core files) while ${a.mod} runs: ${r === true ? "done" : r} ${BAD.test(w.h.out) ? "| " + bad(w) : ""}`);
+  if (r === true && w.sent !== want) r = `sent ${w.sent} files, not ${want}`;
+  if (r === true) {                 // booted on the new core: every core file is the target's now
+    w.h.chip.run(1500);
+    const s = w.req({ type: "sums", names: F.core }, 60000);
+    const off = F.core.filter((n) => s?.sums?.[n] !== sha(fileOf(n)));
+    if (off.length) r = `after the update these aren't the new ones: ${off.join(" ")}`;
+  }
+  check(r === true && !BAD.test(w.all), `firmware update (${want} core files sent, booted on them) while ${a.mod} runs: ${r === true ? "done" : r} ${BAD.test(w.all) ? "| " + bad(w) : ""}`);
 }
 console.log(`     least free heap seen: ${leastFree} bytes (${leastWhere})`);
 console.log(failed ? `${failed} FAILED` : "all checks passed");

@@ -48,7 +48,7 @@ const f1 = await page.evaluate(() => { const f = window.__ports[1]._st.files; re
 check(JSON.stringify(f1.apps) === "[]" && !f1.hello && !f1.keytest && f1.mine && !f1.menu && f1.slot, "0.1.3 → 0.2: no app yet; the carts and the menu gone, the person's own file kept: " + JSON.stringify(f1));
 check((await st(1, "inserting")) >= 2, "its own screen showed the update");
 check(/ done/.test(await card("3D9F01")), "0.1.4 with different files: updated");
-check(/ fail/.test(await card("no ID")) && /wedgie\.dev\/format/.test(await card("no ID")), "no MicroPython: failed, pointed at /format");
+check(/ fail/.test(await card("no ID")) && /wedgie\.dev\/connect/.test(await card("no ID")), "no MicroPython: failed, pointed at /connect (its Set up card)");
 check(/3 updated · 1 failed/.test(await page.textContent("#u-text")), "the headline: 3 updated · 1 failed");
 
 // unplug the 0.1.4 one and plug it back in: already up to date, no copy, no restart
