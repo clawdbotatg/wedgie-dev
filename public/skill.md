@@ -11,7 +11,7 @@ RP2350), a Waveshare Pico-LCD-1.3 hat (240x240 screen, 5-way joystick, A/B/X/Y),
 wedgie firmware: a boot logo, the one app it boots straight into, saves that outlast apps, and a USB
 protocol. Everything is MIT: https://wedgie.dev
 
-**The current firmware is 0.3.23.** If a wedgie's `hello` says older, update it first
+**The current firmware is 0.3.24.** If a wedgie's `hello` says older, update it first
 (`wedgie.py update`, below): everything here assumes current firmware.
 
 **Three guides cover everything** (this one first):
@@ -100,7 +100,7 @@ wedgie's own screen answered by a **real press** (a `press` request can't answer
 - **Signed installs** (an app from the wedgie.dev shelf, a firmware update) ask "Install Buttons?" /
   "Update firmware?" and then take only files signed by wedgie.dev; they never open the REPL.
 - **A no restarts the wedgie.** The question is drawn straight over the app's screen without saving it
-  (saving the 115 KB screen ran wedgies out of memory), so after a no it starts again from the top.
+  (saving the screen ran wedgies out of memory), so after a no it starts again from the top.
   Expect a `refused` answer, then its `ready` line.
 - The lock is in the firmware, not the app: it turns Ctrl-C off before any app runs, so no app can
   leave a computer a way in. An app is code on the wedgie, though, and can do anything once installed;
@@ -123,7 +123,7 @@ crashes at start or keeps USB from answering. Hold **Y**: no WEDGIE drive this t
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.23","fw":"wedgie-0.3.23","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.24","fw":"wedgie-0.3.24","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":2,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -244,9 +244,9 @@ straight apart, rocking gently end to end, never twisting. Reassemble in reverse
 - 3.3 V logic everywhere; GPIOs are **not 5 V tolerant**. Power comes from USB (5 V on VBUS); the
   Pico's 3V3 pin can supply a few hundred mA for add-ons.
 - RP2040: 264 KB RAM, 2 MB flash. RP2350 (Pico 2 W): 520 KB RAM, 4 MB flash. The screen buffer takes
-  115 KB. Free RAM for an app on an RP2040: about 60-70 KB (`hello`'s `ram` says); an RP2350 has
-  several times that.
-- 240x240, 16-bit color; a full-screen push takes 18 ms (code.md has the measured costs).
+  29 KB (16 colors, 0.3.24+; it was 115 KB). Free RAM for an app on an RP2040: about 130-150 KB
+  (`hello`'s `ram` says); an RP2350 has several times that.
+- 240x240; the panel is 16-bit color, the firmware draws in 16 colors (the boot logo in full color); a full-screen push takes ~25 ms (code.md has the measured costs).
 - No battery built in (a Waveshare Pico-UPS-B hat works; its sensor is on I²C1, GP6/GP7).
 
 ## First boot, in order
@@ -307,11 +307,11 @@ the keys in the Trust M's spare key slots.** Only install repos you trust.
 
 The full API with templates and measured speeds is in code.md; the essentials:
 
-- `lcd.LCD()`: a `framebuf.FrameBuffer` (240x240 RGB565): `fill`, `pixel`, `hline`, `vline`, `line`,
+- `lcd.LCD()`: a `framebuf.FrameBuffer` (240x240, 16 colors): `fill`, `pixel`, `hline`, `vline`, `line`,
   `rect`, `fill_rect`, `ellipse`, `poly`, `text(s, x, y, c)` (8x8 font), `blit`, `scroll`, plus
-  `show()`, `show(y0, y1)`, `show_rect(x, y, w, h)`, `show_start()` / `show_wait()` (DMA),
+  `show()`, `show(y0, y1)`, `show_rect(x, y, w, h)`, `show_start()` / `show_wait()` (the same as `show()` since 0.3.24),
   `big_text(s, x, y, c, scale)`, `center_text(s, y, c, scale)`, `backlight(pct)`. Colors:
-  `lcd.color(r, g, b)` (byte-swapped RGB565), or `BLACK WHITE RED GREEN BLUE YELLOW GREY DARK`.
+  `lcd.color(r, g, b)` (the nearest of the 16), or `BLACK WHITE RED GREEN BLUE YELLOW GREY DARK`.
 - `lcd.Keys()`: `pressed()` (names that went down since the last call) and `held(name)`. Names:
   `A B X Y up down left right press`. A = yes, Y = no/back.
 - `ui`: the palette (`WHITE INK MUTED GREEN GREEN_D GREY RED`), `page`, `ask`, `progress`, `band`,

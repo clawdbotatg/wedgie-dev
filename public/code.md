@@ -94,7 +94,7 @@ import time
 from lcd import LCD, Keys, color
 import save
 
-lcd = LCD()                       # the screen: a 240x240 framebuf, RGB565
+lcd = LCD()                       # the screen: a 240x240 framebuf, 16 colors
 keys = Keys()
 BG, INK = color(8, 10, 24), color(240, 240, 235)
 FRAME = 25                        # ms per frame: 40 fps
@@ -135,19 +135,17 @@ so the whole game is about not paying that twice.
 
 | What | Cost |
 |---|---|
-| Full screen push, `lcd.show()` | 18 ms (62.5 MHz SPI) |
-| Same, with `show_start()` | 0.9 ms of CPU, the rest runs by DMA |
+| Full screen push, `lcd.show()` | ~25 ms (0.3.24+: turned from 16 colors to RGB565 row by row; not yet re-measured) |
 | `show(y0, y1)`: a 24-row band / 120 rows | 2.4 ms / 9.4 ms |
 | `show_rect(x, y, 32, 32)` | 1.8 ms (about 45 us per row, plus its bytes) |
 | `fill()` the whole buffer | 4.2 ms |
-| 16x16 RGB565 sprite `blit` | 0.17 ms |
 | 16x16 4-bit sprite `blit` through a palette | 0.33 ms |
 | `text()`, 30 characters | 0.4 ms |
 | `big_text(..., scale 3)`, 10 characters | 14 ms |
 | Plain Python pixel loop | 6.8 us per pixel (a full screen: 0.4 s) |
 | `@micropython.viper` pixel loop | 0.26 us per pixel (26x faster) |
 | `gc.collect()` | 8 ms |
-| RAM free for a game (RP2040, framebuffer taken) | ~60-70 KB (hello's `ram`) |
+| RAM free for a game (RP2040, framebuffer taken) | ~130-150 KB on 0.3.24+ (hello's `ram`) |
 
 The rules that follow from it:
 
@@ -156,19 +154,19 @@ The rules that follow from it:
    with plenty of RAM free in total. Collect parts in a list and `"".join` them once, or write into a
    `bytearray` made once at start. Make big buffers at import, while the heap is in one piece.
 
-1. **Push the frame by DMA.** `lcd.show_start()` returns at once and sends the frame while your code
-   runs; `lcd.show_wait()` before you draw again. Do input, game logic and `gc.collect()` between
-   them. Never draw while a frame is going out (it tears). `show()`, `show(y0, y1)` and `show_rect`
-   wait for a running DMA push by themselves. In the emulator `show_start` is a plain `show`.
+1. **The screen has 16 colors (0.3.24+).** The framebuffer keeps a 4-bit palette index per pixel (29 KB
+   instead of 115 KB, so an RP2040 has room left). `color(r, g, b)` gives the nearest of the 16
+   (`lcd.PALETTE`: the ui colors, a grey ramp, black, yellow, blue). `show_start()` is a plain `show()`
+   now and `show_wait()` does nothing; both stay so older apps run.
 2. **Push less when little changed.** A puzzle, a menu, a card game: redraw the part that changed and
    push `lcd.show(y0, y1)` (full-width rows: nothing is copied) or `lcd.show_rect(x, y, w, h)`.
    Prefer a band over many rects: each rect row costs ~45 us on its own.
 3. **Draw with the C calls.** `fill`, `fill_rect`, `rect`, `hline`, `vline`, `line`, `ellipse`,
    `poly`, `text`, `blit`, `scroll` all run in C. A Python loop over pixels is 20-40x slower than the
    same thing done by one of these.
-4. **Sprites are framebufs made once, at import.** RGB565 (`framebuf.RGB565`, 2 bytes a pixel) is
-   the fastest to draw. 4-bit (`framebuf.GS4_HMSB`) drawn through a palette is a quarter of the RAM
-   and lets one sprite come in many colors:
+4. **Sprites are framebufs made once, at import: 4-bit (`framebuf.GS4_HMSB`) drawn through a palette.**
+   An RGB565 sprite can't be blitted onto the 16-color screen (its colors come out wrong). The palette
+   framebuf holds `color()` values, which are palette indexes:
 
    ```python
    import framebuf
@@ -188,7 +186,7 @@ The rules that follow from it:
    ```
    For big art, keep raw bytes in a `<mod>_art.bin` file and `f.readinto()` it into a preallocated
    `bytearray` once.
-5. **Colors: always `color(r, g, b)`** (the panel wants byte-swapped RGB565). Make them once, at the
+5. **Colors: always `color(r, g, b)`** (the nearest of the screen's 16). Make them once, at the
    top, never in the loop.
 6. **Pixel work (plasma, fire, a raycaster's columns) goes in viper:**
 
@@ -213,9 +211,8 @@ The rules that follow from it:
    for the screen (its divider lands at 37.5 MHz).
 10. **Pace it.** A fixed frame time, sleeping the rest (the template). No tearing signal is wired to
     the Pico, so steady pacing is what keeps motion smooth. Move things by whole pixels per frame.
-11. **RAM is ~60-70 KB on an RP2040** after the 115 KB screen buffer. Don't allocate a second full-screen
-    buffer. A 120x120 game can draw into its own small buffer and scale it up 2x with a viper loop into
-    `lcd.buffer`. Split big data into files and load what the current level needs.
+11. **RAM is ~130-150 KB on an RP2040** after the 29 KB screen buffer (0.3.24+; it was 60-70 KB). Don't
+    allocate a second full-screen buffer. Split big data into files and load what the current level needs.
 12. **Measure on the real one.** `wedgie.py run` a file that times a frame with `time.ticks_us()`, or
     `print()` the frame time now and then.
 
@@ -299,7 +296,7 @@ for i in range(51, 0, -1):          # a fair shuffle: Fisher-Yates, every swap f
 
 ## The rest of the hardware
 
-- Screen: `lcd.LCD()` is a `framebuf.FrameBuffer` (240x240, RGB565) plus `show`, `show_start`,
+- Screen: `lcd.LCD()` is a `framebuf.FrameBuffer` (240x240, 16 colors: GS4_HMSB) plus `show`, `show_start`,
   `show_wait`, `show(y0, y1)`, `show_rect`, `center_text(s, y, c, scale)`, `big_text`,
   `backlight(pct)`. Ready colors: `BLACK WHITE RED GREEN BLUE YELLOW GREY DARK`.
 - Keys: `keys.pressed()` (went down since the last call) and `keys.held(k)`. Names: `A B X Y up down

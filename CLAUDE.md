@@ -47,13 +47,15 @@ drive copy, a "current firmware" that isn't VERSION, or a wedgie.py command / US
    (`src/serial/files.ts`). Nothing on /format starts until its Format button is pressed.
 5. **Nothing touches `navigator.serial` until this browser tapped Connect once** (`wedgies.ts
    armed`): on a Mac the first look makes macOS ask about Bluetooth. `tools/btprobe.mjs` guards it.
-6. **RP2040 RAM is tight**: `import lcd` first (its 115 KB framebuffer needs a fresh heap). The chip
+6. **RP2040 RAM is tight**: `import lcd` first (its framebuffer needs a fresh heap). **The screen is 16
+   colors (0.3.24+, Austin: 115 KB -> 29 KB)**: `lcd.color()` = a palette index; the boot logo is `lcd.art()`, read
+   from flash in full color at each show. Never go back to a full-color framebuffer. The chip
    drivers load only for a `chip` request and are dropped after (`wedgie.chip`).
 7. **The clock is set in lcd.py: 125/125 MHz** (peripherals on the CPU clock) so the screen's SPI runs
    at 62.5 MHz: 18 ms a frame instead of 46. MicroPython's default caps SPI at 24 MHz, and 150 MHz is
    worse (37.5). Measured on an RP2040 with the Speed lab app (`firmware/speed.py`, in git history before
-   2026-10-03); rerun it before changing clocks. `show_start()` pushes by DMA (SPI1 registers + DREQ differ RP2040/RP2350): nothing
-   may draw into the buffer until `show_wait()`, and every other show waits for it first.
+   2026-10-03); rerun it before changing clocks. Since 0.3.24 `show_start()` is a plain `show()` (rows are turned
+   from 16 colors to RGB565 on the way out).
 8. **App rules live in one place**: `src/apps/appjson.mjs` (build + site) and `folder_app` in
    public/wedgie.py; `public/code.md` documents them for agents. Keep the three in step. Every app
    file name starts with its mod (the flash has no folders for apps). `tools/codeprobe.mjs` covers /code
@@ -84,7 +86,7 @@ drive copy, a "current firmware" that isn't VERSION, or a wedgie.py command / US
    the wedgie reads, imports/compiles, hashing, flash writes, drawing), estimate each, and fix them all in
    one release. Fixing the first cause found and shipping took five releases for the install question
    (0.3.6-0.3.10, two crashed a real board). The emulator has 448 KB of heap, an RP2040 about 190 KB with
-   115 KB of it the framebuffer: a firmware change that allocates more is unproven until a real board runs
+   29 KB of it the framebuffer (115 KB before 0.3.24): a firmware change that allocates more is unproven until a real board runs
    it. Say so; never call it tested because the emulator passed. Offer Austin simple tradeoffs early
    ("a no can reboot it" made 0.3.9 easy).
 13. **Never run out of RAM on a real board ("wedgie broke: memory allocation failed").** MicroPython never
