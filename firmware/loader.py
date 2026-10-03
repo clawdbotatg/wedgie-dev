@@ -200,11 +200,8 @@ def logo(d):
         with open("logo.bin", "rb") as f:
             x, y, w, h = struct.unpack(">4H", f.read(8))
             bg = f.read(2)
-            d.fill(bg[0] | bg[1] << 8)          # the framebuffer keeps pixels as the panel's bytes
-            b = memoryview(lcd._BUF)
-            for r in range(h):
-                o = ((y + r) * 240 + x) * 2
-                f.readinto(b[o:o + w * 2])
+            d.fill(lcd.index565(bg[0] | bg[1] << 8))
+            lcd.art(x, y, w, h, "logo.bin", 10)          # full color, read from flash at each show
         return y + h
     except (OSError, ValueError):
         import ui
@@ -248,16 +245,16 @@ def _track(d):
             X, Y, W, H, F0, F1, CW, CR, Lw, Rw, T0, TH = struct.unpack(">12H", f.read(24))
             if X + W > 240 or Y + H > 240 or Lw + Rw >= W:
                 return
-            b, px = memoryview(lcd._BUF), bytearray(2)
-            for r in range(H):                          # left end: H rows of Lw pixels
-                o = ((Y + r) * 240 + X) * 2
-                f.readinto(b[o:o + Lw * 2])
+            b, px = memoryview(lcd._ROWS), bytearray(2)     # bar.bin is full color: lcd.put565 picks
+            for r in range(H):                          # left end: H rows of Lw pixels   (the nearest of 16)
+                f.readinto(b[:Lw * 2])
+                lcd.put565(b, Lw, (Y + r) * 240 + X)
             for r in range(H):                          # the middle: one pixel a row, repeated
                 f.readinto(px)
-                d.fill_rect(X + Lw, Y + r, W - Lw - Rw, 1, px[0] | px[1] << 8)
+                d.fill_rect(X + Lw, Y + r, W - Lw - Rw, 1, lcd.index565(px[0] | px[1] << 8))
             for r in range(H):                          # right end
-                o = ((Y + r) * 240 + X + W - Rw) * 2
-                f.readinto(b[o:o + Rw * 2])
+                f.readinto(b[:Rw * 2])
+                lcd.put565(b, Rw, (Y + r) * 240 + X + W - Rw)
     except (OSError, ValueError):
         pass
 
@@ -269,7 +266,7 @@ def what(text):
         with open("logo.bin", "rb") as f:
             f.seek(8)
             bg = f.read(2)
-            c = bg[0] | bg[1] << 8
+            c = lcd.index565(bg[0] | bg[1] << 8)
     except OSError:
         import ui
         c = ui.WHITE

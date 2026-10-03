@@ -479,15 +479,17 @@ def shot(mid=None):
     """The screen as it is now (the framebuffer every lcd.LCD() draws into), as JSON lines:
     {"type":"shot","i":0,"n":N,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} ... one per chunk."""
     import lcd, binascii
-    b = memoryview(lcd._BUF)
-    step = 3072
-    n = (len(b) + step - 1) // step
+    n = 60                              # 4 rows a chunk, as show() sends them (16 colors + the logo)
+    f = lcd.art_file(0, 240)
     for i in range(n):
+        lcd.rows565(0, i * 4, 240, 4, f)
         d = {"type": "shot", "i": i, "n": n, "w": 240, "h": 240, "fmt": "rgb565be",
-             "data": binascii.b2a_base64(b[i * step:(i + 1) * step]).decode().strip()}
+             "data": binascii.b2a_base64(lcd._ROWS).decode().strip()}
         if mid is not None:
             d["id"] = mid
         print(json.dumps(d))
+    if f:
+        f.close()
 
 
 def ls(path="/"):
