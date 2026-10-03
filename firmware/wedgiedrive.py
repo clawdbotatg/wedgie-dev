@@ -22,6 +22,7 @@ _EP_IN = const(0x80)
 _REQ_GET_MAX_LUN, _REQ_BOT_RESET = const(0xFE), const(0xFF)
 _CBW_SIG, _CSW_SIG = const(0x43425355), const(0x53425355)
 _SECTOR = const(512)
+_NO_SENSE = (0, 0, 0)
 _CAP = const(12)                    # written sectors kept in RAM: 6 KB at most (the Wallet runs with ~19 KB free)
 drive = None
 
@@ -39,23 +40,41 @@ class Image:
         self.zero = bytearray(_SECTOR)
 
     def read(self, lba, buf):
+        """The sector: buf filled from the image, or the zero sector itself (no copy). Use what it returns."""
         off = self.at.get(lba)
         if off is None:
-            buf[:] = self.zero
-        else:
-            self.f.seek(off)
-            self.f.readinto(buf)
+            return self.zero
+        self.f.seek(off)
+        self.f.readinto(buf)
+        return buf
 
 
 class Drive(usbdev.Interface):
     def __init__(self, image):
         super().__init__()
         self.img = image
+        # Nothing on the read or write path allocates (beyond a written sector kept, _CAP at most): a Mac
+        # reads the whole drive (~2 MB) the moment it's plugged in, right while main.py starts the app.
+        # 0.3.12-0.3.22 made a callback per sector and a slice, a bytes and tuples per command: thousands
+        # of small objects through the heap at boot, and real boards ran out of memory ("wedgie broke").
+        # tools/bootprobe.mjs plays the Mac's reads (tools/rp2040/chip.mjs mscHost) and failed the same
+        # way. So: buffers made here, bound methods made once (each self.method access makes a new
+        # object), header fields read byte by byte.
         self.cbw = bytearray(31)
         self.csw = bytearray(13)
+        self.csw[0], self.csw[1], self.csw[2], self.csw[3] = 0x55, 0x53, 0x42, 0x53       # "USBS"
+        self.cmd = bytearray(16)
         self.sec = bytearray(_SECTOR)
-        self.sense = (0, 0, 0)
+        self.sense = _NO_SENSE
         self.ep_out = self.ep_in = None
+        self.want = 0
+        self._lba = self._left = 0
+        self._ok = True
+        self._cb_cbw = self._got_cbw
+        self._cb_status = self._status_sent
+        self._cb_sector = self._sector_sent
+        self._cb_reply = self._reply_sent
+        self._cb_wrote = self._wrote
         self.over = {}                  # lba -> bytearray(512): what the host wrote (differs from the image)
         self.when = {}                  # lba -> ticks_ms it was last written (for _reclaim)
         self.base = None                # a sector of the image, to compare a write with (made at the first)
@@ -71,8 +90,7 @@ class Drive(usbdev.Interface):
         b = self.over.get(lba)
         if b is not None:
             return b
-        self.img.read(lba, buf)
-        return buf
+        return self.img.read(lba, buf)
 
     # ---- descriptors / control ------------------------------------------------------------------
     def desc_cfg(self, desc, itf_num, ep_num, strs):
@@ -103,33 +121,47 @@ class Drive(usbdev.Interface):
     # ---- Bulk-Only Transport --------------------------------------------------------------------
     def _want_cbw(self):
         try:
-            self.submit_xfer(self.ep_out, self.cbw, self._got_cbw)
+            self.submit_xfer(self.ep_out, self.cbw, self._cb_cbw)
         except Exception as e:
             print("drive:", e)
 
     def _got_cbw(self, ep, result, n):
         c = self.cbw
-        if n != 31 or struct.unpack_from("<I", c, 0)[0] != _CBW_SIG:
+        if n != 31 or c[0] != 0x55 or c[1] != 0x53 or c[2] != 0x42 or c[3] != 0x43:     # "USBC"
             self._want_cbw()
             return
-        self.tag = struct.unpack_from("<I", c, 4)[0]
-        self.want = struct.unpack_from("<I", c, 8)[0]
-        self.cmd = bytes(c[15:31])
+        s = self.csw
+        s[4], s[5], s[6], s[7] = c[4], c[5], c[6], c[7]                     # the tag, as it came
+        self.want = c[8] | c[9] << 8 | c[10] << 16 | (c[11] & 0x3F) << 24   # (small int: never > 1 GB)
+        m, i = self.cmd, 0
+        while i < 16:
+            m[i] = c[15 + i]
+            i += 1
         self._scsi()
 
     def _status(self, ok, residue=0):
-        struct.pack_into("<IIIB", self.csw, 0, _CSW_SIG, self.tag, residue, 0 if ok else 1)
-        self.submit_xfer(self.ep_in, self.csw, lambda *a: self._want_cbw())
+        s = self.csw
+        s[8], s[9], s[10], s[11] = residue & 255, residue >> 8 & 255, residue >> 16 & 255, residue >> 24 & 255
+        s[12] = 0 if ok else 1
+        self.submit_xfer(self.ep_in, s, self._cb_status)
+
+    def _status_sent(self, ep, result, n):
+        self._want_cbw()
 
     def _reply(self, data, ok=True):
-        """Send data (trimmed or zero-padded to what the host asked for), then the status."""
+        """Send data (trimmed or zero-padded to what the host asked for), then the status. Only for the
+        rare commands (INQUIRY, sense, capacity): READ(10) and WRITE(10) never come here."""
         n = self.want
         buf = bytearray(n)
         buf[: min(n, len(data))] = data[:n]
+        self._ok = ok
         if n:
-            self.submit_xfer(self.ep_in, buf, lambda *a: self._status(ok))
+            self.submit_xfer(self.ep_in, buf, self._cb_reply)
         else:
             self._status(ok)
+
+    def _reply_sent(self, ep, result, n):
+        self._status(self._ok)
 
     def _fail(self, key, asc, ascq=0):
         self.sense = (key, asc, ascq)
@@ -142,8 +174,8 @@ class Drive(usbdev.Interface):
     def _scsi(self):
         op = self.cmd[0]
         last = self.img.sectors - 1
-        if op in (0x00, 0x1E, 0x1B, 0x2F, 0x35):      # test unit ready, prevent removal, start/stop, verify, sync
-            self.sense = (0, 0, 0)
+        if op == 0x00 or op == 0x1E or op == 0x1B or op == 0x2F or op == 0x35:   # test unit ready, prevent removal, start/stop, verify, sync
+            self.sense = _NO_SENSE
             self._status(True)
         elif op == 0x12:                                # INQUIRY
             d = bytearray(36)
@@ -156,7 +188,7 @@ class Drive(usbdev.Interface):
         elif op == 0x03:                                # REQUEST SENSE
             d = bytearray(18)
             d[0], d[2], d[7], d[12], d[13] = 0x70, self.sense[0], 10, self.sense[1], self.sense[2]
-            self.sense = (0, 0, 0)
+            self.sense = _NO_SENSE
             self._reply(d)
         elif op == 0x1A:                                # MODE SENSE(6): writable
             self._reply(b"\x03\x00\x00\x00")
@@ -166,17 +198,16 @@ class Drive(usbdev.Interface):
             self._reply(struct.pack(">II", last, _SECTOR))
         elif op == 0x23:                                # READ FORMAT CAPACITIES
             self._reply(b"\x00\x00\x00\x08" + struct.pack(">I", self.img.sectors) + b"\x02\x00\x02\x00")
-        elif op == 0x28:                                # READ(10)
-            lba = struct.unpack_from(">I", self.cmd, 2)[0]
-            count = struct.unpack_from(">H", self.cmd, 7)[0]
-            if lba + count > self.img.sectors:
-                self._fail(5, 0x21)                     # LBA out of range
-            else:
-                self._read(lba, count)
-        elif op == 0x2A:                                # WRITE(10)
-            lba = struct.unpack_from(">I", self.cmd, 2)[0]
-            count = struct.unpack_from(">H", self.cmd, 7)[0]
-            if lba + count > self.img.sectors or self.cbw[12] & 0x80:
+        elif op == 0x28 or op == 0x2A:                  # READ(10) / WRITE(10): the hot path, allocates nothing
+            m = self.cmd
+            lba = (m[2] & 0x3F) << 24 | m[3] << 16 | m[4] << 8 | m[5]
+            count = m[7] << 8 | m[8]
+            if op == 0x28:
+                if lba + count > self.img.sectors:
+                    self._fail(5, 0x21)                 # LBA out of range
+                else:
+                    self._read(lba, count)
+            elif lba + count > self.img.sectors or self.cbw[12] & 0x80:
                 self._fail(5, 0x21)
             else:
                 self.full = False
@@ -185,20 +216,31 @@ class Drive(usbdev.Interface):
             self._fail(5, 0x20)                         # illegal request / invalid opcode
 
     def _read(self, lba, count):
-        if count == 0:
+        self._lba, self._left = lba, count
+        self._sector_sent(0, 0, 0)
+
+    def _sector_sent(self, ep, result, n):
+        if not self._left:
             self._status(True)
             return
-        self.submit_xfer(self.ep_in, self.sector(lba, self.sec), lambda *a: self._read(lba + 1, count - 1))
+        buf = self.sector(self._lba, self.sec)
+        self._lba += 1
+        self._left -= 1
+        self.submit_xfer(self.ep_in, buf, self._cb_sector)
 
     def _write(self, lba, count):
         """Take count sectors from the host, one at a time. One the same as the image is dropped from
         RAM; past _CAP new ones the rest are still taken (the host sends them anyway) and the write fails."""
-        if count == 0:
+        self._lba, self._left = lba, count
+        self._next_write()
+
+    def _next_write(self):
+        if not self._left:
             if self.full:
                 self.sense = (3, 0x0C, 0)               # medium error / write error
             self._status(not self.full)
             return
-        self.submit_xfer(self.ep_out, self.sec, lambda *a: self._wrote(lba, count))
+        self.submit_xfer(self.ep_out, self.sec, self._cb_wrote)
 
     def _reclaim(self):
         """RAM is full: forget written data sectors of clusters the FAT now says are free (a deleted
@@ -223,15 +265,17 @@ class Drive(usbdev.Interface):
                 freed = True
         return freed
 
-    def _wrote(self, lba, count):
+    def _wrote(self, ep, result, n):
+        lba = self._lba
+        self._lba += 1
+        self._left -= 1
         a = self.ans
         if a is not None and a[0] <= lba < a[1]:        # ANSWER.TXT is the wedgie's: a host write is dropped
-            self._write(lba + 1, count - 1)
+            self._next_write()
             return
         if self.base is None:
             self.base = bytearray(_SECTOR)
-        self.img.read(lba, self.base)
-        if self.sec == self.base:
+        if self.sec == self.img.read(lba, self.base):
             self.over.pop(lba, None)
             self.when.pop(lba, None)
         elif lba in self.over:
@@ -243,7 +287,7 @@ class Drive(usbdev.Interface):
         self.wrote = ticks_ms() or 1
         if lba in self.over:
             self.when[lba] = self.wrote
-        self._write(lba + 1, count - 1)
+        self._next_write()
 
 
 def start():

@@ -81,10 +81,10 @@ def _answer_file(dr):
     """(first lba, sectors) of ANSWER.TXT in the image's top folder (drive.py: contiguous), or None."""
     fat0, root0, nroot, data0, spc = _geometry(dr)
     for s in range(root0, root0 + nroot):
-        dr.img.read(s, _buf)
+        b = dr.img.read(s, _buf)                # (the image's zero sector itself when it has none there)
         for o in range(0, 512, 32):
-            if bytes(_buf[o:o + 11]) == b"ANSWER  TXT":
-                clus, size = struct.unpack_from("<HI", _buf, o + 26)
+            if bytes(b[o:o + 11]) == b"ANSWER  TXT":
+                clus, size = struct.unpack_from("<HI", b, o + 26)
                 return data0 + (clus - 2) * spc, size // 512
     return None
 

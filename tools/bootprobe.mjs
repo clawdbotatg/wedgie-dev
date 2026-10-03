@@ -1,7 +1,8 @@
 // A fresh plug-in, on the virtual RP2040 (tools/rp2040/chip.mjs: the MicroPython build wedgie.dev
-// flashes, a real board's heap): boot.py adds the WEDGIE drive, main.py starts the app. 0.3.12 and 0.3.13
-// said "wedgie broke: memory allocation failed" here on a real board (compiling slot.py at boot); no
-// test booted this way then. Each app, and no app: no traceback, and the free heap with it running is
+// flashes, a real board's heap): boot.py adds the WEDGIE drive, the "Mac" reads all of it at once (the
+// mount: every sector, twice, then a TEST UNIT READY a second; chip.mjs mscHost), and main.py starts
+// the app meanwhile. 0.3.12-0.3.19 said "wedgie broke: memory allocation failed" here (a real board;
+// here too once the Mac's reads were played: the drive's read path made objects per sector). Each app, and no app: no traceback, and the free heap with it running is
 // at least MIN. One app per process, so tools/gate.mjs runs them side by side.
 //   node tools/bootprobe.mjs [app ...|none] [--fw <firmware dir>]     (no app named: all of them)
 import { host } from "./rp2040/chip.mjs";
@@ -20,7 +21,7 @@ const apps = named.length ? named : ["none", ...F.carts.map((c) => c.mod)];
 let failed = 0;
 for (const a of apps) {
   const app = a === "none" ? null : a;
-  const h = host({ fs: image(F, app) });
+  const h = host({ fs: image(F, app), drive: true });
   for (const p of KEYS) h.chip.mcu.gpio[p].setInputValue(true);
   let all = "";
   const seen = () => (all += h.take());
@@ -31,9 +32,10 @@ for (const a of apps) {
   const hi = h.req({ type: "hello", id: 7 }, 8000);
   seen();
   const ram = hi?.ram;
-  const why = !up ? "never said ready" : BAD.test(all) ? all.split("\n").filter((l) => BAD.test(l) || /File "/.test(l)).slice(0, 4).join(" / ").trim()
+  const dr = h.chip.drive || {};
+  const why = !dr.reads ? `the Mac never read the drive (${JSON.stringify(dr)})` : dr.failed ? `drive reads failed: ${dr.errors.join(", ")}` : !up ? "never said ready" : BAD.test(all) ? all.split("\n").filter((l) => BAD.test(l) || /File "/.test(l)).slice(0, 4).join(" / ").trim()
     : typeof ram !== "number" ? `no hello: ${JSON.stringify(hi)}` : ram < MIN ? `only ${ram} B free (min ${MIN})` : "";
-  console.log(`${why ? "FAIL" : "ok  "} fresh plug-in, ${app || "no app"}: ${why || `${ram} B free`}`);
+  console.log(`${why ? "FAIL" : "ok  "} fresh plug-in, ${app || "no app"}: ${why || `${ram} B free, the drive read (${(dr.bytes / 1024) | 0} KB)`}`);
   if (why) failed++;
 }
 console.log(failed ? `${failed} FAILED` : "all checks passed");
