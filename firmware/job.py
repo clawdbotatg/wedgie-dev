@@ -71,11 +71,11 @@ def rules(m):
         json.loads(m["apps"])
 
 
-def check(m, sig=True):
+def check(m, sig=True, tick=None):
     """The job's files against its signed list: (version, {name: sha}) or raises ValueError. sig=False
-    skips the signature (pure-Python P-256: seconds on an RP2040), which run() checks after the yes."""
+    skips the signature (pure-Python P-256: 2.2 s on an RP2040), which run() checks after the yes."""
     rel = m.get("release") or ""
-    if sig and (not W.RELEASE_KEY[0] or not W.release_ok(rel.encode(), m.get("sig") or "")):
+    if sig and (not W.RELEASE_KEY[0] or not W.release_ok(rel.encode(), m.get("sig") or "", tick)):
         raise ValueError("not signed by wedgie.dev")
     version, files = W.release_files(rel)
     for n in m.get("write") or []:
@@ -85,19 +85,46 @@ def check(m, sig=True):
     return version, files
 
 
-_prog = None     # (title, the boot bar) while the job runs
+_prog = None     # [title, the boot bar, the line under it] while the job runs
 
 
 def progress(title, what, p):
-    """The screen during a job: the boot screen and the boot bar (loader.screen)."""
+    """The screen during a job: the boot screen and the boot bar (loader.screen). what=None keeps the
+    line under the bar; the bar only moves forward, and a move redraws only what it filled."""
     global _prog
     import ui, loader
     if not _prog or _prog[0] != title:
-        _prog = (title, ui.progress(title.replace("...", ""), what))
-    else:
+        _prog = [title, ui.progress(title.replace("...", ""), what or ""), what]
+    elif what is not None and what != _prog[2]:
         loader.what(what)
+        _prog[2] = what
     if _prog[1]:
         _prog[1].to(max(0, min(1, p)))
+
+
+# The bar moves by time, not by step: each part of a job gets the share of the bar it takes of the
+# job's time, so it never sits still (the signature is 2.2 s of a 4 s app install, and sat at 0).
+# ms, measured on the virtual RP2040 (tools/chipprobe.mjs --log, firmware 0.3.12): the yes to the job
+# running again after the restart, the P-256 check, the sums, the commit. Re-measure on a real board.
+RESTART, SIG, SUMS, COMMIT = 1600, 3100, 500, 300
+PER_KB = 400        # one 1 KB put: reading its 1.4 KB line a char at a time, json, base64, sha, flash
+
+
+class Plan:
+    """Where on the bar each part of a job starts. nbytes: what the host will send (the job's "bytes";
+    older hosts don't say, so 6 KB a file is assumed)."""
+    def __init__(self, nbytes):
+        self.files = max(1, nbytes)
+        parts = (("restart", RESTART), ("sig", SIG), ("sums", SUMS), ("files", self.files * PER_KB // 1024), ("commit", COMMIT))
+        total = sum(ms for _, ms in parts)
+        self.at0, at = {}, 0
+        for k, ms in parts:
+            self.at0[k] = (at / total, ms / total)
+            at += ms
+
+    def at(self, part, frac=0):
+        a, w = self.at0[part]
+        return a + w * max(0, min(1, frac))
 
 
 def resume(j):
@@ -136,20 +163,22 @@ def run(mid, m, ask, show=None):
     if not ask(title, note):
         W.send({"id": mid, "type": "refused"})
         return
-    title = title.replace("Install", "Installing").replace("Update", "Updating") + "..."
+    title = W.doing(title)
+    plan = Plan(m.get("bytes") or 6144 * len(write))
+    sig_tick = lambda f: show(title, None, plan.at("sig", f))
     if late:
         files = None
-        show(title, "starting", 0)
+        show(title, "starting", plan.at("sig"))
     else:
-        show(title, "checking the signature", 0)
+        show(title, "checking the signature", plan.at("sig"))
         try:
-            check(m)
+            check(m, tick=sig_tick)
         except ValueError as e:
             W.send({"id": mid, "type": "error", "error": str(e)})
             return
-        show(title, "starting", 0)
+        show(title, "starting", plan.at("sums"))
     W.send({"id": mid, "type": "go", "asked_ms": W.asked_ms})
-    chunks = 0
+    sent, todo = 0, plan.files              # bytes that came, bytes still to come (less what's there already)
     got = {}                                # name -> sha256 of what arrived
     there = {}                              # name -> sha256 of what's on it (this job's sums)
     h, f, cur = None, None, None
@@ -171,10 +200,10 @@ def run(mid, m, ask, show=None):
             line = None
             qid, t = q.get("id"), q.get("type")
             if t == "release":
-                show(title, "checking the signature", 0)
+                show(title, "checking the signature", plan.at("sig"))
                 try:
                     m["release"], m["sig"] = q.get("release") or "", q.get("sig") or ""
-                    version, files = check(m)
+                    version, files = check(m, tick=sig_tick)
                     if m.get("version") and version != m["version"]:
                         raise ValueError("the signed list is %s, not %s" % (version, m["version"]))
                 except ValueError as e:
@@ -182,14 +211,21 @@ def run(mid, m, ask, show=None):
                     return
                 m.pop("release", None)      # the 2.6 KB list: files has what's needed from it
                 gc.collect()
-                show(title, "starting", 0)
+                show(title, "looking at what's on it", plan.at("sums"))
                 last = time.ticks_ms()
                 W.send({"id": qid, "type": "ok", "version": version})
             elif t == "sums":
-                show(title, "looking at what's on it", 0)
+                show(title, "looking at what's on it", plan.at("sums"))
                 v = sums(q.get("names"), q.get("exists"))
                 for n in q.get("names") or []:
                     there[n] = v.get(n)
+                    if files and v.get(n) == files.get(n):      # already there: it won't be sent
+                        try:
+                            todo -= os.stat(n)[6]
+                        except OSError:
+                            pass
+                todo = max(1, todo)
+                show(title, None, plan.at("files"))
                 last = time.ticks_ms()
                 W.send({"id": qid, "type": "sums", "sums": v, "apps": W.apps()})
             elif t == "put":
@@ -209,9 +245,8 @@ def run(mid, m, ask, show=None):
                 q = None
                 f.write(b)
                 h.update(b)
-                chunks += 1
-                if chunks % 6 == 1:
-                    show(title, n, (len(got) + 0.5) / max(1, len(write)))
+                sent += len(b)
+                show(title, n, plan.at("files", sent / todo))
                 if end:
                     f.close()
                     f, cur = None, None
@@ -225,7 +260,7 @@ def run(mid, m, ask, show=None):
                 if files is None:
                     W.send({"id": qid, "type": "error", "error": "the signed list comes first"})
                     return
-                show(title, "restarting...", 1)
+                show(title, "restarting...", plan.at("commit"))
                 missing = [n for n in write if n not in got and there.get(n) != files[n]]
                 if missing:
                     W.send({"id": qid, "type": "error", "error": "not sent: " + " ".join(missing)})
@@ -244,6 +279,7 @@ def run(mid, m, ask, show=None):
                 if m.get("apps") is not None:
                     with open("apps.json", "w") as a:
                         a.write(m["apps"])
+                show(title, None, 1)
                 W.send({"id": qid, "type": "done", "version": version})
                 write = []
                 time.sleep_ms(100)

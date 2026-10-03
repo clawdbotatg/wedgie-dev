@@ -257,7 +257,8 @@ async function job(r: Repl, m: Manifest, title: string, write: string[], del: st
   const rel = late ? null : await relP;
   // the job goes first; the page's "Press A" modal loads while the wedgie asks
   const site = performance.now() - (askStart || performance.now());
-  const asked = r.request({ type: "job", job: title, ...(rel ? { release: rel.text, sig: rel.sig } : { version: m.version }), write, delete: del, apps: apps && JSON.stringify(apps) }, 120000);
+  const asked = r.request({ type: "job", job: title, ...(rel ? { release: rel.text, sig: rel.sig } : { version: m.version }), write, delete: del, apps: apps && JSON.stringify(apps),
+    bytes: write.reduce((t, n) => t + (m.files.find((f) => f.name === n)?.size || 0), 0) }, 120000);    // the wedgie's bar weighs the file part by it
   asked.catch(() => {});
   const close = (await import("../ui/askmodal")).askModal(title, true);
   let v: any;

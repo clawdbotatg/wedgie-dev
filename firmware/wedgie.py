@@ -20,14 +20,14 @@ _open = False
 RELEASE_KEY = ("75467e0970a70909082a39594e9c29e8c6e42cf3663ab9ae31dbbb8babc522f3", "dc7b3ed1006e9273a185c4a6f754cd5c1fd15f0d0a8464f78a9c65ac938eb8d3")
 
 
-def release_ok(text, sig):
+def release_ok(text, sig, tick=None):
     """text: the signed list (tools/release.mjs), sig: "r s" in hex. True if our key signed it.
-    Pure-Python P-256 (p256.py): a few seconds on an RP2040, once per job."""
+    Pure-Python P-256 (p256.py): 2.2 s on an RP2040, once per job; tick(0..1) moves a bar meanwhile."""
     import gc
     try:
         import p256, hashlib
         r, s = (int(x, 16) for x in sig.split())
-        return p256.verify(int(RELEASE_KEY[0], 16), int(RELEASE_KEY[1], 16), hashlib.sha256(text).digest(), r, s)
+        return p256.verify(int(RELEASE_KEY[0], 16), int(RELEASE_KEY[1], 16), hashlib.sha256(text).digest(), r, s, tick)
     except Exception:
         return False
     finally:
@@ -355,6 +355,11 @@ JOB = "_job.json"
 def save_job(d):
     with open(JOB, "w") as f:
         json.dump(d, f)
+
+
+def doing(job):
+    """A job's title on its progress screen: "Install Buttons" -> "Installing Buttons..."."""
+    return str(job or "Update")[:60].replace("Install", "Installing").replace("Update", "Updating") + "..."
 
 
 def take_job():

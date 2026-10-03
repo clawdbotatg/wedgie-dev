@@ -1,7 +1,14 @@
 # Runs before main.py. The boot logo goes up first, before anything slow loads.
 try:
-    import splash
-    splash.show()
+    import splash, os, machine, sys
+    # A soft reset into an install (wedgie.save_job) keeps the screen: it already shows the install's
+    # progress. Only on a soft reset (the drive's mark, below): after a power-up the panel needs its reset.
+    _scr = (0x400D8000 if "RP2350" in sys.implementation._machine else 0x40058000) + 0x0C
+    try:
+        _keep = machine.mem32[_scr] == 0x57ED61E0 and bool(os.stat("_job.json"))
+    except Exception:                   # no job file; or no mem32 (the emulator)
+        _keep = False
+    splash.show(keep=_keep)
 except Exception as e:
     print("splash:", e)
 

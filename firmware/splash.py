@@ -64,12 +64,23 @@ def wake(spi, dc, cs, reset_at):
     cmd(spi, dc, cs, 0x29)         # display on
 
 
-def show(path="logo.bin"):
+def show(path="logo.bin", keep=False):
     """logo.bin holds the box around the logo and the background colour: the screen gets the colour,
-    then the box. No file or a bad one, no logo (the app's LCD() then sets the panel up)."""
+    then the box. No file or a bad one, no logo (the app's LCD() then sets the panel up).
+    keep: a soft reset into an install (boot.py): the panel is up and already shows the install's
+    progress screen (slot._job drew it), so leave it as it is: no reset, no blank, the bar stays."""
     global up, bg
     if up:
         return
+    if keep:
+        try:
+            with open(path, "rb") as f:
+                head = f.read(10)
+            Pin(BL, Pin.OUT, value=1)
+            up, bg = True, bytes(head[8:10])
+            return
+        except OSError:
+            pass
     try:
         with open(path, "rb") as f:
             head = f.read(10)

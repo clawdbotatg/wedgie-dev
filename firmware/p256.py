@@ -58,13 +58,16 @@ def _add(p1, p2):
     return (X3, Y3, Z3)
 
 
-def _mul(k, pt):
-    acc = None
+def _mul(k, pt, tick=None):
+    acc, i = None, 0
     while k:
         if k & 1:
             acc = _add(acc, pt)
         pt = _dbl(pt)
         k >>= 1
+        i += 1
+        if tick and not i & 15:     # every 16 bits: a progress bar can move (verify: ~1 s per _mul on an RP2040)
+            tick(i)
     return acc
 
 
@@ -106,14 +109,17 @@ def sign(d, digest, k=None):
         return r, s
 
 
-def verify(qx, qy, digest, r, s):
+def verify(qx, qy, digest, r, s, tick=None):
+    """tick(0..1), if given, is called about 32 times as it goes."""
     if not (0 < r < N and 0 < s < N):
         return False
     z = int.from_bytes(digest, "big")
     w = inv(s, N)
     u1 = z * w % N
     u2 = r * w % N
-    pt = _add(_mul(u1, (GX, GY, 1)), _mul(u2, (qx, qy, 1)))
+    t1 = (lambda i: tick(i / 512)) if tick else None
+    t2 = (lambda i: tick(0.5 + i / 512)) if tick else None
+    pt = _add(_mul(u1, (GX, GY, 1), t1), _mul(u2, (qx, qy, 1), t2))
     if pt is None:
         return False
     x, _ = _affine(pt)

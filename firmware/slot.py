@@ -298,6 +298,12 @@ def _job(mid, m):
         job.run(mid, m, lambda *a: True, job.progress)
         return False
     W.save_job({"id": mid, "m": m, "asked_ms": W.asked_ms})
+    try:                                # the yes shows at once: the progress screen, the bar already moving.
+        b = ui.progress(W.doing(title).replace("...", ""), "starting")      # The restart keeps it
+        if b:                                                              # (boot.py, splash.show(keep))
+            b.to(0.02)
+    except Exception as e:              # cosmetic: the install goes on without it
+        print("slot: progress:", e)
     _to_job()
     return True
 

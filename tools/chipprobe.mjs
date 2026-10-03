@@ -8,15 +8,18 @@
 // seen (hello's ram, asked mid-job). The release list is signed with a throwaway key put in the test
 // image's wedgie.py, so the real P-256 check (and its memory) runs too. The browser emulator can't do
 // this: its heap starts at 128 MB and grows on demand.
-//   node tools/chipprobe.mjs [--fw <firmware dir>] [--from <app>] [--to <app>] [--no-update]
+//   node tools/chipprobe.mjs [--fw <firmware dir>] [--from <app>] [--to <app>] [--no-update] [--log <file>]
 //   (needs uv: the flash image is made with littlefs-python)
 import { generateKeyPairSync, createPublicKey, sign, createHash } from "node:crypto";
+import { appendFileSync, writeFileSync } from "node:fs";
 import { host } from "./rp2040/chip.mjs";
 import { firmware, image, appEntry } from "./rp2040/image.mjs";
 
 const args = process.argv.slice(2);
 const arg = (k) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : null; };
 const F = firmware(arg("--fw") || undefined);
+const LOG = arg("--log");                 // every byte the chip sends, to read after a failure
+if (LOG) writeFileSync(LOG, "");
 const version = (F.file("wedgie.py").toString().match(/VERSION = "([^"]+)"/) || [])[1];
 
 // a throwaway release key: the test image's wedgie.py trusts it, the list is signed with it
@@ -36,7 +39,7 @@ let failed = 0, leastFree = Infinity, leastWhere = "";
 const check = (ok, what) => { console.log(`${ok ? "ok  " : "FAIL"} ${what}`); if (!ok) failed++; };
 
 function wedgie(app) {
-  const h = host({ fs: image(F, app, { "wedgie.py": wedgiePy }) });
+  const h = host({ fs: image(F, app, { "wedgie.py": wedgiePy }), onData: LOG && ((b) => appendFileSync(LOG, Buffer.from(b))) });
   for (const p of Object.values(KEYS)) h.chip.mcu.gpio[p].setInputValue(true);     // buttons: pulled up
   let id = 100;
   const w = {
@@ -63,7 +66,7 @@ function job(w, title, write, del, apps, where) {
   if (!h?.jobs) return `hello: ${JSON.stringify(h)}`;
   const ex = w.req({ type: "sums", names: [], exists: F.all }, 30000);
   if (!ex?.sums) return `sums before the job: ${JSON.stringify(ex)}`;
-  w.h.chip.write(JSON.stringify({ type: "job", job: title, version, write, delete: del, apps: apps && JSON.stringify(apps), id: 900 }) + "\n");
+  w.h.chip.write(JSON.stringify({ type: "job", job: title, version, write, delete: del, apps: apps && JSON.stringify(apps), bytes: write.reduce((t, n) => t + fileOf(n).length, 0), id: 900 }) + "\n");
   w.h.chip.run(800);                // the question is up
   w.press("A");
   let g = null;
