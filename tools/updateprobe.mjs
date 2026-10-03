@@ -1,7 +1,8 @@
 // /update, the update bench, with four fake wedgies plugged in at once (tools/fakewedgies.mjs):
 //  0 bare MicroPython: gets the core; its first boot adds the WEDGIE drive (the port drops, comes back)
-//  1 wedgie 0.1.3 with an old Hello cart first: core updated; coming from the menu it starts with no
-//    app, so the carts' files go (the person's own mine.py stays on the flash), and the menu; its port stays
+//  1 wedgie 0.1.3 with Buttons first: core updated; coming from the menu it starts with no app, so the
+//    shelf app's files go, and the menu; a retired app's file (hello.py, no longer published) and the
+//    person's own mine.py stay on the flash
 //  2 wedgie 0.1.4 whose core files differ: updated
 //  3 no MicroPython: told to go through /format
 // Then 2 is unplugged and plugged back in: already up to date, nothing copied, no restart.
@@ -20,7 +21,7 @@ const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 }, d
 await ctx.addInitScript(fakeWedgies, [
   { uid: "e66138935f5a2c29", machine: "Raspberry Pi Pico 2 W with RP2350", files: { "boot.py": 1 } },
   { uid: "de6474e3a3152a2f", machine: "Raspberry Pi Pico with RP2040", files: { "main.py": 1, "menu.py": 1, "wedgiedrive.py": 1, "wedgie.py": 'VERSION = "0.1.3"',
-    "apps.json": JSON.stringify([{ mod: "hello", name: "Hello" }, { mod: "keytest", name: "Buttons" }, { mod: "mine", name: "Mine", about: "yours" }]), "hello.py": 1, "keytest.py": 1, "mine.py": 1 } },
+    "apps.json": JSON.stringify([{ mod: "buttons", name: "Buttons" }, { mod: "hello", name: "Hello" }, { mod: "mine", name: "Mine", about: "yours" }]), "buttons.py": 1, "hello.py": 1, "mine.py": 1 } },
   { uid: "aa11bb22cc3d9f01", machine: "Raspberry Pi Pico 2 W with RP2350", files: { "main.py": 1, "menu.py": 1, "wedgie.py": 'VERSION = "0.1.4"' } },
   { uid: "0badc0de00deadff", machine: "?", noMp: true },
 ]);
@@ -44,8 +45,8 @@ await page.screenshot({ path: `${out}/update-bench.png` });
 check(/ done/.test(await card("5A2C29")) && /Updated ✓/.test(await card("5A2C29")), "bare board: updated, green");
 check((await st(0, "drops")) === 1, "bare board: its port dropped at its first boot and it was found again by its ID");
 check(/ done/.test(await card("152A2F")) && (await st(1, "drops")) === 1 && (await st(1, "resets")) === 1, "0.1.3: updated with one soft reset; its port dropped (the drive came off) and it was found again");
-const f1 = await page.evaluate(() => { const f = window.__ports[1]._st.files; return { hello: f.has("hello.py"), keytest: f.has("keytest.py"), mine: f.has("mine.py"), menu: f.has("menu.py"), slot: f.has("slot.mpy"), apps: JSON.parse(new TextDecoder().decode(f.get("apps.json"))).map((a) => a.mod) }; });
-check(JSON.stringify(f1.apps) === "[]" && !f1.hello && !f1.keytest && f1.mine && !f1.menu && f1.slot, "0.1.3 → 0.2: no app yet; the carts and the menu gone, the person's own file kept: " + JSON.stringify(f1));
+const f1 = await page.evaluate(() => { const f = window.__ports[1]._st.files; return { buttons: f.has("buttons.py"), hello: f.has("hello.py"), mine: f.has("mine.py"), menu: f.has("menu.py"), slot: f.has("slot.mpy"), apps: JSON.parse(new TextDecoder().decode(f.get("apps.json"))).map((a) => a.mod) }; });
+check(JSON.stringify(f1.apps) === "[]" && !f1.buttons && f1.hello && f1.mine && !f1.menu && f1.slot, "0.1.3 → 0.2: no app yet; the shelf app and the menu gone, a retired app's file and the person's own kept: " + JSON.stringify(f1));
 check((await st(1, "inserting")) >= 2, "its own screen showed the update");
 check(/ done/.test(await card("3D9F01")), "0.1.4 with different files: updated");
 check(/ fail/.test(await card("no ID")) && /wedgie\.dev\/connect/.test(await card("no ID")), "no MicroPython: failed, pointed at /connect (its Set up card)");
