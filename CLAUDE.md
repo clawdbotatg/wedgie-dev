@@ -128,6 +128,7 @@ uv run --with mpy-cross==1.29.0.post2 python3 tools/mpy.py --check   # the commi
 node tools/chipprobe.mjs                                    # installs on a virtual RP2040 (real heap; needs uv)
 python3 tools/boardprobe.py battery                         # a checked install on a real board (press A)
 python3 tools/fakedevice.py                                 # a pty wedgie for public/wedgie.py
+uv run --with pyserial python3 tools/drivebench.py          # the phone's path from a Mac: REQ-<n>.TXT on the WEDGIE drive, ANSWER.TXT back
 ```
 
 `tools/drive.py` rebuilds `firmware/drive.bin` (macOS + `brew install pngquant`); every byte of it

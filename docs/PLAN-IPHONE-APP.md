@@ -14,7 +14,16 @@ A web page can do this too (wedgie.dev/drive.html), but iOS makes you pick the f
 Send → Save to Files → WEDGIE → Save; Read → Browse → WEDGIE → pick the file. An app picks the
 WEDGIE drive **once**, keeps permission, and then reads and writes it with no taps.
 
-## What's proven (2026-10-03, a real RP2040 wedgie and an iPhone)
+## Status (2026-10-03): working, released in 0.3.18
+
+The app (`ios/WedgieDrive`) is on Austin's phone. On a real RP2040 and an iPhone: Hello sent as
+`REQ-<n>.TXT`, the answer read back from `ANSWER.TXT` in ~3 s; after an unplug and replug the app sent
+again with no picker (unknown 1: the bookmark survives); iOS reads the new ANSWER.TXT, not a cached copy
+(unknown 2). From a Mac, `tools/drivebench.py` sent 20 requests in a row, all answered in ~1 s (the
+drive frees a deleted request's RAM: `wedgiedrive._reclaim`; macOS never reuses a freed cluster). Still
+open: the Mac's "Disk Not Ejected Properly" (Austin: keep it writable everywhere for now), TestFlight.
+
+## What was proven first (2026-10-03, a real RP2040 wedgie and an iPhone)
 
 - Branch `drive-inbox`: the WEDGIE drive takes writes (`firmware/wedgiedrive.py`). Written sectors live
   in RAM (12 sectors, 6 KB at most), are gone at unplug, and flash is never written.

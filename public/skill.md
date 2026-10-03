@@ -345,6 +345,17 @@ request, unplugging) always re-adds the drive. Holding Y while plugging in skips
 boot (for debugging; nobody needs it day to day). Holding X while plugging in starts it without its
 app (its home screen), a way back in when an app keeps USB from answering.
 
+### No serial port? Files on the WEDGIE drive (0.3.18+)
+
+A host that can't open the serial port (an iPhone, a locked-down computer) can talk through the drive.
+Write a new file `REQ-<n>.TXT` in its top folder: one JSON request per line, the same requests as above,
+a new name every time. The wedgie reads it 0.7 s after the last write; anything that needs a yes still
+asks on its screen. Once a request came in as a file, every answer is also written to `ANSWER.TXT`
+(2048 bytes): the first line is `#<count>`, then the answers as JSON lines, padded with newlines. Read it
+uncached until the count moves (a few seconds; up to a minute when it waits for an A press), and delete
+old REQ files. Writes live in the wedgie's RAM (a few KB) and are gone at unplug; flash is never written.
+The iPhone app (ios/WedgieDrive in the repo) works this way.
+
 ## Blank board
 
 No MicroPython yet: hold BOOTSEL while plugging in, drag the `.uf2` for that board from

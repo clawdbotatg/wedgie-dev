@@ -7,9 +7,9 @@ unknowns: `docs/PLAN-IPHONE-APP.md`.
 - The underwear button (bottom right) opens the drive panel. Green dot = a wedgie is plugged in.
 - Pick the WEDGIE drive once (a security-scoped bookmark is kept), then Hello / Ask to connect /
   any JSON request. Each send is a new `REQ-<n>.TXT`; old ones (5 s+) are deleted first.
-- After a send the app reads `ANSWER.TXT` every second for 60 s (the firmware doesn't write it yet).
+- After a send the app reads `ANSWER.TXT` every second for 60 s and logs each new answer.
 - The page gets `window.wedgieDrive` (status, send, list, read, panel), only on wedgie.dev.
-- Needs the `drive-inbox` firmware for the wedgie to read the files.
+- Needs wedgie 0.3.18+. Test from a Mac without the phone: `uv run --with pyserial python3 tools/drivebench.py`.
 
 ## Build and install
 

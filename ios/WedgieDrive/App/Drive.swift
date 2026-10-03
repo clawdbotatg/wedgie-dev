@@ -3,8 +3,8 @@
 // docs/PLAN-IPHONE-APP.md has the why and the unknowns this app is here to test.
 //
 // Send = write a new REQ-<n>.TXT (one JSON request per line; the wedgie's inbox.py reads each new file
-// once). Answers will come back in ANSWER.TXT (firmware still to build): after a send we read it every
-// second for 60 s and log any change.
+// once). Answers come back in ANSWER.TXT (0.3.18+): "#<count>" then the answers as JSON lines, padded
+// with newlines (zeros until the first). After a send we read it every second for 60 s and log any change.
 import Foundation
 import SwiftUI
 
@@ -175,7 +175,7 @@ enum DriveError: LocalizedError {
         }
         if was != state {
             note(.info, state == .here ? "wedgie plugged in (\(name))" : "wedgie unplugged")
-            if state == .here { await refreshFiles() } else { files = [] }
+            if state == .here { await refreshFiles() } else { files = []; lastAnswer = nil }   // a replug starts ANSWER.TXT over
         }
         if state == .here, Date() < watchUntil { await readAnswer() }
     }
@@ -186,10 +186,10 @@ enum DriveError: LocalizedError {
 
     func readAnswer() async {
         guard let t = try? await io.read("ANSWER.TXT") else { return }
-        let trimmed = t.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed != lastAnswer {
+        let trimmed = t.replacingOccurrences(of: "\0", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty, trimmed != lastAnswer {           // empty: nothing answered since this plug-in
             lastAnswer = trimmed
-            if !trimmed.isEmpty { note(.answer, trimmed) }
+            note(.answer, trimmed)
         }
     }
 
