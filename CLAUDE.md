@@ -1,7 +1,10 @@
 # wedgie-dev — orientation for Claude
 
 The website (wedgie.dev) and the wedgie firmware. `README.md` is the overview; `public/skill.md` is
-what agents outside this repo read (keep it true when the firmware or the USB protocol changes).
+what agents outside this repo read (keep it true when the firmware or the USB protocol changes). It,
+`code.md` and `trustm.md` also ship on every wedgie as SKILL.md on its WEDGIE drive (`tools/skilldoc.py`):
+after editing any of them, run `tools/drive.py`. `tools/test_docs.py` (in the release gate) fails on a stale
+drive copy, a "current firmware" that isn't VERSION, or a wedgie.py command / USB request skill.md doesn't name.
 
 **Read `EXPECTATIONS.md` first.** The three rules every change must keep.
 
@@ -130,6 +133,7 @@ python3 tools/test_style.py                                 # the style guide (d
 node tools/busyprobe.mjs http://localhost:4173              # every /connect full-access job shows the boot bar, titled
 python3 tools/test_memory.py                                # USB only through wedgie.lines(), no growing strings
 python3 tools/test_job.py                                   # checked installs vs a hostile host (real job.py, seconds)
+python3 tools/test_docs.py                                  # the guides match the firmware; the drive's SKILL.md matches them
 uv run --with mpy-cross==1.29.0.post2 python3 tools/mpy.py --check   # the committed .mpy match their .py
 node tools/chipprobe.mjs                                    # installs on a virtual RP2040 (real heap; needs uv)
 python3 tools/boardprobe.py buttons                         # a checked install on a real board (press A)

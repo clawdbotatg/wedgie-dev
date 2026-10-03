@@ -7,6 +7,7 @@
 //   - installs and firmware updates where memory is tightest, with the core really replaced
 //     (tools/chipprobe.mjs: onto Buttons, off Buttons, each with an update from an older core)
 //   - checked installs against a hostile host (tools/test_job.py), the memory and style rules
+//   - the guides match the firmware, and the WEDGIE drive's SKILL.md matches them (tools/test_docs.py)
 // Not covered: the virtual chip has no computer reading the WEDGIE drive at boot (macOS does: that's
 // when 0.3.13 broke), and no real board. Run tools/boardprobe.py on one before telling anyone it works.
 //   node tools/gate.mjs            (needs uv; run from the tree being signed)
@@ -33,6 +34,7 @@ const jobs = [
   ["test_job", ["python3", "tools/test_job.py"]],
   ["test_memory", ["python3", "tools/test_memory.py"]],
   ["test_style", ["python3", "tools/test_style.py"]],
+  ["test_docs", ["python3", "tools/test_docs.py"]],
   ["mpy --check", [...UV, "tools/mpy.py", "--check"]],
   ["chip: install Buttons + update", ["node", "tools/chipprobe.mjs", "--from", "hello", "--to", "buttons"]],
   ["chip: install over Buttons + update", ["node", "tools/chipprobe.mjs", "--from", "buttons", "--to", "hello"]],

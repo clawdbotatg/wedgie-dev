@@ -12,6 +12,7 @@
 # Stored sparse: only the sectors that aren't all zeros.   python3 tools/drive.py [--img out.img]
 # Needs macOS (osacompile, codesign) and pngquant to build; the output (firmware/drive.bin) is committed.
 import io, struct, subprocess, sys, tempfile
+sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parent))
 from pathlib import Path
 from PIL import Image
 
@@ -36,14 +37,8 @@ to talk to it over USB.
 
 
 def skill():
-    """The three guides on wedgie.dev as one file: the first one's frontmatter, then each body."""
-    out = "\n".join(open(root / "public" / n).read().split("\n---\n", 1)[1] if i else open(root / "public" / n).read()
-                    for i, n in enumerate(("skill.md", "code.md", "trustm.md")))
-    head = ("> You're reading SKILL.md from a WEDGIE drive: a wedgie is plugged into this computer right now.\n"
-            "> Its serial port is the one to talk to (\"Talk to it directly\" below). This file is skill.md, then code.md,\n"
-            "> then trustm.md: links to those three point to parts further down. Newest copies: https://wedgie.dev/skill.md\n")
-    fm_end = out.index("\n---\n", 4) + 5
-    return (out[:fm_end] + "\n" + head + out[fm_end:]).encode()
+    from skilldoc import skill_md      # one source: tools/test_docs.py checks the drive against it
+    return skill_md()
 autorun = b"[autorun]\r\nicon=wedgie.ico\r\nlabel=wedgie\r\n"
 
 src = Image.open(root / "public/img/sticker.webp").convert("RGBA")

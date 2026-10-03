@@ -3,7 +3,7 @@
 // docs/PLAN-IPHONE-APP.md has the why and the unknowns this app is here to test.
 //
 // Send = write a new REQ-<n>.TXT (one JSON request per line; the wedgie's inbox.py reads each new file
-// once). Answers come back in ANSWER.TXT (0.3.21+): "#<count>" then the answers as JSON lines, padded
+// once). Answers come back in ANSWER.TXT (0.3.22+): "#<count>" then the answers as JSON lines, padded
 // with newlines (zeros until the first). After a send we read it every second for 60 s and log any change.
 import Foundation
 import SwiftUI
