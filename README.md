@@ -28,8 +28,10 @@ its ID, not its port, and don't soft-reset it just to restart its app. Details: 
 - Apps from other repos: a repo with `wedgie.json` (rules: `src/apps/appjson.mjs`, one copy for build and
   site). Anyone adds one on their wedgie's page (`src/apps/repos.ts`, this browser only, marked not
   reviewed). `community.json` lists repos on everyone's shelf, each pinned to a reviewed commit;
-  `node tools/community.mjs add owner/repo` copies that commit into `community/` (review the diff), and
-  `tools/fw.mjs` publishes them as carts. Starter: github.com/clawdbotatg/wedgie-starter.
+  `node tools/community.mjs add owner/repo` copies that commit into `community/` (review the diff),
+  `node tools/sign.mjs` signs them with the firmware, and `tools/fw.mjs` publishes them first on the
+  site. Every app is its own repo (ours: `clawdbotatg/wedgie-*`); the steps are in `docs/APPS.md`.
+  Starter: github.com/clawdbotatg/wedgie-starter.
 - `art/` + `tools/art.py` — source renders and the web images made from them.
 
 ```

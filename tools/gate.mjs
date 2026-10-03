@@ -3,7 +3,7 @@
 // "no more memory errors"). What it covers (docs/PLAN-BOOT-MEMORY.md, the north star):
 //   - nothing compiles on the wedgie at boot: every core file ships as .mpy (0.3.13 broke on a real
 //     board compiling slot.py at a fresh plug-in) and every .mpy matches its .py (tools/mpy.py --check)
-//   - a fresh plug-in with each app and with none (tools/bootprobe.mjs): no traceback, >= 16 KB free
+//   - a fresh plug-in with each app (the shelf's too) and with none (tools/bootprobe.mjs): no traceback, >= 16 KB free
 //   - installs and firmware updates where memory is tightest, with the core really replaced
 //     (tools/chipprobe.mjs: onto Buttons, off Buttons, each with an update from an older core)
 //   - checked installs against a hostile host (tools/test_job.py), the memory and style rules
@@ -14,6 +14,7 @@ import { spawn } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { firmware } from "./rp2040/image.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const fw = join(root, "firmware");
@@ -27,7 +28,7 @@ function bootSource() {
   return names.filter((n) => n.endsWith(".py") && !["boot.py", "main.py"].includes(n) && !claimed.has(n.slice(0, -3)) && !names.includes(n.slice(0, -3) + ".mpy"));
 }
 
-const carts = JSON.parse(readFileSync(join(fw, "carts.json"), "utf8")).map((c) => c.mod);
+const carts = firmware().carts.map((c) => c.mod);       // firmware/carts.json and the shelf (community.json)
 const jobs = [
   ["test_job", ["python3", "tools/test_job.py"]],
   ["test_memory", ["python3", "tools/test_memory.py"]],

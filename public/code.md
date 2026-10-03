@@ -40,6 +40,9 @@ The Trust M secure chip from an app: https://wedgie.dev/trustm.md
    wedgie.dev/connect (Software, **Apps from a GitHub repo**, `owner/repo`). Such an app isn't signed by
    wedgie.dev, so it installs with full access: it can do anything on that wedgie, including replacing
    the keys in its Trust M's spare key slots. Say so in your README.
+6. To be on wedgie.dev for everyone (signed, one tap to install): ask wedgie.dev to add the repo
+   (an issue on github.com/clawdbotatg/wedgie-dev). We read one commit, sign it, and it's on the shelf;
+   a later commit goes up only when we read that one too.
 
 ## wedgie.json
 

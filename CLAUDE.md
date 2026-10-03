@@ -30,6 +30,7 @@ what agents outside this repo read (keep it true when the firmware or the USB pr
    tools/sign.mjs`, commit: the shelf's apps are in the signed list (`tools/release.mjs shelf()`), first
    on the site. A new commit in their repo changes nothing until it's added again. The old built-in apps
    are in git history before 2026-10-03; `tools/fixtures/hello.py` is a test app for the probes only.
+   How to add, update or remove one: **`docs/APPS.md`**.
    A module the core imports at boot must not be claimed by a cart.
    Removed core files go in `RETIRED` (install.ts, wedgie.py) so an update deletes them.
    **App Timers are wrapped on the board** (`slot.py _Timer`): an app whose tick takes as long as its
