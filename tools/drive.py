@@ -40,7 +40,8 @@ def skill():
     out = "\n".join(open(root / "public" / n).read().split("\n---\n", 1)[1] if i else open(root / "public" / n).read()
                     for i, n in enumerate(("skill.md", "code.md", "trustm.md")))
     head = ("> You're reading SKILL.md from a WEDGIE drive: a wedgie is plugged into this computer right now.\n"
-            "> Its serial port is the one to talk to (\"Talk to it directly\" below). Newest copy: https://wedgie.dev/skill.md\n")
+            "> Its serial port is the one to talk to (\"Talk to it directly\" below). This file is skill.md, then code.md,\n"
+            "> then trustm.md: links to those three point to parts further down. Newest copies: https://wedgie.dev/skill.md\n")
     fm_end = out.index("\n---\n", 4) + 5
     return (out[:fm_end] + "\n" + head + out[fm_end:]).encode()
 autorun = b"[autorun]\r\nicon=wedgie.ico\r\nlabel=wedgie\r\n"

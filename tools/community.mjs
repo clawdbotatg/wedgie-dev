@@ -9,6 +9,7 @@
 //   node tools/community.mjs remove owner/repo
 //
 // Review before you commit: `git diff community/` is exactly the code that will run on people's wedgies.
+// Then node tools/sign.mjs: the shelf's apps are in the signed list (tools/release.mjs shelf()). docs/APPS.md.
 import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -102,6 +103,6 @@ async function main() {
   } else if (cmd) throw new Error("usage: node tools/community.mjs [add owner/repo | remove owner/repo]");
   writeFileSync(LIST, JSON.stringify(list, null, 2) + "\n");
   await sync();
-  if (cmd === "add") console.log(`\nReview it: git diff community/ (that's the code that will run on people's wedgies), then commit.`);
+  if (cmd === "add") console.log(`\nReview it: git diff community/ (that's the code that will run on people's wedgies), then node tools/sign.mjs, then commit.`);
 }
 if (process.argv[1] === fileURLToPath(import.meta.url)) main().catch((e) => { console.error(e.message); process.exit(1); });

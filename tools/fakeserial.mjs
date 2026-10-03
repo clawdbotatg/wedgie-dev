@@ -1,8 +1,11 @@
 // Drives /connect with fake WebSerial boards so the USB paths run without hardware. Real clicks.
 //  - a bare MicroPython board (raw REPL; a little filesystem, so the installer's hash / write / verify /
 //    rename steps really run), which becomes a wedgie 0.2 after a firmware install;
-//  - a wedgie on 0.1.3 (the menu, two apps); its update takes both apps and the menu off: no app yet;
-//  - a wedgie on 0.2 with no app yet and a save: picks an app, switches, takes it off; its saves are
+//  - a wedgie on 0.1.3 (the menu, two apps); its update takes the shelf's app (Buttons) and the menu off
+//    and leaves a retired app's file alone (hello.py: no longer published, never deleted): no app yet;
+//  - a wedgie on 0.2 with no app yet and a save: picks Buttons, switches to two apps from GitHub repos
+//    (faked: Dodge from the starter folder, and Vault, a made-up repo app that needs the chip and has USB
+//    to itself), takes it off; its saves are
 //    listed, downloaded, deleted and put back; the Developer file list shows, opens, deletes, uploads.
 //    It is sealed (0.2.5+): every job that needs its REPL asks its pretend person (the page says to
 //    press A; a yes is for that job only), and a no changes nothing.
@@ -27,9 +30,9 @@ const ctx = await browser.newContext(phone ? { viewport: { width: 390, height: 8
 await ctx.addInitScript(fakeWedgies, [
   { uid: "e66138935f5a2c29", machine: "Raspberry Pi Pico 2 W with RP2350", files: { "boot.py": 1 } },
   { uid: "de6474e3a3152a2f", machine: "Raspberry Pi Pico with RP2040", files: { "main.py": 1, "menu.py": 1, "wedgiedrive.py": 1, "wedgie.py": 'VERSION = "0.1.3"',
-    "apps.json": JSON.stringify([{ mod: "hello", name: "Hello" }, { mod: "keytest", name: "Buttons" }]), "hello.py": 1, "keytest.py": 1 }, chip: "none" },
+    "apps.json": JSON.stringify([{ mod: "buttons", name: "Buttons" }, { mod: "hello", name: "Hello" }]), "buttons.py": 1, "hello.py": 1 }, chip: "none" },
   { uid: "aa11bb22cc3d9f01", machine: "Raspberry Pi Pico 2 W with RP2350", files: { "main.py": 1, "slot.py": 1, "wedgiedrive.py": 1, "wedgie.py": `VERSION = "${CUR}"`,
-    "apps.json": "[]", "/saves/hello/best.json": '{"score": 120}', "junk.txt": "delete me" }, person: { say: "yes", ms: 5000 } },
+    "apps.json": "[]", "/saves/buttons/best.json": '{"score": 120}', "junk.txt": "delete me" }, person: { say: "yes", ms: 5000 } },
 ]);
 
 let bad = 0;
@@ -42,8 +45,23 @@ if (!man.signed) {
   await ctx.route("**/fw/manifest.json", (r) => r.fulfill({ contentType: "application/json", body: JSON.stringify({ ...man, signed: true }) }));
   await ctx.route("**/fw/release.txt", (r) => r.fulfill({ contentType: "text/plain", body: `wedgie-release 1\nversion ${man.version}\n` + [...man.files].sort((a, b) => a.name < b.name ? -1 : 1).map((f) => `${f.sha256}  ${f.name}\n`).join("") }));
 }
-const WALLET = man.carts.find((c) => c.mod === "usbwallet").files.find((n) => n.startsWith("usbwallet."));   // .mpy when compiled (tools/mpy.py)
-const KECCAK = man.carts.find((c) => c.mod === "usbwallet").files.find((n) => n.startsWith("keccak."));
+// Apps from GitHub repos, faked: clawdbotatg/wedgie-starter from the local starter folder, someone/vault from
+// VAULT_REPO (an app that needs the ATECC608 and has USB to itself, two files).
+const starter = join(homedir(), "clawd/wedgie-starter");
+const VAULT_REPO = {
+  "wedgie.json": JSON.stringify({ apps: [{ mod: "vault", name: "Vault", about: "A made-up app for this probe: needs the chip, USB to itself.", files: ["vault.py", "vault_keys.bin"], entry: "run", chip: "ATECC608", usb: true }] }),
+  "vault.py": "def run():\n    pass\n",
+  "vault_keys.bin": "\x01\x02\x03",
+};
+const WALLET = "vault.py", KECCAK = "vault_keys.bin";
+const cors = { "access-control-allow-origin": "*" };
+await ctx.route("https://api.github.com/**", (r) => r.fulfill({ status: 200, headers: cors, contentType: "application/json", body: JSON.stringify({ sha: "0123456789abcdef0123456789abcdef01234567" }) }));
+await ctx.route("https://raw.githubusercontent.com/**", (r) => {
+  const m = r.request().url().match(/githubusercontent\.com\/([^/]+\/[^/]+)\/[^/]+\/(.+)$/);
+  if (m?.[1] === "someone/vault") return m[2] in VAULT_REPO ? r.fulfill({ status: 200, headers: cors, body: VAULT_REPO[m[2]] }) : r.fulfill({ status: 404, headers: cors, body: "" });
+  const p = join(starter, m?.[2] || "");
+  return m && existsSync(p) ? r.fulfill({ status: 200, headers: cors, body: readFileSync(p) }) : r.fulfill({ status: 404, headers: cors, body: "" });
+});
 const page = await ctx.newPage();
 page.setDefaultTimeout(90000);          // software 3D (swiftshader) on a busy box: a tap can wait 10-30 s for the page to answer
 // On Linux's headless shell a Playwright screenshot leaves the page deaf to the next tap (it never
@@ -88,25 +106,26 @@ await page.click('[data-act="mirror"]');
 await wait(() => window.__ports[2]._st.shots >= 2, null, 10000, "Show its screen here: mirrored");
 check(/ATECC608 working/.test(await page.textContent("#d-hw")), "detail: hardware says the chip works");
 check(/Up to date/.test(await page.textContent("#d-fw")), "detail: firmware up to date");
-await wait(() => /Hello/.test(document.querySelector("#d-saves")?.textContent || ""), null, 10000, "its saves listed");
-check(/1 file · 1 KB/.test(await page.textContent("#d-saves")) && (await st(2, "interrupts")) === 0, "saves: Hello's, read live (nothing stopped)");
+await wait(() => /Buttons/.test(document.querySelector("#d-saves")?.textContent || ""), null, 10000, "its saves listed");
+check(/1 file · 1 KB/.test(await page.textContent("#d-saves")) && (await st(2, "interrupts")) === 0, "saves: Buttons', read live (nothing stopped)");
 await shoot({ path: `${out}/connect-wedgie${phone ? "-phone" : ""}.png`, fullPage: true });
 
 // pick one: it goes on (the wedgie's screen says so), the wedgie restarts into it, the page finds it again
-const shelfOn = (mod) => `document.querySelector('#d-shelf .cart-slot[data-mod="${mod}"] .cart.playing') && /on it|running/.test(document.querySelector('#d-shelf .cart-slot[data-mod="${mod}"] .cart-state').textContent) && document.querySelector('#d-shelf .cart-slot:not([data-mod="${mod}"]) .cart:not(:disabled)')`;
+// on, running, and the page idle again (the cart on it can be tapped: a tap takes it off)
+const shelfOn = (mod) => `document.querySelector('#d-shelf .cart-slot[data-mod="${mod}"] .cart.playing:not(:disabled)') && /on it|running/.test(document.querySelector('#d-shelf .cart-slot[data-mod="${mod}"] .cart-state').textContent)`;
 const pickApp = async (mod, what) => { await page.click(`#d-shelf .cart-slot[data-mod="${mod}"] .cart`); return wait(new Function(`return ${shelfOn(mod)}`), null, 30000, what); };
 const hashed0 = (await st(2, "hashed")) || 0;
-await page.click(`#d-shelf .cart-slot[data-mod="hello"] .cart`);
+await page.click(`#d-shelf .cart-slot[data-mod="buttons"] .cart`);
 await wait(() => /Press A on the wedgie/.test(document.querySelector("#d-status")?.textContent || ""), null, 5000, "sealed: the page says to press A on the wedgie");
 await wait(() => document.querySelector(".ask-a .ask-3d"), null, 5000, "sealed: the Press A modal is up");
 await page.waitForTimeout(2500);
 await shoot({ path: `${out}/connect-ask${phone ? "-phone" : ""}.png` });
-await wait(new Function(`return ${shelfOn("hello")}`), null, 30000, "Hello on, running");
+await wait(new Function(`return ${shelfOn("buttons")}`), null, 30000, "Buttons on, running");
 check((await st(2, "asks")) === 1, "sealed: it asked its person once");
 check(!(await page.$(".ask-a")), "the Press A modal is gone once it answered");
-check((await files(2)).includes("hello.py"), "hello.py is on it");
+check((await files(2)).includes("buttons.py"), "buttons.py is on it");
 const a1 = await appsOn(2);
-check(a1?.length === 1 && a1[0].mod === "hello" && /^[0-9a-f]{12}$/.test(a1[0].v), "apps.json: just hello, with its version: " + JSON.stringify(a1));
+check(a1?.length === 1 && a1[0].mod === "buttons" && /^[0-9a-f]{12}$/.test(a1[0].v), "apps.json: just buttons, with its version: " + JSON.stringify(a1));
 check((await st(2, "jobs")) >= 1 && (await st(2, "interrupts")) === 0, "a checked install (0.3.0+): the wedgie did it itself, no Ctrl-C, no REPL");
 check((await st(2, "rawPuts")) >= 1, `0.3.16+: the files went as raw puts (${await st(2, "rawPuts")})`);
 check(/Question on its screen in \d+ ms \(site \d+, wedgie 42\)/.test(await page.getAttribute("#d-status", "data-ask") || ""), "0.3.11+: the status says how long the question took (site + wedgie): " + (await page.getAttribute("#d-status", "data-ask")));
@@ -116,78 +135,80 @@ const im = CUR.split(".").map(Number).reduce((a, x) => a * 100 + x, 0) >= 312;  
 if (im) check((await st(2, "lostGo")) === 1, "0.3.12+: install mode's restart dropped the port (the first soft reset since the plug-in), and the page found the job again");
 check((await st(2, "resets")) === (im ? 2 : 1) && (await st(2, "drops")) === 1, `${im ? "two soft resets (install mode, then into it)" : "one soft reset into it"}; the first one since the plug-in dropped the port, and the page found it again (resets ${await st(2, "resets")}, drops ${await st(2, "drops")})`);
 
-// switch: the old app's files come off; a shared file stays only while something needs it
-await pickApp("wire_demo", "Clear sign on");
+// switch to an app from a GitHub repo: on the shelf as not reviewed; on it, its files named in apps.json;
+// the old app's files come off
+const addRepo = async (repo) => {
+  if (!(await page.evaluate(() => document.querySelector("#d-repo-box").open))) await page.click("#d-repo-box summary");
+  await page.fill("#d-repo", repo);
+  await page.click("#d-repo-form button");
+};
+await addRepo("clawdbotatg/wedgie-starter");
+await wait(() => document.querySelector('#d-shelf .cart-slot[data-mod="dodge"] .cart-from.unreviewed'), null, 15000, "Dodge on the shelf, not reviewed");
+await pickApp("dodge", "Dodge on");
 let f = await files(2);
-check(!f.includes("hello.py") && f.includes("wire_demo.py") && f.includes("cbor.py"), "switched: hello.py gone, wire_demo on");
-await pickApp("usbwallet", "Wallet on");
+const aD = await appsOn(2);
+check(!f.includes("buttons.py") && f.includes("dodge.py") && aD?.[0]?.repo === "clawdbotatg/wedgie-starter" && JSON.stringify(aD[0].files) === '["dodge.py"]', "switched: buttons.py gone; a repo's app goes on, apps.json names its repo and files: " + JSON.stringify(aD));
+// switch again, to a repo app with two files that has USB to itself: the repo app's files come off by apps.json's list
+await addRepo("someone/vault");
+await wait(() => document.querySelector('#d-shelf .cart-slot[data-mod="vault"] .cart-from.unreviewed'), null, 15000, "Vault on the shelf, not reviewed");
+check(!(await page.evaluate(() => document.querySelector('#d-shelf .cart-slot[data-mod="vault"]').classList.contains("nochip"))), "an app that needs the ATECC608 isn't faded on a wedgie that has one");
+await pickApp("vault", "Vault on");
 f = await files(2);
-check(!f.includes("wire_demo.py") && !f.includes("cbor.py") && f.includes(WALLET), "switched again: its own files gone");
-check(JSON.stringify((await appsOn(2)).map((a) => [a.mod, a.usb])) === '[["usbwallet",true]]', "apps.json: the Wallet, which has USB to itself");
-check((await files(2)).includes("/saves/hello/best.json"), "switching apps never touched the saves");
+check(!f.includes("dodge.py") && f.includes(WALLET) && f.includes(KECCAK), "switched again: the repo app's files gone by apps.json's list, both of Vault's on");
+check(JSON.stringify((await appsOn(2)).map((a) => [a.mod, a.usb])) === '[["vault",true]]', "apps.json: Vault, which has USB to itself");
+check((await files(2)).includes("/saves/buttons/best.json"), "switching apps never touched the saves");
+// take a repo app off: its files come off by apps.json's list (the manifest doesn't know them)
+await page.click('#d-shelf .cart-slot[data-mod="vault"] .cart');
+await wait(() => JSON.parse(new TextDecoder().decode(window.__ports[2]._st.files.get("apps.json"))).length === 0, null, 15000, "Vault off");
+f = await files(2);
+check(!f.includes(WALLET) && !f.includes(KECCAK), "taking a repo app off: both of its files gone");
+await wait(() => document.querySelector('#d-shelf .cart-slot[data-mod="buttons"] .cart:not(:disabled)'), null, 15000, "back after taking Vault off");
+await pickApp("buttons", "Buttons on again");
+f = await files(2);
+check(f.includes("buttons.py"), "Buttons on again");
 
 // take it off
-await page.click('#d-shelf .cart-slot[data-mod="usbwallet"] .cart');   // a tap on the app on it takes it off
-await wait(() => JSON.parse(new TextDecoder().decode(window.__ports[2]._st.files.get("apps.json"))).length === 0, null, 15000, "Wallet off");
+await page.click('#d-shelf .cart-slot[data-mod="buttons"] .cart');   // a tap on the app on it takes it off
+await wait(() => JSON.parse(new TextDecoder().decode(window.__ports[2]._st.files.get("apps.json"))).length === 0, null, 15000, "Buttons off");
 f = await files(2);
-check(!f.includes(WALLET) && !f.includes(KECCAK) && (f.includes("slot.py") || f.includes("slot.mpy")), "its files gone, the core stays");
+check(!f.includes("buttons.py") && (f.includes("slot.py") || f.includes("slot.mpy")), "its files gone, the core stays");
 await wait(() => /Nothing on it yet/.test(document.querySelector("#d-carts-note").textContent), null, 10000, "the page: nothing on it");
 
 const asks = await st(2, "asks");
-check(asks === 4 && !(await st(2, "open")), `sealed: every job asked (hello, Clear sign, Wallet, taking it off: ${asks}), locked again after each`);
+check(asks === 6 && !(await st(2, "open")), `sealed: every job asked (Buttons, Dodge, Vault, taking it off, Buttons, taking it off: ${asks}), locked again after each`);
 
 // a no changes nothing
 await page.evaluate(() => { window.__ports[2]._st.person = { say: "no", ms: 300 }; });
-await wait(() => document.querySelector('#d-shelf .cart-slot[data-mod="hello"] .cart:not(:disabled)') && document.querySelector("#d-missing").hidden, null, 15000, "back after taking it off");
+await wait(() => document.querySelector('#d-shelf .cart-slot[data-mod="buttons"] .cart:not(:disabled)') && document.querySelector("#d-missing").hidden, null, 15000, "back after taking it off");
 const beforeNo = JSON.stringify(await files(2));
-await page.click(`#d-shelf .cart-slot[data-mod="hello"] .cart`);
+await page.click(`#d-shelf .cart-slot[data-mod="buttons"] .cart`);
 await wait(() => /said no/.test(document.querySelector("main")?.textContent || ""), null, 10000, "a no: the page says the wedgie said no");
 check((await st(2, "asks")) === asks + 1 && JSON.stringify(await files(2)) === beforeNo, "a no changes nothing");
 await page.evaluate(() => { window.__ports[2]._st.person = { say: "yes", ms: 300 }; });
 
-// an app from a GitHub repo (faked from the local starter folder): on the shelf as not reviewed; on it, its
-// files named in apps.json; switching away takes them off by that list
-const starter = join(homedir(), "clawd/wedgie-starter");
-const cors = { "access-control-allow-origin": "*" };
-await ctx.route("https://api.github.com/**", (r) => r.fulfill({ status: 200, headers: cors, contentType: "application/json", body: JSON.stringify({ sha: "0123456789abcdef0123456789abcdef01234567" }) }));
-await ctx.route("https://raw.githubusercontent.com/**", (r) => {
-  const p = join(starter, r.request().url().replace(/^.*?githubusercontent\.com\/[^/]+\/[^/]+\/[^/]+\//, ""));
-  return existsSync(p) ? r.fulfill({ status: 200, headers: cors, body: readFileSync(p) }) : r.fulfill({ status: 404, headers: cors, body: "" });
-});
-await page.click("#d-repo-box summary");
-await page.fill("#d-repo", "clawdbotatg/wedgie-starter");
-await page.click("#d-repo-form button");
-await wait(() => document.querySelector('#d-shelf .cart-slot[data-mod="dodge"] .cart-from.unreviewed'), null, 15000, "Dodge on the shelf, not reviewed");
-await pickApp("dodge", "Dodge on");
-const aD = await appsOn(2);
-check((await files(2)).includes("dodge.py") && aD?.[0]?.repo === "clawdbotatg/wedgie-starter" && JSON.stringify(aD[0].files) === '["dodge.py"]', "a repo's app goes on; apps.json names its repo and files: " + JSON.stringify(aD));
-await pickApp("hello", "Hello on after Dodge");
-check(!(await files(2)).includes("dodge.py"), "switching away takes the repo app's files off");
-await page.click('#d-shelf .cart-slot[data-mod="hello"] .cart');
-await wait(() => JSON.parse(new TextDecoder().decode(window.__ports[2]._st.files.get("apps.json"))).length === 0, null, 15000, "Hello off again");
-await wait(() => /Nothing on it yet/.test(document.querySelector("#d-carts-note").textContent) && document.querySelector('[data-sv-dl="hello"]:not(:disabled)'), null, 15000, "the page: nothing on it, saves ready");
+await wait(() => /Nothing on it yet/.test(document.querySelector("#d-carts-note").textContent) && document.querySelector('[data-sv-dl="buttons"]:not(:disabled)'), null, 15000, "the page: nothing on it, saves ready");
 
 // saves: download, delete, put back
 const dl = page.waitForEvent("download");
-await page.click('[data-sv-dl="hello"]');
+await page.click('[data-sv-dl="buttons"]');
 const bundlePath = `${out}/saves-bundle.json`;
 await (await dl).saveAs(bundlePath);
 const bundle = JSON.parse((await import("node:fs")).readFileSync(bundlePath, "utf8"));
-check(bundle["wedgie-saves"] === 1 && atob(bundle.files["/saves/hello/best.json"]) === '{"score": 120}', "saves download: a bundle with Hello's save");
-await page.click('[data-sv-rm="hello"]');
-check(/Delete them\?/.test(await page.textContent('[data-sv-rm="hello"]')), "Delete saves asks once");
-await page.click('[data-sv-rm="hello"]');
-await wait(() => ![...window.__ports[2]._st.files.keys()].some((k) => k.startsWith("/saves/hello")), null, 10000, "saves deleted");
+check(bundle["wedgie-saves"] === 1 && atob(bundle.files["/saves/buttons/best.json"]) === '{"score": 120}', "saves download: a bundle with Buttons' save");
+await page.click('[data-sv-rm="buttons"]');
+check(/Delete them\?/.test(await page.textContent('[data-sv-rm="buttons"]')), "Delete saves asks once");
+await page.click('[data-sv-rm="buttons"]');
+await wait(() => ![...window.__ports[2]._st.files.keys()].some((k) => k.startsWith("/saves/buttons")), null, 10000, "saves deleted");
 await wait(() => /No saves yet/.test(document.querySelector("#d-saves-note").textContent), null, 10000, "the page: no saves yet");
 await page.setInputFiles("#d-saves-in", bundlePath);
-await wait(() => window.__ports[2]._st.files.has("/saves/hello/best.json") && new TextDecoder().decode(window.__ports[2]._st.files.get("/saves/hello/best.json")) === '{"score": 120}', null, 15000, "saves put back");
+await wait(() => window.__ports[2]._st.files.has("/saves/buttons/best.json") && new TextDecoder().decode(window.__ports[2]._st.files.get("/saves/buttons/best.json")) === '{"score": 120}', null, 15000, "saves put back");
 await wait(() => /1 save file put back/.test(document.querySelector("#d-saves-note").textContent), null, 10000, "the page says it put them back");
 const busyOn = async (i, title) => ((await st(i, "screens")) || []).filter((x) => x.title === title);
-check((await busyOn(2, "Putting saves back")).some((x) => x.what === "saves/hello/best.json"), "its screen: the boot bar, 'Putting saves back', the file under it (docs/STYLE.md)");
+check((await busyOn(2, "Putting saves back")).some((x) => x.what === "saves/buttons/best.json"), "its screen: the boot bar, 'Putting saves back', the file under it (docs/STYLE.md)");
 
 // Developer: the files
 await page.click('[data-fs="refresh"]');
-await wait(() => document.querySelector('[data-fs-open="/junk.txt"]') && document.querySelector('[data-fs-open="/saves/hello/best.json"]'), null, 10000, "file list, saves folder included");
+await wait(() => document.querySelector('[data-fs-open="/junk.txt"]') && document.querySelector('[data-fs-open="/saves/buttons/best.json"]'), null, 10000, "file list, saves folder included");
 await page.click('[data-fs-open="/junk.txt"]');
 await wait(() => /delete me/.test(document.querySelector("#d-fs-view")?.textContent || ""), null, 10000, "a text file opens");
 await page.click('[data-fs-rm="/junk.txt"]');
@@ -217,20 +238,21 @@ check(up.length >= 5 && up.every((x) => x.title === "Updating firmware") && up.s
   `its screen the whole update: the boot bar, 'Updating firmware', filling to the end, file by file (${up.length} draws, titles ${[...new Set(up.map((x) => x.title))]})`);
 const a3 = await appsOn(1), f3 = await files(1);
 check(JSON.stringify(a3) === "[]", "no app yet (nobody picked one): " + JSON.stringify(a3));
-check(!f3.includes("hello.py") && !f3.includes("keytest.py") && !f3.includes("menu.py") && (f3.includes("slot.py") || f3.includes("slot.mpy")), "its old apps and the menu gone, the slot on");
+check(!f3.includes("buttons.py") && !f3.includes("menu.py") && (f3.includes("slot.py") || f3.includes("slot.mpy")), "its shelf app (Buttons) and the menu gone, the slot on");
+check(f3.includes("hello.py"), "a retired app's file (hello.py, no longer published) is left alone");
 await wait(() => /Nothing on it yet/.test(document.querySelector("#d-carts-note")?.textContent || ""), null, 10000, "the page: nothing on it yet");
 check(await st(1, "chips") >= 1, "after the update the chip is checked too");
 
 // an app for a chip it hasn't got: faded, says why, the first tap only warns, a second puts it on anyway
-const wl = '#d-shelf .cart-slot[data-mod="usbwallet"]';
-await wait((s) => document.querySelector(s)?.classList.contains("nochip"), wl, 10000, "no chip: the Wallet is faded");
-check(/Wallet needs an ATECC608 chip\. This wedgie has no chip\./.test(await page.textContent(`${wl} .cart-needs`)), "it says why");
-check(!(await page.evaluate(() => document.querySelector('#d-shelf .cart-slot[data-mod="hello"]').classList.contains("nochip"))), "an app with no chip needs isn't faded");
+const wl = '#d-shelf .cart-slot[data-mod="vault"]';      // the repo added on the other wedgie's page: this browser keeps it
+await wait((s) => document.querySelector(s)?.classList.contains("nochip"), wl, 10000, "no chip: Vault is faded");
+check(/Vault needs an ATECC608 chip\. This wedgie has no chip\./.test(await page.textContent(`${wl} .cart-needs`)), "it says why");
+check(!(await page.evaluate(() => document.querySelector('#d-shelf .cart-slot[data-mod="buttons"]').classList.contains("nochip"))), "an app with no chip needs isn't faded");
 await page.click(`${wl} .cart`);
 await page.waitForTimeout(800);
 check(/Tap it again to put it on anyway/.test(await page.textContent(`${wl} .cart-needs`)) && !(await files(1)).includes(WALLET), "first tap: a warning, nothing installed");
 await page.click(`${wl} .cart`);
-await wait((WALLET) => window.__ports[1]._st.files.has(WALLET) && JSON.parse(new TextDecoder().decode(window.__ports[1]._st.files.get("apps.json")))[0]?.mod === "usbwallet", WALLET, 30000, "second tap: on anyway");
+await wait((WALLET) => window.__ports[1]._st.files.has(WALLET) && JSON.parse(new TextDecoder().decode(window.__ports[1]._st.files.get("apps.json")))[0]?.mod === "vault", WALLET, 30000, "second tap: on anyway");
 
 // ---- the bare board: install the core, it comes back a wedgie with no app yet ---------------------------
 await page.click(".back");
@@ -239,7 +261,7 @@ await wait(() => document.querySelector("[data-fw]") && !document.querySelector(
 await page.click("[data-fw]");
 await wait(() => /Up to date/.test(document.querySelector("#d-fw")?.textContent || ""), null, 120000, "bare board installed");
 const f0 = await files(0);
-check(f0.includes("slot.mpy") && f0.includes("save.mpy") && !f0.includes("menu.py") && !f0.includes("hello.py"), "the core only, no apps: " + f0.length + " files");
+check(f0.includes("slot.mpy") && f0.includes("save.mpy") && !f0.includes("menu.py") && !f0.includes("buttons.py"), "the core only, no apps: " + f0.length + " files");
 check(JSON.stringify(await appsOn(0)) === "[]", "no app yet");
 check((await st(0, "drops")) === 1, "its first boot added the WEDGIE drive (port dropped, came back, found by its ID)");
 check(errs.length === 0, errs.length ? "page errors: " + errs.join(" | ") : "no page errors");

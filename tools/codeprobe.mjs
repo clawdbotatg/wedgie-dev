@@ -1,7 +1,7 @@
 // /code end to end in headless Chromium, with GitHub faked: api.github.com and raw.githubusercontent.com
 // are answered from local folders (a repo = a folder with wedgie.json). Checks: the starter repo loads
 // and its app runs in the emulator; the real keyboard (D) moves it; its save reaches the page, an
-// edited save runs it again; a folder opens; a broken wedgie.json says why; Speed lab reports. Screenshots go to <outdir>/code-*.png.
+// edited save runs it again; a folder opens; a broken wedgie.json says why; Buttons (the shelf's app) runs and answers a key. Screenshots go to <outdir>/code-*.png.
 //   node tools/codeprobe.mjs <site url, e.g. http://localhost:4173> <outdir> [starter repo folder]
 import { chromium } from "playwright-core";
 import { readdirSync, readFileSync, existsSync, mkdirSync } from "node:fs";
@@ -105,17 +105,25 @@ try {
   await page.waitForFunction(() => /no public repo/.test(document.querySelector("#c-note")?.textContent || ""), null, { timeout: 10000 });
   check(true, "a repo GitHub doesn't have says so");
 
-  // Speed lab (a firmware cart) on the virtual wedgie: it runs every test and reports.
+  // Buttons (the shelf's app: in the manifest, not a repo) on the virtual wedgie: it starts, draws, and
+  // its first check (N: joystick up, W on the keyboard) moves on when pressed.
   const lines = await page.evaluate(() => new Promise((res) => {
     const got = [];
-    const off = window.__codeVw.onOutput((l) => { got.push(l); if (l.startsWith("@speed {")) { off(); res(got); } });
-    window.__codeVw.reboot("speed", null);
-    setTimeout(() => { off(); res(got); }, 60000);
+    const off = window.__codeVw.onOutput((l) => got.push(l));
+    window.__codeVw.reboot("buttons", null).then(() => setTimeout(() => { off(); res(got); }, 3000), (e) => { off(); res([...got, "reboot failed: " + e.message]); });
   }));
-  const res = lines.find((l) => l.startsWith("@speed {"));
-  check(!!res, `Speed lab finishes and reports: ${res ? res.slice(0, 140) : lines.slice(-4).join(" | ")}`);
-  await page.waitForTimeout(500);
-  await page.locator("#c-vw").screenshot({ path: `${out}/code-speed.png` });
+  await page.waitForFunction(() => window.__codeVw.fps > 5, null, { timeout: 30000 }).then(() => true, () => false);
+  const ready = lines.map((l) => { try { return JSON.parse(l); } catch { return null; } }).find((j) => j?.type === "ready");
+  check(ready?.running === "buttons" && !lines.some((l) => /Traceback|failed/.test(l)), `Buttons, the shelf's app, starts on the virtual wedgie: ${ready ? "running " + ready.running : lines.slice(-4).join(" | ")}`);
+  await page.locator("#c-vw .vw").focus();
+  const k0 = await page.evaluate(() => window.__codeVw.screenshotPNG());
+  await page.waitForTimeout(800);
+  const k1 = await page.evaluate(() => window.__codeVw.screenshotPNG());
+  check(k0 === k1, "Buttons: it waits for its first button (the screen holds still)");
+  await page.keyboard.down("w"); await page.waitForTimeout(150); await page.keyboard.up("w");
+  await page.waitForTimeout(800);
+  check(k1 !== await page.evaluate(() => window.__codeVw.screenshotPNG()), "Buttons: W (up, its first check) moves it on");
+  await page.locator("#c-vw").screenshot({ path: `${out}/code-buttons.png` });
   check(!errs.length, `no page errors${errs.length ? ": " + errs.join("; ") : ""}`);
 } finally {
   await browser.close();

@@ -14,7 +14,7 @@ A web page can do this too (wedgie.dev/drive.html), but iOS makes you pick the f
 Send → Save to Files → WEDGIE → Save; Read → Browse → WEDGIE → pick the file. An app picks the
 WEDGIE drive **once**, keeps permission, and then reads and writes it with no taps.
 
-## Status (2026-10-03): working, released in 0.3.18
+## Status (2026-10-03): working, released in 0.3.21
 
 The app (`ios/WedgieDrive`) is on Austin's phone. On a real RP2040 and an iPhone: Hello sent as
 `REQ-<n>.TXT`, the answer read back from `ANSWER.TXT` in ~3 s; after an unplug and replug the app sent

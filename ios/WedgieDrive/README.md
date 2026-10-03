@@ -9,7 +9,7 @@ unknowns: `docs/PLAN-IPHONE-APP.md`.
   any JSON request. Each send is a new `REQ-<n>.TXT`; old ones (5 s+) are deleted first.
 - After a send the app reads `ANSWER.TXT` every second for 60 s and logs each new answer.
 - The page gets `window.wedgieDrive` (status, send, list, read, panel), only on wedgie.dev.
-- Needs wedgie 0.3.18+. Test from a Mac without the phone: `uv run --with pyserial python3 tools/drivebench.py`.
+- Needs wedgie 0.3.21+. Test from a Mac without the phone: `uv run --with pyserial python3 tools/drivebench.py`.
 
 ## Build and install
 
