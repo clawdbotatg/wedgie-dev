@@ -238,6 +238,12 @@ html, body { overflow-x: clip; }
 .connect-btn .n:empty { display: none; }
 .connect-btn .n { font-family: var(--mono); font-size: 14px; background: rgba(0,0,0,.18); border-radius: 999px; padding: 1px 8px; }
 .connect { min-height: 60vh; padding-top: 40px; }
+.setup { display: grid; gap: 12px; margin: 0 auto 24px; max-width: 640px; }
+.setup h3 { margin: 0; }
+.setup.good { box-shadow: var(--shell-shadow), 0 0 0 4px var(--mint); }
+.setup.bad { box-shadow: var(--shell-shadow), 0 0 0 4px var(--coral); }
+.setup-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.setup .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .buy { display: flex; flex-wrap: wrap; gap: 8px; }
 .part .buy .btn { align-self: auto; }
 
@@ -475,9 +481,6 @@ body.test-mode .top, body.test-mode .foot { display: none; }
 .repo-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 15px; }
 .repo-list li.bad { color: #b0231f; font-size: 14px; }
 .cart-needs[hidden] { display: none; }
-.cart-out { -webkit-appearance: none; appearance: none; border: 0; background: none; font: 800 13px var(--font); color: var(--muted); padding: 4px 2px; cursor: pointer; align-self: flex-start; text-decoration: underline; text-underline-offset: 3px; }
-.cart-out.sure { color: #c22621; }
-.cart-out[hidden] { display: none; }
 
 /* ---- /update: the update bench, a card per wedgie ---- */
 .upd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; width: min(100%, 980px); }

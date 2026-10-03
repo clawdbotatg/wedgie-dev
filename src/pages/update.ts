@@ -108,7 +108,7 @@ export function update(main: HTMLElement) {
       if (w.state === "error") {
         const j = w.uid ? jobs.get(w.uid) : undefined;
         if (!jobs.has("key" + w.key) && !j) jobs.set("key" + w.key, { uid: "key" + w.key, key: w.key, state: "fail", from: "", board: "", p: 0, what: "", at: Date.now(),
-          error: /No MicroPython/.test(w.error || "") ? "No MicroPython on it: set it up at wedgie.dev/format first" : w.error });
+          error: /No MicroPython/.test(w.error || "") ? "No MicroPython on it: set it up at wedgie.dev/connect first" : w.error });
         continue;
       }
       if (w.state !== "ready" || !w.uid || running.has(w.key)) continue;

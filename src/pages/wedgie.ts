@@ -13,7 +13,7 @@
 // running main.py (Repl.leave({ reset: false })), which keeps the port. Picking another app ends with
 // a soft reset (a fresh heap for it); 0.1.3+ keeps the port through that too.
 import { esc, KEYS, type Screen } from "../ui/device";
-import { place3D, idScreen as idCanvas, colorScreen } from "../ui/place3d";
+import { place3D, idScreen as idCanvas, colorScreen, baseColor } from "../ui/place3d";
 import type { Wedgie3D } from "../ui/wedgie3d";
 import * as W from "../serial/wedgies";
 import { pyStr, type Repl } from "../serial/repl";
@@ -233,7 +233,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
   place3D($(".wd-3d"), {
     screen: tex(shown),
     onKey: (k, down) => { if (down && mirrorOn && wedgie() && link && !busy) link.request({ type: "press", key: k }).catch(() => {}); },
-  }).then((x) => { w3 = x; x?.setScreen(tex(shown)); });
+  }).then((x) => { w3 = x; x?.setScreen(tex(shown)); x?.setColor("base", baseColor(w?.chip?.type)); });
 
   const cx = canvas.getContext("2d")!, img = cx.createImageData(240, 240);
   async function mirror() {
@@ -303,6 +303,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
       return;
     }
     const x = w!;
+    w3?.setColor("base", baseColor(x.chip?.type));
     $("#d-light").className = `light ${F.overall(x, m)}`;
     $("#d-hint").textContent = mirrorOn && wedgie() && link ? "Its real screen. Click its buttons (or press arrows, Enter, A, B, X, Y) to press the real ones." : "";
     const mb = $<HTMLButtonElement>('[data-act="mirror"]');
@@ -346,7 +347,6 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
 
   // ---- software: the one app it runs ------------------------------------------------------------------
   const inserting: Record<string, number> = {};   // mod -> progress while it goes on
-  let confirmOut = false;                          // Remove was tapped once
   let confirmChip = "";                            // an app for another chip, tapped once
   // The chip this wedgie has, once known ("ATECC608", "OPTIGA Trust M", "none"); null: not checked yet.
   const chipType = () => (w?.chip?.type as string | undefined) || null;
@@ -365,7 +365,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     const a = m.carts.find((c) => c.mod === active());
     if (x.kind === "micropython") note.innerHTML = "Apps run on wedgie firmware. Install it above first.";
     else if (x.kind === "wedgie" && !slot()) note.innerHTML = "Update the firmware above first. From 0.2 a wedgie runs one app: it boots straight into it, and the app gets every button.";
-    else note.innerHTML = a ? `It runs <b>${esc(a.name)}</b>. Tap another and it restarts into that. Saves stay.` : "Nothing on it yet. Tap one: it goes on and the wedgie restarts into it.";
+    else note.innerHTML = a ? `It runs <b>${esc(a.name)}</b>. Tap it to take it off, or another to switch. Saves stay.` : "Nothing on it yet. Tap one: it goes on and the wedgie restarts into it.";
     const shelf = $("#d-shelf");
     const mods = new Set(m.carts.map((c) => c.mod));
     shelf.querySelectorAll<HTMLElement>(".cart-slot").forEach((el) => { if (!mods.has(el.dataset.mod!)) el.remove(); });
@@ -377,9 +377,9 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
         slotEl.dataset.v = c.v;
         slotEl.className = "cart-slot";
         slotEl.dataset.mod = c.mod;
-        slotEl.innerHTML = `<button class="cart" title="${esc(c.about || "")}">${cartHtml(c)}</button><p class="cart-about">${esc(c.about || "")}</p>${c.repo ? `<p class="cart-from${c.unreviewed ? " unreviewed" : ""}">${c.unreviewed ? "not reviewed · " : "by "}<a href="https://github.com/${esc(c.repo)}/tree/${esc(c.sha || "HEAD")}" target="_blank" rel="noopener">${esc(c.repo)}</a></p>` : ""}<p class="cart-needs" hidden></p><button class="cart-out" hidden></button>`;
-        slotEl.querySelector<HTMLButtonElement>(".cart")!.onclick = () => pick(c);
-        slotEl.querySelector<HTMLButtonElement>(".cart-out")!.onclick = () => eject();
+        slotEl.innerHTML = `<button class="cart" title="${esc(c.about || "")}">${cartHtml(c)}</button><p class="cart-about">${esc(c.about || "")}</p>${c.repo ? `<p class="cart-from${c.unreviewed ? " unreviewed" : ""}">${c.unreviewed ? "not reviewed · " : "by "}<a href="https://github.com/${esc(c.repo)}/tree/${esc(c.sha || "HEAD")}" target="_blank" rel="noopener">${esc(c.repo)}</a></p>` : ""}<p class="cart-needs" hidden></p>`;
+        // The app on it (and up to date): a tap takes it off. Any other: a tap puts it on.
+        slotEl.querySelector<HTMLButtonElement>(".cart")!.onclick = () => (active() === c.mod && (w?.carts || [])[0]?.v === c.v && slot() ? eject() : pick(c));
       }
       if (shelf.children[i] !== slotEl) shelf.insertBefore(slotEl, shelf.children[i] || null);
       const on = active() === c.mod;
@@ -390,7 +390,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
       btn.classList.toggle("playing", on);
       btn.classList.toggle("absent", !on);
       btn.classList.toggle("busy", p !== undefined);
-      btn.disabled = !link || !!busy || !canPick() || (on && !outdated);
+      btn.disabled = !link || !!busy || !canPick() || (on && !outdated && !slot());
       btn.style.setProperty("--p", String(p ?? 0));
       const st = slotEl.querySelector(".cart-state")!;
       st.innerHTML = p !== undefined ? "installing" : outdated ? "update" : playing ? "▶ running" : on ? "on it" : kb(c.size);
@@ -400,11 +400,6 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
       const needs = slotEl.querySelector<HTMLElement>(".cart-needs")!;
       needs.hidden = !why;
       needs.innerHTML = why ? (confirmChip === c.mod ? `<b>${esc(why)}</b> Tap it again to put it on anyway.` : esc(why)) : "";
-      const out = slotEl.querySelector<HTMLButtonElement>(".cart-out")!;
-      out.hidden = !on || !slot();
-      out.disabled = !link || !!busy;
-      out.textContent = confirmOut ? `Take ${c.name} off?` : "Take it off";
-      out.classList.toggle("sure", confirmOut);
     });
   }
 
@@ -412,7 +407,6 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
   async function pick(c: Cart) {
     if (!link || busy || !w) return;
     const x = w, r = link;
-    confirmOut = false;
     // An app for another chip: the first tap says so; a second puts it on anyway (it's their wedgie).
     if ((wrongChip(c) || oldFw(c)) && confirmChip !== c.mod) { confirmChip = c.mod; paint(); return; }
     confirmChip = "";
@@ -440,8 +434,6 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
 
   async function eject() {
     if (!link || busy || !w) return;
-    if (!confirmOut) { confirmOut = true; paint(); return; }
-    confirmOut = false;
     const r = link;
     busy = "cart"; paint();
     const x = w;

@@ -118,9 +118,7 @@ check(JSON.stringify((await appsOn(2)).map((a) => [a.mod, a.usb])) === '[["usbwa
 check((await files(2)).includes("/saves/hello/best.json"), "switching apps never touched the saves");
 
 // take it off
-await page.click('#d-shelf .cart-slot[data-mod="usbwallet"] .cart-out');
-check(/Take Wallet off\?/.test(await page.textContent('#d-shelf .cart-slot[data-mod="usbwallet"] .cart-out')), "Take it off asks once");
-await page.click('#d-shelf .cart-slot[data-mod="usbwallet"] .cart-out');
+await page.click('#d-shelf .cart-slot[data-mod="usbwallet"] .cart');   // a tap on the app on it takes it off
 await wait(() => JSON.parse(new TextDecoder().decode(window.__ports[2]._st.files.get("apps.json"))).length === 0, null, 15000, "Wallet off");
 f = await files(2);
 check(!f.includes(WALLET) && !f.includes(KECCAK) && f.includes("slot.py"), "its files gone, the core stays");
@@ -156,8 +154,7 @@ const aD = await appsOn(2);
 check((await files(2)).includes("dodge.py") && aD?.[0]?.repo === "clawdbotatg/wedgie-starter" && JSON.stringify(aD[0].files) === '["dodge.py"]', "a repo's app goes on; apps.json names its repo and files: " + JSON.stringify(aD));
 await pickApp("hello", "Hello on after Dodge");
 check(!(await files(2)).includes("dodge.py"), "switching away takes the repo app's files off");
-await page.click('#d-shelf .cart-slot[data-mod="hello"] .cart-out');
-await page.click('#d-shelf .cart-slot[data-mod="hello"] .cart-out');
+await page.click('#d-shelf .cart-slot[data-mod="hello"] .cart');
 await wait(() => JSON.parse(new TextDecoder().decode(window.__ports[2]._st.files.get("apps.json"))).length === 0, null, 15000, "Hello off again");
 await wait(() => /Nothing on it yet/.test(document.querySelector("#d-carts-note").textContent) && document.querySelector('[data-sv-dl="hello"]:not(:disabled)'), null, 15000, "the page: nothing on it, saves ready");
 
