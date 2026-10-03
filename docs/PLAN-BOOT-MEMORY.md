@@ -2,6 +2,10 @@
 
 **The goal: NO MORE MEMORY ERRORS.** Not fewer. None, on any wedgie, in anything it does.
 
+**North star:** firmware installs, firmware updates, software installs, reinstalls and uninstalls
+never hit a memory error, on any wedgie, from any state (any app running or none, fresh plug-in
+or not). Every release is tested against exactly this list before it's signed.
+
 ## What Austin wants
 
 - Installing, updating, plugging in, starting any app: never "memory allocation failed". On any wedgie.
