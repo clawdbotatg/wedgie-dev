@@ -4,8 +4,13 @@ try:
     # A soft reset into an install (wedgie.save_job) keeps the screen: it already shows the install's
     # progress. Only on a soft reset (the drive's mark, below): after a power-up the panel needs its reset.
     _scr = (0x400D8000 if "RP2350" in sys.implementation._machine else 0x40058000) + 0x0C
+    try:                                # (scratch1 0xC01D: slot._cold's hard reset reset the panel too)
+        _cold = machine.mem32[_scr + 4] == 0xC01D
+        machine.mem32[_scr + 4] = 0
+    except Exception:
+        _cold = False
     try:
-        _keep = machine.mem32[_scr] == 0x57ED61E0 and bool(os.stat("_job.json"))
+        _keep = not _cold and machine.mem32[_scr] == 0x57ED61E0 and bool(os.stat("_job.json"))
     except Exception:                   # no job file; or no mem32 (the emulator)
         _keep = False
     splash.show(keep=_keep)

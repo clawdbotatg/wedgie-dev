@@ -331,9 +331,21 @@ def _to_job():
         def now(*_):
             machine.soft_reset()
         L._on_show = now
-        _RealTimer(-1).init(period=1500, mode=_RealTimer.ONE_SHOT, callback=lambda t: machine.reset())
+        _RealTimer(-1).init(period=1500, mode=_RealTimer.ONE_SHOT, callback=_cold)
         return
     machine.soft_reset()
+
+
+def _cold(_=None):
+    """The hard reset when an entry app never draws again (Bunker waiting on its title page). It resets
+    the panel too (its reset pin floats low), so boot.py must set it up again, not keep it: kept, the
+    whole install ran on a black screen (0.3.24, Austin 2026-10-04). Watchdog scratch1 says so."""
+    import machine
+    try:
+        machine.mem32[(0x400D8000 if "RP2350" in sys.implementation._machine else 0x40058000) + 0x10] = 0xC01D
+    except Exception:
+        pass
+    machine.reset()
 
 
 def _there(names):
