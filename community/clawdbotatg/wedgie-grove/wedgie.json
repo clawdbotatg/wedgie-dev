@@ -1,0 +1,29 @@
+{
+  "apps": [
+    {
+      "mod": "grove",
+      "name": "Crystal Grove",
+      "about": "A knight with a sword in a big world. Slash bushes: one in five hides a crystal.",
+      "files": [
+        "grove.py"
+      ],
+      "entry": "run",
+      "fw": "0.3.24",
+      "label": "#22c452",
+      "icon": [
+        "............",
+        "...kkkk.....",
+        "..kggggk..w.",
+        ".kggggggkw..",
+        ".kggggggw...",
+        "..kggggk....",
+        "...kkkk.....",
+        "......kk....",
+        ".....kbbk...",
+        "....kbbbbk..",
+        ".....kkkk...",
+        "............"
+      ]
+    }
+  ]
+}

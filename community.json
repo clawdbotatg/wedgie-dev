@@ -7,13 +7,18 @@
       "approved": "2026-10-03"
     },
     {
-      "repo": "clawdbotatg/wedgie-frog",
-      "sha": "1ebd30c87d74144c9cb292c6302cdd35bd7142d3",
+      "repo": "clawdbotatg/wedgie-keypad",
+      "sha": "14a0eec4f745a99952c91087782259db06210a1b",
       "approved": "2026-10-03"
     },
     {
-      "repo": "clawdbotatg/wedgie-keypad",
-      "sha": "14a0eec4f745a99952c91087782259db06210a1b",
+      "repo": "clawdbotatg/wedgie-grove",
+      "sha": "de6f066fa47ce3ced8fb209a823cc8af38fbca85",
+      "approved": "2026-10-03"
+    },
+    {
+      "repo": "clawdbotatg/wedgie-frog",
+      "sha": "5fa187b87f447628252a6a7dc97e2d1873ae02b5",
       "approved": "2026-10-03"
     }
   ]

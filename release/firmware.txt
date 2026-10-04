@@ -5,7 +5,8 @@ fdf4bcc822cc89d7b445dd274720eec32b24a121b5fb5bf974270bf7773e0d8f  atecc.mpy
 fb0416ded0a198e844850d320ae5afd4151da4412c9567d1486bf38a0e6bfb42  boot.py
 8e228f1f9d15dcc6210319e1034ad59afa21b92c1661cd4b88a3653ea59ff132  buttons.py
 b5bab1f4b83ce4a2c3fcb284e424c83f3d842daca5eff288eac571e960bfa5ba  drive.bin
-f75a88dc5d6a1d7bc9642994fb9a0350e7ef4cdee6bca1f0dfc476f170e9939b  frog.py
+7f10349db6a4b3d16428bff5a28f7d8db5985d7723dfea101d0a3aee36aede96  frog.py
+7c059725a5ba2f460ad7c6baddb922a5d68a91ba2357f1a1651404890e40eb10  grove.py
 fa1d25c589c0f6b3c891ff440bc09f738309c4743c98a20bb7c710d204492add  hatch.mpy
 67b6afba61ca365e4fc1fb15f929de683ed55e9a4b2472bc1030fe9c7102c982  inbox.mpy
 8ae1d4d91c4b8f4d1642ff205bd41e02631d636c0fdc9418515c14f961da59eb  job.mpy
@@ -26,4 +27,5 @@ e656efa1581715fb53ebbf0812ced808ddb017716167b4da2c64d15dcf9f0a01  wedgie.mpy
 52dae08d91d4f91b85a7cb00b72c6b9ab41b4928e052dbd88051885d759d345a  wedgiedrive.mpy
 @app  {"mod":"buttons","name":"Buttons","entry":"run","files":["buttons.py"]}
 @app  {"mod":"frog","name":"Frog","entry":"run","files":["frog.py"]}
+@app  {"mod":"grove","name":"Crystal Grove","entry":"run","files":["grove.py"]}
 @app  {"mod":"keypad","name":"Keypad","entry":"run","files":["keypad.py"]}

@@ -9,7 +9,7 @@
 #
 # Drawn with framebuf's C calls (ellipses, lines): no sprite RAM, and he can be any size.
 # Only the pond (y 34..203) is redrawn every frame; the top bar and the menu only when they change.
-import time, random
+import time, random, math
 from array import array
 from lcd import LCD, Keys, color
 import save
@@ -119,6 +119,28 @@ def burst(n, kind, x, y):
 
 def add(k, v):
     frog[k] = max(0, min(100, frog[k] + v))
+
+
+# ---- eating: the food comes in, the tongue snaps it ----
+
+FLY_MS = 2120           # the fly buzzes this long; 2120 lands it at the bottom of its loop
+TONGUE_MS = 260         # out in 100 ms, back in the rest
+
+
+def snap_at():
+    return FLY_MS if eat_i == 0 else 700
+
+
+def food_at(e):
+    """Where the food is, e ms into a bite."""
+    if eat_i == 0:      # the fly: loops around his head, flying in from the right at first
+        x = CX + 45 + int(38 * math.sin(e / 260))
+        y = BY - size * 2 - 10 + int(22 * math.sin(e / 150)) + ((e >> 5) & 1) * 2
+        if e < 500:
+            x, y = 250 + (x - 250) * e // 500, 60 + (y - 60) * e // 500
+        return x, y
+    tx, ty = CX + size + 34, BY - size * 2
+    return 250 - (250 - tx) * e // 700, ty - 30 + 30 * e // 700
 
 
 # ---- drawing ----
@@ -310,12 +332,12 @@ def draw(t):
         hop = 112 * p * (600 - p) // 360000             # three hops, 28 px high
         shut = p > 200 and p < 400
     elif act == "eat":
-        tx, ty = CX + size + 34, BY - size * 2
-        if e < 700:                                     # the food comes in from the right
-            fx = 250 - (250 - tx) * e // 700
-            fy = ty - 30 + 30 * e // 700 + (((e >> 5) & 3) * 2 if eat_i == 0 else 0)
-            lx, ly = 1, 0
-        elif e < 1000:
+        T = snap_at()
+        if e < T:                                       # the food comes in; his eyes follow it
+            fx, fy = food_at(e)
+            lx = 1 if fx > CX + size // 2 else (-1 if fx < CX - size // 2 else 0)
+            ly = -1 if fy < BY - size * 2 - 12 else 0
+        elif e < T + TONGUE_MS:
             lx, ly = 1, 0
         else:
             mouth = 1 if (e // 150) & 1 else 2
@@ -328,18 +350,17 @@ def draw(t):
     else:
         breath = 1 if (t >> 9) & 1 else 0
         my = draw_frog(CX, BY - hop, size, E, lx, ly, shut, md, mouth, breath)
-        if act == "eat" and 700 <= e < 1000:            # the tongue: out, then back with the food
-            tx, ty = CX + size + 34, BY - size * 2
-            k = (e - 700) if e < 850 else (1000 - e)
-            ex = CX + (tx - CX) * k // 150
-            ey = my + 2 + (ty - my - 2) * k // 150
-            for d in (-1, 0, 1):
-                lcd.line(CX, my + 2 + d, ex, ey + d, TONGUE)
+        T = snap_at()
+        if act == "eat" and T <= e < T + TONGUE_MS:     # the tongue: snaps out, comes back with it
+            tx, ty = food_at(T)
+            d = e - T
+            k = 1000 * d // 100 if d < 100 else 1000 * (TONGUE_MS - d) // (TONGUE_MS - 100)
+            ex = CX + (tx - CX) * k // 1000
+            ey = my + 2 + (ty - my - 2) * k // 1000
+            for o in (-1, 0, 1):
+                lcd.line(CX, my + 2 + o, ex, ey + o, TONGUE)
             lcd.ellipse(ex, ey, 3, 3, TONGUE, True)
-            if e >= 850:
-                fx, fy = ex, ey
-            elif e < 850:
-                fx, fy = tx, ty
+            fx, fy = (tx, ty) if d < 100 else (ex, ey)
     if fx is not None:
         food_art(eat_i, fx, fy, t)
     for p in parts:
@@ -485,8 +506,9 @@ def update():
         look_t = time.ticks_add(now, random.randint(1500, 4000))
     if time.ticks_diff(now, blink_t) > 0:
         blink_t = time.ticks_add(now, random.randint(2000, 5000))
-    # actions finishing
-    if act == "eat" and e >= 1000 and not ate:
+    # actions finishing (e again: a key above may have just started one)
+    e = time.ticks_diff(now, act_t)
+    if act == "eat" and e >= snap_at() + TONGUE_MS and not ate:
         name, f, j = FOODS[eat_i]
         fav = eat_i == frog["fav"]
         add("food", f)
@@ -499,7 +521,7 @@ def update():
         else:
             say(("yum!", "tasty!", "gulp!", "mmm!")[random.randint(0, 3)], 1500)
         dirty = True
-    if act == "eat" and e >= 1800:
+    if act == "eat" and e >= snap_at() + TONGUE_MS + 800:
         act = None
         keep()
     elif act == "play" and e >= 1800:
