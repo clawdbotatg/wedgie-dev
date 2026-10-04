@@ -178,6 +178,17 @@ await page.click(upd);
 await wait(new Function(`return ${shelfOn("buttons")} && document.querySelector('${upd}').hidden`), null, 30000, "updated: Update gone");
 check(JSON.parse(await page.evaluate(() => new TextDecoder().decode(window.__ports[2]._st.files.get("apps.json"))))[0].v !== "old", "apps.json: the new Buttons");
 
+// an app that takes 15 s to start, saying nothing: the page waits for it, and never sends the Ctrl-C that
+// asks a locked wedgie FULL CONTROL? (Austin, 2026-10-03, after updating Grove)
+const sealedB = (await st(2, "sealedBytes")) || 0, intB = await st(2, "interrupts");
+await page.evaluate(() => { window.__ports[2]._st.slowStart = 15000; window.__plug(2, false); });
+await new Promise((r) => setTimeout(r, 500));
+await page.evaluate(() => window.__plug(2, true));
+await wait(() => Date.now() > window.__ports[2]._st.slowUntil + 3000, null, 30000, "a slow-starting app: its start is over");
+await wait(new Function(`return ${shelfOn("buttons")}`), null, 30000, "a slow-starting app: found once it answers");
+check(((await st(2, "sealedBytes")) || 0) === sealedB && (await st(2, "interrupts")) === intB, "a slow-starting app: no Ctrl-C (no FULL CONTROL? question), found once it answered ");
+await page.evaluate(() => { window.__ports[2]._st.slowStart = 0; });
+
 // take it off
 await page.click('#d-shelf .cart-slot[data-mod="buttons"] .cart');   // a tap on the app on it does nothing
 await new Promise((r) => setTimeout(r, 500));

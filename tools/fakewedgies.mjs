@@ -8,7 +8,8 @@
 // Use: await ctx.addInitScript(fakeWedgies, [{ uid, machine, files: { "name": "text" | 1 } }, ...])
 //   (1 = a one-byte stand-in); window.__ports[i]._st is each board's state; window.__plug(i, false|true)
 //   pulls a board out or plugs it back in. A board with noMp: true never answers (no MicroPython);
-//   chip: "none" has no secure chip (default: an ATECC608 that proves itself).
+//   chip: "none" has no secure chip (default: an ATECC608 that proves itself). _st.slowStart = ms: after each
+//   plug-in its app takes that long to start, saying nothing (Grove 4f7748d making its pictures).
 // 0.2.5+ is sealed: Ctrl-C is a plain byte until {"type": "open"} is answered yes by the pretend person
 // (person: { say: "yes" | "no", ms }, default yes after 300 ms; _st.asks counts the questions). A yes lasts
 // until main.py starts again (a soft reset or exec(main.py)): one job.
@@ -125,6 +126,7 @@ export function fakeWedgies(specs) {
       if (!wedgie()) return push(">>> " + JSON.stringify(msg) + "\r\n{'x': 1}\r\n>>> ");
       const id = msg.id, v = version();
       const ok = () => push(JSON.stringify({ id, type: "ok" }) + "\r\n");
+      if (st.slowUntil && Date.now() < st.slowUntil) return;      // its app still starting: nothing answers
       if (msg.type === "hello") return push((st.job ? hello(id).replace(/}$/, `, "job": true${st.job.asked_ms != null ? ', "asked_ms": ' + st.job.asked_ms : ""}}`) : hello(id)) + "\r\n");   // 0.3.12+: a job is running (install mode: job.py's hello)
       if (msg.type === "launch") { if (!apps().some((a) => a.mod === msg.app)) return push(JSON.stringify({ id, type: "error", error: "no such app" }) + "\r\n"); st.launched = msg.app; return ok(); }
       if (msg.type === "home" || msg.type === "stop") { st.launched = null; if (slot()) st.stopped = true; return ok(); }
@@ -293,7 +295,7 @@ export function fakeWedgies(specs) {
   window.__ports = ports;
   const t = new EventTarget();
   const plugged = new Set(ports);
-  window.__plug = (i, on) => { const p = ports[i]; p._st.dropped = !on; if (on && (p._st.files.has("wedgiedrive.py") || p._st.files.has("wedgiedrive.mpy"))) p._st.mark = p._st.driveOn = true; if (on) { plugged.add(p); t.dispatchEvent(Object.assign(new Event("connect"), { port: p })); } else { plugged.delete(p); t.dispatchEvent(Object.assign(new Event("disconnect"), { port: p })); } };
+  window.__plug = (i, on) => { const p = ports[i]; p._st.dropped = !on; if (on && (p._st.files.has("wedgiedrive.py") || p._st.files.has("wedgiedrive.mpy"))) p._st.mark = p._st.driveOn = true; if (on) { if (p._st.slowStart) p._st.slowUntil = Date.now() + p._st.slowStart; plugged.add(p); t.dispatchEvent(Object.assign(new Event("connect"), { port: p })); } else { plugged.delete(p); t.dispatchEvent(Object.assign(new Event("disconnect"), { port: p })); } };
   for (const p of ports) p._st.resetHook = () => {
     p._st.dropped = true;
     p._st.fail?.(new DOMException("The device has been lost.", "NetworkError"));   // Chrome errors the open port's reads

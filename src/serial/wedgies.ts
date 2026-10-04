@@ -159,10 +159,16 @@ async function identify(w: Wedgie) {
 function talk(w: Wedgie) {
   return withRepl(w, async (r) => {
     await new Promise((res) => setTimeout(res, 150));
-    // A wedgie that just plugged in may still be booting (logo, loader): keep asking for ~4 s before
-    // falling back to the REPL, which would interrupt it.
-    let h: any = null;
-    for (let i = 0; i < 6 && !h; i++) h = await r.hello(700);
+    // A wedgie that just plugged in may still be booting (logo, loader, an app making its pictures): keep
+    // asking. Ctrl-C only a board that shows a REPL (it echoes our hello, or prints >>>): on a locked wedgie
+    // Ctrl-C is the FULL CONTROL? question (hatch.py), which a slow-starting app (Grove 4f7748d, ~5 s)
+    // put up after every install (Austin, 2026-10-03). A silent port gets 20 s before the REPL fallback.
+    let h: any = null, seen = "";
+    const text = r.onText;
+    r.onText = (s) => { seen = (seen + s).slice(-400); text?.(s); };
+    const repl = () => /type":"hello"|>>>|raw REPL/.test(seen);
+    for (let i = 0, end = Date.now() + 20000; !h && (i < 6 || (!repl() && Date.now() < end)); i++) h = await r.hello(700);
+    r.onText = text;
     if (!h) {
       let got: any = null;
       r.onLine = (tag, v) => { if (tag === "id") got = v; };
