@@ -477,6 +477,8 @@ body.test-mode .top, body.test-mode .foot { display: none; }
 .cart-slot.nochip .cart:hover:not(:disabled) { opacity: .7; }
 .cart-needs { font-size: 13px; line-height: 1.35; color: #b0231f; margin: 6px 2px 0; font-weight: 700; }
 .cart-needs b { font-weight: 900; }
+.cart-acts { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 2px 0; }
+.cart-acts:not(:has(button:not([hidden]))) { display: none; }
 .cart-from { font-size: 12px; line-height: 1.3; color: var(--muted); margin: 4px 2px 0; font-weight: 700; overflow-wrap: anywhere; }
 .cart-from a { color: inherit; }
 .cart-from.unreviewed { color: #b06a00; }

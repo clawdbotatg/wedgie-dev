@@ -366,7 +366,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     const a = m.carts.find((c) => c.mod === active());
     if (x.kind === "micropython") note.innerHTML = "Apps run on wedgie firmware. Install it above first.";
     else if (x.kind === "wedgie" && !slot()) note.innerHTML = "Update the firmware above first. From 0.2 a wedgie runs one app: it boots straight into it, and the app gets every button.";
-    else note.innerHTML = a ? `It runs <b>${esc(a.name)}</b>. Tap it to uninstall it, or another to switch. Saves stay.` : "Nothing on it yet. Tap one: it goes on and the wedgie restarts into it.";
+    else note.innerHTML = a ? `It runs <b>${esc(a.name)}</b>. Tap another to switch. Saves stay.` : "Nothing on it yet. Tap one: it goes on and the wedgie restarts into it.";
     const shelf = $("#d-shelf");
     const mods = new Set(m.carts.map((c) => c.mod));
     shelf.querySelectorAll<HTMLElement>(".cart-slot").forEach((el) => { if (!mods.has(el.dataset.mod!)) el.remove(); });
@@ -378,9 +378,11 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
         slotEl.dataset.v = c.v;
         slotEl.className = "cart-slot";
         slotEl.dataset.mod = c.mod;
-        slotEl.innerHTML = `<button class="cart" title="${esc(c.about || "")}">${cartHtml(c)}</button><p class="cart-about">${esc(c.about || "")}</p>${c.repo ? `<p class="cart-from${c.unreviewed ? " unreviewed" : ""}">${c.unreviewed ? "not reviewed · " : "by "}<a href="https://github.com/${esc(c.repo)}/tree/${esc(c.sha || "HEAD")}" target="_blank" rel="noopener">${esc(c.repo)}</a></p>` : ""}<p class="cart-needs" hidden></p>`;
-        // The app on it (and up to date): a tap takes it off. Any other: a tap puts it on.
-        slotEl.querySelector<HTMLButtonElement>(".cart")!.onclick = () => (active() === c.mod && (w?.carts || [])[0]?.v === c.v && slot() ? eject() : pick(c));
+        slotEl.innerHTML = `<button class="cart" title="${esc(c.about || "")}">${cartHtml(c)}</button><p class="cart-about">${esc(c.about || "")}</p>${c.repo ? `<p class="cart-from${c.unreviewed ? " unreviewed" : ""}">${c.unreviewed ? "not reviewed · " : "by "}<a href="https://github.com/${esc(c.repo)}/tree/${esc(c.sha || "HEAD")}" target="_blank" rel="noopener">${esc(c.repo)}</a></p>` : ""}<p class="cart-needs" hidden></p><div class="cart-acts"><button class="btn btn-xs btn-green" data-cart="update" hidden>Update</button><button class="btn btn-xs" data-cart="uninstall" hidden>Uninstall</button></div>`;
+        // A tap on the cart puts it on (or updates it). The app on it comes off only by its Uninstall button.
+        slotEl.querySelector<HTMLButtonElement>(".cart")!.onclick = () => (active() === c.mod && (w?.carts || [])[0]?.v === c.v ? undefined : pick(c));
+        slotEl.querySelector<HTMLButtonElement>('[data-cart="update"]')!.onclick = () => pick(c);
+        slotEl.querySelector<HTMLButtonElement>('[data-cart="uninstall"]')!.onclick = () => eject();
       }
       if (shelf.children[i] !== slotEl) shelf.insertBefore(slotEl, shelf.children[i] || null);
       const on = active() === c.mod;
@@ -392,6 +394,10 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
       btn.classList.toggle("absent", !on);
       btn.classList.toggle("busy", p !== undefined);
       btn.disabled = !link || !!busy || !canPick() || (on && !outdated && !slot());
+      const off = !link || !!busy || !canPick();
+      const upd = slotEl.querySelector<HTMLButtonElement>('[data-cart="update"]')!, rm = slotEl.querySelector<HTMLButtonElement>('[data-cart="uninstall"]')!;
+      upd.hidden = !outdated || p !== undefined; upd.disabled = off;
+      rm.hidden = !on || !slot() || p !== undefined; rm.disabled = off;
       btn.style.setProperty("--p", String(p ?? 0));
       const st = slotEl.querySelector(".cart-state")!;
       st.innerHTML = p !== undefined ? "installing" : outdated ? "update" : playing ? "▶ running" : on ? "on it" : kb(c.size);

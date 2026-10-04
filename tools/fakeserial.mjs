@@ -158,7 +158,7 @@ check(!f.includes("dodge.py") && f.includes(WALLET) && f.includes(KECCAK), "swit
 check(JSON.stringify((await appsOn(2)).map((a) => [a.mod, a.usb])) === '[["vault",true]]', "apps.json: Vault, which has USB to itself");
 check((await files(2)).includes("/saves/buttons/best.json"), "switching apps never touched the saves");
 // take a repo app off: its files come off by apps.json's list (the manifest doesn't know them)
-await page.click('#d-shelf .cart-slot[data-mod="vault"] .cart');
+await page.click('#d-shelf .cart-slot[data-mod="vault"] [data-cart="uninstall"]');
 await wait(() => JSON.parse(new TextDecoder().decode(window.__ports[2]._st.files.get("apps.json"))).length === 0, null, 15000, "Vault off");
 f = await files(2);
 check(!f.includes(WALLET) && !f.includes(KECCAK), "taking a repo app off: both of its files gone");
@@ -167,15 +167,29 @@ await pickApp("buttons", "Buttons on again");
 f = await files(2);
 check(f.includes("buttons.py"), "Buttons on again");
 
+// a newer Buttons on the shelf: its Update button puts it on
+await page.evaluate(() => { const st = window.__ports[2]._st; const a = JSON.parse(new TextDecoder().decode(st.files.get("apps.json"))); a[0].v = "old"; st.files.set("apps.json", new TextEncoder().encode(JSON.stringify(a))); window.__plug(2, false); });
+await new Promise((r) => setTimeout(r, 500));
+await page.evaluate(() => window.__plug(2, true));
+const upd = '#d-shelf .cart-slot[data-mod="buttons"] [data-cart="update"]';
+await wait((s) => { const b = document.querySelector(s); return b && !b.hidden && !b.disabled; }, upd, 20000, "an older Buttons on it: Update shows");
+check(await page.isVisible('#d-shelf .cart-slot[data-mod="buttons"] [data-cart="uninstall"]'), "Uninstall shows beside it");
+await page.click(upd);
+await wait(new Function(`return ${shelfOn("buttons")} && document.querySelector('${upd}').hidden`), null, 30000, "updated: Update gone");
+check(JSON.parse(await page.evaluate(() => new TextDecoder().decode(window.__ports[2]._st.files.get("apps.json"))))[0].v !== "old", "apps.json: the new Buttons");
+
 // take it off
-await page.click('#d-shelf .cart-slot[data-mod="buttons"] .cart');   // a tap on the app on it takes it off
+await page.click('#d-shelf .cart-slot[data-mod="buttons"] .cart');   // a tap on the app on it does nothing
+await new Promise((r) => setTimeout(r, 500));
+check(JSON.parse(await page.evaluate(() => new TextDecoder().decode(window.__ports[2]._st.files.get("apps.json")))).length === 1, "a tap on the app on it leaves it on");
+await page.click('#d-shelf .cart-slot[data-mod="buttons"] [data-cart="uninstall"]');   // its Uninstall button takes it off
 await wait(() => JSON.parse(new TextDecoder().decode(window.__ports[2]._st.files.get("apps.json"))).length === 0, null, 15000, "Buttons off");
 f = await files(2);
 check(!f.includes("buttons.py") && (f.includes("slot.py") || f.includes("slot.mpy")), "its files gone, the core stays");
 await wait(() => /Nothing on it yet/.test(document.querySelector("#d-carts-note").textContent), null, 10000, "the page: nothing on it");
 
 const asks = await st(2, "asks");
-check(asks === 6 && !(await st(2, "open")), `sealed: every job asked (Buttons, Dodge, Vault, taking it off, Buttons, taking it off: ${asks}), locked again after each`);
+check(asks === 7 && !(await st(2, "open")), `sealed: every job asked (Buttons, Dodge, Vault, taking it off, Buttons, updating it, taking it off: ${asks}), locked again after each`);
 
 // a no changes nothing
 await page.evaluate(() => { window.__ports[2]._st.person = { say: "no", ms: 300 }; });
