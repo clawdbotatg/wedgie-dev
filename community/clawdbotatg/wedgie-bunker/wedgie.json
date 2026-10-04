@@ -5,8 +5,10 @@
       "name": "Demon Bunker",
       "about": "A first-person shooter: zombies, imps and demons in a bunker. Find the red key, hit the exit.",
       "files": [
-        "bunker.mpy",
-        "bunker_draw.py"
+        "bunker.py",
+        "bunker_draw.py",
+        "bunker_art.mpy",
+        "bunker_game.mpy"
       ],
       "entry": "run",
       "fw": "0.3.24",
