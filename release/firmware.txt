@@ -3,6 +3,8 @@ version 0.3.24
 fdf4bcc822cc89d7b445dd274720eec32b24a121b5fb5bf974270bf7773e0d8f  atecc.mpy
 5ac401b4dcabd6cfa942c011dc9280a9e7890acac41dcf787c2279c6d8a887f6  bar.bin
 fb0416ded0a198e844850d320ae5afd4151da4412c9567d1486bf38a0e6bfb42  boot.py
+bd51e44f73b0ac3e3c1836a4a0fa87ea07d064fa5db0f556fa5486fd107fdf36  bunker.mpy
+42688335337e67532924c86df2d9fdf0e05a82083728985ea43429cc5dcb5f32  bunker_draw.py
 8e228f1f9d15dcc6210319e1034ad59afa21b92c1661cd4b88a3653ea59ff132  buttons.py
 b5bab1f4b83ce4a2c3fcb284e424c83f3d842daca5eff288eac571e960bfa5ba  drive.bin
 7f10349db6a4b3d16428bff5a28f7d8db5985d7723dfea101d0a3aee36aede96  frog.py
@@ -25,6 +27,7 @@ f72bcffa043c81790a7914605111d40f3613909487ae8ccf364fa0527b1640b9  slot.mpy
 8891352abecddf9de45f4e7aa87afad8c9dd30964d5b99a9853a3758878d7f36  usbdev.mpy
 e656efa1581715fb53ebbf0812ced808ddb017716167b4da2c64d15dcf9f0a01  wedgie.mpy
 52dae08d91d4f91b85a7cb00b72c6b9ab41b4928e052dbd88051885d759d345a  wedgiedrive.mpy
+@app  {"mod":"bunker","name":"Demon Bunker","entry":"run","files":["bunker.mpy","bunker_draw.py"]}
 @app  {"mod":"buttons","name":"Buttons","entry":"run","files":["buttons.py"]}
 @app  {"mod":"frog","name":"Frog","entry":"run","files":["frog.py"]}
 @app  {"mod":"grove","name":"Crystal Grove","entry":"run","files":["grove.py"]}

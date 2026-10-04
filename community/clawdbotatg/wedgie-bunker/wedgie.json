@@ -1,0 +1,30 @@
+{
+  "apps": [
+    {
+      "mod": "bunker",
+      "name": "Demon Bunker",
+      "about": "A first-person shooter: zombies, imps and demons in a bunker. Find the red key, hit the exit.",
+      "files": [
+        "bunker.mpy",
+        "bunker_draw.py"
+      ],
+      "entry": "run",
+      "fw": "0.3.24",
+      "label": "#e3312c",
+      "icon": [
+        "............",
+        "..k......k..",
+        "..rk....kr..",
+        "...rrrrrr...",
+        "..rrwrrwrr..",
+        "..rrkrrkrr..",
+        "..rrrrrrrr..",
+        "...rkkkkr...",
+        "...rwkwkr...",
+        "....rrrr....",
+        "............",
+        "............"
+      ]
+    }
+  ]
+}
