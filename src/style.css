@@ -423,6 +423,7 @@ body.test-mode .top, body.test-mode .foot { display: none; }
 .file-btn { cursor: pointer; }
 .file-btn.disabled { opacity: .55; pointer-events: none; }
 .carts .shelf { margin-top: 18px; }
+.carts .build { margin-top: 20px; }
 .saves .row { margin-top: 14px; }
 .save-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 0; border-top: 1px solid var(--line, #e4e4e0); }
 .save-row .row { margin: 0; }

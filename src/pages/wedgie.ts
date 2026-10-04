@@ -104,6 +104,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
             <h3>Software</h3>
             <p class="fine" id="d-carts-note"></p>
             <div class="shelf" id="d-shelf"></div>
+            <div class="row build"><a class="btn btn-sm" href="/code">Build</a><span class="fine">your own software for it.</span></div>
             <details class="repo-add" id="d-repo-box">
               <summary>Apps from a GitHub repo</summary>
               <p class="fine">Anyone can make apps for a wedgie (<a href="/code">how</a>). Add a repo here and its apps join the shelf, on this browser only.
