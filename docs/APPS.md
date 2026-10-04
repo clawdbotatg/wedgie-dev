@@ -16,12 +16,31 @@ history before commit 020765c.
 - `tools/fw.mjs` publishes them to `/fw/` beside the core, first in the manifest, so they're first on
   the site. A wedgie installs them with a checked install (`firmware/job.py`): every file must match
   the signed hash, and the person presses A.
-- A new commit in the app's repo changes nothing until someone adds it again.
+- A new commit in the app's repo changes nothing until someone adds it again (`community.mjs update`).
 - Repos a person adds by hand on their wedgie's page aren't signed. They install through full access.
+
+## Versions
+
+**An app's version is its repo's commit** (`4f7748d · Oct 4`). There is no version number to bump.
+
+- **Pushing to the app's repo puts nothing on wedgie.dev.** The site serves only the commit it signed.
+  Until you add it again, Update on the site gives the old one. The site says so under the cart:
+  "GitHub has a newer commit, ..., not on wedgie.dev yet."
+- `community.json` keeps each repo's commit (`sha`), its date (`at`), each app's `v` (the hash of its
+  files that a wedgie records in apps.json), and every earlier commit in `past`.
+- `tools/fw.mjs` publishes that history as the manifest's `known` (v -> commit). With it the site and
+  `wedgie.py apps` say which commit a wedgie runs, and tell three cases apart:
+  - **older**: a commit wedgie.dev published before. **Update** is offered.
+  - **newer**: also one wedgie.dev published, but newer than what the site has now.
+  - **other**: a version wedgie.dev never published (put on from GitHub, /code or wedgie.py).
+  For newer and other, the button says **Replace**, never Update.
+- Firmware has its own version: `VERSION` in `firmware/wedgie.py` (bump it when the core changes).
 
 ## Put an app on the site, or update one
 
 ```
+node tools/community.mjs status                             # which apps GitHub has newer commits of
+node tools/community.mjs update                             # take every one of them (or: update owner/repo)
 node tools/community.mjs add clawdbotatg/wedgie-<name>     # its current commit (or owner/repo@ref)
 git diff community/                                         # read it: this runs on people's wedgies
 node tools/sign.mjs                                         # runs tools/gate.mjs first; signs only if it passes

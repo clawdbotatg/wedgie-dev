@@ -31,7 +31,7 @@ drive copy, a "current firmware" that isn't VERSION, or a wedgie.py command / US
    own repos** (`clawdbotatg/wedgie-*`; Austin, 2026-10-03), never in firmware/ (`carts.json` is `[]`). A new
    app on the site = `node tools/community.mjs add owner/repo`, review `git diff community/`, `node
    tools/sign.mjs`, commit: the shelf's apps are in the signed list (`tools/release.mjs shelf()`), first
-   on the site. A new commit in their repo changes nothing until it's added again. The old built-in apps
+   on the site. A new commit in their repo changes nothing until it's added again (`node tools/community.mjs status` / `update`); an app's version is its commit, and community.json's `past` lets the site name any version a wedgie has (`src/apps/version.ts`). The old built-in apps
    are in git history before 2026-10-03; `tools/fixtures/hello.py` is a test app for the probes only.
    How to add, update or remove one: **`docs/APPS.md`**.
    A module the core imports at boot must not be claimed by a cart.

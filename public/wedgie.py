@@ -786,8 +786,15 @@ def main():
             act = active_of(m, have)
             on = {a["mod"]: a.get("v") for a in have["apps"]}
             for cart in m["carts"]:
-                state = ("runs it" if on.get(cart["mod"]) == cart["v"] else "runs it, update ready") if cart["mod"] == act else "%d KB" % max(1, cart["size"] // 1024)
-                print("%-10s %-12s %-20s %s%s" % (cart["mod"], cart["name"], state, cart.get("about", ""), "  [needs an %s chip]" % cart["chip"] if cart.get("chip") else ""))
+                state = "%d KB" % max(1, cart["size"] // 1024)
+                if cart["mod"] == act:
+                    # an app's version is its repo's commit; known: every version wedgie.dev ever published
+                    k = (m.get("known") or {}).get(on.get(cart["mod"]) or "")
+                    state = ("runs it" if on.get(cart["mod"]) == cart["v"]
+                             else "runs %s, update ready" % k["sha"][:7] if k and k["at"] < cart.get("at", "")
+                             else "runs %s (newer)" % k["sha"][:7] if k else "runs a version not on wedgie.dev")
+                ver = " @ %s %s" % (cart["sha"][:7], cart.get("at", "")[:10]) if cart.get("sha") else ""
+                print("%-10s %-12s %-28s %s%s%s" % (cart["mod"], cart["name"], state, cart.get("about", ""), ver, "  [needs an %s chip]" % cart["chip"] if cart.get("chip") else ""))
             if act and not any(x["mod"] == act for x in m["carts"]):
                 print("%-10s %-12s %-20s" % (act, "(yours)", "runs it"))
         elif c in ("use", "cart"):

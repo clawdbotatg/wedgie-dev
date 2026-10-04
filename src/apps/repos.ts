@@ -37,11 +37,11 @@ async function fetchRepo(spec: string, m: Manifest): Promise<Repo> {
   const repo = `${p.owner}/${p.repo}`;
   // The commit it's at now, so every file comes from the same one. GitHub's API allows 60 lookups an
   // hour per visitor; past that, the branch name itself (raw.githubusercontent takes either).
-  let sha = p.ref || "HEAD";
+  let sha = p.ref || "HEAD", at: string | undefined;
   try {
     const r = await fetch(`https://api.github.com/repos/${repo}/commits/${encodeURIComponent(sha)}`);
     if (r.status === 404) throw new Error(`GitHub has no public repo ${repo}${p.ref ? ` with ${p.ref}` : ""}`);
-    if (r.ok) sha = (await r.json()).sha;
+    if (r.ok) { const j = await r.json(); sha = j.sha; at = j.commit?.committer?.date; }
   } catch (e: any) { if (/no public repo/.test(e?.message)) throw e; }
   const base = `https://raw.githubusercontent.com/${repo}/${sha}/`;
   const jr = await fetch(base + "wedgie.json", { cache: "no-cache" });
@@ -65,7 +65,7 @@ async function fetchRepo(spec: string, m: Manifest): Promise<Repo> {
       files.push(f); data[f.name] = buf; hashes.push(f.sha256); size += buf.length;
     }
     if (size > MAX_APP_BYTES) throw new Error(`${repo}: ${a.mod} is ${Math.round(size / 1024)} KB; an app can be ${MAX_APP_BYTES / 1024} KB`);
-    carts.push({ ...a, v: await cartV(hashes), size, repo, sha, unreviewed: true });
+    carts.push({ ...a, v: await cartV(hashes), size, repo, sha, at, unreviewed: true });
   }
   return { repo, sha, carts, files, data };
 }

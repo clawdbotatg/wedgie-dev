@@ -4,22 +4,65 @@
     {
       "repo": "clawdbotatg/wedgie-buttons",
       "sha": "3a3697cca92b0b67387ad9e6f58e510be87147d4",
-      "approved": "2026-10-03"
+      "approved": "2026-10-03",
+      "at": "2026-10-03T19:40:07Z",
+      "v": {
+        "buttons": "a7883fe8a210"
+      }
     },
     {
       "repo": "clawdbotatg/wedgie-keypad",
       "sha": "14a0eec4f745a99952c91087782259db06210a1b",
-      "approved": "2026-10-03"
+      "approved": "2026-10-03",
+      "at": "2026-10-03T23:54:49Z",
+      "v": {
+        "keypad": "f413db18f2a5"
+      },
+      "past": [
+        {
+          "sha": "9f0a17a58426f6df37fa3dae34f245ac301fd896",
+          "at": "2026-10-03T22:50:42Z",
+          "v": {
+            "keypad": "8a0388e7a7c0"
+          }
+        }
+      ]
     },
     {
       "repo": "clawdbotatg/wedgie-grove",
-      "sha": "de6f066fa47ce3ced8fb209a823cc8af38fbca85",
-      "approved": "2026-10-03"
+      "sha": "4f7748df88f8de7d4ec8ea4f12df50fa5ca5deda",
+      "at": "2026-10-04T00:38:11Z",
+      "approved": "2026-10-04",
+      "v": {
+        "grove": "95642aa78667"
+      },
+      "past": [
+        {
+          "sha": "de6f066fa47ce3ced8fb209a823cc8af38fbca85",
+          "at": "2026-10-03T23:30:44Z",
+          "v": {
+            "grove": "87931bd38816"
+          }
+        }
+      ]
     },
     {
       "repo": "clawdbotatg/wedgie-frog",
       "sha": "5fa187b87f447628252a6a7dc97e2d1873ae02b5",
-      "approved": "2026-10-03"
+      "approved": "2026-10-03",
+      "at": "2026-10-03T23:57:29Z",
+      "v": {
+        "frog": "71630fd360d9"
+      },
+      "past": [
+        {
+          "sha": "1ebd30c87d74144c9cb292c6302cdd35bd7142d3",
+          "at": "2026-10-03T23:09:42Z",
+          "v": {
+            "frog": "371565e80ef6"
+          }
+        }
+      ]
     }
   ]
 }

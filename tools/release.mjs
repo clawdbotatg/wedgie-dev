@@ -53,7 +53,7 @@ export function shelf(core, mods) {
     const { apps, errors } = checkAppJson(JSON.parse(readFileSync(join(dir, "wedgie.json"), "utf8")), core, mods);
     if (errors.length) throw new Error(`community/${e.repo}/wedgie.json:\n  ${errors.join("\n  ")}`);
     for (const { paths, ...a } of apps.filter((a) => !e.apps || e.apps.includes(a.mod)))
-      out.push({ app: { ...a, repo: e.repo, sha: e.sha }, files: a.files.map((name, i) => ({ name, buf: readFileSync(join(dir, paths[i])) })) });
+      out.push({ app: { ...a, repo: e.repo, sha: e.sha, ...(e.at ? { at: e.at } : {}) }, files: a.files.map((name, i) => ({ name, buf: readFileSync(join(dir, paths[i])) })) });
   }
   return out;
 }

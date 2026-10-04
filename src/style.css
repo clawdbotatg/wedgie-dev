@@ -482,6 +482,9 @@ body.test-mode .top, body.test-mode .foot { display: none; }
 .cart-from { font-size: 12px; line-height: 1.3; color: var(--muted); margin: 4px 2px 0; font-weight: 700; overflow-wrap: anywhere; }
 .cart-from a { color: inherit; }
 .cart-from.unreviewed { color: #b06a00; }
+.cart-ver { font-size: 12px; line-height: 1.35; color: var(--muted); margin: 4px 2px 0; font-weight: 700; }
+.cart-ver a { color: inherit; }
+.cart-ver[hidden] { display: none; }
 .repo-add { margin-top: 22px; border-top: 1px solid var(--line); padding-top: 14px; }
 .repo-add summary { cursor: pointer; font-weight: 800; }
 .repo-add form { gap: 8px; flex-wrap: nowrap; }

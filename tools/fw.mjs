@@ -8,7 +8,9 @@
 // apps.json when that cart went on, so there is no version number to forget to bump. A file two carts
 // share (p256.py) goes on once. apps.json is the wedgie's own list of what it has; it isn't published.
 // Then the community shelf: each repo in community.json, as copied into community/ by tools/community.mjs
-// at its reviewed commit; its carts carry repo + sha.
+// at its reviewed commit; its carts carry repo + sha + at (the commit's date): an app's version is its
+// commit. `known` maps every v the shelf ever published (community.json's `past` too) to { mod, repo, sha,
+// at }, so the site can name the version a wedgie has and tell an update from a version it never had.
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, rmSync, copyFileSync, statSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join, dirname } from "node:path";
@@ -58,6 +60,9 @@ export function buildFirmware() {
     shelfCarts.push({ ...a, v: cartV(hashes), size: a.files.reduce((s, n) => s + byName.get(n).size, 0) });
   }
   carts.unshift(...shelfCarts);        // the shelf's apps first on the site
+  const known = {};
+  for (const e of JSON.parse(readFileSync(join(root, "community.json"), "utf8")).repos)
+    for (const x of [e, ...(e.past || [])]) for (const [mod, v] of Object.entries(x.v || {})) known[v] = { mod, repo: e.repo, sha: x.sha, at: x.at };
   // The signed file list (tools/sign.mjs). signed: it covers exactly these files; a wedgie refuses a
   // checked install from an unsigned manifest.
   let signed = false;
@@ -68,7 +73,7 @@ export function buildFirmware() {
     signed = txt === releaseText();
     if (!signed) console.warn("fw: release/firmware.txt is out of date: run node tools/sign.mjs");
   } catch {}
-  writeFileSync(join(out, "manifest.json"), JSON.stringify({ version, files, core, carts, signed }, null, 1));
+  writeFileSync(join(out, "manifest.json"), JSON.stringify({ version, files, core, carts, known, signed }, null, 1));
   copyFileSync(join(root, "LORE.md"), join(root, "public/lore.md")); // served at wedgie.dev/lore.md
   return { version, core: core.length, carts: carts.length };
 }

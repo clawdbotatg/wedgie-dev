@@ -28,15 +28,16 @@ import { busy, progress, writeFile } from "./files";
 /** url: where to fetch it, when it isn't /fw/<name> (an app from a repo someone added). */
 export type FileInfo = { name: string; size: number; sha256: string; url?: string };
 /** chip: the secure chip it needs ("ATECC608" / "OPTIGA Trust M", as the chip check names them), if any.
- *  fw: the oldest wedgie firmware it runs on. repo/sha: an app from a GitHub repo, at that commit; unreviewed: added on this browser, not on the shelf. */
-export type Cart = { mod: string; name: string; entry?: string; usb?: boolean; chip?: string; fw?: string; about?: string; files: string[]; v: string; size: number; label: string; icon: string[]; repo?: string; sha?: string; unreviewed?: boolean };
+ *  fw: the oldest wedgie firmware it runs on. repo/sha/at: an app from a GitHub repo, at that commit (its date); unreviewed: added on this browser, not on the shelf. */
+export type Cart = { mod: string; name: string; entry?: string; usb?: boolean; chip?: string; fw?: string; about?: string; files: string[]; v: string; size: number; label: string; icon: string[]; repo?: string; sha?: string; at?: string; unreviewed?: boolean };
 /** Core files a newer core dropped: an update deletes them (0.2.0: the menu went). */
 const RETIRED = ["menu.py", "menu.mpy"];
 /** What the firmware keeps free for saves and itself (save.py FLOOR). */
 const FLOOR = 32 * 1024;
 /** Bytes per write while copying: small, so each needs little RAM in one piece (RP2040). */
 const CHUNK = 1024;
-export type Manifest = { version: string; files: FileInfo[]; core: string[]; carts: Cart[]; signed?: boolean };
+/** known: every v the shelf ever published -> its commit (tools/fw.mjs; src/apps/version.ts). */
+export type Manifest = { version: string; files: FileInfo[]; core: string[]; carts: Cart[]; known?: Record<string, { mod: string; repo: string; sha: string; at: string }>; signed?: boolean };
 
 let manifest: Promise<Manifest> | null = null;
 export function firmwareManifest(): Promise<Manifest> {

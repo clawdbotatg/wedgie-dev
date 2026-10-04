@@ -20,6 +20,7 @@ import { pyStr, type Repl } from "../serial/repl";
 import { installCore, useApp, removeApp, takeOver, setAskHint, askHint, firmwareManifest, lastAsk, type Cart, type Manifest } from "../serial/install";
 import * as FS from "../serial/files";
 import { cartHtml } from "../ui/cart";
+import { compare, githubHead, verLink, type Ver } from "../apps/version";
 import { bootScreen } from "../ui/bootscreen";
 import { askScreen } from "../ui/askmodal";
 import { ASK_TEXT } from "../serial/install";
@@ -348,6 +349,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
 
   // ---- software: the one app it runs ------------------------------------------------------------------
   const inserting: Record<string, number> = {};   // mod -> progress while it goes on
+  const heads: Record<string, Ver | null> = {};   // shelf repo -> GitHub's newest commit (null: not known)
   let confirmChip = "";                            // an app for another chip, tapped once
   // The chip this wedgie has, once known ("ATECC608", "OPTIGA Trust M", "none"); null: not checked yet.
   const chipType = () => (w?.chip?.type as string | undefined) || null;
@@ -378,7 +380,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
         slotEl.dataset.v = c.v;
         slotEl.className = "cart-slot";
         slotEl.dataset.mod = c.mod;
-        slotEl.innerHTML = `<button class="cart" title="${esc(c.about || "")}">${cartHtml(c)}</button><p class="cart-about">${esc(c.about || "")}</p>${c.repo ? `<p class="cart-from${c.unreviewed ? " unreviewed" : ""}">${c.unreviewed ? "not reviewed · " : "by "}<a href="https://github.com/${esc(c.repo)}/tree/${esc(c.sha || "HEAD")}" target="_blank" rel="noopener">${esc(c.repo)}</a></p>` : ""}<p class="cart-needs" hidden></p><div class="cart-acts"><button class="btn btn-xs btn-green" data-cart="update" hidden>Update</button><button class="btn btn-xs" data-cart="uninstall" hidden>Uninstall</button></div>`;
+        slotEl.innerHTML = `<button class="cart" title="${esc(c.about || "")}">${cartHtml(c)}</button><p class="cart-about">${esc(c.about || "")}</p>${c.repo ? `<p class="cart-from${c.unreviewed ? " unreviewed" : ""}">${c.unreviewed ? "not reviewed · " : "by "}<a href="https://github.com/${esc(c.repo)}" target="_blank" rel="noopener">${esc(c.repo)}</a>${c.sha && /^[0-9a-f]{40}$/.test(c.sha) ? ` · ${verLink(c.repo, { sha: c.sha, at: c.at }, esc)}` : ""}</p>` : ""}<p class="cart-needs" hidden></p><p class="cart-ver" hidden></p><div class="cart-acts"><button class="btn btn-xs btn-green" data-cart="update" hidden>Update</button><button class="btn btn-xs" data-cart="uninstall" hidden>Uninstall</button></div>`;
         // A tap on the cart puts it on (or updates it). The app on it comes off only by its Uninstall button.
         slotEl.querySelector<HTMLButtonElement>(".cart")!.onclick = () => (active() === c.mod && (w?.carts || [])[0]?.v === c.v ? undefined : pick(c));
         slotEl.querySelector<HTMLButtonElement>('[data-cart="update"]')!.onclick = () => pick(c);
@@ -386,7 +388,9 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
       }
       if (shelf.children[i] !== slotEl) shelf.insertBefore(slotEl, shelf.children[i] || null);
       const on = active() === c.mod;
-      const outdated = on && (x.carts || [])[0]?.v !== c.v;
+      const cmp = on ? compare(m, c, (x.carts || [])[0]?.v) : null;
+      const outdated = !!cmp && cmp.is !== "same";
+      const older = cmp?.is === "older";
       const playing = on && x.running === c.mod;
       const p = inserting[c.mod];
       const btn = slotEl.querySelector<HTMLButtonElement>(".cart")!;
@@ -397,10 +401,22 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
       const off = !link || !!busy || !canPick();
       const upd = slotEl.querySelector<HTMLButtonElement>('[data-cart="update"]')!, rm = slotEl.querySelector<HTMLButtonElement>('[data-cart="uninstall"]')!;
       upd.hidden = !outdated || p !== undefined; upd.disabled = off;
+      upd.textContent = older ? "Update" : "Replace";        // never "Update" to an older or unknown version
       rm.hidden = !on || !slot() || p !== undefined; rm.disabled = off;
       btn.style.setProperty("--p", String(p ?? 0));
       const st = slotEl.querySelector(".cart-state")!;
-      st.innerHTML = p !== undefined ? "installing" : outdated ? "update" : playing ? "▶ running" : on ? "on it" : kb(c.size);
+      st.innerHTML = p !== undefined ? "installing" : older ? "update" : outdated ? "other version" : playing ? "▶ running" : on ? "on it" : kb(c.size);
+      // Which version: the one on the wedgie when it isn't this one, and GitHub's newest when wedgie.dev is behind it.
+      if (c.repo && !c.unreviewed && !(c.repo in heads)) { heads[c.repo] = null; githubHead(c.repo).then((h) => { heads[c.repo!] = h; paint(); }); }
+      const head = c.repo ? heads[c.repo] : null, repo = c.repo || "";
+      const lines = [
+        older ? `This wedgie has ${verLink(repo, cmp!.has!, esc)}. Update puts on the newer one above.`
+          : cmp?.is === "newer" ? `This wedgie has ${verLink(repo, cmp.has!, esc)}, newer than wedgie.dev's.`
+          : outdated ? "This wedgie has a version that isn't on wedgie.dev (put on from GitHub, /code or wedgie.py). Replace puts on wedgie.dev's." : "",
+        head && c.sha && head.sha !== c.sha && c.at && head.at && head.at > c.at ? `GitHub has a newer commit, ${verLink(repo, head, esc)}, not on wedgie.dev yet.` : "",
+      ].filter(Boolean).map((l) => `<span>${l}</span>`).join(" ");
+      const ver = slotEl.querySelector<HTMLElement>(".cart-ver")!;
+      if (ver.dataset.html !== lines) { ver.dataset.html = lines; ver.innerHTML = lines; ver.hidden = !lines; }
       st.className = `cart-state${on && !outdated ? " on" : outdated || !on ? " soft" : ""}`;
       const why = wrongChip(c) || oldFw(c);
       slotEl.classList.toggle("nochip", !!why);
