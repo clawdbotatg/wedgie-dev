@@ -202,13 +202,16 @@ export class Repl {
   interrupt() { return this.write("\x03"); }
 
   /** Leave raw mode and soft reset: the wedgie's main.py runs again. */
-  // reset: false starts the wedgie's app again by running main.py, with no soft reset (so the port
-  // stays up); use it after tests. A reset boots new firmware, or a newly picked app, with a fresh heap.
+  // reset: false starts the wedgie's app again: a soft reset when the board marks soft resets (0.1.3+,
+  // boot.py's watchdog mark: the port stays up), so the app gets a fresh heap; a job's leftovers cut it
+  // up and Grove died of it ("memory allocation failed": Austin, 2026-10-04). Without the mark (older
+  // firmware, Y held at plug-in, the emulator) it runs main.py as before. public/wedgie.py LEAVE: the same line.
+  // A reset boots new firmware, or a newly picked app.
   async leave(opts: { reset?: boolean } = {}) {
     this.busy = null;
     try {
       await this.write("\x02"); await sleep(50);
-      if (opts.reset === false) await this.write('exec(open("main.py").read())\r');
+      if (opts.reset === false) await this.write(LEAVE + "\r");
       else await this.write("\x04");
     } catch {}
   }
@@ -222,6 +225,9 @@ export class Repl {
     navigator.serial?.removeEventListener("disconnect", this.onGone);
   }
 }
+
+/** Typed at the plain REPL to start the app again (Repl.leave reset: false). */
+export const LEAVE = `exec("import machine, sys\\ntry:\\n    _w = machine.mem32[(0x400D8000 if 'RP2350' in sys.implementation._machine else 0x40058000) + 0x0C] == 0x57ED61E0\\nexcept Exception:\\n    _w = False\\nif _w:\\n    machine.soft_reset()\\nexec(open('main.py').read())")`;
 
 /** Python source literal for a string (for writing files through exec). */
 export const pyStr = (s: string) => JSON.stringify(s);

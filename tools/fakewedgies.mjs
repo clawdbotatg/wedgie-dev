@@ -257,8 +257,8 @@ export function fakeWedgies(specs) {
           if (ch === "\x02") { raw = false; continue; }
           if (!raw) {
             if (ch === "\x04") { softReset(); continue; }
-            // Repl.leave({ reset: false }) types exec(open("main.py").read()) + CR: the launcher starts again, home
-            if (ch === "\r") { if (line.startsWith("exec(open(")) { line = ""; st.launched = null; st.stopped = false; st.open = false; st.relaunches = (st.relaunches || 0) + 1; } continue; }
+            // Repl.leave({ reset: false }) types LEAVE + CR: no watchdog mark here, so main.py runs again, home
+            if (ch === "\r") { if (line.startsWith("exec(")) { line = ""; st.launched = null; st.stopped = false; st.open = false; st.relaunches = (st.relaunches || 0) + 1; } continue; }
             if (ch === "\n") {
               const l = dec.decode(u8(line)); line = "";
               if (!l.startsWith("{")) continue;

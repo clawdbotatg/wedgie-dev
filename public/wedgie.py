@@ -54,6 +54,9 @@ def ports():
     return [p for p in list_ports.comports() if p.vid == VID]
 
 
+# Typed at the plain REPL to start the app again (leave(reset=False)); src/serial/repl.ts LEAVE is the same line.
+LEAVE = rb'''exec("import machine, sys\ntry:\n    _w = machine.mem32[(0x400D8000 if 'RP2350' in sys.implementation._machine else 0x40058000) + 0x0C] == 0x57ED61E0\nexcept Exception:\n    _w = False\nif _w:\n    machine.soft_reset()\nexec(open('main.py').read())")'''
+
 class Wedgie:
     def __init__(self, dev):
         self.dev = dev
@@ -218,11 +221,12 @@ class Wedgie:
     def leave(self, reset=True):
         """Out of raw mode and back to its app. reset=True soft-resets (after writing firmware or a new app;
         the port stays on 0.1.3+, but the first soft reset after updating from older firmware drops it);
-        False just runs main.py again, port stays up."""
+        False starts its app again with the port up: a soft reset when the board marks them (0.1.3+), for a
+        fresh heap (a job's leftovers ran Grove out of memory), else main.py run again (LEAVE)."""
         self._busy = None
         self.s.write(b"\x02")
         time.sleep(0.05)
-        self.s.write(b"\x04" if reset else b'exec(open("main.py").read())\r')
+        self.s.write(b"\x04" if reset else LEAVE + b"\r")
 
     # The wedgie's screen while this computer has its REPL: the boot screen and the boot bar, titled with
     # what it's doing (docs/STYLE.md; the site's files.ts busy/writeFile do the same). put() is the one

@@ -14,10 +14,13 @@ drive copy, a "current firmware" that isn't VERSION, or a wedgie.py command / US
    (the underwear on the desktop), which re-enumerates USB: the serial port vanishes and comes back
    as a new port, same board ID. Every host must: wait before identifying a new port, retry an open
    that fails, find a wedgie by its ID (never by its port), and **never soft-reset just to restart
-   its app** — run main.py (`Repl.leave({ reset: false })`, `wedgie.py leave(reset=False)`). 0.1.3+
+   its app** on a board without the watchdog mark. `Repl.leave({ reset: false })` / `wedgie.py
+   leave(reset=False)` type `LEAVE`: a soft reset when the mark says the port stays (a fresh heap: main.py
+   run on a used heap ran Grove out of memory; Austin 2026-10-04: "a quick black flash is 100 times better
+   than a memory allocation failure"), main.py otherwise. 0.1.3+
    marks soft resets so the drive isn't re-added, but the first soft reset after an update from older
    firmware does drop the port, and a host that reconnects and resets again loops forever (it did:
-   e6ea8c1). The only sanctioned soft resets boot new firmware or a newly picked app, and the wedgie's own restart
+   e6ea8c1). The only sanctioned soft resets boot new firmware or a newly picked app, `LEAVE` on a marked board, and the wedgie's own restart
    after a no to its question (`slot._restart`: the question draws over the app's screen at once and nothing keeps it; Austin, 2026-10-01). Full note: `firmware/boot.py`.
    `tools/fakewedgies.mjs` (used by fakeserial.mjs and updateprobe.mjs) plays both the dropping and the surviving case — extend it, don't bypass it.
 2. **Firmware = core + one app (0.2+).** A wedgie boots straight into the one app in its `apps.json`
