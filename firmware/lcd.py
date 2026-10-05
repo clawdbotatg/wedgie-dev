@@ -36,6 +36,7 @@ _PB = bytes([p[2] for p in PALETTE])
 _BUF = bytearray(240 * 240 // 2)
 _ROWS = bytearray(240 * 4 * 2)
 _on_show = None     # loader.py: called at the app's first show(), i.e. its first screen
+_on_keys = None     # slot.py: called when the app reads its keys (an app on a still screen only does that)
 _art = None         # (x, y, w, h, file, offset): a full-color picture on flash shown over that box (art())
 _artrow = None      # one of its rows, read from the file
 
@@ -327,6 +328,8 @@ class Keys:
 
     def pressed(self):
         """Names of keys that went down since the last call."""
+        if _on_keys:
+            _on_keys()
         out = []
         for k, p in self.pins.items():
             v = p.value()
@@ -339,6 +342,8 @@ class Keys:
         return out
 
     def held(self, k):
+        if _on_keys:
+            _on_keys()
         if self.pins[k].value() == 0:
             return True
         if self.physical:

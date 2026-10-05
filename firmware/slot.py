@@ -322,15 +322,16 @@ def _job(mid, m):
 def _to_job():
     """Restart into install mode, keeping USB (a soft reset: the host stays connected and waits for the
     job's go). From the main loop that's now. An entry app (Demo) owns the main loop and this runs in
-    its USB timer, where a soft reset is swallowed: the app's next screen does it (lcd._on_show), and
-    a hard reset a second later if it never draws again."""
+    its USB timer, where a soft reset is swallowed: the app's next screen or key read does it
+    (lcd._on_show, lcd._on_keys: an app on a still screen only reads keys), and a hard reset a second
+    later if it does neither (_cold: the screen flashes black)."""
     import machine
     W.restarting = True
     stop()
     if state == "entry" and not _own_usb():
         def now(*_):
             machine.soft_reset()
-        L._on_show = now
+        L._on_show = L._on_keys = now
         _RealTimer(-1).init(period=1500, mode=_RealTimer.ONE_SHOT, callback=_cold)
         return
     machine.soft_reset()
@@ -385,7 +386,7 @@ def _drop():
     global _kbd
     _kbd = True
     if state == "entry":
-        L._on_show = _interrupt
+        L._on_show = L._on_keys = _interrupt
 
 
 def _asking(fn):
@@ -403,13 +404,18 @@ def _restart():
     over the app's screen and nothing keeps that screen, so the question is up at once (0.3.5 saved the
     115 KB screen to flash first: seconds before every question). A soft reset keeps USB (boot.py,
     0.1.3+) and main.py lets it through (W.restarting). An entry app owns the main loop and this then
-    runs in its USB timer, where a soft reset's SystemExit is swallowed: that one gets a hard reset (its
-    port drops and comes back; hosts find a wedgie by its ID)."""
+    runs in its USB timer, where a soft reset's SystemExit is swallowed: the app's next screen or key
+    read does it, and a hard reset if it does neither (its port drops and comes back; hosts find a
+    wedgie by its ID)."""
     import machine
     time.sleep_ms(100)                  # the answer goes out first
-    if state == "entry" and not _own_usb():    # (the Wallet reads USB in its own loop: a soft reset works)
-        machine.reset()
     W.restarting = True
+    if state == "entry" and not _own_usb():    # (the Wallet reads USB in its own loop: a soft reset works)
+        def now(*_):                    # the app's next screen or key read, as _to_job
+            machine.soft_reset()
+        L._on_show = L._on_keys = now
+        _RealTimer(-1).init(period=1500, mode=_RealTimer.ONE_SHOT, callback=lambda t: machine.reset())
+        return
     machine.soft_reset()
 
 
@@ -446,7 +452,7 @@ def serve(_=None):
 
 def _interrupt():
     """lcd._on_show after a yes to a Ctrl-C while an entry app runs: stop it as Ctrl-C would."""
-    L._on_show = None
+    L._on_show = L._on_keys = None
     raise KeyboardInterrupt
 
 
