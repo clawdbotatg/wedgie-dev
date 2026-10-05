@@ -88,6 +88,15 @@
           }
         }
       ]
+    },
+    {
+      "repo": "clawdbotatg/wedgie-safe",
+      "sha": "84a066e4d10f93175dc6f1e1471a11c1bc071e2e",
+      "at": "2026-10-05T18:10:41Z",
+      "approved": "2026-10-05",
+      "v": {
+        "safe": "414d2d22a47f"
+      }
     }
   ]
 }
