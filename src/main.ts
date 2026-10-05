@@ -11,6 +11,7 @@ import { update } from "./pages/update";
 import { build } from "./pages/build";
 import { code } from "./pages/code";
 import { debug } from "./pages/debug";
+import { safe } from "./pages/safe";
 
 const path = location.pathname.replace(/\/+$/, "");
 const onConnect = path === "/connect" || path.startsWith("/connect/");   // the list, or one wedgie (/connect/<ID>)
@@ -21,6 +22,7 @@ const onUpdate = path === "/update";
 const onBuild = path === "/build";
 const onCode = path === "/code";
 const onDebug = path === "/debug";
+const onSafe = path === "/safe";
 
 const app = document.getElementById("app")!;
 app.innerHTML = `
@@ -66,5 +68,5 @@ const top = document.getElementById("top")!;
 // Ready when the page's first screen is really there: on the home page that includes the hero wedgie
 // (its files are in the loader's byte count, and it has drawn a frame). Other 3D waits for the page.
 if (onFormat || onUpdate) document.body.classList.add("test-mode");
-const up = onFormat ? (format(top), Promise.resolve()) : onUpdate ? (update(top), Promise.resolve()) : onConnect ? (connect(top), Promise.resolve()) : onAssemble ? (assemble(top), Promise.resolve()) : onBuild ? (build(top), Promise.resolve()) : onCode ? (code(top), Promise.resolve()) : onDebug ? (debug(top), Promise.resolve()) : home(top);
+const up = onFormat ? (format(top), Promise.resolve()) : onUpdate ? (update(top), Promise.resolve()) : onConnect ? (connect(top), Promise.resolve()) : onAssemble ? (assemble(top), Promise.resolve()) : onBuild ? (build(top), Promise.resolve()) : onCode ? (code(top), Promise.resolve()) : onDebug ? (debug(top), Promise.resolve()) : onSafe ? (safe(top), Promise.resolve()) : home(top);
 up.then(() => (window as any).__wedgieReady?.(), () => (window as any).__wedgieReady?.());

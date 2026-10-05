@@ -41,6 +41,12 @@ TOKENS = {
     (84532, "0x036cbd53842c5426634e7929541ec2318f3dcf7e"): ("USDC", 6),
 }
 
+# Safe's MultiSend contracts (1.3.0 and 1.4.1, both deployments): a batch is a DELEGATECALL to one of
+# these, and the wedgie shows every action in it. A DELEGATECALL to anything else stays red.
+MULTISEND = ("0x9641d764fc13c8b624c04430c7356c1c7c8102e2", "0x38869bf66a61cf6bdb996a6ae40d5853fd43b526",
+             "0x40a2accbd92bca938b02010e17a5b8929b49130d", "0xa1dabef33b3b82c7814b6d82a79e50f4ac44102b",
+             "0xa238cbeb142c10ef7ad8442c6d1f9e89e07e7761", "0x998739bfdaadde7c933b942a68053933098f9eda")
+
 d = None
 keys = None
 _poll = None
@@ -172,6 +178,25 @@ def describe(tx):
     return out + [("call " + sel + ", %d bytes, on" % len(data), RED)] + _addr_lines("", to, RED)[1:]
 
 
+def batch(tx):
+    """The actions in a MultiSend batch, each a tx-like dict, or None if this isn't one."""
+    data = tx["data"]
+    if not (tx["operation"] == 1 and tx["to"] in MULTISEND and data[:4] == b"\x8d\x80\xff\x0a"):
+        return None
+    n = int.from_bytes(data[36:68], "big")
+    b = data[68:68 + n]
+    out, i = [], 0
+    while i < len(b):
+        dl = int.from_bytes(b[i + 53:i + 85], "big")
+        if b[i] > 1 or i + 85 + dl > len(b):
+            raise ValueError("bad batch")
+        out.append({"chainId": tx["chainId"], "safe": tx["safe"], "operation": b[i],
+                    "to": hx(b[i + 1:i + 21]), "value": int.from_bytes(b[i + 21:i + 53], "big"),
+                    "data": b[i + 85:i + 85 + dl]})
+        i += 85 + dl
+    return out
+
+
 def webauthn_digest(h):
     """What the chip signs: the WebAuthn message the signer contract rebuilds (WebAuthn.sol)."""
     auth = hashlib.sha256(RP_ID).digest() + b"\x05\x00\x00\x00\x00"     # user present + verified
@@ -235,25 +260,16 @@ def draw_home():
     d.show()
 
 
-def confirm(tx, h):
-    """The transaction on the screen; True on a real A, False on Y or no answer."""
-    k = L.Keys(physical=True)
-    k.pressed()
+def _screen(head, lines, yes, k):
+    """One page of the question; True on a real A, False on Y or no answer."""
     d.fill(WHITE)
     ui.band(d)
-    ui.title(d, "Sign for Safe?", 40, 1)
-    lines = [("%s  nonce %d" % (CHAINS.get(tx["chainId"], "chain %d" % tx["chainId"]), tx["nonce"]), INK),
-             ("Safe " + short(tx["safe"]), MUTED)]
-    lines += describe(tx)
-    if tx["gasPrice"]:
-        lines.append(("pays a gas refund", RED))
-    lines = lines[:9]
-    lines.append(("hash " + short(hx(h)), MUTED))
+    ui.title(d, head, 40, 1)
     y = 64
-    for s, c in lines:
+    for s, c in lines[:10]:
         d.center_text(s, y, c)
         y += 12
-    ui.buttons(d, "sign", "no")
+    ui.buttons(d, yes, "no")
     d.show()
     t0 = time.ticks_ms()
     while time.ticks_diff(time.ticks_ms(), t0) < ASK_MS:
@@ -262,6 +278,29 @@ def confirm(tx, h):
                 return kk == "A"
         time.sleep_ms(20)
     return False
+
+
+def confirm(tx, h):
+    """The transaction on the screen, a page per action in a batch. True only on A through every page."""
+    k = L.Keys(physical=True)
+    k.pressed()
+    top = [("%s  nonce %d" % (CHAINS.get(tx["chainId"], "chain %d" % tx["chainId"]), tx["nonce"]), INK),
+           ("Safe " + short(tx["safe"]), MUTED)]
+    tail = [("pays a gas refund", RED)] if tx["gasPrice"] else []
+    tail.append(("hash " + short(hx(h)), MUTED))
+    acts = batch(tx)
+    if acts is None:
+        return _screen("Sign for Safe?", (top + describe(tx))[:9 - len(tail) + 1] + tail, "sign", k)
+    n = len(acts)
+    if not _screen("Safe batch", top + [("%d actions in one transaction" % n, INK),
+                                         ("A shows each one", MUTED)] + tail, "next", k):
+        return False
+    for i, a in enumerate(acts):
+        last = i == n - 1
+        if not _screen("%d of %d" % (i + 1, n), describe(a) + ([("", INK)] + tail if last else []),
+                       "sign all" if last else "next", k):
+            return False
+    return True
 
 
 # ---- requests ---------------------------------------------------------------------------------

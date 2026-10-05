@@ -518,3 +518,13 @@ body.test-mode .top, body.test-mode .foot { display: none; }
 .look-row { display: flex; gap: 12px; flex-wrap: wrap; margin: 8px 0; }
 .look-row figure { margin: 0; width: 120px; text-align: center; font-size: 12px; }
 .look-row img { border-radius: 8px; image-rendering: pixelated; box-shadow: 0 1px 4px rgba(0,0,0,.15); }
+
+/* /safe */
+.safe-page { justify-content: flex-start; max-width: 720px; margin: 0 auto; }
+.safe-box { width: 100%; padding: 16px 18px; text-align: left; }
+.safe-box h2 { font-size: 15px; margin: 0 0 10px; }
+.safe-box p { margin: 8px 0; }
+.safe-box input, .safe-box select { font: inherit; font-size: 14px; padding: 6px 8px; max-width: 100%; }
+.safe-addr { word-break: break-all; font-size: 14px; }
+.safe-list { list-style: none; padding: 0; margin: 0; }
+.safe-list li { padding: 8px 0; border-bottom: 1px solid rgba(0,0,0,.08); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }

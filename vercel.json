@@ -106,6 +106,10 @@
     {
       "source": "/debug",
       "destination": "/index.html"
+    },
+    {
+      "source": "/safe",
+      "destination": "/index.html"
     }
   ],
   "trailingSlash": false
