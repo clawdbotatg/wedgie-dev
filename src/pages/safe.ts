@@ -107,7 +107,7 @@ export function safe(main: HTMLElement) {
       const h = await W.withRepl(w, (r) => r.request({ type: "hello" }, 5000));
       if (!h.safe) { say("Press A on the wedgie to make its key, then reload this page."); return; }
       key = h.safe; signer = E.signerAddress(key!.x, key!.y);
-      paintWedgie(); paintSafe();
+      paintWedgie(); paintSafe(); paintQueue(); paintNew();
     } catch (e: any) { say(e?.message || String(e), true); wedgie = null; }
   }
 
