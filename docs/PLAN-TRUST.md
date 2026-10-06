@@ -71,22 +71,32 @@ know we trust. And what if someone flashes the firmware with their own version?"
 - **Apps on a money wedgie:** only shelf apps, each reviewed for what it does with the chip. Keep
   a short review checklist in `docs/APPS.md`.
 
-### Phase 4: a real chain of trust (RP2350)
+### Phase 4: open hardware, but the money key only works under our firmware (RP2350)
 
-The fix for hole 1 is a chip that refuses unsigned firmware.
+Austin, 2026-10-06: don't lock a wedgie to our firmware. People can put anything on theirs. But
+money only moves when it runs ours.
 
-- **RP2350 secure boot.** Burn the hash of a boot key into OTP. The boot ROM then runs only images
-  signed by that key; BOOTSEL can't load anything else, and debug is locked.
-- **The core moves into the signed image** (frozen MicroPython modules). Files on the flash
-  filesystem aren't covered by the image signature, so the signed core checks the apps, as job.py
-  does now.
-- **Bind the Trust M to that RP2350.** Trust M's shielded connection uses a shared secret; keep it
-  in OTP that only signed code reads. Move the Trust M to other hardware, or sniff its wires, and it
-  won't talk.
-- **Then the wedgie can prove it's genuine** to the site: a signed answer only real firmware can
-  make.
+- **Anyone can run anything.** A small first stage we sign (RP2350 secure boot, our key hash in
+  OTP) starts every boot. It checks the firmware image: ours, or not.
+- **Only ours gets the chip secret.** The Trust M's money key needs a shared secret (Trust M
+  shielded connection). It sits in an OTP page. The first stage reads it only for our signed
+  firmware, then locks that page until the next reset (RP2350 OTP software locks). Other firmware
+  boots fine but can't read the secret, so the chip won't sign money for it.
+- **The screen says which.** Other firmware isn't ours, so it can say anything; the check is the
+  chip refusing to sign, not the screen.
+- **The core moves into the signed image** (frozen MicroPython modules). Apps on the flash are
+  checked by the signed core, as job.py does now.
+- **Then the wedgie can prove it's genuine** to the site: an answer only our firmware can make.
+- To check first: RP2350 OTP lock behavior, a signed first stage that starts unsigned code, Trust
+  M shielded connection on our chip version.
 - Costs: OTP is forever, a mistake bricks a board; the boot key needs the same care as the release
-  key (phase 1); RP2350 has known glitch attacks with lab gear, so "hard", not "impossible".
+  key; RP2350 has known glitch attacks with lab gear, so "hard", not "impossible".
+
+### Phase 4b: signed data, not just code
+
+Some updates are data the firmware uses (token lists, contract addresses, chain settings). They go
+through the same signed list as code: each data file has its hash in it, signed by our key, and the
+firmware refuses a data file the list doesn't name. A host can't slip in a fake token address.
 
 ### Phase 5: hashes onchain
 
@@ -97,5 +107,5 @@ site and `wedgie.py` check there too, so a stolen key can't quietly ship a relea
 
 1. Release key: two YubiKeys (recommended), or a passphrase-locked file, or a dedicated wedgie.
 2. Firmware signing needs your touch every release, agents can't sign (recommended: yes).
-3. Money wedgies move to RP2350 with secure boot (recommended: yes, after phases 1-2).
+3. Money wedgies move to RP2350: open to any firmware, money key only for ours (recommended: yes, after phases 1-2).
 4. Rollback: refuse older than current in a checked install, full access can still (recommended).
