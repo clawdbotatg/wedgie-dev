@@ -42,6 +42,9 @@ and a release that isn't onchain would be refused or flagged.
 
 ## Known gaps that stay open
 
+The plan for these and for the release key itself: `docs/PLAN-TRUST.md`.
+
+
 - Holding BOOTSEL while plugging in bypasses everything: the RP2040 has no secure boot.
 - Firmware put on by someone else (BOOTSEL, or a thief who gives it back) can fake the screens.
 - An app you approved runs with full access to the chip. While a wallet key exists, only allow
