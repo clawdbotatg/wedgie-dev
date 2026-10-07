@@ -221,7 +221,7 @@ for (const sc of scenarios.filter((x) => !process.env.ONLY || x.name === process
           const addr = dv.getUint32(16, true), n = dv.getUint32(20, true);
           if (id === 1) exclusive = dv.getUint8(16) > 0;
           if (id === 6) xipOff = true;
-          if ((id === 3 || id === 5) && (!exclusive || (rp2040 && !xipOff))) return err("flash op before exclusive/exit_xip");
+          if ((id === 3 || id === 5) && (!exclusive || !xipOff)) return err("flash op before exclusive/exit_xip");
           if (id === 3) {
             if (addr % 4096 || n % 4096 || addr < 0x10000000 || addr + n > 0x10000000 + size) return err("erase range " + addr.toString(16));
             if (addr === 0x10000000) { st.flash.clear(); st.maxWrite = 0; }

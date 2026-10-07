@@ -78,7 +78,9 @@ export async function flashMicroPython(dev: USBDevice, onProgress: (p: number) =
   }
 
   await cmd(CMD.exclusive, [1]);
-  if (chip === "RP2040") await cmd(CMD.exitXip, []);
+  // Both chips: an RP2350 sent here by machine.bootloader() (not the button) acks every erase and
+  // write but changes nothing without it (a Pico 2 W came back on its old MicroPython; 2026-10-07).
+  await cmd(CMD.exitXip, []);
   for (let i = 0; i < secs.length; i++) {
     const [addr, data] = secs[i];
     await cmd(CMD.erase, [addr, SECTOR]);
