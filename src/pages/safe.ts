@@ -3,6 +3,8 @@
 // This page: the wedgie's signer address (worked out here, no RPC), the Safe's queue from Safe's
 // Transaction Service (api.safe.global, no key, CORS open), sign one on the wedgie and post the
 // signature there, propose a new one, and deploy the signer contract / execute with a browser wallet.
+// With a browser wallet that owns a Safe it also adds the wedgie as an owner (proposed to the other owners,
+// or run at once when one signature is enough), and it makes a new Safe with the wedgie as an owner.
 import * as W from "../serial/wedgies";
 import * as E from "../safe/eth";
 
@@ -38,29 +40,25 @@ async function wallet(chain: number): Promise<string> {
     await eth().request({ method: "wallet_switchEthereumChain", params: [{ chainId: want }] });
   return from;
 }
-async function send(chain: number, to: string, data: string, say: (s: string) => void) {
+async function send(chain: number, to: string, data: string, say: (s: string) => void): Promise<any> {
   const from = await wallet(chain);
-  say("Confirm it in your wallet…");
+  say("Confirm it in your wallet.");
   const hash = await eth().request({ method: "eth_sendTransaction", params: [{ from, to, data }] });
-  say("Waiting for it to land…");
+  say("Sent. Waiting for it to land in a block.");
   for (let i = 0; i < 120; i++) {
     const r = await eth().request({ method: "eth_getTransactionReceipt", params: [hash] });
-    if (r) { if (r.status !== "0x1") throw new Error("It failed on chain: " + hash); return hash as string; }
+    if (r) { if (r.status !== "0x1") throw new Error("It failed on chain: " + hash); return r; }
     await new Promise((res) => setTimeout(res, 1500));
   }
   throw new Error("Still not in a block: " + hash);
 }
-const hasCode = async (a: string) => ((await eth()?.request({ method: "eth_getCode", params: [a, "latest"] })) || "0x").length > 2;
-
-/** execTransaction(to, value, data, operation, safeTxGas, baseGas, gasPrice, gasToken, refundReceiver, signatures) */
-function execData(t: E.SafeTx, sigs: string) {
-  const pad = (b: Uint8Array) => E.cat(b, new Uint8Array((32 - (b.length % 32)) % 32));
-  const d = E.bytes(t.data || "0x"), s = E.bytes(sigs);
-  const head = 10 * 32, dataPart = E.cat(E.word(d.length), pad(d));
-  return E.selector("execTransaction(address,uint256,bytes,uint8,uint256,uint256,uint256,address,address,bytes)") + E.hex(E.cat(
-    E.aword(t.to), E.word(t.value), E.word(head), E.word(t.operation), E.word(t.safeTxGas), E.word(t.baseGas), E.word(t.gasPrice),
-    E.aword(t.gasToken), E.aword(t.refundReceiver), E.word(head + dataPart.length), dataPart, E.word(s.length), pad(s))).slice(2);
+/** The wallet signs t as an owner (EIP-712, what Safe{Wallet} asks for too). */
+async function walletSig(chain: number, safe: string, t: E.SafeTx) {
+  const from = await wallet(chain);
+  const sig = await eth().request({ method: "eth_signTypedData_v4", params: [from, JSON.stringify(E.typedData(chain, safe, t))] });
+  return { owner: E.checksum(from), signature: E.ecdsa(sig) };
 }
+const hasCode = async (a: string) => ((await eth()?.request({ method: "eth_getCode", params: [a, "latest"] })) || "0x").length > 2;
 
 export function safe(main: HTMLElement) {
   main.innerHTML = `
@@ -70,6 +68,8 @@ export function safe(main: HTMLElement) {
     <p class="fine">Your wedgie signs for a <a href="https://app.safe.global" target="_blank" rel="noopener">Safe</a>. Its key never leaves its chip; it shows each transaction and signs only when you press A on it.</p>
     <div class="safe-box recess" id="s-wedgie"></div>
     <div class="safe-box recess" id="s-safe"></div>
+    <div class="safe-box recess" id="s-add" hidden></div>
+    <div class="safe-box recess" id="s-create" hidden></div>
     <div class="safe-box recess" id="s-queue" hidden></div>
     <div class="safe-box recess" id="s-new" hidden></div>
     <p class="fine" id="s-msg"></p>
@@ -77,7 +77,7 @@ export function safe(main: HTMLElement) {
   const $ = (id: string) => document.getElementById(id)!;
   const q = new URLSearchParams(location.search);
   let key: { x: string; y: string } | null = null, signer = "", wedgie: W.Wedgie | null = null, asking = false;
-  let chain = 8453, safeAddr = "", info: any = null, queue: any[] = [];
+  let chain = 8453, safeAddr = "", info: any = null, queue: any[] = [], creating = false;
   const saved = q.get("safe") || localStorage.getItem("wedgie.safe") || "";
   const m = saved.match(/^(?:(\w+):)?(0x[0-9a-fA-F]{40})$/);
   if (m) { safeAddr = E.checksum(m[2]); chain = +(Object.entries(CHAINS).find(([, c]) => c.key === m[1])?.[0] || 8453); }
@@ -91,7 +91,7 @@ export function safe(main: HTMLElement) {
     if (!W.armed()) h += `<p><a class="btn btn-green" href="/connect">Connect a wedgie</a></p>`;
     else if (!ws.length) h += `<p class="fine">Plug it in. Not showing? <a href="/connect">Connect</a> it first.</p>`;
     else if (!app.length) h += `<p class="fine">It isn't running the Safe signer. Install it from <a href="/connect/${esc(ws[0].short)}">its page</a> (Software, Safe signer).</p>`;
-    else if (!key) h += `<p class="fine">Reading its key…</p>`;
+    else if (!key) h += `<p class="fine">Reading its key.</p>`;
     else h += `<p class="fine">Its key, on chain, is this signer contract. Add it as an owner of your Safe.</p>
       <p><code class="safe-addr">${esc(signer)}</code> <button class="btn" id="s-copy">Copy</button></p>
       <p class="fine" id="s-deploy-line"><button class="btn" id="s-deploy">Deploy it on ${esc(CHAINS[chain].name)}</button> once, before its first signature (any wallet can; it costs a little gas).</p>`;
@@ -107,7 +107,7 @@ export function safe(main: HTMLElement) {
       const h = await W.withRepl(w, (r) => r.request({ type: "hello" }, 5000));
       if (!h.safe) { say("Press A on the wedgie to make its key, then reload this page."); return; }
       key = h.safe; signer = E.signerAddress(key!.x, key!.y);
-      paintWedgie(); paintSafe(); paintQueue(); paintNew();
+      paintAll();
     } catch (e: any) { say(e?.message || String(e), true); wedgie = null; }
   }
 
@@ -126,14 +126,17 @@ export function safe(main: HTMLElement) {
   function paintSafe() {
     const opts = Object.entries(CHAINS).map(([id, c]) => `<option value="${id}"${+id === chain ? " selected" : ""}>${esc(c.name)}</option>`).join("");
     let h = `<h2>2. Your Safe</h2>
-      <p><select id="s-chain">${opts}</select> <input id="s-addr" placeholder="0x… Safe address" value="${esc(safeAddr)}" spellcheck="false" size="44"> <button class="btn" id="s-load">Open</button></p>`;
+      <p><select id="s-chain">${opts}</select> <input id="s-addr" placeholder="0x… Safe address" value="${esc(safeAddr)}" spellcheck="false" size="44"> <button class="btn" id="s-load">Open</button></p>
+      ${key ? `<p class="fine">No Safe yet? <button class="btn btn-sm" id="s-new-safe">Make a new Safe</button></p>` : ""}`;
     if (info) {
-      const owner = signer && info.owners.some((o: string) => o.toLowerCase() === signer.toLowerCase());
+      const owner = signer && isOwner(signer);
       h += `<p class="fine">${info.owners.length} owners, ${info.threshold} needed to sign · nonce ${esc(info.nonce)} · <a href="${appLink(chain, safeAddr)}" target="_blank" rel="noopener">open in Safe{Wallet}</a></p>`;
       h += !signer ? "" : owner ? `<p class="good">Your wedgie is an owner.</p>`
-        : `<p class="bad">Your wedgie isn't an owner yet.</p><p class="fine">In Safe{Wallet}: <a href="${appLink(chain, safeAddr, "settings/setup")}" target="_blank" rel="noopener">Settings → Setup → Add signer</a>, paste ${esc(short(signer))}. Then Refresh here.</p>`;
+        : `<p class="bad">Your wedgie isn't an owner yet.</p>`;
     }
     $("s-safe").innerHTML = h;
+    $("s-new-safe")?.addEventListener("click", () => { creating = !creating; paintCreate(); });
+    $("s-chain").onchange = () => { chain = +($("s-chain") as HTMLSelectElement).value; paintWedgie(); paintCreate(); };
     $("s-load").onclick = () => {
       const a = ($("s-addr") as HTMLInputElement).value.trim().replace(/^\w+:/, "");
       if (!E.isAddress(a)) { say("That isn't an address.", true); return; }
@@ -144,15 +147,116 @@ export function safe(main: HTMLElement) {
     };
   }
 
-  async function load() {
-    say("Loading the Safe…");
+  async function load(quiet = false) {
+    if (!quiet) say("Opening the Safe.");
     try {
       info = await get(`${api(chain)}/safes/${safeAddr}/`);
       const r = await get(`${api(chain)}/safes/${safeAddr}/multisig-transactions/?executed=false&nonce__gte=${info.nonce}&ordering=nonce&limit=20`);
       queue = r.results || [];
       say("");
-    } catch (e: any) { info = null; queue = []; say(e?.message || String(e), true); }
-    paintWedgie(); paintSafe(); paintQueue(); paintNew();
+    } catch (e: any) { info = null; queue = []; if (!quiet) say(e?.message || String(e), true); }
+    paintAll();
+  }
+  const paintAll = () => { paintWedgie(); paintSafe(); paintAdd(); paintCreate(); paintQueue(); paintNew(); };
+  const isOwner = (a: string) => !!info && info.owners.some((o: string) => o.toLowerCase() === a.toLowerCase());
+  const nextNonce = () => Math.max(+info.nonce, ...queue.map((t) => +t.nonce + 1));
+  const threshOpts = (n: number, at: number) => Array.from({ length: n }, (_, i) => `<option${i + 1 === at ? " selected" : ""}>${i + 1}</option>`).join("");
+
+  // ---- add the wedgie as an owner, from a browser wallet that already is one ----
+  function paintAdd() {
+    const box = $("s-add");
+    box.hidden = !(info && signer && !isOwner(signer));
+    if (box.hidden) return;
+    const n = info.owners.length;
+    box.innerHTML = `<h2>Add your wedgie as a signer</h2>
+      <p class="fine">An owner of this Safe does it from their browser wallet. ${info.threshold > 1
+        ? `This Safe needs ${info.threshold} signatures, so it goes to the queue below for the other owners to sign (here or in <a href="${appLink(chain, safeAddr, "transactions/queue")}" target="_blank" rel="noopener">Safe{Wallet}</a>), then anyone executes it.`
+        : "One signature is enough here, so it runs right away."}</p>
+      <p>Then <select id="a-th">${threshOpts(n + 1, info.threshold)}</select> of ${n + 1} owners must sign. <button class="btn btn-green" id="a-go">Add it with my wallet</button></p>`;
+    $("a-go").onclick = addSigner;
+  }
+
+  async function addSigner() {
+    try {
+      const from = await wallet(chain);
+      if (!isOwner(from)) throw new Error(`This wallet (${short(from)}) isn't an owner of this Safe. Switch to one that is.`);
+      if (!(await hasCode(signer))) {
+        say("First your wallet puts the wedgie's signer contract on chain (once per chain).");
+        await send(chain, E.FACTORY, E.createSignerData(key!.x, key!.y), say);
+      }
+      const th = +($("a-th") as HTMLSelectElement).value;
+      const t: E.SafeTx = { to: safeAddr, value: "0", data: E.addOwnerData(signer, th), operation: 0, safeTxGas: "0", baseGas: "0",
+        gasPrice: "0", gasToken: Z, refundReceiver: Z, nonce: nextNonce() };
+      say("Sign it in your wallet: add owner " + short(signer) + ".");
+      const sig = await walletSig(chain, safeAddr, t);
+      if (info.threshold === 1 && +t.nonce === +info.nonce) {
+        await send(chain, safeAddr, E.execData(t, E.packSignatures([sig])), say);
+        await load();
+        say("Done: your wedgie is an owner.");
+        return;
+      }
+      await post(`${api(chain)}/safes/${safeAddr}/multisig-transactions/`, { ...t, contractTransactionHash: E.safeTxHash(chain, safeAddr, t),
+        sender: sig.owner, signature: sig.signature, origin: "wedgie.dev/safe" });
+      await load();
+      say(`In the queue with your signature. ${info.threshold - 1} more owner${info.threshold > 2 ? "s" : ""} to sign, then Execute.`);
+    } catch (e: any) { say(e?.message || String(e), true); }
+  }
+
+  // ---- a new Safe with the wedgie as an owner; a browser wallet pays the gas ----
+  function paintCreate() {
+    const box = $("s-create");
+    box.hidden = !(creating && key);
+    if (box.hidden) return;
+    if (document.getElementById("c-go")) { $("c-go").textContent = `Make it on ${CHAINS[chain].name}`; return; }   // keep what's typed
+    box.innerHTML = `<h2>Make a new Safe</h2>
+      <p class="fine">Your wedgie is an owner. Add more owners (any wallet, one address a line), or leave it the only one.</p>
+      <p><textarea id="c-owners" rows="3" cols="44" placeholder="0x… other owners" spellcheck="false"></textarea></p>
+      <p><button class="btn btn-sm" id="c-me">Add my wallet</button></p>
+      <p><select id="c-th"></select> <span id="c-of"></span> must sign.
+        <button class="btn btn-green" id="c-go">Make it on ${esc(CHAINS[chain].name)}</button></p>
+      <p class="fine">Your browser wallet sends one transaction: the wedgie's signer contract, then the Safe (Safe 1.4.1).</p>`;
+    const ta = $("c-owners") as HTMLTextAreaElement, th = $("c-th") as HTMLSelectElement;
+    const count = () => {                         // only the count: never rebuild the box under someone typing
+      const n = 1 + new Set(ta.value.split(/\s+/).filter(E.isAddress).map((a) => a.toLowerCase())).size;
+      th.innerHTML = threshOpts(n, Math.min(n, Math.max(+th.value || 2, 1)));
+      $("c-of").textContent = `of ${n} owner${n > 1 ? "s" : ""}`;
+    };
+    ta.oninput = count;
+    count();
+    $("c-me").onclick = async () => {
+      try {
+        const me = E.checksum(await wallet(chain));
+        if (!ta.value.toLowerCase().includes(me.toLowerCase())) ta.value = (ta.value.trim() + "\n" + me).trim();
+        count();
+      } catch (e: any) { say(e?.message || String(e), true); }
+    };
+    $("c-go").onclick = createSafe;
+  }
+
+  async function createSafe() {
+    try {
+      const words = ($("c-owners") as HTMLTextAreaElement).value.split(/\s+/).filter(Boolean);
+      const bad = words.find((a) => !E.isAddress(a));
+      if (bad) throw new Error(`${bad} isn't an address.`);
+      const owners = [signer];
+      for (const a of words.map(E.checksum)) if (!owners.some((o) => o.toLowerCase() === a.toLowerCase())) owners.push(a);
+      const th = +($("c-th") as HTMLSelectElement).value;
+      const r = await send(chain, E.MULTICALL3, E.newSafeData(key!.x, key!.y, owners, th, BigInt(Date.now())), say);
+      const log = (r.logs || []).find((l: any) => l.address.toLowerCase() === E.SAFE_FACTORY.toLowerCase() && l.topics[0] === E.PROXY_CREATION);
+      if (!log) throw new Error("It ran, but no new Safe showed up in it: " + r.transactionHash);
+      safeAddr = E.checksum("0x" + log.topics[1].slice(26));
+      creating = false;
+      localStorage.setItem("wedgie.safe", `${CHAINS[chain].key}:${safeAddr}`);
+      history.replaceState(null, "", `/safe?safe=${CHAINS[chain].key}:${safeAddr}`);
+      ($("s-addr") as HTMLInputElement | null)?.setAttribute("value", safeAddr);
+      for (let i = 0; i < 20; i++) {             // Safe's API finds a new Safe a few seconds after its block
+        await load(true);
+        if (info) break;
+        say(`Made ${short(safeAddr)}. Waiting for Safe's API to see it.`);
+        await new Promise((res) => setTimeout(res, 3000));
+      }
+      if (info) say(`Made your Safe: ${safeAddr}.`);
+    } catch (e: any) { say(e?.message || String(e), true); }
   }
 
   // ---- what's waiting ----
@@ -165,12 +269,13 @@ export function safe(main: HTMLElement) {
       const n = (t.confirmations || []).length, need = t.confirmationsRequired ?? info.threshold;
       const what = t.dataDecoded?.method || (t.data && t.data !== "0x" ? "contract call" : `send ${Number(BigInt(t.value)) / 1e18} ETH`);
       return `<li><b>#${esc(t.nonce)}</b> ${esc(what)} → ${esc(short(t.to))} <span class="fine">${n}/${need} signed</span>
-        ${mine(t) ? `<span class="good">wedgie signed</span>` : `<button class="btn btn-green" data-sign="${i}"${!key || asking ? " disabled" : ""}>Sign with wedgie</button>`}
-        ${n >= need ? `<button class="btn" data-exec="${i}">Execute</button>` : ""}</li>`;
+        ${!isOwner(signer) ? "" : mine(t) ? `<span class="good">wedgie signed</span>` : `<button class="btn btn-green" data-sign="${i}"${!key || asking ? " disabled" : ""}>Sign with wedgie</button>`}
+        ${n < need ? `<button class="btn btn-sm" data-wsign="${i}">Sign with wallet</button>` : `<button class="btn" data-exec="${i}">Execute</button>`}</li>`;
     }).join("");
     box.innerHTML = `<h2>3. Waiting to sign</h2>${rows ? `<ul class="safe-list">${rows}</ul>` : `<p class="fine">Nothing waiting.</p>`}<p><button class="btn" id="s-refresh">Refresh</button></p>`;
-    $("s-refresh").onclick = load;
+    $("s-refresh").onclick = () => load();
     box.querySelectorAll<HTMLButtonElement>("[data-sign]").forEach((b) => b.onclick = () => signQueued(queue[+b.dataset.sign!]));
+    box.querySelectorAll<HTMLButtonElement>("[data-wsign]").forEach((b) => b.onclick = () => signWallet(queue[+b.dataset.wsign!]));
     box.querySelectorAll<HTMLButtonElement>("[data-exec]").forEach((b) => b.onclick = () => execute(queue[+b.dataset.exec!]));
   }
 
@@ -195,20 +300,31 @@ export function safe(main: HTMLElement) {
     try {
       const g = await wedgieSign(t);
       if (g.safeTxHash !== t.safeTxHash) throw new Error("Safe's API has a different hash for this one: not sent.");
-      say("Sending the signature to Safe…");
+      say("Sending the signature to Safe.");
       await post(`${api(chain)}/multisig-transactions/${t.safeTxHash}/confirmations/`, { signature: E.safeSignature(signer, g) });
       await load();
       say("Signed. It shows in Safe{Wallet} too.");
     } catch (e: any) { say(e?.message || String(e), true); paintQueue(); }
   }
 
-  async function execute(t: any) {
-    // Safe{Wallet} puts any mix of signatures together; here only the wedgie's own is enough.
-    const conf = t.confirmations || [];
-    const ours = conf.find((c: any) => c.owner.toLowerCase() === signer.toLowerCase());
-    if (!(info.threshold === 1 && ours)) { window.open(`${appLink(chain, safeAddr, "transactions/tx")}&id=multisig_${safeAddr}_${t.safeTxHash}`, "_blank"); return; }
+  async function signWallet(t: any) {
     try {
-      await send(chain, safeAddr, execData(t, ours.signature), say);
+      const from = await wallet(chain);
+      if (!isOwner(from)) throw new Error(`This wallet (${short(from)}) isn't an owner of this Safe.`);
+      const sig = await walletSig(chain, safeAddr, t);
+      await post(`${api(chain)}/multisig-transactions/${t.safeTxHash}/confirmations/`, { signature: sig.signature });
+      await load();
+      say("Signed with your wallet.");
+    } catch (e: any) { say(e?.message || String(e), true); }
+  }
+
+  /** Every owner's signature from Safe's API, packed; a browser wallet sends it (and pays the gas). */
+  async function execute(t: any) {
+    try {
+      if (+t.nonce !== +info.nonce) throw new Error(`#${info.nonce} runs first: a Safe runs its transactions in order.`);
+      const sigs = (t.confirmations || []).map((c: any) => ({ owner: c.owner,
+        signature: c.signature || E.hex(E.cat(E.aword(c.owner), E.word(0), new Uint8Array([1]))) }));   // an approveHash on chain
+      await send(chain, safeAddr, E.execData(t, E.packSignatures(sigs)), say);
       await load();
       say("Done: it ran.");
     } catch (e: any) { say(e?.message || String(e), true); }
@@ -233,12 +349,12 @@ export function safe(main: HTMLElement) {
     if (!/^\d*\.?\d*$/.test(amt)) { say("The ETH amount isn't a number.", true); return; }
     const [w, f = ""] = amt.split(".");
     const value = (BigInt(w || "0") * 10n ** 18n + BigInt((f + "0".repeat(18)).slice(0, 18))).toString();
-    const nonce = Math.max(+info.nonce, ...queue.map((t) => +t.nonce + 1));
+    const nonce = nextNonce();
     const t: E.SafeTx = { to: E.checksum(to), value, data, operation: 0, safeTxGas: "0", baseGas: "0", gasPrice: "0", gasToken: Z, refundReceiver: Z, nonce };
     try {
       E.bytes(data);
       const g = await wedgieSign(t);
-      say("Queuing it on Safe…");
+      say("Putting it in the Safe's queue.");
       await post(`${api(chain)}/safes/${safeAddr}/multisig-transactions/`, { ...t, contractTransactionHash: g.safeTxHash,
         sender: signer, signature: E.safeSignature(signer, g), origin: "wedgie.dev/safe" });
       await load();
@@ -248,6 +364,6 @@ export function safe(main: HTMLElement) {
 
   W.onChange(paintWedgie);
   if (W.armed()) W.start();
-  paintWedgie(); paintSafe();
+  paintAll();
   if (safeAddr) load();
 }

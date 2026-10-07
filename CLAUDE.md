@@ -143,6 +143,8 @@ uv run --with mpy-cross==1.29.0.post2 python3 tools/mpy.py --check   # the commi
 node tools/chipprobe.mjs                                    # installs on a virtual RP2040 (real heap; needs uv)
 python3 tools/boardprobe.py buttons                         # a checked install on a real board (press A)
 python3 tools/fakedevice.py                                 # a pty wedgie for public/wedgie.py
+node tools/safefork.mjs                                     # /safe's Ethereum on a Base fork (anvil): new Safe, add owner, wedgie signatures executed
+node tools/safeprobe.mjs http://localhost:4173 <outdir>     # /safe's buttons on the fork: add the wedgie with a wallet, make a new Safe
 uv run --with pyserial python3 tools/drivebench.py          # the phone's path from a Mac: REQ-<n>.TXT on the WEDGIE drive, ANSWER.TXT back
 ```
 

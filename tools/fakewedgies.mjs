@@ -10,6 +10,7 @@
 //   pulls a board out or plugs it back in. A board with noMp: true never answers (no MicroPython);
 //   chip: "none" has no secure chip (default: an ATECC608 that proves itself). _st.slowStart = ms: after each
 //   plug-in its app takes that long to start, saying nothing (Grove 4f7748d making its pictures).
+//   _st.hello = { ... }: extra fields in each hello, as an app's own hello adds them (spec hello: { ... }).
 // 0.2.5+ is sealed: Ctrl-C is a plain byte until {"type": "open"} is answered yes by the pretend person
 // (person: { say: "yes" | "no", ms }, default yes after 300 ms; _st.asks counts the questions). A yes lasts
 // until main.py starts again (a soft reset or exec(main.py)): one job.
@@ -78,6 +79,7 @@ export function fakeWedgies(specs) {
       if (cmpV(version() || "0", "0.3.0") >= 0 && slot()) h.jobs = cmpV(version(), "0.3.10") >= 0 ? 2 : 1;
       if (cmpV(version() || "0", "0.3.11") >= 0 && slot()) h.ram = 52000;
       if (cmpV(version() || "0", "0.3.16") >= 0 && slot()) h.bin = 4096;     // raw puts (job.py RAW)
+      Object.assign(h, st.hello);     // an app's own hello fields (Safe signer: { running: "safe", safe: {x, y} })
       return JSON.stringify(h);
     };
     const answer = (stdout) => push("OK" + stdout + "\x04\x04>");
@@ -290,6 +292,7 @@ export function fakeWedgies(specs) {
     if (b.noMp) p._st.dead = true;
     p._st.chip = b.chip;
     p._st.person = b.person;
+    p._st.hello = b.hello;
     return p;
   });
   window.__ports = ports;
