@@ -8,6 +8,19 @@ drive copy, a "current firmware" that isn't VERSION, or a wedgie.py command / US
 
 **Read `EXPECTATIONS.md` first.** The three rules every change must keep.
 
+## Accounts (Twitter / X, Gmail)
+
+wedgie's own accounts, made 2026-09-29 in this folder (session `3d5bc178-1724-483e-b3ef-ea360e58a146`).
+
+- **Twitter / X:** [@wedgiedev](https://x.com/wedgiedev), display name "wedgie". To log in, use
+  "Continue with Google" and pick wedgie@buidlguidl.com. It also has its own password.
+- **Gmail / Google:** wedgie@buidlguidl.com ("wedgie bot").
+- **ENS:** wedgie.eth, registered by Austin.
+
+Passwords are in `.env` here (gitignored: `WEDGIE_EMAIL`, `WEDGIE_EMAIL_PASSWORD`, `X_HANDLE`, `X_PASSWORD`)
+and the backup `~/.wedgie-credentials.env`. Never put them in git. A new wedgie account goes in both
+files and in this list.
+
 ## Landmines
 
 1. **A wedgie's USB port drops about a second after power-up.** boot.py adds the WEDGIE USB drive
