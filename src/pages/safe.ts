@@ -126,7 +126,8 @@ export function safe(main: HTMLElement) {
   // the view: null = the list; else one Safe
   let chain = 8453, safeAddr = "", info: Info | null = null, queue: any[] = [];
   let rows: Row[] = [], listing = false;
-  let newChain = 8453;
+  let newChain = 8453, showWallet = false;   // the wallet's own Safes: folded away (the wedgie's are the point)
+  const OFF = "wedgie.safe.wallet-off";      // Disconnect sticks: no reconnecting by itself on the next visit
   const deployed: Record<number, boolean | undefined> = {};
 
   localStorage.removeItem("wedgie.safe");        // the old page's "last Safe": it opened that one every time
@@ -252,11 +253,27 @@ export function safe(main: HTMLElement) {
     let h = `<h2>Your browser wallet <span class="fine">(optional)</span></h2>`;
     if (!eth()) h += `<p class="fine">None in this browser. You need one to pay gas: to make a Safe, add your wedgie to one, or execute. Signing with the wedgie alone needs none.</p>`;
     else if (!account) h += `<p class="fine">It pays the gas (make a Safe, add your wedgie, execute) and can sign as an owner too.</p><p><button class="btn" id="w-go"${dis()}>Connect wallet</button></p>`;
-    else h += `<p><code class="safe-addr">${esc(account)}</code>${isOwner(account) ? ` <span class="good">an owner of this Safe</span>` : ""}</p>`;
+    else h += `<p><code class="safe-addr">${esc(account)}</code>${isOwner(account) ? ` <span class="good">an owner of this Safe</span>` : ""}
+      <button class="btn btn-sm" id="w-off"${dis()}>Disconnect</button></p>`;
     $("s-wallet").innerHTML = h;
-    $("w-go")?.addEventListener("click", () => job(async () => { account = await wallet(safeAddr ? chain : newChain); if (!safeAddr) findSafes(); }));
+    $("w-go")?.addEventListener("click", () => job(async () => {
+      account = await wallet(safeAddr ? chain : newChain);
+      try { localStorage.removeItem(OFF); } catch {}
+      if (!safeAddr) findSafes();
+    }));
+    $("w-off")?.addEventListener("click", async () => {
+      account = ""; showWallet = false;
+      try { localStorage.setItem(OFF, "1"); } catch {}
+      // MetaMask and most others forget this site's permission; a wallet that can't, the page still stops using
+      try { await eth().request({ method: "wallet_revokePermissions", params: [{ eth_accounts: {} }] }); } catch {}
+      rows = rows.filter((r) => r.wedgie).map((r) => ({ ...r, wallet: false }));
+      paintAll();
+    });
   }
-  eth()?.on?.("accountsChanged", (a: string[]) => { account = a[0] ? E.checksum(a[0]) : ""; paintAll(); if (!safeAddr) findSafes(); });
+  eth()?.on?.("accountsChanged", (a: string[]) => {
+    if (localStorage.getItem(OFF)) return;
+    account = a[0] ? E.checksum(a[0]) : ""; paintAll(); if (!safeAddr) findSafes();
+  });
 
   // ---- /safe: every Safe the wedgie (and the wallet) owns, on every chain ----
   async function findSafes() {
@@ -288,7 +305,7 @@ export function safe(main: HTMLElement) {
 
   function paintList() {
     const box = $("s-list");
-    box.hidden = !!safeAddr || !(key || account);
+    box.hidden = !!safeAddr || !key;
     if (box.hidden) return;
     const row = (r: Row) => {
       const i = r.info!;
@@ -300,11 +317,14 @@ export function safe(main: HTMLElement) {
     let h = `<h2>Your wedgie's Safes</h2>`;
     h += mine.length ? `<ul class="safe-list safe-rows">${mine.map(row).join("")}</ul>`
       : listing ? `<p class="fine">Looking on every chain.</p>` : `<p class="fine">${key ? "None yet. Make one below, or add your wedgie to a Safe you already have." : "Plug in your wedgie to see its Safes."}</p>`;
-    if (theirs.length) h += `<h2>Your wallet's Safes</h2><p class="fine">Open one to add your wedgie as an owner.</p><ul class="safe-list safe-rows">${theirs.map(row).join("")}</ul>`;
+    if (theirs.length) h += showWallet
+      ? `<p class="fine"><button class="btn btn-sm" id="l-wallet">Hide your wallet's Safes</button> Open one to add your wedgie as an owner.</p><ul class="safe-list safe-rows">${theirs.map(row).join("")}</ul>`
+      : `<p class="fine"><button class="btn btn-sm" id="l-wallet">Your wallet's Safes (${theirs.length})</button> to add your wedgie to one</p>`;
     h += `<p class="fine"><button class="btn btn-sm" id="l-refresh"${dis(listing)}>Refresh</button>
       · Open another: <input id="l-addr" placeholder="0x… Safe address" size="30" spellcheck="false"> <select id="l-chain">${chainOpts(newChain)}</select> <button class="btn btn-sm" id="l-open">Open</button></p>`;
     box.innerHTML = h;
     $("l-refresh").onclick = () => findSafes();
+    $("l-wallet")?.addEventListener("click", () => { showWallet = !showWallet; paintList(); });
     $("l-open").onclick = () => {
       const a = ($("l-addr") as HTMLInputElement).value.trim().replace(/^\w+:/, "");
       if (!E.isAddress(a)) { say("That isn't an address.", true); return; }
@@ -595,6 +615,7 @@ export function safe(main: HTMLElement) {
 
   W.onChange(paintWedgie);
   if (W.armed()) W.start();
-  eth()?.request({ method: "eth_accounts" }).then((a: string[]) => { if (a?.[0]) { account = E.checksum(a[0]); paintAll(); if (!safeAddr) findSafes(); } }, () => {});
+  if (!localStorage.getItem(OFF))
+    eth()?.request({ method: "eth_accounts" }).then((a: string[]) => { if (a?.[0]) { account = E.checksum(a[0]); paintAll(); if (!safeAddr) findSafes(); } }, () => {});
   show();
 }

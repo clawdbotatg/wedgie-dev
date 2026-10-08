@@ -152,8 +152,11 @@ check(eq(await page.textContent("#s-wedgie .safe-addr"), signer), `signer addres
 check(new globalThis.URL(page.url()).pathname === "/safe" && !(await page.isHidden("#s-list")) && !(await page.isHidden("#s-create")), "an old saved Safe doesn't open itself: /safe is the list, with Make a new Safe");
 await wait(() => /None yet/.test(document.querySelector("#s-list").textContent), null, 20000, "the wedgie has no Safes yet");
 await page.click("#w-go");
+await wait(() => document.querySelector("#l-wallet"), null, 20000, "the wallet's Safes, folded");
+check(!(await page.$(`.safe-row[href$="${mine}"]`)) && /Your wallet's Safes \(1\)/.test(await page.textContent("#s-list")), "the wallet's Safes are folded away: Your wallet's Safes (1)");
+await page.click("#l-wallet");
 await wait((s) => document.querySelector(`.safe-row[href$="${s}"]`), mine, 20000, "the wallet's Safe listed");
-check(/Your wallet's Safes[\s\S]*1 of 1 owner/.test(await page.textContent("#s-list")), "listed under the wallet's Safes, 1 of 1");
+check(/1 of 1 owner/.test(await page.textContent("#s-list")), "unfolded: the wallet's Safe, 1 of 1");
 if (out) await page.screenshot({ path: `${out}/safe-0-list.png`, fullPage: true });
 await page.click(`.safe-row[href$="${mine}"]`);
 await wait(() => !document.querySelector("#s-add")?.hidden, null, 30000, "the Add box");
@@ -209,7 +212,7 @@ check(/Nothing waiting/.test(await page.textContent("#s-queue")), "on chain: the
 
 // 4: back to the list (no reload): the Safe is the wedgie's now. Then a new one: wallet + wedgie, 2 of 2
 await page.click('a[href="/safe"][data-nav]');
-await wait((s) => /Your wedgie's Safes/.test(document.querySelector("#s-list").textContent) && document.querySelector(`.safe-row[href$="${s}"]`) && !/Your wallet's Safes/.test(document.querySelector("#s-list").textContent), mine, 30000, "the list: the Safe is the wedgie's now");
+await wait((s) => /Your wedgie's Safes/.test(document.querySelector("#s-list").textContent) && document.querySelector(`.safe-row[href$="${s}"]`) && !document.querySelector("#l-wallet"), mine, 30000, "the list: the Safe is the wedgie's now");
 await page.click("#c-me");
 await wait(() => /of 2 owners/.test(document.querySelector("#c-of").textContent), null, 10000, "2 owners counted");
 await page.selectOption("#c-th", "2");
@@ -226,6 +229,14 @@ if (out) await page.screenshot({ path: `${out}/safe-4-made.png`, fullPage: true 
 await page.goBack();
 await wait((a) => [...document.querySelectorAll("#s-list .safe-row")].filter((r) => a.some((x) => r.getAttribute("href").endsWith(x))).length === 2, [mine, made], 30000, "the list has both (Back button)");
 check(true, "Back: the list has both Safes (the new one before Safe's API has it)");
+
+// 5: Disconnect: the wallet is gone, and stays gone after a reload
+await page.click("#w-off");
+await wait(() => document.querySelector("#w-go"), null, 10000, "Connect wallet again");
+await page.reload();
+await wait(() => document.querySelector("#s-wedgie .safe-addr"), null, 30000, "reloaded");
+await page.waitForTimeout(1500);
+check(!!(await page.$("#w-go")), "Disconnect sticks after a reload (Connect wallet shows, no address)");
 if (out) await page.screenshot({ path: `${out}/safe-5-list.png`, fullPage: true });
 
 check(!errs.length, "no page errors " + errs.join("; "));
