@@ -7,7 +7,8 @@
       "files": [
         "safe.py",
         "safe_keccak.py",
-        "safe_addr.py"
+        "safe_addr.py",
+        "safe_blockie.py"
       ],
       "entry": "run",
       "fw": "0.3.17",

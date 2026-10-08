@@ -71,8 +71,16 @@ ROLES_COPY = "0xf2964ce6161ce0e75964fe7927ce114cb0b283d5"       # Zodiac Roles 2
 MULTICALL3 = "0xca11bde05977b3631167028862be2a173976ca11"       # the budget sends ETH through it
 MODULES = {RECOVERY: "7-day recovery"}
 # Roles allowance keys Instant Wallet uses (keccak of the name): what they count
-LIMITS = {"8cf0b93cd9d3e32167f8de799f8e55df33697bb155a46b384f39bd78e75879b5": ("USDC", 6),   # instant-wallet.burner.usdc
-          "45cc4838df5ba19e2e80bafaf996e5acf9194b3706f31dfa92fdfb8cc4fd3017": ("ETH", 18)}   # instant-wallet.burner.eth
+K_USDC = "8cf0b93cd9d3e32167f8de799f8e55df33697bb155a46b384f39bd78e75879b5"   # instant-wallet.burner.usdc
+K_ETH = "45cc4838df5ba19e2e80bafaf996e5acf9194b3706f31dfa92fdfb8cc4fd3017"    # instant-wallet.burner.eth
+K_FEE = "e0a4e7171a966a6c2f8a346d61492f1479248405e8f190113096dd36aed44e2b"    # instant-wallet.burner.fee-usdc
+# what each allowance is: (what it's called, symbol, decimals, what it's for)
+LIMITS = {K_USDC: ("daily limit", "USDC", 6, "Face ID alone, a day"),
+          K_ETH: ("daily limit", "ETH", 18, "Face ID alone, a day"),
+          K_FEE: ("fee cap", "USDC", 6, "relay fees, a day")}
+# Instant Wallet's relay: it sends the transactions and is paid a fee in the batch. Built in, never from the host.
+RELAY = "0x4cfab32186e65e2a39ec0e882e11380cbf2f8a2f"
+NAMES = {RELAY: "the Instant relay"}
 ROUTER_THIS = "0x0000000000000000000000000000000000000002"      # SwapRouter02: "the router", then unwrap
 
 SAFES_MAX = 32          # Safes the wedgie remembers (save "safes")
@@ -226,14 +234,59 @@ def _aarg(data, i):
     return "0x" + binascii.hexlify(_arg(data, i)[12:]).decode()
 
 
+BIG = "big"         # a line kind: big text (the amount, the limit)
+ADDR = "addr"       # a line kind: an address in full, with its blockie (safe_blockie) beside it
+PIC = "pic"         # a line kind: a blockie of the Safe tx hash and its short form
+
+
 def _addr_lines(head, a, c=INK):
-    """An address in full on two lines: nobody should have to trust 0x12..cdef."""
-    return [(head, MUTED), (a[:22], c), ("  " + a[22:], c)]
+    """An address in full, its blockie beside it: nobody should have to trust 0x12..cdef. A name the wedgie
+    knows itself (NAMES) goes on the line above."""
+    n = NAMES.get(a)
+    return [((head + " " + n).strip() if n else head, MUTED), (a, c, ADDR)]
+
+
+def _h(line):
+    """Pixels a line takes on a page."""
+    k = line[2] if len(line) > 2 else None
+    return (30 if len(line[0]) <= 10 else 22) if k == BIG else 38 if k in (ADDR, PIC) else 12
+
+
+def _draw(lines, y, bottom=182):
+    """Lines of (text, color) or (text, color, kind) from y; stops before bottom. Returns the y under them."""
+    import safe_blockie
+    for l in lines:
+        if y + _h(l) > bottom:
+            break
+        s, c, k = l[0], l[1], (l[2] if len(l) > 2 else None)
+        if k == BIG and len(s) <= 10:
+            d.center_text(s, y + 3, c, 3)
+        elif k == BIG and len(s) <= ui.COLS_BIG:
+            d.center_text(s, y + 2, c, 2)
+        elif k == ADDR:
+            safe_blockie.draw(d, s, 12, y + 2, 4, MUTED)
+            d.text(s[:22], 54, y + 6, c)
+            d.text(s[22:], 54, y + 20, c)
+        elif k == PIC:
+            safe_blockie.draw(d, s, 70, y + 2, 4, MUTED)
+            d.text("tx", 112, y + 6, MUTED)
+            d.text(short(s), 112, y + 20, MUTED)
+        elif s:
+            d.center_text(s, y + (4 if k == BIG else 0), c)
+        y += _h(l)
+    return y
 
 
 def _tok(tx, a):
     t = TOKENS.get((tx["chainId"], a))
     return t if t else (None, 0)
+
+
+def _who(a, safe):
+    """Who gets paid: this Safe, a name the wedgie knows, or the address with its blockie."""
+    if a == safe:
+        return [("to this Safe", GREEN_D)]
+    return _addr_lines("to", a)
 
 
 def _amt(tx, a, n):
@@ -299,15 +352,52 @@ def _roles(tx, sel):
         return [("budget: may use", INK), (what, INK)]
     if sel == "0172a43a" and len(data) == 68:               # revokeTarget(role, target)
         return [("budget: no longer uses", INK), (what, INK)]
-    if sel == "7508dd98":                                   # scopeFunction(role, target, selector, ...)
-        return [("budget: rules for", INK), (what, INK)]
+    if sel == "7508dd98":                                   # scopeFunction(role, target, selector, conditions, options)
+        try:
+            r = _rule(data, t)
+        except Exception:
+            r = None
+        return r or [("budget: rules for", INK), (what, INK), ("it can't read the rule", RED)]
     if sel == "a8ec43ee" and len(data) == 4 + 32 * 6:       # setAllowance(key, balance, max, refill, period, ts)
-        sym, dec = LIMITS.get(binascii.hexlify(_arg(data, 0)).decode(), ("", 0))
+        k = binascii.hexlify(_arg(data, 0)).decode()
         refill, per = int.from_bytes(_arg(data, 3), "big"), int.from_bytes(_arg(data, 4), "big")
-        when = "a day" if per == 86400 else "every %ds" % per
-        return [("budget: up to", INK), ("%s %s %s" % (amount(refill, dec), sym or "units", when), INK)]
+        if k in LIMITS:
+            name, sym, dec, why = LIMITS[k]
+            return [(name, MUTED), ("%s %s" % (amount(refill, dec), sym), INK, BIG),
+                    (why if per == 86400 else "every %ds" % per, MUTED if per == 86400 else RED)]
+        return [("budget: up to", INK), ("%d units, unknown limit" % refill, RED)]
     if sel == "2916a9af":                                   # setTransactionUnwrapper
         return [("budget: read batches", INK)]
+    return None
+
+
+def _conds(data):
+    """scopeFunction's ConditionFlat[]: [(parent, paramType, operator, compValue hex)]."""
+    b = data[4:]
+    o = int.from_bytes(b[96:128], "big")
+    n = int.from_bytes(b[o:o + 32], "big")
+    out = []
+    for i in range(n):
+        t = o + 32 + int.from_bytes(b[o + 32 + 32 * i:o + 64 + 32 * i], "big")
+        v = _bytes_at(b, t + int.from_bytes(b[t + 96:t + 128], "big"))
+        out.append((b[t + 31], b[t + 63], b[t + 95], binascii.hexlify(v).decode()))
+    return out
+
+
+def _rule(data, target):
+    """The rules Instant Wallet sets for the burner's USDC and ETH, in words; None for any other."""
+    c = _conds(data)
+    sel = binascii.hexlify(data[68:72]).decode()
+    if sel == "a9059cbb" and c == [(0, 5, 5, ""), (0, 1, 0, ""), (0, 1, 28, K_USDC)]:
+        return [("USDC rule", MUTED), ("sends to anyone", INK), ("up to the daily limit", INK)]
+    if sel == "a9059cbb" and len(c) == 7 and c[:3] == [(0, 0, 2, ""), (0, 5, 5, ""), (0, 5, 5, "")] and \
+            c[3][:3] == (1, 1, 16) and len(c[3][3]) == 64 and c[4:] == [(1, 1, 28, K_FEE), (2, 1, 0, ""), (2, 1, 28, K_USDC)]:
+        r = "0x" + c[3][3][24:]
+        return [("USDC rule", MUTED), ("fees, up to the fee cap", INK)] + _addr_lines("to", r, INK if r in NAMES else RED) + \
+            [("others: up to the daily limit", INK)]
+    if target == MULTICALL3 and sel == "174dea71" and c == [(0, 5, 5, ""), (0, 4, 0, ""), (0, 0, 29, K_ETH), (1, 3, 0, ""),
+                                                            (3, 1, 0, ""), (3, 1, 0, ""), (3, 1, 0, ""), (3, 2, 0, "")]:
+        return [("ETH rule", MUTED), ("sends to anyone", INK), ("up to the daily limit", INK)]
     return None
 
 
@@ -326,8 +416,7 @@ def describe(tx):
     if tx["operation"] == 1:
         out.append(("DELEGATECALL: can do anything", RED))
     if not data:
-        out.append(("send %s ETH to" % amount(tx["value"], 18), INK))
-        return out + _addr_lines("", to)[1:]
+        return out + [("send", MUTED), ("%s ETH" % amount(tx["value"], 18), INK, BIG)] + _who(to, safe)
     if tx["value"] and to not in ROUTERS:
         out.append(("+ %s ETH" % amount(tx["value"], 18), RED))
     if to == safe and sel == "0d582f13" and len(data) == 68:
@@ -383,8 +472,10 @@ def describe(tx):
     if sel == "a9059cbb" and len(data) == 68:
         tok = TOKENS.get((tx["chainId"], to))
         n = int.from_bytes(_arg(data, 1), "big")
-        what = "%s %s" % (amount(n, tok[1]), tok[0]) if tok else "%d of token %s" % (n, short(to))
-        return out + [("send " + what + " to", INK)] + _addr_lines("", _aarg(data, 0))[1:]
+        if not tok:
+            return out + [("send %d of token" % n, INK)] + _addr_lines("", to, RED)[1:] + _who(_aarg(data, 0), safe)
+        r = _aarg(data, 0)
+        return out + [("fee" if r == RELAY else "send", MUTED), ("%s %s" % (amount(n, tok[1]), tok[0]), INK, BIG)] + _who(r, safe)
     return out + [("call " + sel + ", %d bytes, on" % len(data), RED)] + _addr_lines("", to, RED)[1:]
 
 
@@ -486,9 +577,7 @@ def draw_home():
         lines = [("No key yet.", INK), ("The chip makes one and", MUTED), ("never lets it out.", MUTED)]
     if note:
         lines.append((note, MUTED))
-    for s, c in lines:
-        d.center_text(s, y, c)
-        y += 14
+    _draw(lines, y, 240)
     if not key:
         ui.buttons(d, "make a key", "not now")
     d.show()
@@ -499,10 +588,7 @@ def _screen(head, lines, yes, k):
     d.fill(WHITE)
     ui.band(d)
     ui.title(d, head, 40, 1)
-    y = 64
-    for s, c in lines[:10]:
-        d.center_text(s, y, c)
-        y += 12
+    _draw(lines, 62)
     ui.buttons(d, yes, "no")
     d.show()
     t0 = time.ticks_ms()
@@ -521,14 +607,15 @@ def confirm(tx, h):
     top = [("%s  nonce %d" % (CHAINS.get(tx["chainId"], "chain %d" % tx["chainId"]), tx["nonce"]), INK),
            ("Safe " + short(tx["safe"]), MUTED)]
     tail = [("pays a gas refund", RED)] if tx["gasPrice"] else []
-    tail.append(("hash " + short(hx(h)), MUTED))
+    pic = (hx(h), MUTED, PIC)       # the phone and computer draw the same blockie of this hash
     acts = batch(tx)
     if acts is None:
-        return _screen("Sign for Safe?", (top + describe(tx))[:9 - len(tail) + 1] + tail, "sign", k)
+        return _screen("Sign for Safe?", top + describe(tx) + tail + [pic], "sign", k)
     n = len(acts)
     if not _screen("Safe batch", top + [("%d actions in one transaction" % n, INK),
-                                         ("A shows each one", MUTED)] + tail, "next", k):
+                                         ("A shows each one", MUTED)] + tail + [pic], "next", k):
         return False
+    tail.append(("tx " + short(hx(h)), MUTED))
     for i, a in enumerate(acts):
         last = i == n - 1
         if not _screen("%d of %d" % (i + 1, n), describe(a) + ([("", INK)] + tail if last else []),
