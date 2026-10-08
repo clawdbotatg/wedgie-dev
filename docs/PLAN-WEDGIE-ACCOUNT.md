@@ -1,6 +1,6 @@
 # Plan: a wedgie address that can hold money, and keys that can change
 
-Status 2026-10-08. Plan only.
+Status 2026-10-08. Plan only, on hold (Austin: "we won't do anything yet"). Decisions below are open.
 
 ## The problem
 
