@@ -18,6 +18,10 @@
 #   -> {"id":1,"type":"refused"} (Y, or no answer in 2 minutes) or {"type":"error","error":".."}
 #   hello answers also carry "safe": {"x","y"} (or null: no key yet) and "signer": its Safe owner address
 #   (safe_addr.py; the home screen shows it, wedgie.dev/safe checks it against its own).
+#   {"type":"safe_list"} -> {"type":"safe_list","safes":["8453:0x..", ...]}: the Safes this wedgie knows it's
+#   in, newest first, so any computer can list them. {"type":"safe_note","chainId":8453,"safe":"0x.."} adds
+#   one (a host that made or opened it); signing for a Safe adds it too. Just a list of addresses: a host
+#   checks on chain that the wedgie really is an owner before it shows one.
 import sys, select, json, time, gc, binascii, hashlib
 import lcd as L
 import wedgie as W
@@ -25,7 +29,7 @@ import save
 import ui
 from ui import WHITE, INK, MUTED, GREEN_D, RED
 
-FW = "safe-3"
+FW = "safe-4"
 RP_ID = b"wedgie.dev"
 FIELDS = '"origin":"https://wedgie.dev"'
 ASK_MS = 120000
@@ -71,10 +75,12 @@ LIMITS = {"8cf0b93cd9d3e32167f8de799f8e55df33697bb155a46b384f39bd78e75879b5": ("
           "45cc4838df5ba19e2e80bafaf996e5acf9194b3706f31dfa92fdfb8cc4fd3017": ("ETH", 18)}   # instant-wallet.burner.eth
 ROUTER_THIS = "0x0000000000000000000000000000000000000002"      # SwapRouter02: "the router", then unwrap
 
+SAFES_MAX = 32          # Safes the wedgie remembers (save "safes")
 CHUNK = 4000            # hex chars per safe_data line (a USB line is at most 6 KB)
-# bytes of tx data the wedgie takes in pieces. Measured on a virtual RP2040 (tools/safechip.mjs): 16 KB signs,
-# 20 KB runs out of memory joining the pieces (one block that big on a used heap). 12 KB leaves room.
-MAX_DATA = 12000
+# bytes of tx data the wedgie takes in pieces. Joining them needs one free block that size, and how big a
+# block a used RP2040 heap still has varies: on a virtual RP2040 (wedgie-dev tools/safechip.mjs) 12 KB
+# passed one run and failed another, 16 KB once, 20 KB never. 8 KB passes every run, with room.
+MAX_DATA = 8000
 
 # Safe's MultiSend contracts (1.3.0 and 1.4.1, both deployments): a batch is a DELEGATECALL to one of
 # these, and the wedgie shows every action in it. A DELEGATECALL to anything else stays red.
@@ -432,6 +438,7 @@ def make_key():
         key = {"x": hx(pub[1:33]), "y": hx(pub[33:65])}
         save.store("key", key)
         save.delete("signer")                   # a new key, a new address
+        save.delete("safes")                    # and none of the old key's Safes
     finally:
         _unload()
     find_signer()
@@ -553,8 +560,26 @@ def on_sign(mid, t):
     auth, dg = webauthn_digest(h)
     r, s = sign(dg)
     note = "signed nonce %d" % tx["nonce"]
+    try:
+        keep_safe(tx["chainId"], tx["safe"])
+    except Exception as e:              # the list is a convenience: never lose a signature over it
+        sys.print_exception(e)
     W.send({"id": mid, "type": "safe_sig", "safeTxHash": hx(h), "x": key["x"], "y": key["y"],
             "r": "0x%064x" % r, "s": "0x%064x" % s, "authenticatorData": hx(auth), "clientDataFields": FIELDS})
+
+
+def keep_safe(chain, safe):
+    """Remember a Safe (newest first, at most SAFES_MAX). Writes the flash only for a new one."""
+    k = "%d:%s" % (chain, safe.lower())
+    l = save.load("safes", [])
+    if l[:1] == [k]:
+        return len(l)
+    if k in l:
+        l.remove(k)
+    l.insert(0, k)
+    del l[SAFES_MAX:]
+    save.store("safes", l)
+    return len(l)
 
 
 def handle(m):
@@ -565,6 +590,15 @@ def handle(m):
         dirty = True
     elif t == "safe_data":
         on_data(mid, m)
+    elif t == "safe_list":
+        W.send({"id": mid, "type": "safe_list", "safes": save.load("safes", [])})
+    elif t == "safe_note":
+        try:
+            n = keep_safe(num(m.get("chainId")), addr(m.get("safe")))
+        except ValueError as e:
+            W.send({"id": mid, "type": "error", "error": "bad safe: %s" % e})
+            return
+        W.send({"id": mid, "type": "ok", "safes": n})
     elif t == "hello":
         W.send(W.hello(mid, running="safe", app=FW, safe=key, signer=signer, safe_chunk=CHUNK))
     else:                               # hello's cousins, shots, jobs, open: the slot's
