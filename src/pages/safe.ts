@@ -344,9 +344,9 @@ export function safe(main: HTMLElement) {
     if (box.hidden) return;
     const row = (r: Row) => {
       const i = r.info;
-      return `<li><a class="safe-row" data-nav href="${route(r.chain, r.addr)}"><b>${esc(short(r.addr))}</b>
+      return `<li><a class="safe-row${r.wedgie ? " btn btn-green" : ""}" data-nav href="${route(r.chain, r.addr)}"><b>${esc(short(r.addr))}</b>
         <span>${esc(CHAINS[r.chain].name)}</span><span class="fine">${i ? `${i.threshold} of ${plural(i.owners.length, "owner")} · ${esc(E.fmt(i.balance, 18, 4))} ETH${i.usdc ? ` · ${esc(E.fmt(i.usdc, 6, 2))} USDC` : ""}` : `couldn't read it just now (${esc(r.err || "")}): open it, or Refresh`}</span>
-        ${r.wedgie ? "" : `<span class="fine">your wallet's: add your wedgie</span>`}</a></li>`;
+        ${r.wedgie ? `<span class="safe-open">Open →</span>` : `<span class="fine">your wallet's: add your wedgie</span>`}</a></li>`;
     };
     const mine = rows.filter((r) => r.wedgie), theirs = rows.filter((r) => !r.wedgie);
     let h = `<h2>Your wedgie's Safes</h2>`;

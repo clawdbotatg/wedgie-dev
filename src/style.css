@@ -534,4 +534,9 @@ body.test-mode .top, body.test-mode .foot { display: none; }
 .safe-row { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; width: 100%; padding: 10px 6px; color: inherit; text-decoration: none; border-radius: 10px; }
 .safe-row:hover { background: rgba(0,0,0,.05); }
 .safe-row b { font-family: "DM Mono", monospace; }
+/* the wedgie's own Safes: the page's main action */
+.safe-row.btn { height: auto; padding: 14px 20px; margin: 8px 0; border-radius: 18px; justify-content: flex-start; font-size: 16px; }
+.safe-row.btn:hover { background: var(--green-fill); }
+.safe-row.btn .fine { color: rgba(255,255,255,.85); }
+.safe-open { margin-left: auto; }
 .safe-list li { padding: 8px 0; border-bottom: 1px solid rgba(0,0,0,.08); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
