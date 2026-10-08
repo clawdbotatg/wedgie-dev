@@ -78,6 +78,8 @@ time.sleep(2)
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const kb = (n: number) => `${Math.max(1, Math.round(n / 1024))} KB`;
+// apps with their own page on wedgie.dev: a button to it on the app's card once it's on the wedgie
+const PAGES: Record<string, { href: string; label: string }> = { safe: { href: "/safe", label: "Manage Safes" } };
 /** How long the last question took to show: the site's part, then the wedgie's (0.3.11+ reports it). */
 const askTime = () => lastAsk ? ` <span class="fine">Question on its screen in ${lastAsk.wedgie != null ? `${lastAsk.site + lastAsk.wedgie} ms (site ${lastAsk.site}, wedgie ${lastAsk.wedgie})` : `${lastAsk.site} ms + the wedgie's part`}.</span>` : "";
 
@@ -380,7 +382,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
         slotEl.dataset.v = c.v;
         slotEl.className = "cart-slot";
         slotEl.dataset.mod = c.mod;
-        slotEl.innerHTML = `<button class="cart" title="${esc(c.about || "")}">${cartHtml(c)}</button><p class="cart-about">${esc(c.about || "")}</p>${c.repo ? `<p class="cart-from${c.unreviewed ? " unreviewed" : ""}">${c.unreviewed ? "not reviewed · " : "by "}<a href="https://github.com/${esc(c.repo)}" target="_blank" rel="noopener">${esc(c.repo)}</a>${c.sha && /^[0-9a-f]{40}$/.test(c.sha) ? ` · ${verLink(c.repo, { sha: c.sha, at: c.at }, esc)}` : ""}</p>` : ""}<p class="cart-needs" hidden></p><p class="cart-ver" hidden></p><div class="cart-acts"><button class="btn btn-xs btn-green" data-cart="update" hidden>Update</button><button class="btn btn-xs" data-cart="uninstall" hidden>Uninstall</button></div>`;
+        slotEl.innerHTML = `<button class="cart" title="${esc(c.about || "")}">${cartHtml(c)}</button><p class="cart-about">${esc(c.about || "")}</p>${c.repo ? `<p class="cart-from${c.unreviewed ? " unreviewed" : ""}">${c.unreviewed ? "not reviewed · " : "by "}<a href="https://github.com/${esc(c.repo)}" target="_blank" rel="noopener">${esc(c.repo)}</a>${c.sha && /^[0-9a-f]{40}$/.test(c.sha) ? ` · ${verLink(c.repo, { sha: c.sha, at: c.at }, esc)}` : ""}</p>` : ""}<p class="cart-needs" hidden></p><p class="cart-ver" hidden></p><div class="cart-acts">${PAGES[c.mod] ? `<a class="btn btn-xs btn-green" data-cart="page" href="${PAGES[c.mod].href}" hidden>${esc(PAGES[c.mod].label)}</a>` : ""}<button class="btn btn-xs btn-green" data-cart="update" hidden>Update</button><button class="btn btn-xs" data-cart="uninstall" hidden>Uninstall</button></div>`;
         // A tap on the cart puts it on (or updates it). The app on it comes off only by its Uninstall button.
         slotEl.querySelector<HTMLButtonElement>(".cart")!.onclick = () => (active() === c.mod && (w?.carts || [])[0]?.v === c.v ? undefined : pick(c));
         slotEl.querySelector<HTMLButtonElement>('[data-cart="update"]')!.onclick = () => pick(c);
@@ -403,6 +405,8 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
       upd.hidden = !outdated || p !== undefined; upd.disabled = off;
       upd.textContent = older ? "Update" : "Replace";        // never "Update" to an older or unknown version
       rm.hidden = !on || !slot() || p !== undefined; rm.disabled = off;
+      const pg = slotEl.querySelector<HTMLElement>('[data-cart="page"]');
+      if (pg) pg.hidden = !on || outdated || p !== undefined;
       btn.style.setProperty("--p", String(p ?? 0));
       const st = slotEl.querySelector(".cart-state")!;
       st.innerHTML = p !== undefined ? "installing" : older ? "update" : outdated ? "other version" : playing ? "▶ running" : on ? "on it" : kb(c.size);
