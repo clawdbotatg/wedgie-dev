@@ -116,6 +116,7 @@ export function safe(main: HTMLElement) {
     <div class="safe-box recess" id="s-safe" hidden></div>
     <div class="safe-box recess" id="s-add" hidden></div>
     <div class="safe-box recess" id="s-queue" hidden></div>
+    <div class="safe-box recess" id="s-owner" hidden></div>
     <div class="safe-box recess" id="s-new" hidden></div>
     <p class="safe-msg" id="s-msg" hidden></p>
   </section>`;
@@ -171,7 +172,7 @@ export function safe(main: HTMLElement) {
     say("");
     if (m && KEYS[m[1]]) {
       chain = KEYS[m[1]]; safeAddr = E.checksum(m[2]); info = null; queue = [];
-      $("s-new").innerHTML = "";
+      $("s-new").innerHTML = ""; $("s-owner").innerHTML = "";
       paintAll();
       checkDeployed();
       load();                 // not job(): a create that lands here is still a job
@@ -459,6 +460,34 @@ export function safe(main: HTMLElement) {
     if (eqA(o, signer) && !confirm("Remove this wedgie as an owner? It won't be able to sign for this Safe.")) return;
     job(() => propose(safeTx(safeAddr, "0", E.removeOwnerData(at ? i.owners[at - 1] : E.SENTINEL, o, th)), by(), `remove owner ${short(o)}, then ${th} must sign`));
   }
+  // ---- add any owner (a wallet, another wedgie): its own box, built once per Safe so typing survives repaints ----
+  function paintOwner() {
+    const box = $("s-owner");
+    box.hidden = !(safeAddr && info && (isOwner(signer) || isOwner(account)));
+    if (box.hidden) return;
+    const i = info!;
+    if (!document.getElementById("ow-addr")) {
+      box.innerHTML = `<h2>Add an owner</h2>
+        <p class="fine">Any wallet, or another wedgie's Safe owner address (its screen shows it).</p>
+        <p><input id="ow-addr" placeholder="0x… new owner" size="44" spellcheck="false"></p>
+        <p>Then <select id="ow-th"></select> <span id="ow-of"></span> must sign.</p>
+        <p id="ow-btns"></p>`;
+    }
+    const th = $("ow-th") as HTMLSelectElement, keep = +th.value || i.threshold;
+    th.innerHTML = threshOpts(i.owners.length + 1, Math.min(keep, i.owners.length + 1));
+    $("ow-of").textContent = `of ${i.owners.length + 1} owners`;
+    $("ow-btns").innerHTML = `${isOwner(signer) ? `<button class="btn btn-green" id="ow-wedgie"${dis(!key)}>Sign with wedgie</button> ` : ""}${isOwner(account) ? `<button class="btn" id="ow-wallet"${dis()}>Sign with wallet</button>` : ""}`;
+    $("ow-wedgie")?.addEventListener("click", () => job(() => addOwner("wedgie")));
+    $("ow-wallet")?.addEventListener("click", () => job(() => addOwner("wallet")));
+  }
+  async function addOwner(who: "wedgie" | "wallet") {
+    const a = ($("ow-addr") as HTMLInputElement).value.trim(), th = +($("ow-th") as HTMLSelectElement).value;
+    if (!E.isAddress(a)) throw new Error("That isn't an address.");
+    if (isOwner(a)) throw new Error("That's already an owner.");
+    await propose(safeTx(safeAddr, "0", E.addOwnerData(E.checksum(a), th)), who, `add owner ${short(a)}, then ${th} of ${info!.owners.length + 1} must sign`);
+    ($("ow-addr") as HTMLInputElement).value = "";
+  }
+
   function changeThreshold(th: number) {
     if (th === info!.threshold) { say(`It's already ${th}.`); return; }
     job(() => propose(safeTx(safeAddr, "0", E.changeThresholdData(th)), by(), `${th} of ${info!.owners.length} must sign`));
@@ -611,7 +640,7 @@ export function safe(main: HTMLElement) {
     ($("n-to") as HTMLInputElement).value = ""; ($("n-amt") as HTMLInputElement).value = ""; ($("n-data") as HTMLInputElement).value = "";
   }
 
-  function paintAll() { paintWedgie(); paintWallet(); paintList(); paintCreate(); paintSafe(); paintAdd(); paintQueue(); paintNew(); }
+  function paintAll() { paintWedgie(); paintWallet(); paintList(); paintCreate(); paintSafe(); paintAdd(); paintQueue(); paintOwner(); paintNew(); }
 
   W.onChange(paintWedgie);
   if (W.armed()) W.start();

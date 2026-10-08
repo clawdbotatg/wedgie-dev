@@ -177,13 +177,27 @@ await says(/Done: 2 of 2 must sign/, "threshold changed");
 check(await asks() === 1, "the wedgie was asked (safe_sign)");
 check(await num(mine, "getThreshold()") === 2, "on chain: 2 of 2, on the wedgie's signature alone");
 
+// 2b: Add an owner (2 of 2 -> 2 of 3), signed with the wedgie: 1 of 2 isn't enough, so queue, wallet, execute
+const third = E.checksum(E.hex(crypto.randomBytes(20)));
+await page.fill("#ow-addr", third);
+await page.selectOption("#ow-th", "2");
+await page.click("#ow-wedgie");
+await says(/In the queue with the wedgie's signature: add owner/, "add owner queued");
+await page.click("[data-wsign]");
+await says(/That's enough: press Execute/, "wallet signed add owner");
+await page.click("[data-exec]");
+await says(/Done: it ran/, "add owner executed");
+check((await owners(mine)).some((o) => eq(o, third)) && await num(mine, "getThreshold()") === 2, "Add an owner: on chain, 2 of 3 (wedgie proposed, wallet signed, executed)");
+check(/2 of 3 owners must sign/.test(await page.textContent("#s-safe")), "page: 2 of 3");
+
 // 3: send ETH: the wedgie signs, the wallet signs, execute
 const to = E.checksum(E.hex(crypto.randomBytes(20)));
+const asked = await asks();
 await page.fill("#n-to", to);
 await page.fill("#n-amt", "0.001");
 await page.click("#n-wedgie");
 await says(/In the queue with the wedgie's signature/, "queued");
-check(await asks() === 2, "the wedgie was asked again");
+check(await asks() === asked + 1, "the wedgie was asked again");
 await wait(() => document.querySelector("[data-wsign]"), null, 10000, "Sign with wallet");
 if (out) await page.screenshot({ path: `${out}/safe-3-queue.png`, fullPage: true });
 await page.click("[data-wsign]");
