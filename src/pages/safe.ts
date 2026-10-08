@@ -17,6 +17,7 @@
 // with safe_note), and this browser's own memory (per wedgie). Each is checked on chain before it's shown.
 import * as W from "../serial/wedgies";
 import * as E from "../safe/eth";
+import { address, addressInput, addressOf, watch } from "../safe/address";
 
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 const short = (a: string) => a.slice(0, 6) + "…" + a.slice(-4);
@@ -206,6 +207,7 @@ export function safe(main: HTMLElement) {
     window.scrollTo(0, 0);
   }
   window.addEventListener("popstate", show);
+  watch(main, (to, data) => view(1, to, data));   // ENS names and avatars on every address, from Ethereum
   main.addEventListener("click", (e) => {        // in-page links: no reload, the wedgie stays read
     const a = (e.target as HTMLElement).closest?.("a[data-nav]") as HTMLAnchorElement | null;
     if (!a || e.metaKey || e.ctrlKey) return;
@@ -234,8 +236,7 @@ export function safe(main: HTMLElement) {
     // up top, under Connected: the wedgie's Safe owner address (what you'd add to another Safe), a tap copies it
     const me = $("s-me");
     me.hidden = !signer;
-    me.innerHTML = signer ? `<span class="safe-id-tag">wedgie</span><code class="safe-addr" title="${esc(signer)}">${esc(short(signer))}</code><button class="btn btn-sm" id="s-copy">Copy</button>` : "";
-    $("s-copy")?.addEventListener("click", () => { navigator.clipboard.writeText(signer); say("Copied."); });
+    me.innerHTML = signer ? `<span class="safe-id-tag">wedgie</span>${address(signer, { size: "sm" })}` : "";
     $("s-deploy")?.addEventListener("click", () => job(deploy));
     if (app.length && !key && wedgie !== app[0]) readKey(app[0]);
   }
@@ -286,7 +287,7 @@ export function safe(main: HTMLElement) {
     const box = $("s-wallet");
     box.hidden = !eth();
     box.innerHTML = !eth() ? "" : !account ? `<button class="btn btn-sm btn-wallet" id="w-go"${dis()}>Connect wallet</button>`
-      : `<span class="safe-id-tag">wallet</span><code class="safe-addr" title="${esc(account)}">${esc(short(account))}</code>${isOwner(account) ? `<span class="good">owner</span>` : ""}
+      : `<span class="safe-id-tag">wallet</span>${address(account, { size: "sm" })}${isOwner(account) ? `<span class="good">owner</span>` : ""}
       <button class="btn btn-sm" id="w-off"${dis()}>Disconnect</button>`;
     $("w-go")?.addEventListener("click", () => job(async () => {
       account = await wallet(safeAddr ? chain : newChain);
@@ -344,7 +345,7 @@ export function safe(main: HTMLElement) {
     if (box.hidden) return;
     const row = (r: Row) => {
       const i = r.info;
-      return `<li><a class="safe-row${r.wedgie ? " btn btn-green" : ""}" data-nav href="${route(r.chain, r.addr)}"><b>${esc(short(r.addr))}</b>
+      return `<li><a class="safe-row${r.wedgie ? " btn btn-green" : ""}" data-nav href="${route(r.chain, r.addr)}">${address(r.addr)}
         <span>${esc(CHAINS[r.chain].name)}</span><span class="fine">${i ? `${i.threshold} of ${plural(i.owners.length, "owner")} · ${esc(E.fmt(i.balance, 18, 4))} ETH${i.usdc ? ` · ${esc(E.fmt(i.usdc, 6, 2))} USDC` : ""}` : `couldn't read it just now (${esc(r.err || "")}): open it, or Refresh`}</span>
         ${r.wedgie ? `<span class="safe-open">Open →</span>` : `<span class="fine">your wallet's: add your wedgie</span>`}</a></li>`;
     };
@@ -356,14 +357,16 @@ export function safe(main: HTMLElement) {
       ? `<p class="fine"><button class="btn btn-sm" id="l-wallet">Hide your wallet's Safes</button> Open one to add your wedgie as an owner.</p><ul class="safe-list safe-rows">${theirs.map(row).join("")}</ul>`
       : `<p class="fine"><button class="btn btn-sm" id="l-wallet">Your wallet's Safes (${theirs.length})</button> to add your wedgie to one</p>`;
     h += `<p class="fine"><button class="btn btn-sm" id="l-refresh"${dis(listing)}>Refresh</button>
-      · Open another: <input id="l-addr" placeholder="0x… Safe address" size="30" spellcheck="false"> <select id="l-chain">${chainOpts(newChain)}</select> <button class="btn btn-sm" id="l-open">Open</button></p>`;
+      · Open another: ${addressInput("l-addr", "0x… or ENS name of a Safe")} <select id="l-chain">${chainOpts(newChain)}</select> <button class="btn btn-sm" id="l-open">Open</button></p>`;
     box.innerHTML = h;
     $("l-refresh").onclick = () => findSafes();
     $("l-wallet")?.addEventListener("click", () => { showWallet = !showWallet; paintList(); });
     $("l-open").onclick = () => {
-      const a = ($("l-addr") as HTMLInputElement).value.trim().replace(/^\w+:/, "");
-      if (!E.isAddress(a)) { say("That isn't an address.", true); return; }
-      go(route(+($("l-chain") as HTMLSelectElement).value, E.checksum(a)));
+      const el = $("l-addr") as HTMLInputElement;
+      el.value = el.value.trim().replace(/^\w+:/, "");    // a pasted "base:0x…"
+      const a = addressOf(el);
+      if (!a) { say("That isn't an address.", true); return; }
+      go(route(+($("l-chain") as HTMLSelectElement).value, a));
     };
   }
 
@@ -374,36 +377,54 @@ export function safe(main: HTMLElement) {
     if (box.hidden) return;
     if (document.getElementById("c-go")) { ($("c-go") as HTMLButtonElement).disabled = busy; return; }   // keep what's typed
     box.innerHTML = `<h2>Make a new Safe</h2>
-      <p class="fine">Your wedgie is an owner. Add more owners (any wallet or wedgie address, one a line), or leave it the only one.</p>
-      <p><textarea id="c-owners" rows="3" cols="44" placeholder="0x… other owners" spellcheck="false"></textarea></p>
-      <p><button class="btn btn-sm" id="c-me">Add my wallet</button></p>
+      <p class="fine">Owners: your wedgie, and any wallet or other wedgie you add.</p>
+      <div class="safe-owners" id="c-owners"><div class="safe-owner">${address(signer)} <span class="fine">this wedgie</span></div></div>
+      <p><button class="btn btn-sm" id="c-add" aria-label="Add an owner">＋ Owner</button> <button class="btn btn-sm" id="c-me">Add my wallet</button></p>
       <p><select id="c-th"></select> <span id="c-of"></span> must sign, on <select id="c-chain">${chainOpts(newChain)}</select></p>
       <p><button class="btn btn-green" id="c-go">Make it</button></p>
       <p class="fine">Your browser wallet sends one transaction: it sets up your wedgie on that chain and makes the Safe (Safe 1.4.1).</p>`;
-    const ta = $("c-owners") as HTMLTextAreaElement, th = $("c-th") as HTMLSelectElement;
+    const list = $("c-owners"), th = $("c-th") as HTMLSelectElement;
+    let rowN = 0;
+    const addRow = (v = "") => {                  // one input per owner; × takes it off
+      const d = document.createElement("div");
+      d.className = "safe-owner";
+      d.innerHTML = `${addressInput("c-o" + ++rowN, "0x… or ENS name")} <button class="btn btn-sm" type="button" aria-label="Take this owner off">×</button>`;
+      list.append(d);
+      const inp = d.querySelector("input")!;
+      if (v) { inp.value = v; inp.dispatchEvent(new Event("input")); }
+      d.querySelector("button")!.onclick = () => { d.remove(); count(); };
+      return inp;
+    };
     const count = () => {                         // only the count: never rebuild the box under someone typing
-      const n = 1 + new Set(ta.value.split(/\s+/).filter(E.isAddress).map((a) => a.toLowerCase()).filter((a) => a !== signer.toLowerCase())).size;
+      const n = 1 + new Set(owners().map((a) => a.toLowerCase()).filter((a) => a !== signer.toLowerCase())).size;
       th.innerHTML = threshOpts(n, Math.min(n, Math.max(+th.value || 2, 1)));
       $("c-of").textContent = `of ${plural(n, "owner")}`;
     };
-    ta.oninput = count;
+    list.addEventListener("address", count);
+    $("c-add").onclick = () => addRow().focus();
+    addRow();
     count();
     $("c-chain").onchange = () => { newChain = +($("c-chain") as HTMLSelectElement).value; };
     $("c-me").onclick = () => job(async () => {
       const me = account = await wallet(newChain);
-      if (!ta.value.toLowerCase().includes(me.toLowerCase())) ta.value = (ta.value.trim() + "\n" + me).trim();
+      if (!owners().some((a) => eqA(a, me))) {
+        const empty = [...list.querySelectorAll<HTMLInputElement>("input")].find((i) => !i.value.trim());
+        if (empty) { empty.value = me; empty.dispatchEvent(new Event("input")); } else addRow(me);
+      }
       count();
     });
     $("c-go").onclick = () => job(createSafe);
   }
 
+  const ownerInputs = () => [...document.querySelectorAll<HTMLInputElement>("#c-owners input")].map(addressOf).filter(Boolean);
+  const owners = ownerInputs;
+
   async function createSafe() {
     const c = newChain;
-    const words = ($("c-owners") as HTMLTextAreaElement).value.split(/\s+/).filter(Boolean);
-    const bad = words.find((a) => !E.isAddress(a));
-    if (bad) throw new Error(`${bad} isn't an address.`);
+    const bad = [...$("c-owners").querySelectorAll<HTMLInputElement>("input")].find((i) => i.value.trim() && !addressOf(i));
+    if (bad) throw new Error(`${bad.value.trim()} isn't an address (or an ENS name that has one).`);
     const owners = [signer];
-    for (const a of words.map(E.checksum)) if (!owners.some((o) => eqA(o, a))) owners.push(a);
+    for (const a of ownerInputs()) if (!owners.some((o) => eqA(o, a))) owners.push(a);
     const th = +($("c-th") as HTMLSelectElement).value;
     account = await wallet(c);
     const r = await send(c, E.MULTICALL3, E.newSafeData(key!.x, key!.y, owners, th, BigInt(Date.now())), say);
@@ -426,19 +447,18 @@ export function safe(main: HTMLElement) {
     if (box.hidden) return;
     const c = CHAINS[chain];
     let h = `<p class="fine"><a data-nav href="/safe">← All your Safes</a></p>
-      <h2>Safe ${esc(short(safeAddr))} on ${esc(c.name)}</h2>
-      <p><code class="safe-addr">${esc(safeAddr)}</code> <button class="btn btn-sm" id="o-copy">Copy</button></p>`;
+      <h2>Safe on ${esc(c.name)}</h2>
+      <p>${address(safeAddr, { link: c.scan, size: "lg", long: true })}</p>`;
     if (info) {
       const i = info, canChange = isOwner(signer) || isOwner(account);
       h += `<p>${esc(E.fmt(i.balance, 18))} ETH${i.usdc !== null ? ` · ${esc(E.fmt(i.usdc, 6, 2))} USDC` : ""} ·
           <a href="${appLink(chain, safeAddr)}" target="_blank" rel="noopener">Safe{Wallet}</a> · <a href="${c.scan}/address/${safeAddr}" target="_blank" rel="noopener">explorer</a></p>
         <p>${i.threshold} of ${plural(i.owners.length, "owner")} must sign${canChange && i.owners.length > 1
           ? ` · <select id="o-th"${dis()}>${threshOpts(i.owners.length, i.threshold)}</select> <button class="btn btn-sm" id="o-th-go"${dis()}>Change</button>` : ""}</p>
-        <ul class="safe-list">${i.owners.map((o) => `<li><code>${esc(o)}</code>${label(o)}${canChange && i.owners.length > 1 ? ` <button class="btn btn-sm" data-rm="${esc(o)}"${dis()}>Remove</button>` : ""}</li>`).join("")}</ul>
+        <ul class="safe-list">${i.owners.map((o) => `<li>${address(o, { link: c.scan })}${label(o)}${canChange && i.owners.length > 1 ? ` <button class="btn btn-sm" data-rm="${esc(o)}"${dis()}>Remove</button>` : ""}</li>`).join("")}</ul>
         ${signer ? isOwner(signer) ? `<p class="good">Your wedgie is an owner.</p>` : `<p class="bad">Your wedgie isn't an owner of this Safe.</p>` : ""}`;
     }
     box.innerHTML = h;
-    $("o-copy").onclick = () => { navigator.clipboard.writeText(safeAddr); say("Copied."); };
     box.querySelectorAll<HTMLButtonElement>("[data-rm]").forEach((b) => b.onclick = () => removeOwner(b.dataset.rm!));
     $("o-th-go")?.addEventListener("click", () => changeThreshold(+($("o-th") as HTMLSelectElement).value));
   }
@@ -504,7 +524,7 @@ export function safe(main: HTMLElement) {
     if (!document.getElementById("ow-addr")) {
       box.innerHTML = `<h2>Add an owner</h2>
         <p class="fine">Any wallet, or another wedgie's Safe owner address (its screen shows it).</p>
-        <p><input id="ow-addr" placeholder="0x… new owner" size="44" spellcheck="false"></p>
+        <p>${addressInput("ow-addr", "0x… or ENS name of the new owner")}</p>
         <p>Then <select id="ow-th"></select> <span id="ow-of"></span> must sign.</p>
         <p id="ow-btns"></p>`;
     }
@@ -516,11 +536,12 @@ export function safe(main: HTMLElement) {
     $("ow-wallet")?.addEventListener("click", () => job(() => addOwner("wallet")));
   }
   async function addOwner(who: "wedgie" | "wallet") {
-    const a = ($("ow-addr") as HTMLInputElement).value.trim(), th = +($("ow-th") as HTMLSelectElement).value;
-    if (!E.isAddress(a)) throw new Error("That isn't an address.");
+    const a = addressOf($("ow-addr") as HTMLInputElement), th = +($("ow-th") as HTMLSelectElement).value;
+    if (!a) throw new Error("That isn't an address (or an ENS name that has one).");
     if (isOwner(a)) throw new Error("That's already an owner.");
     await propose(safeTx(safeAddr, "0", E.addOwnerData(E.checksum(a), th)), who, `add owner ${short(a)}, then ${th} of ${info!.owners.length + 1} must sign`);
     ($("ow-addr") as HTMLInputElement).value = "";
+    $("ow-addr").dispatchEvent(new Event("input"));
   }
 
   function changeThreshold(th: number) {
@@ -542,7 +563,7 @@ export function safe(main: HTMLElement) {
       if (isOwner(signer)) btns.push(signed(t, signer) ? `<span class="good">wedgie signed</span>` : `<button class="btn btn-sm btn-green" data-sign="${k}"${dis(!key)}>Sign with wedgie</button>`);
       if (account && isOwner(account)) btns.push(signed(t, account) ? `<span class="good">wallet signed</span>` : n < need ? `<button class="btn btn-sm" data-wsign="${k}"${dis()}>Sign with wallet</button>` : "");
       if (n >= need) btns.push(first ? `<button class="btn btn-sm btn-green" data-exec="${k}"${dis()}>Execute</button>` : `<span class="fine">runs after #${i.nonce}</span>`);
-      return `<li><b>#${esc(t.nonce)}</b> ${esc(what)} → ${esc(eqA(t.to, safeAddr) ? "this Safe" : short(t.to))} <span class="fine">${n}/${need} signed</span> ${btns.join(" ")}</li>`;
+      return `<li><b>#${esc(t.nonce)}</b> ${esc(what)} → ${eqA(t.to, safeAddr) ? "this Safe" : address(t.to, { link: CHAINS[chain].scan, size: "sm" })} <span class="fine">${n}/${need} signed</span> ${btns.join(" ")}</li>`;
     }).join("");
     box.innerHTML = `<h2>Waiting to sign</h2>${items ? `<ul class="safe-list">${items}</ul>` : `<p class="fine">Nothing waiting.</p>`}
       <p><button class="btn btn-sm" id="s-refresh"${dis()}>Refresh</button></p>`;
@@ -645,7 +666,7 @@ export function safe(main: HTMLElement) {
     const c = CHAINS[chain];
     if (!document.getElementById("n-to")) {      // built once per Safe: keep what's typed across repaints
       box.innerHTML = `<h2>New transaction</h2>
-        <p><input id="n-to" placeholder="to 0x…" size="44" spellcheck="false"></p>
+        <p>${addressInput("n-to", "to: 0x… or ENS name")}</p>
         <p><input id="n-amt" placeholder="amount" size="12" inputmode="decimal"> <select id="n-tok"><option value="eth">ETH</option>${c.usdc ? `<option value="usdc">USDC</option>` : ""}</select></p>
         <details class="fine"><summary>Contract call data (optional)</summary><p><input id="n-data" placeholder="data 0x…" size="44" spellcheck="false"></p></details>
         <p id="n-btns"></p>`;
@@ -656,7 +677,7 @@ export function safe(main: HTMLElement) {
   }
 
   async function newTx(who: "wedgie" | "wallet") {
-    const to = ($("n-to") as HTMLInputElement).value.trim(), amt = ($("n-amt") as HTMLInputElement).value.trim() || "0";
+    const to = addressOf($("n-to") as HTMLInputElement) || ($("n-to") as HTMLInputElement).value.trim(), amt = ($("n-amt") as HTMLInputElement).value.trim() || "0";
     const tok = ($("n-tok") as HTMLSelectElement).value, data = ($("n-data") as HTMLInputElement).value.trim() || "0x";
     if (!E.isAddress(to)) throw new Error("The to address isn't an address.");
     E.bytes(data);
@@ -672,7 +693,7 @@ export function safe(main: HTMLElement) {
       t = safeTx(to, v.toString(), data); what = data === "0x" ? `send ${amt} ETH to ${short(to)}` : `call ${short(to)}`;
     }
     await propose(t, who, what);
-    ($("n-to") as HTMLInputElement).value = ""; ($("n-amt") as HTMLInputElement).value = ""; ($("n-data") as HTMLInputElement).value = "";
+    ($("n-to") as HTMLInputElement).value = ""; $("n-to").dispatchEvent(new Event("input")); ($("n-amt") as HTMLInputElement).value = ""; ($("n-data") as HTMLInputElement).value = "";
   }
 
   function paintAll() { paintWedgie(); paintWallet(); paintList(); paintCreate(); paintSafe(); paintAdd(); paintQueue(); paintOwner(); paintNew(); }

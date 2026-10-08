@@ -523,9 +523,8 @@ body.test-mode .top, body.test-mode .foot { display: none; }
 .safe-page { justify-content: flex-start; max-width: 720px; margin: 0 auto; }
 /* /safe: who's signing, top right under Connected: the wedgie, then the browser wallet */
 .safe-ids { position: fixed; top: 76px; right: 22px; z-index: 19; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
-.safe-id { display: flex; align-items: center; gap: 8px; padding: 4px 4px 4px 14px; border-radius: 999px; background: var(--card); box-shadow: 0 1px 0 rgba(0,0,0,.06), 0 6px 16px -8px rgba(0,0,0,.3); font-size: 14px; }
+.safe-id { display: flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px; background: var(--card); box-shadow: 0 1px 0 rgba(0,0,0,.06), 0 6px 16px -8px rgba(0,0,0,.3); font-size: 14px; }
 .safe-id[hidden] { display: none; }
-.safe-id .safe-addr { font-size: 14px; word-break: normal; }
 .safe-id .btn-sm { height: 34px; padding: 0 14px; font-size: 14px; }
 .safe-id-tag { font-size: 12px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 .safe-id-wallet { background: #e6eefb; }
@@ -551,3 +550,37 @@ body.test-mode .top, body.test-mode .foot { display: none; }
 .safe-row.btn .fine { color: rgba(255,255,255,.85); }
 .safe-open { margin-left: auto; }
 .safe-list li { padding: 8px 0; border-bottom: 1px solid rgba(0,0,0,.08); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* an address (src/safe/address.ts, Scaffold-ETH's look): avatar, ENS name over the short address, copy */
+.addr { display: inline-flex; align-items: center; gap: 7px; vertical-align: middle; line-height: 1.2; color: inherit; }
+.addr-av { width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; object-fit: cover; }
+.addr-txt { display: flex; flex-direction: column; min-width: 0; }
+.addr-ens { font-weight: 800; font-size: 15px; }
+.addr-ens[hidden] { display: none; }
+.addr-row { display: inline-flex; align-items: center; gap: 4px; }
+.addr-hex { font-family: var(--mono); font-size: 14px; word-break: break-all; }
+.addr-hex a { color: inherit; }
+.addr-copy { -webkit-appearance: none; appearance: none; border: 0; background: none; padding: 2px; margin: 0; cursor: pointer; color: inherit; opacity: .7; display: inline-flex; }
+.addr-copy:hover { opacity: 1; }
+.addr-copy svg { width: 16px; height: 16px; }
+.addr-sm .addr-av { width: 20px; height: 20px; }
+.addr-sm .addr-ens { font-size: 13px; }
+.addr-sm .addr-hex { font-size: 13px; }
+.addr-lg .addr-av { width: 40px; height: 40px; }
+.addr-lg .addr-ens { font-size: 18px; }
+.addr-lg .addr-hex { font-size: 15px; }
+.addr-sm .addr-ens:not([hidden]) + .addr-row .addr-hex { font-size: 11px; opacity: .75; }
+.addr.bad { color: var(--coral); font-family: var(--mono); }
+/* an address input: the ENS name (or the address a name means) on the left, the blockie on the right */
+.addr-in { display: inline-flex; align-items: stretch; width: min(100%, 470px); background: var(--card); border: 2px solid var(--line); border-radius: 999px; overflow: hidden; vertical-align: middle; }
+.addr-in:focus-within { border-color: var(--mint); }
+.addr-in.bad { border-color: var(--coral); }
+.addr-in input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font-family: var(--mono); font-size: 14px; padding: 8px 14px; }
+.addr-pre { display: flex; align-items: center; gap: 6px; padding: 0 12px 0 4px; background: var(--line); font-weight: 800; font-size: 14px; white-space: nowrap; }
+.addr-pre[hidden] { display: none; }
+.addr-pre:not(:has(img)) { padding-left: 12px; }
+.addr-pre img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
+.addr-in-av { width: 28px; height: 28px; border-radius: 50%; align-self: center; margin-right: 6px; flex-shrink: 0; }
+.addr-in-av[hidden] { display: none; }
+.safe-owner { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+.safe-owner .addr-in { flex: 1; }

@@ -165,8 +165,8 @@ const asks = () => page.evaluate(() => (window.__ports[0]._st.appAsks || []).fil
 await page.goto(`${base}/`);
 await page.evaluate((m) => localStorage.setItem("wedgie.safe", "base:" + m), mine);
 await page.goto(`${base}/safe`);
-await wait(() => document.querySelector("#s-me .safe-addr"), null, 30000, "the wedgie's signer address");
-check(eq(await page.getAttribute("#s-me .safe-addr", "title"), signer), `signer address shown: ${signer}`);
+await wait(() => document.querySelector("#s-me .addr"), null, 30000, "the wedgie's signer address");
+check(eq(await page.getAttribute("#s-me .addr", "data-addr"), signer), `signer address shown: ${signer}`);
 check(new globalThis.URL(page.url()).pathname === "/safe" && !(await page.isHidden("#s-list")) && !(await page.isHidden("#s-create")), "an old saved Safe doesn't open itself: /safe is the list, with Make a new Safe");
 await wait((s) => document.querySelector(`.safe-row[href$="${s}"]`), hidden, 20000, "the Safe only the wedgie's own list knows");
 check(/Your wedgie's Safes[\s\S]*1 of 1 owner/.test(await page.textContent("#s-list")), "listed from the wedgie's own list (safe_list), though Safe's API doesn't know it");
@@ -270,7 +270,7 @@ check(onWedgie.includes(`8453:${made.toLowerCase()}`) && onWedgie.includes(`8453
 await page.click("#w-off");
 await wait(() => document.querySelector("#w-go"), null, 10000, "Connect wallet again");
 await page.reload();
-await wait(() => document.querySelector("#s-me .safe-addr"), null, 30000, "reloaded");
+await wait(() => document.querySelector("#s-me .addr"), null, 30000, "reloaded");
 await page.waitForTimeout(1500);
 check(!!(await page.$("#w-go")), "Disconnect sticks after a reload (Connect wallet shows, no address)");
 if (out) await page.screenshot({ path: `${out}/safe-5-list.png`, fullPage: true });
