@@ -236,7 +236,7 @@ export function safe(main: HTMLElement) {
     // up top, under Connected: the wedgie's Safe owner address (what you'd add to another Safe), a tap copies it
     const me = $("s-me");
     me.hidden = !signer;
-    me.innerHTML = signer ? `<span class="safe-id-tag">wedgie</span>${address(signer, { size: "sm" })}` : "";
+    me.innerHTML = signer ? `<span class="safe-id-tag">wedgie</span>${address(signer)}` : "";
     $("s-deploy")?.addEventListener("click", () => job(deploy));
     if (app.length && !key && wedgie !== app[0]) readKey(app[0]);
   }
@@ -287,7 +287,7 @@ export function safe(main: HTMLElement) {
     const box = $("s-wallet");
     box.hidden = !eth();
     box.innerHTML = !eth() ? "" : !account ? `<button class="btn btn-sm btn-wallet" id="w-go"${dis()}>Connect wallet</button>`
-      : `<span class="safe-id-tag">wallet</span>${address(account, { size: "sm" })}${isOwner(account) ? `<span class="good">owner</span>` : ""}
+      : `<span class="safe-id-tag">wallet</span>${address(account)}${isOwner(account) ? `<span class="good">owner</span>` : ""}
       <button class="btn btn-sm" id="w-off"${dis()}>Disconnect</button>`;
     $("w-go")?.addEventListener("click", () => job(async () => {
       account = await wallet(safeAddr ? chain : newChain);
