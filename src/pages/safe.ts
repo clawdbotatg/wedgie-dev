@@ -12,8 +12,9 @@
 //   - a new transaction (ETH, USDC or raw data), signed by the wedgie or the wallet, into the queue
 // Every transaction goes through propose(): one signature, into Safe's queue, where Safe{Wallet} sees it too.
 // tools/safefork.mjs + safeprobe.mjs (a Base fork) and safelive.mjs (Base Sepolia, the real API) test it.
-// Nothing here remembers "the" Safe: a wedgie has many. Only the list of ones made or opened in this browser
-// (per wedgie, so a new one shows before Safe's API has it).
+// Nothing here remembers "the" Safe: a wedgie has many. The list comes from Safe's API (every chain), the
+// wedgie itself (safe_list: the Safes it signed for or was told about, wedgie-safe safe-4+; the page tells it
+// with safe_note), and this browser's own memory (per wedgie). Each is checked on chain before it's shown.
 import * as W from "../serial/wedgies";
 import * as E from "../safe/eth";
 
@@ -36,7 +37,7 @@ const CHAINS: Record<number, Chain> = {
 const api = (chain: number) => `https://api.safe.global/tx-service/${CHAINS[chain].key}/api/v1`;
 const appLink = (chain: number, safe: string, path = "home") => `https://app.safe.global/${path}?safe=${CHAINS[chain].key}:${safe}`;
 const LINE_MAX = 6000;      // the wedgie drops a USB line over 6 KB
-const DATA_MAX = 12000;     // wedgie-safe 1c401ff+: bigger data goes in safe_data pieces, up to this many bytes
+const DATA_MAX = 8000;      // wedgie-safe safe_data pieces: up to this many bytes (what an RP2040 heap joins safely)
 
 async function get(url: string) {
   const r = await fetch(url);
@@ -50,11 +51,21 @@ async function post(url: string, body: unknown) {
 
 // ---- the chain, read through a public RPC (no wallet needed) ----
 let rpcId = 0;
+/** Public RPCs rate-limit a burst (a list of Safes reads several at once): wait and try again. */
 async function rpc(chain: number, method: string, params: unknown[]) {
-  const r = await (await fetch(CHAINS[chain].rpc, { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: ++rpcId, method, params }) })).json();
-  if (r.error) throw new Error(`${CHAINS[chain].name}: ${r.error.message}`);
-  return r.result as string;
+  for (let i = 0; ; i++) {
+    try {
+      const res = await fetch(CHAINS[chain].rpc, { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: ++rpcId, method, params }) });
+      if (res.status === 429 || res.status >= 500) throw Object.assign(new Error(`${CHAINS[chain].name}: busy (${res.status})`), { again: true });
+      const r = await res.json();
+      if (r.error) throw new Error(`${CHAINS[chain].name}: ${r.error.message}`);
+      return r.result as string;
+    } catch (e: any) {
+      if (i >= 3 || !(e.again || e instanceof TypeError)) throw e;     // TypeError: the fetch itself failed
+      await sleep(600 * 2 ** i);
+    }
+  }
 }
 const view = (chain: number, to: string, data: string) => rpc(chain, "eth_call", [{ to, data }, "latest"]);
 const hasCode = async (chain: number, a: string) => (await rpc(chain, "eth_getCode", [a, "latest"])).length > 2;
@@ -90,13 +101,13 @@ async function send(chain: number, to: string, data: string, say: (s: string) =>
 }
 
 type Info = { owners: string[]; threshold: number; nonce: number; balance: bigint; usdc: bigint | null };
-type Row = { chain: number; addr: string; wedgie: boolean; wallet: boolean; info?: Info | null };
+type Row = { chain: number; addr: string; wedgie: boolean; wallet: boolean; info?: Info | null; err?: string; gone?: boolean };
 const KEYS = Object.fromEntries(Object.entries(CHAINS).map(([id, c]) => [c.key, +id]));
 const route = (chain: number, a: string) => `/safe/${CHAINS[chain].key}:${a}`;
 
 /** Owners, threshold, nonce, balances: from the chain, not Safe's API (which can lag a block or more). */
 async function readSafe(c: number, a: string): Promise<Info> {
-  if (!(await hasCode(c, a))) throw new Error(`There's no Safe at ${short(a)} on ${CHAINS[c].name}.`);
+  if (!(await hasCode(c, a))) throw Object.assign(new Error(`There's no Safe at ${short(a)} on ${CHAINS[c].name}.`), { gone: true });
   const [owners, th, n, bal, usdc] = await Promise.all([view(c, a, E.selector("getOwners()")), view(c, a, E.selector("getThreshold()")),
     view(c, a, E.selector("nonce()")), rpc(c, "eth_getBalance", [a, "latest"]),
     CHAINS[c].usdc ? view(c, CHAINS[c].usdc!, E.call("balanceOf(address)", [E.aword(a)])).catch(() => null) : Promise.resolve(null)]);
@@ -123,6 +134,7 @@ export function safe(main: HTMLElement) {
   const $ = (id: string) => document.getElementById(id)!;
   let key: { x: string; y: string } | null = null, signer = "", wedgie: W.Wedgie | null = null, asking = false, noKey = false;
   let chunk = 0;          // hex chars per safe_data piece (its hello's safe_chunk), 0: this app can't take pieces
+  let onWedgie: string[] | null = null;   // the wedgie's own list ("8453:0x.."), null: its app keeps none
   let account = "", busy = false;
   // the view: null = the list; else one Safe
   let chain = 8453, safeAddr = "", info: Info | null = null, queue: any[] = [];
@@ -131,7 +143,9 @@ export function safe(main: HTMLElement) {
   const OFF = "wedgie.safe.wallet-off";      // Disconnect sticks: no reconnecting by itself on the next visit
   const deployed: Record<number, boolean | undefined> = {};
 
-  localStorage.removeItem("wedgie.safe");        // the old page's "last Safe": it opened that one every time
+  // the old page's "last Safe" (it opened that one every time): moved into the list once the wedgie is read
+  let oldSaved = "";
+  try { oldSaved = localStorage.getItem("wedgie.safe") || ""; } catch {}
   const old = new URLSearchParams(location.search).get("safe")?.match(/^(\w+):(0x[0-9a-fA-F]{40})$/);
   if (old && KEYS[old[1]]) history.replaceState(null, "", route(KEYS[old[1]], E.checksum(old[2])));
 
@@ -164,6 +178,16 @@ export function safe(main: HTMLElement) {
     if (signer && !m.includes(k)) localStorage.setItem(memKey(), JSON.stringify([k, ...m]));
   };
   const forget = (c: number, a: string) => localStorage.setItem(memKey(), JSON.stringify(remembered().filter((k) => k !== `${CHAINS[c].key}:${E.checksum(a)}`)));
+
+  /** Put a Safe on the wedgie's own list, so every computer it's plugged into lists it (safe-4+). */
+  async function tellWedgie(c: number, a: string) {
+    const k = `${c}:${a.toLowerCase()}`;
+    if (!wedgie || onWedgie === null || onWedgie.includes(k)) return;
+    try {
+      const r = await W.withRepl(wedgie, (r) => r.request({ type: "safe_note", chainId: c, safe: a }, 5000));
+      if (r.type === "ok") onWedgie = [k, ...onWedgie.filter((x) => x !== k)];
+    } catch {}
+  }
 
   // ---- the route ----
   function go(path: string) { history.pushState(null, "", path); show(); }
@@ -230,6 +254,13 @@ export function safe(main: HTMLElement) {
       key = h.safe; signer = E.signerAddress(key!.x, key!.y); chunk = +h.safe_chunk || 0;
       // newer apps work out the address themselves and show it: the two must agree
       if (h.signer && !eqA(h.signer, signer)) { key = null; signer = ""; throw new Error(`The wedgie says its address is ${h.signer}, this page works out ${E.signerAddress(h.safe.x, h.safe.y)}. Not using it: tell us.`); }
+      const om = oldSaved.match(/^(\w+):(0x[0-9a-fA-F]{40})$/);
+      if (om && KEYS[om[1]]) remember(KEYS[om[1]], om[2]);     // checked on chain like every other before it's listed
+      try { localStorage.removeItem("wedgie.safe"); } catch {}
+      try {
+        const l = await W.withRepl(w, (r) => r.request({ type: "safe_list" }, 5000));
+        onWedgie = l.type === "safe_list" && Array.isArray(l.safes) ? l.safes : null;
+      } catch { onWedgie = null; }
       paintAll();
       if (safeAddr) { checkDeployed(); if (info && isOwner(signer)) remember(chain, safeAddr); } else findSafes();
     } catch (e) { fail(e); wedgie = null; }
@@ -291,14 +322,17 @@ export function safe(main: HTMLElement) {
       if (account) for (const s of await of(c, account)) add(c, s, "wallet");
     }));
     for (const k of signer ? remembered() : []) { const [ck, a] = k.split(":"); if (KEYS[ck]) add(KEYS[ck], a, "wedgie"); }
+    for (const k of onWedgie || []) { const [c, a] = k.split(":"); if (CHAINS[+c] && E.isAddress(a)) add(+c, a, "wedgie"); }
     const list = [...found.values()];
-    await Promise.all(list.map(async (r) => { try { r.info = await readSafe(r.chain, r.addr); } catch { r.info = null; } }));
+    for (let i = 0; i < list.length; i += 4)      // a few at a time: public RPCs rate-limit a burst
+      await Promise.all(list.slice(i, i + 4).map(async (r) => { try { r.info = await readSafe(r.chain, r.addr); } catch (e: any) { r.info = null; r.err = msgOf(e); r.gone = !!e?.gone; } }));
     for (const r of list) {          // the chain is the truth: who really is an owner now
       if (!r.info) continue;
       r.wedgie = !!signer && r.info.owners.some((o) => eqA(o, signer));
       r.wallet = !!account && r.info.owners.some((o) => eqA(o, account));
     }
-    rows = list.filter((r) => r.info && (r.wedgie || r.wallet))
+    // a Safe the chain couldn't be read for stays listed (as its sources said): never hidden by a busy RPC
+    rows = list.filter((r) => (!r.info && !r.gone) || r.wedgie || r.wallet)
       .sort((a, b) => +b.wedgie - +a.wedgie || +!!CHAINS[a.chain].test - +!!CHAINS[b.chain].test || a.chain - b.chain);
     listing = false;
     paintList();
@@ -309,9 +343,9 @@ export function safe(main: HTMLElement) {
     box.hidden = !!safeAddr || !key;
     if (box.hidden) return;
     const row = (r: Row) => {
-      const i = r.info!;
+      const i = r.info;
       return `<li><a class="safe-row" data-nav href="${route(r.chain, r.addr)}"><b>${esc(short(r.addr))}</b>
-        <span>${esc(CHAINS[r.chain].name)}</span><span class="fine">${i.threshold} of ${plural(i.owners.length, "owner")} · ${esc(E.fmt(i.balance, 18, 4))} ETH${i.usdc ? ` · ${esc(E.fmt(i.usdc, 6, 2))} USDC` : ""}</span>
+        <span>${esc(CHAINS[r.chain].name)}</span><span class="fine">${i ? `${i.threshold} of ${plural(i.owners.length, "owner")} · ${esc(E.fmt(i.balance, 18, 4))} ETH${i.usdc ? ` · ${esc(E.fmt(i.usdc, 6, 2))} USDC` : ""}` : `couldn't read it just now (${esc(r.err || "")}): open it, or Refresh`}</span>
         ${r.wedgie ? "" : `<span class="fine">your wallet's: add your wedgie</span>`}</a></li>`;
     };
     const mine = rows.filter((r) => r.wedgie), theirs = rows.filter((r) => !r.wedgie);
@@ -378,6 +412,7 @@ export function safe(main: HTMLElement) {
     deployed[c] = true;
     const a = E.checksum("0x" + log.topics[1].slice(26));
     remember(c, a);
+    await tellWedgie(c, a);
     $("s-create").innerHTML = "";
     rows = [];
     go(route(c, a));
@@ -420,7 +455,7 @@ export function safe(main: HTMLElement) {
       } catch (e: any) { if (e.status !== 404) throw e; }     // a Safe made seconds ago: Safe's API hasn't seen it yet
       if (c !== chain || a !== safeAddr) return;
       info = i; queue = qq;
-      if (signer) { if (isOwner(signer)) remember(c, a); else forget(c, a); }
+      if (signer) { if (isOwner(signer)) { remember(c, a); tellWedgie(c, a); } else forget(c, a); }
       if (!quiet) say("");
     } catch (e) { if (c === chain && a === safeAddr) { info = null; queue = []; if (!quiet) fail(e); } }
     paintAll();

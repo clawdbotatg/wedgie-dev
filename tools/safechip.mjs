@@ -69,6 +69,20 @@ if (args.includes("--shot")) {           // the home screen, from the slot's sho
   h.take();
 }
 
+{ // its list of Safes (wedgie-safe safe-4+): safe_note adds, newest first, no duplicates; safe_list reads it
+  const l0 = h.req({ id: ++id, type: "safe_list" }, 8000);
+  if (l0?.type === "safe_list") {
+    const a1 = "0x" + "a1".repeat(20), a2 = "0x" + "b2".repeat(20);
+    const n1 = h.req({ id: ++id, type: "safe_note", chainId: 8453, safe: a1 }, 8000);
+    h.req({ id: ++id, type: "safe_note", chainId: 84532, safe: a2 }, 8000);
+    h.req({ id: ++id, type: "safe_note", chainId: 8453, safe: a1.toUpperCase().replace("0X", "0x") }, 8000);
+    const bad = h.req({ id: ++id, type: "safe_note", chainId: 8453, safe: "0x12" }, 8000);
+    const l = h.req({ id: ++id, type: "safe_list" }, 8000);
+    check(n1?.type === "ok" && bad?.type === "error" && JSON.stringify(l?.safes) === JSON.stringify([`8453:${a1}`, `84532:${a2}`]),
+      `safe_note / safe_list: ${JSON.stringify(l?.safes)} (newest first, no duplicates, a bad address refused)`);
+  } else console.log("     (no safe_list: an older app)");
+}
+
 const Z = "0x" + "0".repeat(40), safe = "0x" + "5a".repeat(20), usdc = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 const tx = (to, data, value = "0") => ({ chainId: 8453, safe, to, value, data, operation: 0, safeTxGas: "0", baseGas: "0", gasPrice: "0", gasToken: Z, refundReceiver: Z, nonce: 3 });
 // a MultiSend batch of USDC sends, as big as fits one line
@@ -110,19 +124,19 @@ for (const [what, t, pages] of cases) {
   check(chipStep && !crash(out), `${what}: ${pages} page(s), A through them, ${secs} s: answered ${got ? got.type + (got.error ? " (" + got.error.slice(0, 40) + ")" : "") : "nothing"} · ${r?.ram} B free`);
 }
 if (hi?.safe_chunk) {     // a transaction over the 6 KB line: its data in safe_data pieces first, then "@"
-  for (const size of (process.env.SIZES || "12000,16000").split(",").map(Number)) {
+  for (const size of (process.env.SIZES || "8000,12000").split(",").map(Number)) {
     const data = "0x12345678" + "ab".repeat(size - 4), before = all.length;
     let okp = true, at = 0;
     for (let o = 2; o < data.length; o += hi.safe_chunk) {
       const hex = data.slice(o, o + hi.safe_chunk);
       const r = h.req({ id: ++id, type: "safe_data", at, hex }, 20000);
       at += hex.length / 2;
-      if (r?.type !== "safe_data" || r.have !== at) { okp = false; if (size <= 12000) console.log("     piece:", JSON.stringify(r)); break; }
+      if (r?.type !== "safe_data" || r.have !== at) { okp = false; if (size <= 8000) console.log("     piece:", JSON.stringify(r)); break; }
     }
     const { got, secs } = okp ? ask({ ...tx("0x" + "66".repeat(20), "@"), data: "@" }, "A") : { got: null, secs: 0 };
     const r = ram(`a ${size} B tx in pieces`);
     const chipStep = got?.type === "safe_sig" || /trustm/.test(got?.error || "");
-    if (size > (hi.safe_max || 12000)) { check(!okp && !crash(all.slice(before)), `a ${size} B transaction: refused as too big, no crash`); continue; }
+    if (size > (hi.safe_max || 8000)) { check(!okp && !crash(all.slice(before)), `a ${size} B transaction: refused as too big, no crash`); continue; }
     check(okp && chipStep && !crash(all.slice(before)), `a ${size} B transaction in ${Math.ceil(size * 2 / hi.safe_chunk)} safe_data pieces, then signed, ${secs} s: answered ${got ? got.type + (got.error ? " (" + got.error.slice(0, 40) + ")" : "") : "nothing"} · ${r?.ram} B free`);
   }
 }

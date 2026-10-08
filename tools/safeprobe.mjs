@@ -2,12 +2,13 @@
 // carries a key, its safe_sign is answered by a P-256 key here, signing what safe.py signs), window.ethereum
 // = an anvil account (the browser wallet), the page's public RPC = the fork, Safe's Transaction Service faked
 // in memory. /safe lists the Safes; each opens at /safe/<chain>:<address>. One Safe's life, then a new one:
-//   0. an old page's "last Safe" in localStorage doesn't open itself any more (/safe is the list)
+//   0. an old page's "last Safe" in localStorage doesn't open itself any more (/safe is the list); a Safe only
+//      the wedgie's own list knows (safe_list) is listed
 //   1. a 1-of-1 Safe the wallet owns, from the list: the page shows the wedgie's signer; Add it with my
 //      wallet (sets up the signer contract, runs at once)
 //   2. Change the threshold to 2: proposed by the wedgie (A on it), run at once (1 of 2 was enough)
 //   3. New transaction, 0.001 ETH, signed with the wedgie: into the queue; Sign with wallet; Execute.
-//      Then an 8 KB contract call: the wedgie gets it in safe_data pieces
+//      Then a 6 KB contract call: the wedgie gets it in safe_data pieces
 //   4. back to the list: the Safe is the wedgie's now. Make a new Safe: wallet + wedgie, 2 of 2, one
 //      transaction, then its page; the list has both
 // (Safe's real API: tools/safelive.mjs.) Needs anvil and Node 23+.
@@ -44,7 +45,9 @@ const { privateKey, publicKey } = crypto.generateKeyPairSync("ec", { namedCurve:
 const jwk = publicKey.export({ format: "jwk" });
 const b64 = (s) => "0x" + Buffer.from(s, "base64url").toString("hex");
 const key = { x: b64(jwk.x), y: b64(jwk.y) }, signer = E.signerAddress(key.x, key.y);
-let pieces = "";            // safe_data, as wedgie-safe takes it: hex pieces, then data "@"
+let pieces = "";
+const safeList = () => ({ type: "safe_list", safes: onWedgie });
+const safeNote = (m) => { const k = `${m.chainId}:${m.safe.toLowerCase()}`; if (!onWedgie.includes(k)) onWedgie.unshift(k); return { type: "ok", safes: onWedgie.length }; };            // safe_data, as wedgie-safe takes it: hex pieces, then data "@"
 function safeData(m) {
   if (m.at === 0) pieces = "";
   if (m.at * 2 !== pieces.length) return { type: "error", error: "bad piece" };
@@ -70,6 +73,14 @@ let rc = null;
 while (!rc) rc = await rpc("eth_getTransactionReceipt", [h0]);
 const mine = E.checksum("0x" + rc.logs.find((l) => l.topics[0] === E.PROXY_CREATION).topics[1].slice(26));
 await rpc("anvil_setBalance", [mine, "0xde0b6b3a7640000"]);     // 1 ETH
+// a Safe only the wedgie owns, that Safe's API doesn't list: only the wedgie's own list (safe_list) knows it
+const setup2 = E.call("setup(address[],uint256,address,bytes,address,address,uint256,address)",
+  [E.dynAddrs([signer]), E.word(1), Z32, E.dynBytes("0x"), E.aword(E.FALLBACK_HANDLER), Z32, Z32, Z32]);
+const h1 = await rpc("eth_sendTransaction", [{ from: me, to: E.SAFE_FACTORY, data: E.call("createProxyWithNonce(address,bytes,uint256)", [E.aword(E.SAFE_L2), E.dynBytes(setup2), E.word(8)]) }]);
+let rc1 = null;
+while (!rc1) rc1 = await rpc("eth_getTransactionReceipt", [h1]);
+const hidden = E.checksum("0x" + rc1.logs.find((l) => l.topics[0] === E.PROXY_CREATION).topics[1].slice(26));
+const onWedgie = [`8453:${hidden.toLowerCase()}`];      // the fake wedgie's save "safes"
 
 const cache = homedir() + "/Library/Caches/ms-playwright";
 const shell = readdirSync(cache).filter((d) => d.startsWith("chromium_headless_shell-")).sort().reverse()[0];
@@ -77,10 +88,12 @@ const browser = await chromium.launch({ executablePath: `${cache}/${shell}/${pro
 const ctx = await browser.newContext({ viewport: { width: 1100, height: 1600 } });
 await ctx.exposeBinding("__safeSign", (_, m) => safeSign(m));
 await ctx.exposeBinding("__safeData", (_, m) => safeData(m));
+await ctx.exposeBinding("__safeList", () => safeList());
+await ctx.exposeBinding("__safeNote", (_, m) => safeNote(m));
 await ctx.addInitScript(fakeWedgies, [
   { uid: "aa11bb22cc5afe01", machine: "Raspberry Pi Pico with RP2040", files: { "main.py": 1, "slot.py": 1, "wedgiedrive.py": 1, "wedgie.py": 'VERSION = "0.3.26"',
     "apps.json": JSON.stringify([{ mod: "safe", name: "Safe signer" }]), "safe.py": 1 }, chip: "none",
-    hello: { running: "safe", safe: key, signer, safe_chunk: 4000 }, app: { safe_sign: "__safeSign", safe_data: "__safeData" } },
+    hello: { running: "safe", safe: key, signer, safe_chunk: 4000 }, app: { safe_sign: "__safeSign", safe_data: "__safeData", safe_list: "__safeList", safe_note: "__safeNote" } },
 ]);
 // the browser wallet: anvil, on Base
 await ctx.exposeBinding("__rpc", (_, method, params) => rpc(method, params).catch((e) => ({ __err: e.message })));
@@ -97,7 +110,12 @@ await ctx.addInitScript((me) => {
   } };
 }, me);
 // the page's public RPC for Base = the fork
-await ctx.route("https://mainnet.base.org/**", async (r) => r.fulfill({ headers: { "access-control-allow-origin": "*" }, contentType: "application/json", body: await rpcRaw(r.request().postData()) }));
+// ... and like the real one, it rate-limits a burst: the first reads of the list get 429 (the page must retry, not drop the Safe)
+let busyFor = 4;
+await ctx.route("https://mainnet.base.org/**", async (r) => {
+  if (busyFor > 0 && /eth_getCode/.test(r.request().postData())) { busyFor--; return r.fulfill({ status: 429, headers: { "access-control-allow-origin": "*" }, body: "rate limited" }); }
+  r.fulfill({ headers: { "access-control-allow-origin": "*" }, contentType: "application/json", body: await rpcRaw(r.request().postData()) });
+});
 // Safe's Transaction Service, in memory (owners from the chain)
 const txs = new Map();
 const known = [mine];      // Safes the fake API can list     // safeTxHash -> the API's multisig transaction
@@ -141,7 +159,7 @@ const msg = () => page.textContent("#s-msg");
 const wait = (fn, arg, ms, what) => page.waitForFunction(fn, arg, { timeout: ms }).then(() => true, async () => {
   console.log("STUCK:", what, "| msg:", await msg(), "|", (await page.textContent("main")).replace(/\s+/g, " ").slice(0, 600)); bad++; return false; });
 const says = (re, what) => wait((re) => new RegExp(re).test(document.querySelector("#s-msg").textContent), re.source, 60000, what);
-const asks = () => page.evaluate(() => (window.__ports[0]._st.appAsks || []).length);
+const asks = () => page.evaluate(() => (window.__ports[0]._st.appAsks || []).filter((m) => m.type === "safe_sign").length);
 
 // 0 + 1: /safe with an old "last Safe" saved: still the list. The wallet's Safe, from the list: add the wedgie
 await page.goto(`${base}/`);
@@ -150,7 +168,9 @@ await page.goto(`${base}/safe`);
 await wait(() => document.querySelector("#s-wedgie .safe-addr"), null, 30000, "the wedgie's signer address");
 check(eq(await page.textContent("#s-wedgie .safe-addr"), signer), `signer address shown: ${signer}`);
 check(new globalThis.URL(page.url()).pathname === "/safe" && !(await page.isHidden("#s-list")) && !(await page.isHidden("#s-create")), "an old saved Safe doesn't open itself: /safe is the list, with Make a new Safe");
-await wait(() => /None yet/.test(document.querySelector("#s-list").textContent), null, 20000, "the wedgie has no Safes yet");
+await wait((s) => document.querySelector(`.safe-row[href$="${s}"]`), hidden, 20000, "the Safe only the wedgie's own list knows");
+check(/Your wedgie's Safes[\s\S]*1 of 1 owner/.test(await page.textContent("#s-list")), "listed from the wedgie's own list (safe_list), though Safe's API doesn't know it");
+check(busyFor === 0, "the public RPC said 429 four times on the way: the page tried again, nothing dropped");
 await page.click("#w-go");
 await wait(() => document.querySelector("#l-wallet"), null, 20000, "the wallet's Safes, folded");
 check(!(await page.$(`.safe-row[href$="${mine}"]`)) && /Your wallet's Safes \(1\)/.test(await page.textContent("#s-list")), "the wallet's Safes are folded away: Your wallet's Safes (1)");
@@ -207,8 +227,8 @@ await says(/Done: it ran/, "executed");
 check(BigInt(await rpc("eth_getBalance", [to, "latest"])) === 10n ** 15n, "on chain: 0.001 ETH sent (wedgie + wallet, packed, executed)");
 check(/Nothing waiting/.test(await page.textContent("#s-queue")), "page: the queue is empty");
 
-// 3b: a contract call too big for one USB line (8 KB of data): sent to the wedgie in safe_data pieces
-const big = "0x12345678" + "cd".repeat(8000);
+// 3b: a contract call too big for one USB line (6 KB of data): sent to the wedgie in safe_data pieces
+const big = "0x12345678" + "cd".repeat(6000);
 const callee = E.checksum(E.hex(crypto.randomBytes(20)));
 await page.fill("#n-to", callee);
 await page.fill("#n-amt", "");
@@ -217,12 +237,12 @@ await page.fill("#n-data", big);
 await page.click("#n-wedgie");
 await says(/In the queue with the wedgie's signature/, "big one queued");
 const kinds = await page.evaluate(() => window.__ports[0]._st.appAsks.map((m) => m.type));
-check(kinds.filter((k) => k === "safe_data").length === 5 && kinds.at(-1) === "safe_sign", `8 KB of data: ${kinds.filter((k) => k === "safe_data").length} safe_data pieces, then safe_sign with data "@"`);
+check(kinds.filter((k) => k === "safe_data").length === 4 && kinds.at(-1) === "safe_sign", `6 KB of data: ${kinds.filter((k) => k === "safe_data").length} safe_data pieces, then safe_sign with data "@"`);
 await page.click("[data-wsign]");
 await says(/That's enough: press Execute/, "wallet signed the big one");
 await page.click("[data-exec]");
 await says(/Done: it ran/, "big one executed");
-check(/Nothing waiting/.test(await page.textContent("#s-queue")), "on chain: the 8 KB call ran (wedgie's signature over pieces + wallet)");
+check(/Nothing waiting/.test(await page.textContent("#s-queue")), "on chain: the 6 KB call ran (wedgie's signature over pieces + wallet)");
 
 // 4: back to the list (no reload): the Safe is the wedgie's now. Then a new one: wallet + wedgie, 2 of 2
 await page.click('a[href="/safe"][data-nav]');
@@ -243,6 +263,7 @@ if (out) await page.screenshot({ path: `${out}/safe-4-made.png`, fullPage: true 
 await page.goBack();
 await wait((a) => [...document.querySelectorAll("#s-list .safe-row")].filter((r) => a.some((x) => r.getAttribute("href").endsWith(x))).length === 2, [mine, made], 30000, "the list has both (Back button)");
 check(true, "Back: the list has both Safes (the new one before Safe's API has it)");
+check(onWedgie.includes(`8453:${made.toLowerCase()}`) && onWedgie.includes(`8453:${mine.toLowerCase()}`), "the wedgie was told (safe_note): its own list has the new Safe and the one it joined");
 
 // 5: Disconnect: the wallet is gone, and stays gone after a reload
 await page.click("#w-off");
