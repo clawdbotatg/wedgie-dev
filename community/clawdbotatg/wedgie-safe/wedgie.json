@@ -6,7 +6,8 @@
       "about": "Sign Safe{Wallet} transactions with a key in the Trust M chip. A signs, Y says no.",
       "files": [
         "safe.py",
-        "safe_keccak.py"
+        "safe_keccak.py",
+        "safe_addr.py"
       ],
       "entry": "run",
       "fw": "0.3.17",
