@@ -1,11 +1,13 @@
-// /safe through its buttons, on a Base fork: a fake wedgie running the Safe signer (fakewedgies, its hello
-// carries a key), window.ethereum = an anvil account (the browser wallet), Safe's Transaction Service faked
-// from the fork's state. Checks:
-//   - the page shows the wedgie's signer address
-//   - a wallet that owns a 1-of-1 Safe adds the wedgie as an owner: Add box, the signer contract deployed,
-//     signed and run at once
-//   - Make a new Safe: wallet + wedgie, 2 of 2, one transaction, then the page opens it
-// (The wedgie's own signature on chain: tools/safefork.mjs.) Needs anvil and Node 23+.
+// /safe through its buttons, on a Base fork: a fake wedgie running the Safe signer (fakewedgies: its hello
+// carries a key, its safe_sign is answered by a P-256 key here, signing what safe.py signs), window.ethereum
+// = an anvil account (the browser wallet), the page's public RPC = the fork, Safe's Transaction Service faked
+// in memory. One Safe's life, then a new one:
+//   1. a 1-of-1 Safe the wallet owns: the page shows the wedgie's signer; Add it with my wallet (deploys the
+//      signer contract, runs at once)
+//   2. Change the threshold to 2: proposed by the wedgie (A on it), run at once (1 of 2 was enough)
+//   3. New transaction, 0.001 ETH, signed with the wedgie: into the queue; Sign with wallet; Execute
+//   4. Make a new Safe: wallet + wedgie, 2 of 2, one transaction, then the page opens it
+// (Safe's real API: tools/safelive.mjs.) Needs anvil and Node 23+.
 // Serve dist first (npm run build && npx vite preview --port 4173), then: node tools/safeprobe.mjs [url] [outdir]
 import { chromium } from "playwright-core";
 import { readdirSync } from "node:fs";
@@ -20,24 +22,33 @@ const RPC = process.env.BASE_RPC || "https://mainnet.base.org", PORT = 8598, URL
 const anvil = spawn("anvil", ["--fork-url", RPC, "--port", String(PORT), "--mnemonic-random", "--hardfork", "osaka", "--silent"], { stdio: "inherit" });
 process.on("exit", () => anvil.kill());
 let id = 0;
+async function rpcRaw(body) { return (await fetch(URL, { method: "POST", headers: { "content-type": "application/json" }, body })).text(); }
 async function rpc(method, params = []) {
-  const r = await (await fetch(URL, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: ++id, method, params }) })).json();
+  const r = JSON.parse(await rpcRaw(JSON.stringify({ jsonrpc: "2.0", id: ++id, method, params })));
   if (r.error) throw Object.assign(new Error(r.error.message), { rpc: r.error });
   return r.result;
 }
 for (let i = 0; ; i++) { try { await rpc("eth_chainId"); break; } catch { if (i > 100) throw new Error("anvil didn't start"); await new Promise((r) => setTimeout(r, 200)); } }
 const [me] = await rpc("eth_accounts");
 const view = (to, data) => rpc("eth_call", [{ to, data }, "latest"]);
-const owners = async (safe) => {
-  const b = E.bytes(await view(safe, E.selector("getOwners()")));
-  return Array.from({ length: Number(BigInt(E.hex(b.slice(32, 64)))) }, (_, i) => E.checksum(E.hex(b.slice(76 + 32 * i, 96 + 32 * i))));
-};
+const owners = async (safe) => E.addrs(await view(safe, E.selector("getOwners()")));
+const num = async (safe, sig) => Number(BigInt(await view(safe, E.selector(sig))));
 const eq = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
 
-// the wedgie's key (only its public half matters here)
-const jwk = crypto.generateKeyPairSync("ec", { namedCurve: "P-256" }).publicKey.export({ format: "jwk" });
+// the wedgie: a P-256 key, and safe.py's answer to safe_sign
+const { privateKey, publicKey } = crypto.generateKeyPairSync("ec", { namedCurve: "P-256" });
+const jwk = publicKey.export({ format: "jwk" });
 const b64 = (s) => "0x" + Buffer.from(s, "base64url").toString("hex");
 const key = { x: b64(jwk.x), y: b64(jwk.y) }, signer = E.signerAddress(key.x, key.y);
+function safeSign(m) {
+  const t = m.tx, h = E.safeTxHash(t.chainId, t.safe, t);
+  const sha = (b) => crypto.createHash("sha256").update(b).digest();
+  const auth = Buffer.concat([sha("wedgie.dev"), Buffer.from("0500000000", "hex")]);
+  const cdj = `{"type":"webauthn.get","challenge":"${Buffer.from(h.slice(2), "hex").toString("base64url")}","origin":"https://wedgie.dev"}`;
+  const sig = crypto.sign(null, Buffer.concat([auth, sha(cdj)]), { key: privateKey, dsaEncoding: "ieee-p1363" });
+  return { type: "safe_sig", safeTxHash: h, ...key, r: "0x" + sig.subarray(0, 32).toString("hex"), s: "0x" + sig.subarray(32).toString("hex"),
+    authenticatorData: "0x" + auth.toString("hex"), clientDataFields: '"origin":"https://wedgie.dev"' };
+}
 
 // a Safe only the wallet owns, 1 of 1 (made here, not on the page)
 const Z32 = new Uint8Array(32);
@@ -47,20 +58,25 @@ const h0 = await rpc("eth_sendTransaction", [{ from: me, to: E.SAFE_FACTORY, dat
 let rc = null;
 while (!rc) rc = await rpc("eth_getTransactionReceipt", [h0]);
 const mine = E.checksum("0x" + rc.logs.find((l) => l.topics[0] === E.PROXY_CREATION).topics[1].slice(26));
+await rpc("anvil_setBalance", [mine, "0xde0b6b3a7640000"]);     // 1 ETH
 
 const cache = homedir() + "/Library/Caches/ms-playwright";
 const shell = readdirSync(cache).filter((d) => d.startsWith("chromium_headless_shell-")).sort().reverse()[0];
 const browser = await chromium.launch({ executablePath: `${cache}/${shell}/${process.platform === "linux" ? "chrome-headless-shell-linux64" : "chrome-headless-shell-mac-arm64"}/chrome-headless-shell` });
-const ctx = await browser.newContext({ viewport: { width: 1100, height: 1400 } });
+const ctx = await browser.newContext({ viewport: { width: 1100, height: 1600 } });
+await ctx.exposeBinding("__safeSign", (_, m) => safeSign(m));
 await ctx.addInitScript(fakeWedgies, [
   { uid: "aa11bb22cc5afe01", machine: "Raspberry Pi Pico with RP2040", files: { "main.py": 1, "slot.py": 1, "wedgiedrive.py": 1, "wedgie.py": 'VERSION = "0.3.26"',
-    "apps.json": JSON.stringify([{ mod: "safe", name: "Safe signer" }]), "safe.py": 1 }, chip: "none", hello: { running: "safe", safe: key } },
+    "apps.json": JSON.stringify([{ mod: "safe", name: "Safe signer" }]), "safe.py": 1 }, chip: "none",
+    hello: { running: "safe", safe: key }, app: { safe_sign: "__safeSign" } },
 ]);
 // the browser wallet: anvil, on Base
 await ctx.exposeBinding("__rpc", (_, method, params) => rpc(method, params).catch((e) => ({ __err: e.message })));
 await ctx.addInitScript((me) => {
+  let on = false;      // like a real wallet: eth_accounts is empty until this site asked once
   window.ethereum = { async request({ method, params }) {
-    if (method === "eth_requestAccounts" || method === "eth_accounts") return [me];
+    if (method === "eth_requestAccounts") { on = true; return [me]; }
+    if (method === "eth_accounts") return on ? [me] : [];
     if (method === "eth_chainId") return "0x2105";
     if (method === "wallet_switchEthereumChain") return null;
     const r = await window.__rpc(method, params || []);
@@ -68,19 +84,34 @@ await ctx.addInitScript((me) => {
     return r;
   } };
 }, me);
-// Safe's Transaction Service, from the fork
-const queue = [];
+// the page's public RPC for Base = the fork
+await ctx.route("https://mainnet.base.org/**", async (r) => r.fulfill({ headers: { "access-control-allow-origin": "*" }, contentType: "application/json", body: await rpcRaw(r.request().postData()) }));
+// Safe's Transaction Service, in memory (owners from the chain)
+const txs = new Map();     // safeTxHash -> the API's multisig transaction
+const sigOwner = (sig) => (E.bytes(sig)[64] === 0 ? E.checksum("0x" + sig.slice(26, 66)) : E.checksum(me));   // contract: r = owner; EOA: the one wallet here
 await ctx.route("https://api.safe.global/**", async (r) => {
-  const u = new globalThis.URL(r.request().url()), cors = { "access-control-allow-origin": "*" };
-  const m = u.pathname.match(/\/safes\/(0x[0-9a-fA-F]{40})\/(multisig-transactions\/)?$/);
-  if (r.request().method() === "POST") { queue.push(JSON.parse(r.request().postData())); return r.fulfill({ status: 201, headers: cors, body: "" }); }
-  if (m && m[2]) return r.fulfill({ headers: cors, contentType: "application/json", body: JSON.stringify({ results: [] }) });
-  if (m) {
-    if ((await rpc("eth_getCode", [m[1], "latest"])).length <= 2) return r.fulfill({ status: 404, headers: cors, body: "{}" });
-    const nonce = Number(BigInt(await view(m[1], E.selector("nonce()")))), threshold = Number(BigInt(await view(m[1], E.selector("getThreshold()"))));
-    return r.fulfill({ headers: cors, contentType: "application/json", body: JSON.stringify({ address: m[1], nonce: String(nonce), threshold, owners: await owners(m[1]) }) });
+  const u = new globalThis.URL(r.request().url()), p = u.pathname.replace(/^\/tx-service\/\w+\/api\/v1/, ""), cors = { "access-control-allow-origin": "*" };
+  const json = (b, status = 200) => r.fulfill({ status, headers: cors, contentType: "application/json", body: JSON.stringify(b) });
+  let m;
+  if (r.request().method() === "POST") {
+    const b = JSON.parse(r.request().postData());
+    if ((m = p.match(/^\/safes\/(0x\w+)\/multisig-transactions\/$/))) {
+      if (!(await owners(m[1])).some((o) => eq(o, b.sender))) return json({ sender: "not an owner" }, 422);
+      txs.set(b.contractTransactionHash, { ...b, safe: m[1], safeTxHash: b.contractTransactionHash, confirmations: [{ owner: b.sender, signature: b.signature }] });
+      return json({}, 201);
+    }
+    if ((m = p.match(/^\/multisig-transactions\/(0x\w+)\/confirmations\/$/))) {
+      txs.get(m[1]).confirmations.push({ owner: sigOwner(b.signature), signature: b.signature });
+      return json({}, 201);
+    }
+    return json({}, 404);
   }
-  r.fulfill({ status: 404, headers: cors, body: "{}" });
+  if ((m = p.match(/^\/safes\/(0x\w+)\/multisig-transactions\/$/))) {
+    const n = await num(m[1], "nonce()"), th = await num(m[1], "getThreshold()");
+    return json({ results: [...txs.values()].filter((t) => eq(t.safe, m[1]) && +t.nonce >= n).map((t) => ({ ...t, confirmationsRequired: th })).sort((a, b) => a.nonce - b.nonce) });
+  }
+  if ((m = p.match(/^\/owners\/(0x\w+)\/safes\/$/))) return json({ safes: eq(m[1], me) ? [mine] : [] });
+  json({}, 404);
 });
 
 let bad = 0;
@@ -89,35 +120,65 @@ const page = await ctx.newPage();
 const errs = [];
 page.on("pageerror", (e) => errs.push(e.message));
 const msg = () => page.textContent("#s-msg");
-const wait = (fn, arg, ms, what) => page.waitForFunction(fn, arg, { timeout: ms }).then(() => true, async () => { console.log("STUCK:", what, "|", (await page.textContent("main")).replace(/\s+/g, " ").slice(0, 500)); bad++; return false; });
+const wait = (fn, arg, ms, what) => page.waitForFunction(fn, arg, { timeout: ms }).then(() => true, async () => {
+  console.log("STUCK:", what, "| msg:", await msg(), "|", (await page.textContent("main")).replace(/\s+/g, " ").slice(0, 600)); bad++; return false; });
+const says = (re, what) => wait((re) => new RegExp(re).test(document.querySelector("#s-msg").textContent), re.source, 60000, what);
+const asks = () => page.evaluate(() => (window.__ports[0]._st.appAsks || []).length);
 
-// 1: an existing Safe the wallet owns: add the wedgie
-await page.goto(`${base}/safe?safe=base:${mine}`);
+// 1: the wallet's 1-of-1 Safe (from "Your wallet's Safes"): add the wedgie
+await page.goto(`${base}/safe`);
 await wait(() => document.querySelector(".safe-addr"), null, 30000, "the wedgie's signer address");
-check(eq(await page.textContent(".safe-addr"), signer), `signer address shown: ${signer}`);
+check(eq(await page.textContent("#s-wedgie .safe-addr"), signer), `signer address shown: ${signer}`);
+await wait(() => /Not on Base yet/.test(document.querySelector("#s-wedgie").textContent), null, 20000, "not deployed yet, says so");
+await page.click("#w-go");
+await wait((s) => document.querySelector(`[data-open="${s}"]`), mine, 20000, "the wallet's Safe listed");
+await page.click(`[data-open="${mine}"]`);
 await wait(() => !document.querySelector("#s-add")?.hidden, null, 30000, "the Add box");
-if (out) await page.screenshot({ path: `${out}/safe-add.png`, fullPage: true });
+check(/1 of 1 owner must sign/.test(await page.textContent("#s-safe")) && /1 ETH/.test(await page.textContent("#s-safe")), "the Safe: 1 of 1, 1 ETH");
+if (out) await page.screenshot({ path: `${out}/safe-1-add.png`, fullPage: true });
 await page.click("#a-go");
-await wait(() => /Done: your wedgie is an owner/.test(document.querySelector("#s-msg").textContent), null, 60000, "added");
-check((await owners(mine)).some((o) => eq(o, signer)), "on chain: the wedgie's signer is an owner of the wallet's Safe");
+await says(/Done: add owner/, "added");
+check((await owners(mine)).some((o) => eq(o, signer)), "on chain: the wedgie's signer is an owner");
 check((await rpc("eth_getCode", [signer, "latest"])).length > 2, "on chain: its signer contract was deployed first");
-check(await page.isHidden("#s-add") && /Your wedgie is an owner/.test(await page.textContent("#s-safe")), "page: an owner now, Add box gone");
+check(await page.isHidden("#s-add") && /Your wedgie is an owner/.test(await page.textContent("#s-safe")) && /Deployed on Base/.test(await page.textContent("#s-wedgie")), "page: an owner now, deployed, Add box gone");
 
-// 2: a new Safe: wallet + wedgie, 2 of 2
+// 2: 2 of 2, proposed by the wedgie: 1 of 2 is enough, so it runs at once
+await page.selectOption("#o-th", "2");
+await page.click("#o-th-go");
+await says(/Done: 2 of 2 must sign/, "threshold changed");
+check(await asks() === 1, "the wedgie was asked (safe_sign)");
+check(await num(mine, "getThreshold()") === 2, "on chain: 2 of 2, on the wedgie's signature alone");
+
+// 3: send ETH: the wedgie signs, the wallet signs, execute
+const to = E.checksum(E.hex(crypto.randomBytes(20)));
+await page.fill("#n-to", to);
+await page.fill("#n-amt", "0.001");
+await page.click("#n-wedgie");
+await says(/In the queue with the wedgie's signature/, "queued");
+check(await asks() === 2, "the wedgie was asked again");
+await wait(() => document.querySelector("[data-wsign]"), null, 10000, "Sign with wallet");
+if (out) await page.screenshot({ path: `${out}/safe-3-queue.png`, fullPage: true });
+await page.click("[data-wsign]");
+await says(/That's enough: press Execute/, "wallet signed");
+await page.click("[data-exec]");
+await says(/Done: it ran/, "executed");
+check(BigInt(await rpc("eth_getBalance", [to, "latest"])) === 10n ** 15n, "on chain: 0.001 ETH sent (wedgie + wallet, packed, executed)");
+check(/Nothing waiting/.test(await page.textContent("#s-queue")), "page: the queue is empty");
+
+// 4: a new Safe: wallet + wedgie, 2 of 2
 await page.click("#s-new-safe");
 await page.click("#c-me");
 await wait(() => /of 2 owners/.test(document.querySelector("#c-of").textContent), null, 10000, "2 owners counted");
 await page.selectOption("#c-th", "2");
-if (out) await page.screenshot({ path: `${out}/safe-new.png`, fullPage: true });
+if (out) await page.screenshot({ path: `${out}/safe-4-new.png`, fullPage: true });
 await page.click("#c-go");
-await wait(() => /Made your Safe: 0x/.test(document.querySelector("#s-msg").textContent), null, 60000, "made");
+await says(/Made your Safe: 0x/, "made");
 const made = (await msg()).match(/0x[0-9a-fA-F]{40}/)[0];
 const os = await owners(made);
 check(os.length === 2 && os.some((o) => eq(o, signer)) && os.some((o) => eq(o, me)), `on chain: new Safe ${made} owned by the wedgie and the wallet`);
-check(Number(BigInt(await view(made, E.selector("getThreshold()")))) === 2, "on chain: 2 of 2");
-check(new globalThis.URL(page.url()).search.includes(made), "page: opened the new Safe (its address in the link)");
-check(/2 needed to sign/.test(await page.textContent("#s-safe")), "page: shows it, 2 needed");
-if (out) await page.screenshot({ path: `${out}/safe-made.png`, fullPage: true });
+check(await num(made, "getThreshold()") === 2, "on chain: 2 of 2");
+check(new globalThis.URL(page.url()).search.includes(made) && /2 of 2 owners must sign/.test(await page.textContent("#s-safe")), "page: opened the new Safe, 2 of 2");
+if (out) await page.screenshot({ path: `${out}/safe-4-made.png`, fullPage: true });
 
 check(!errs.length, "no page errors " + errs.join("; "));
 await browser.close();

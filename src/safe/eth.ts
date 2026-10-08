@@ -210,3 +210,27 @@ export function execData(t: SafeTx, sigs: string) {
     aword(t.to), word(t.value), word(head), word(t.operation), word(t.safeTxGas), word(t.baseGas), word(t.gasPrice),
     aword(t.gasToken), aword(t.refundReceiver), word(head + dataPart.length), dataPart, word(s.length), pad(s))).slice(2);
 }
+
+// ---- owners and tokens ----
+
+/** Safe's owner list is linked: removeOwner needs the owner before it (0x1 = the list's head). */
+export const SENTINEL = "0x0000000000000000000000000000000000000001";
+export const removeOwnerData = (prev: string, owner: string, threshold: number) =>
+  call("removeOwner(address,address,uint256)", [aword(prev), aword(owner), word(threshold)]);
+export const changeThresholdData = (threshold: number) => call("changeThreshold(uint256)", [word(threshold)]);
+export const transferData = (to: string, amount: bigint) => call("transfer(address,uint256)", [aword(to), word(amount)]);
+/** An address[] return value (getOwners). */
+export function addrs(ret: string) {
+  const b = bytes(ret), n = Number(BigInt(hex(b.slice(32, 64))));
+  return Array.from({ length: n }, (_, i) => checksum(hex(b.slice(76 + 32 * i, 96 + 32 * i))));
+}
+/** "1.5" with 18 decimals -> 1500000000000000000n; throws on anything that isn't a plain amount. */
+export function units(s: string, dec: number) {
+  if (!/^\d*\.?\d*$/.test(s) || s === "." || (s.split(".")[1] || "").length > dec) throw new Error(`${s} isn't an amount.`);
+  const [w, f = ""] = s.split(".");
+  return BigInt(w || "0") * 10n ** BigInt(dec) + BigInt((f + "0".repeat(dec)).slice(0, dec) || "0");
+}
+export function fmt(n: bigint, dec: number, keep = 6) {
+  const w = n / 10n ** BigInt(dec), f = (n % 10n ** BigInt(dec)).toString().padStart(dec, "0").slice(0, keep).replace(/0+$/, "");
+  return f ? `${w}.${f}` : String(w);
+}

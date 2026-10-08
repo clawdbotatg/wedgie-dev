@@ -527,4 +527,7 @@ body.test-mode .top, body.test-mode .foot { display: none; }
 .safe-box input, .safe-box select { font: inherit; font-size: 14px; padding: 6px 8px; max-width: 100%; }
 .safe-addr { word-break: break-all; font-size: 14px; }
 .safe-list { list-style: none; padding: 0; margin: 0; }
+.safe-info { border-top: 1px solid rgba(0,0,0,.08); margin-top: 12px; padding-top: 4px; }
+.safe-list code { font-size: 13px; word-break: break-all; }
+.safe-msg { position: sticky; bottom: 12px; width: 100%; margin: 12px 0 0; padding: 12px 16px; border-radius: 14px; background: var(--card); box-shadow: 0 6px 24px rgba(0,0,0,.18); font-size: 14px; text-align: left; z-index: 5; }
 .safe-list li { padding: 8px 0; border-bottom: 1px solid rgba(0,0,0,.08); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }

@@ -11,6 +11,8 @@
 //   chip: "none" has no secure chip (default: an ATECC608 that proves itself). _st.slowStart = ms: after each
 //   plug-in its app takes that long to start, saying nothing (Grove 4f7748d making its pictures).
 //   _st.hello = { ... }: extra fields in each hello, as an app's own hello adds them (spec hello: { ... }).
+//   _st.app = { <type>: "<window function>" }: an app's own USB requests, answered by that page function
+//   (spec app: { ... }; _st.appAsks lists them). safeprobe.mjs: safe_sign, answered by a P-256 key in node.
 // 0.2.5+ is sealed: Ctrl-C is a plain byte until {"type": "open"} is answered yes by the pretend person
 // (person: { say: "yes" | "no", ms }, default yes after 300 ms; _st.asks counts the questions). A yes lasts
 // until main.py starts again (a soft reset or exec(main.py)): one job.
@@ -217,6 +219,10 @@ export function fakeWedgies(specs) {
         for (let i = 0; i < n; i++) { let s = ""; for (const b of px.subarray(i * 3072, (i + 1) * 3072)) s += String.fromCharCode(b); o += JSON.stringify({ id, type: "shot", i, n, w: 240, h: 240, fmt: "rgb565be", data: btoa(s) }) + "\r\n"; }
         return push(o);
       }
+      if (st.app?.[msg.type]) {            // an app's own request (st.app / spec app: { type: "window function name" })
+        (st.appAsks ||= []).push(msg);
+        return Promise.resolve(window[st.app[msg.type]](msg)).then((r) => push(JSON.stringify({ id, ...r }) + "\r\n"));
+      }
       push(JSON.stringify({ id, type: "error", error: "unknown type" }) + "\r\n");
     }
     function softReset() {
@@ -293,6 +299,7 @@ export function fakeWedgies(specs) {
     p._st.chip = b.chip;
     p._st.person = b.person;
     p._st.hello = b.hello;
+    p._st.app = b.app;
     return p;
   });
   window.__ports = ports;
