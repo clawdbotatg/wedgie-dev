@@ -679,9 +679,14 @@ export function safe(main: HTMLElement) {
     if (!document.getElementById("n-to")) {      // built once per Safe: keep what's typed across repaints
       box.innerHTML = `<h2>New transaction</h2>
         <p>${addressInput("n-to", "to: 0x… or ENS name")}</p>
-        <p><input id="n-amt" placeholder="amount" size="12" inputmode="decimal"> <select id="n-tok"><option value="eth">ETH</option>${c.usdc ? `<option value="usdc">USDC</option>` : ""}</select></p>
+        <p><input id="n-amt" placeholder="amount" size="12" inputmode="decimal"> <select id="n-tok"><option value="eth">ETH</option>${c.usdc ? `<option value="usdc">USDC</option>` : ""}</select> <button class="btn btn-sm" id="n-max" type="button">Max</button></p>
         <details class="fine"><summary>Contract call data (optional)</summary><p><input id="n-data" placeholder="data 0x…" size="44" spellcheck="false"></p></details>
         <p id="n-btns"></p>`;
+      // all of it: the Safe pays no gas itself (the wallet that executes does), so the whole balance can go
+      $("n-max").onclick = () => {
+        const i = info!, usdc = ($("n-tok") as HTMLSelectElement).value === "usdc";
+        ($("n-amt") as HTMLInputElement).value = usdc ? E.fmt(i.usdc ?? 0n, 6, 6) : E.fmt(i.balance, 18, 18);
+      };
     }
     $("n-btns").innerHTML = `${isOwner(signer) ? `<button class="btn btn-green" id="n-wedgie"${dis(!key)}>Sign with wedgie</button> ` : ""}${isOwner(account) ? `<button class="btn" id="n-wallet"${dis()}>Sign with wallet</button>` : ""}`;
     $("n-wedgie")?.addEventListener("click", () => job(() => newTx("wedgie")));
