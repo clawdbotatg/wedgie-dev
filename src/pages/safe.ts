@@ -117,11 +117,8 @@ async function readSafe(c: number, a: string): Promise<Info> {
 export function safe(main: HTMLElement) {
   main.innerHTML = `
   <section class="test-page safe-page">
-    <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
-    <h1>Safe signer</h1>
-    <p class="fine">Your wedgie signs for <a href="https://app.safe.global" target="_blank" rel="noopener">Safe</a> multisigs. Its key never leaves its chip; it shows each transaction and signs only when you press A on it.</p>
-    <div class="safe-box recess" id="s-wedgie"></div>
-    <div class="safe-box recess" id="s-wallet"></div>
+    <div class="safe-ids" id="s-ids"><div class="safe-id" id="s-me" hidden></div><div class="safe-id safe-id-wallet" id="s-wallet" hidden></div></div>
+    <div class="safe-box recess" id="s-wedgie" hidden></div>
     <div class="safe-box recess" id="s-list" hidden></div>
     <div class="safe-box recess" id="s-create" hidden></div>
     <div class="safe-box recess" id="s-safe" hidden></div>
@@ -219,15 +216,13 @@ export function safe(main: HTMLElement) {
   function paintWedgie() {
     const ws = W.wedgies().filter((w) => w.state === "ready");
     const app = ws.filter((w) => w.running === "safe");
-    let h = `<h2>Your wedgie</h2>`;
+    let h = "";
     if (!W.supported()) h += `<p class="fine">This browser can't talk to a wedgie over USB. Use Chrome, Edge or Brave on a computer.</p>`;
     else if (!W.armed()) h += `<p><a class="btn btn-green" href="/connect">Connect a wedgie</a></p>`;
     else if (!ws.length) h += `<p class="fine">Plug it in. Not showing? <a href="/connect">Connect</a> it first.</p>`;
     else if (!app.length) h += `<p class="fine">It isn't running the Safe signer yet. <a class="btn btn-sm btn-green" href="/connect/${esc(ws[0].short)}">Install Safe signer</a> (on its page, Software).</p>`;
     else if (!key) h += noKey ? `<p><b>Press A on the wedgie to make its key.</b> The chip makes it and never lets it out.</p>` : `<p class="fine">Reading its key.</p>`;
     else {
-      h += `<p class="fine">Its Safe owner address, the same on every chain (its screen shows it too):</p>
-      <p><code class="safe-addr">${esc(signer)}</code> <button class="btn btn-sm" id="s-copy">Copy</button></p>`;
       if (safeAddr) {
         const d = deployed[chain];
         h += `<p class="fine">${d === undefined ? `Checking ${esc(CHAINS[chain].name)}.` : d ? `<span class="good">Set up on ${esc(CHAINS[chain].name)}.</span>`
@@ -235,6 +230,11 @@ export function safe(main: HTMLElement) {
       }
     }
     $("s-wedgie").innerHTML = h;
+    $("s-wedgie").hidden = !h;
+    // up top, under Connected: the wedgie's Safe owner address (what you'd add to another Safe), a tap copies it
+    const me = $("s-me");
+    me.hidden = !signer;
+    me.innerHTML = signer ? `<span class="safe-id-tag">wedgie</span><code class="safe-addr" title="${esc(signer)}">${esc(short(signer))}</code><button class="btn btn-sm" id="s-copy">Copy</button>` : "";
     $("s-copy")?.addEventListener("click", () => { navigator.clipboard.writeText(signer); say("Copied."); });
     $("s-deploy")?.addEventListener("click", () => job(deploy));
     if (app.length && !key && wedgie !== app[0]) readKey(app[0]);
@@ -282,12 +282,12 @@ export function safe(main: HTMLElement) {
 
   // ---- the wallet ----
   function paintWallet() {
-    let h = `<h2>Your browser wallet <span class="fine">(optional)</span></h2>`;
-    if (!eth()) h += `<p class="fine">None in this browser. You need one to pay gas: to make a Safe, add your wedgie to one, or execute. Signing with the wedgie alone needs none.</p>`;
-    else if (!account) h += `<p class="fine">It pays the gas (make a Safe, add your wedgie, execute) and can sign as an owner too.</p><p><button class="btn" id="w-go"${dis()}>Connect wallet</button></p>`;
-    else h += `<p><code class="safe-addr">${esc(account)}</code>${isOwner(account) ? ` <span class="good">an owner of this Safe</span>` : ""}
-      <button class="btn btn-sm" id="w-off"${dis()}>Disconnect</button></p>`;
-    $("s-wallet").innerHTML = h;
+    // up top, under the wedgie: the browser wallet (pays gas, can sign as an owner too)
+    const box = $("s-wallet");
+    box.hidden = !eth();
+    box.innerHTML = !eth() ? "" : !account ? `<button class="btn btn-sm btn-wallet" id="w-go"${dis()}>Connect wallet</button>`
+      : `<span class="safe-id-tag">wallet</span><code class="safe-addr" title="${esc(account)}">${esc(short(account))}</code>${isOwner(account) ? `<span class="good">owner</span>` : ""}
+      <button class="btn btn-sm" id="w-off"${dis()}>Disconnect</button>`;
     $("w-go")?.addEventListener("click", () => job(async () => {
       account = await wallet(safeAddr ? chain : newChain);
       try { localStorage.removeItem(OFF); } catch {}
