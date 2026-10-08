@@ -266,6 +266,26 @@ html, body { overflow-x: clip; }
   background: var(--green-fill); box-shadow: inset 0 2px 0 rgba(255,255,255,.3), inset 0 -3px 0 rgba(0,0,0,.2), 0 8px 16px -8px rgba(22,140,52,.8); }
 .wedge-label i { position: absolute; left: -1.5px; bottom: 8px; width: 3px; height: 52px; background: #168c34; border-radius: 2px; }
 .wedge-label i::after { content: ""; position: absolute; left: -5.5px; bottom: -8px; border: 7px solid transparent; border-top: 9px solid #168c34; border-bottom: 0; }
+/* the software library: carts on a shelf, flipped through by scrolling (home.ts library) */
+.lib { height: calc(60vh + var(--n, 6) * 38vh); position: relative; }
+.lib-sticky { position: sticky; top: 86px; height: calc(100vh - 110px); min-height: 440px; max-height: 600px; display: grid; grid-template-rows: 1fr auto; overflow: hidden; padding: 24px 16px; }
+.lib-stage { position: relative; perspective: 1100px; display: grid; place-items: center; }
+.lib-row { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; }
+.lib-item { position: absolute; left: 50%; top: 50%; width: 200px; margin: -114px 0 0 -100px; transform-style: preserve-3d; transition: transform .12s linear; will-change: transform; }
+.lib-item .cart { text-decoration: none; }
+.lib-plank { position: absolute; left: 4%; right: 4%; top: calc(50% + 117px); height: 14px; border-radius: 4px;
+  background: linear-gradient(#e2e3e0, #c9cac6); box-shadow: 0 10px 18px rgba(20,20,20,.15), inset 0 2px 0 rgba(255,255,255,.7); }
+.lib-cap { text-align: center; max-width: 520px; margin: 0 auto; min-height: 92px; }
+.lib-cap h3 { font-family: var(--lcd); font-size: 24px; margin: 0 0 6px; }
+.lib-cap p { margin: 0; color: #474947; font-size: 17px; }
+.lib-cap.in { animation: lib-in .3s ease-out; }
+@keyframes lib-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (max-width: 860px) {
+  .lib-sticky { top: 76px; height: calc(100vh - 92px); }
+  .lib-item { width: 130px; margin: -74px 0 0 -65px; }
+  .lib-plank { top: calc(50% + 78px); }
+}
+
 .agents { display: flex; flex-wrap: wrap; gap: 22px; justify-content: center; padding: 60px 0 20px; }
 .btn-lg { height: 68px; padding: 0 36px; font-size: 22px; font-family: var(--mono); font-weight: 500; }
 .btn-lg .bot { font-size: 28px; }

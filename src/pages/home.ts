@@ -90,6 +90,20 @@ export function home(main: HTMLElement): Promise<unknown> {
     </div>
   </section>
 
+  <section id="library" class="sec">
+    <div class="sec-head">
+      <span class="kicker">Software</span>
+      <h2>A shelf full of carts.</h2>
+      <p>Games, tools, a wallet. One app at a time, swapped in from the browser. Or have your agent make a new one.</p>
+    </div>
+    <div class="lib" id="lib">
+      <div class="lib-sticky card">
+        <div class="lib-stage"><div class="lib-row"></div><div class="lib-plank"></div></div>
+        <div class="lib-cap"><h3></h3><p></p></div>
+      </div>
+    </div>
+  </section>
+
   <section id="agents" class="sec agents">
     <a class="btn btn-lg" href="/skill.md" target="_blank"><span class="bot" aria-hidden="true">🤖</span> skill.md</a>
     <a class="btn btn-lg" href="/code">Software</a>
@@ -120,6 +134,7 @@ export function home(main: HTMLElement): Promise<unknown> {
       : "One wedgie: pico, screen, chip, and case.";
   }));
   assembly(main.querySelector<HTMLElement>("#assembly")!);
+  library(main.querySelector<HTMLElement>("#lib")!);
   main.querySelectorAll<HTMLElement>(".part-3d").forEach((el, i) => {
     new IntersectionObserver(async (es, o) => {
       if (!es.some((e) => e.isIntersecting)) return;
@@ -159,4 +174,49 @@ function assembly(box: HTMLElement) {
       update();
     } catch (err) { console.error("assembly:", err); }
   }, { rootMargin: "400px" }).observe(stage);
+}
+
+// The software library: the shelf's carts stand side by side like books, and scrolling flips through them,
+// one at a time turned to face you with its name and what it does underneath.
+function library(box: HTMLElement) {
+  const row = box.querySelector<HTMLElement>(".lib-row")!;
+  const cap = box.querySelector<HTMLElement>(".lib-cap")!;
+  let items: HTMLElement[] = [];
+  let carts: import("../serial/install").Cart[] = [];
+  let shown = -1;
+  const update = () => {
+    if (!items.length) return;
+    const r = box.getBoundingClientRect();
+    const p = Math.max(0, Math.min(1, -r.top / Math.max(1, r.height - innerHeight)));
+    const at = p * (items.length - 1);
+    const w = row.clientWidth;
+    const spine = Math.min(34, w / 22), gap = Math.min(140, w / 4.2);
+    items.forEach((el, i) => {
+      const d = i - at, s = Math.max(-1, Math.min(1, d));
+      el.style.transform = `translateX(${d * spine + s * gap}px) translateZ(${(1 - Math.abs(s)) * 130}px) rotateY(${-s * 72}deg)`;
+      el.style.zIndex = String(100 - Math.round(Math.abs(d) * 10));
+    });
+    const n = Math.round(at);
+    if (n !== shown) {
+      shown = n;
+      cap.querySelector("h3")!.textContent = carts[n].name;
+      cap.querySelector("p")!.textContent = carts[n].about || "";
+      cap.classList.remove("in"); void cap.offsetWidth; cap.classList.add("in");
+    }
+  };
+  addEventListener("scroll", update, { passive: true });
+  addEventListener("resize", update);
+  new IntersectionObserver(async (es, o) => {
+    if (!es.some((e) => e.isIntersecting)) return;
+    o.disconnect();
+    try {
+      const [{ cartHtml }, m] = await Promise.all([import("../ui/cart"), fetch("/fw/manifest.json", { cache: "no-cache" }).then((r) => r.json())]);
+      carts = m.carts || [];
+      if (!carts.length) { box.closest("section")!.hidden = true; return; }
+      box.style.setProperty("--n", String(carts.length));
+      row.innerHTML = carts.map((c) => `<div class="lib-item"><a class="cart" href="/code" aria-label="${c.name.replace(/"/g, "&quot;")}">${cartHtml(c)}</a></div>`).join("");
+      items = [...row.querySelectorAll<HTMLElement>(".lib-item")];
+      update();
+    } catch (err) { console.error("library:", err); }
+  }, { rootMargin: "600px" }).observe(box);
 }
