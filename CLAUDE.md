@@ -159,6 +159,7 @@ python3 tools/fakedevice.py                                 # a pty wedgie for p
 node tools/safefork.mjs                                     # /safe's Ethereum on a Base fork (anvil): new Safe, add owner, wedgie signatures executed
 node tools/safeprobe.mjs http://localhost:4173 <outdir>     # /safe's buttons on the fork, a fake wedgie signing: add it, threshold, send, execute, new Safe
 SAFE_LIVE_KEY=... node tools/safelive.mjs                  # /safe's flow on Base Sepolia against Safe's real Transaction Service
+node tools/safechip.mjs [--app <wedgie-safe dir>]          # the Safe signer app on a virtual RP2040: its address, every signing path, big txs in pieces, memory
 uv run --with pyserial python3 tools/drivebench.py          # the phone's path from a Mac: REQ-<n>.TXT on the WEDGIE drive, ANSWER.TXT back
 ```
 

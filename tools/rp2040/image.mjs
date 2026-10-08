@@ -1,6 +1,6 @@
 // The littlefs image of a wedgie: the core firmware, one app's files and its apps.json (what an
 // install from wedgie.dev leaves on the flash). Built with tools/rp2040/mkfs.py (littlefs-python, via uv).
-import { readFileSync, readdirSync, writeFileSync, mkdtempSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, writeFileSync, mkdtempSync, mkdirSync, statSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -36,6 +36,7 @@ export function image(F, app, over = {}, drop = []) {
   for (const n of Object.keys(over)) if (!names.includes(n)) names.push(n);    // over can add files (an older core's .py)
   const args = names.map((n) => {
     if (!over[n] && !F.extra[n]) return `${n}=${join(F.dir, n)}`;
+    mkdirSync(dirname(join(dir, n)), { recursive: true });     // over can put a save in its folder (saves/<app>/<name>.json)
     writeFileSync(join(dir, n), over[n] || F.extra[n]);
     return `${n}=${join(dir, n)}`;
   });
