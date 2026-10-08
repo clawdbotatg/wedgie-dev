@@ -208,7 +208,7 @@ export function safe(main: HTMLElement) {
     window.scrollTo(0, 0);
   }
   window.addEventListener("popstate", show);
-  watch(main, (to, data) => view(1, to, data));   // ENS names and avatars on every address, from Ethereum
+  watch(main, CHAINS[1].rpc);   // ENS names and avatars on every address, from Ethereum
   main.addEventListener("click", (e) => {        // in-page links: no reload, the wedgie stays read
     const a = (e.target as HTMLElement).closest?.("a[data-nav]") as HTMLAnchorElement | null;
     if (!a || e.metaKey || e.ctrlKey) return;
@@ -355,7 +355,7 @@ export function safe(main: HTMLElement) {
     if (box.hidden) return;
     const row = (r: Row) => {
       const i = r.info;
-      return `<li><a class="safe-row${r.wedgie ? " btn btn-green" : ""}" data-nav href="${route(r.chain, r.addr)}">${address(r.addr)}
+      return `<li><a class="safe-row${r.wedgie ? " btn btn-green" : ""}" data-nav href="${route(r.chain, r.addr)}">${address(r.addr, { chain: r.chain })}
         <span>${esc(CHAINS[r.chain].name)}</span><span class="fine">${i ? `${i.threshold} of ${plural(i.owners.length, "owner")} · ${esc(E.fmt(i.balance, 18, 4))} ETH${i.usdc ? ` · ${esc(E.fmt(i.usdc, 6, 2))} USDC` : ""}` : `couldn't read it just now (${esc(r.err || "")}): open it, or Refresh`}</span>
         ${r.wedgie ? `<span class="safe-open">Open →</span>` : `<span class="fine">your wallet's: add your wedgie</span>`}</a></li>`;
     };
@@ -458,14 +458,14 @@ export function safe(main: HTMLElement) {
     const c = CHAINS[chain];
     let h = `<p class="fine"><a data-nav href="/safe">← All your Safes</a></p>
       <h2>Safe on ${esc(c.name)}</h2>
-      <p>${address(safeAddr, { link: c.scan, size: "lg", long: true })}</p>`;
+      <p>${address(safeAddr, { link: c.scan, size: "lg", long: true, chain })}</p>`;
     if (info) {
       const i = info, canChange = isOwner(signer) || isOwner(account);
       h += `<p>${esc(E.fmt(i.balance, 18))} ETH${i.usdc !== null ? ` · ${esc(E.fmt(i.usdc, 6, 2))} USDC` : ""} ·
           <a href="${appLink(chain, safeAddr)}" target="_blank" rel="noopener">Safe{Wallet}</a> · <a href="${c.scan}/address/${safeAddr}" target="_blank" rel="noopener">explorer</a></p>
         <p>${i.threshold} of ${plural(i.owners.length, "owner")} must sign${canChange && i.owners.length > 1
           ? ` · <select id="o-th"${dis()}>${threshOpts(i.owners.length, i.threshold)}</select> <button class="btn btn-sm" id="o-th-go"${dis()}>Change</button>` : ""}</p>
-        <ul class="safe-list">${i.owners.map((o) => `<li>${address(o, { link: c.scan })}${label(o)}${canChange && i.owners.length > 1 ? ` <button class="btn btn-sm" data-rm="${esc(o)}"${dis()}>Remove</button>` : ""}</li>`).join("")}</ul>
+        <ul class="safe-list">${i.owners.map((o) => `<li>${address(o, { link: c.scan, chain })}${label(o)}${canChange && i.owners.length > 1 ? ` <button class="btn btn-sm" data-rm="${esc(o)}"${dis()}>Remove</button>` : ""}</li>`).join("")}</ul>
         ${signer ? isOwner(signer) ? `<p class="good">Your wedgie is an owner.</p>` : `<p class="bad">Your wedgie isn't an owner of this Safe.</p>` : ""}`;
     }
     box.innerHTML = h;
@@ -573,7 +573,7 @@ export function safe(main: HTMLElement) {
       if (isOwner(signer)) btns.push(signed(t, signer) ? `<span class="good">wedgie signed</span>` : `<button class="btn btn-sm btn-green" data-sign="${k}"${dis(!key)}>Sign with wedgie</button>`);
       if (account && isOwner(account)) btns.push(signed(t, account) ? `<span class="good">wallet signed</span>` : n < need ? `<button class="btn btn-sm" data-wsign="${k}"${dis()}>Sign with wallet</button>` : "");
       if (n >= need) btns.push(first ? `<button class="btn btn-sm btn-green" data-exec="${k}"${dis()}>Execute</button>` : `<span class="fine">runs after #${i.nonce}</span>`);
-      return `<li><b>#${esc(t.nonce)}</b> ${esc(what)} → ${eqA(t.to, safeAddr) ? "this Safe" : address(t.to, { link: CHAINS[chain].scan, size: "sm" })} <span class="fine">${n}/${need} signed</span> ${btns.join(" ")}</li>`;
+      return `<li><b>#${esc(t.nonce)}</b> ${esc(what)} → ${eqA(t.to, safeAddr) ? "this Safe" : address(t.to, { link: CHAINS[chain].scan, size: "sm", chain })} <span class="fine">${n}/${need} signed</span> ${btns.join(" ")}</li>`;
     }).join("");
     box.innerHTML = `<h2>Waiting to sign</h2>${items ? `<ul class="safe-list">${items}</ul>` : `<p class="fine">Nothing waiting.</p>`}
       <p><button class="btn btn-sm" id="s-refresh"${dis()}>Refresh</button></p>`;
