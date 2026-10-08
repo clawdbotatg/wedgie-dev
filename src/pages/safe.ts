@@ -318,7 +318,15 @@ export function safe(main: HTMLElement) {
       const k = `${c}:${a.toLowerCase()}`, r = found.get(k) || { chain: c, addr: E.checksum(a), wedgie: false, wallet: false };
       r[who] = true; found.set(k, r);
     };
-    const of = async (c: number, a: string) => { try { return (await get(`${api(c)}/owners/${E.checksum(a)}/safes/`)).safes as string[]; } catch { return []; } };
+    // Safe's API, asked for six chains at once, sometimes says 429 or fails: try again before giving up on a chain
+    const of = async (c: number, a: string) => {
+      for (let i = 0; ; i++) {
+        try { return (await get(`${api(c)}/owners/${E.checksum(a)}/safes/`)).safes as string[]; } catch (e: any) {
+          if (e.status === 404 || e.status === 400 || i >= 3) return [];
+          await sleep(700 * 2 ** i);
+        }
+      }
+    };
     await Promise.all(Object.keys(CHAINS).map(Number).map(async (c) => {
       if (signer) for (const s of await of(c, signer)) add(c, s, "wedgie");
       if (account) for (const s of await of(c, account)) add(c, s, "wallet");
@@ -331,6 +339,7 @@ export function safe(main: HTMLElement) {
     for (const r of list) {          // the chain is the truth: who really is an owner now
       if (!r.info) continue;
       r.wedgie = !!signer && r.info.owners.some((o) => eqA(o, signer));
+      if (r.wedgie) remember(r.chain, r.addr);   // seen once, listed in this browser even when Safe's API isn't answering
       r.wallet = !!account && r.info.owners.some((o) => eqA(o, account));
     }
     // a Safe the chain couldn't be read for stays listed (as its sources said): never hidden by a busy RPC
