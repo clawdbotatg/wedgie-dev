@@ -237,6 +237,7 @@ def _aarg(data, i):
 BIG = "big"         # a line kind: big text (the amount, the limit)
 ADDR = "addr"       # a line kind: an address in full, with its blockie (safe_blockie) beside it
 PIC = "pic"         # a line kind: a blockie of the Safe tx hash and its short form
+GAP = ("", INK, "gap")  # a line: 6 px of space
 
 
 def _addr_lines(head, a, c=INK):
@@ -249,7 +250,7 @@ def _addr_lines(head, a, c=INK):
 def _h(line):
     """Pixels a line takes on a page."""
     k = line[2] if len(line) > 2 else None
-    return (30 if len(line[0]) <= 10 else 22) if k == BIG else 38 if k in (ADDR, PIC) else 12
+    return (30 if len(line[0]) <= 10 else 22) if k == BIG else 38 if k in (ADDR, PIC) else 6 if k == "gap" else 12
 
 
 def _draw(lines, y, bottom=182):
@@ -570,7 +571,8 @@ def draw_home():
     ui.band(d)
     y = ui.title(d, "Safe signer", 48) + 14
     if key:
-        lines = _addr_lines("your Safe owner address", signer) + [("same on every chain", MUTED)] if signer \
+        h, a = _addr_lines("your Safe owner address", signer)
+        lines = [h, GAP, GAP, a, GAP, ("same on every chain", MUTED)] if signer \
             else [("your key", MUTED), (key["x"][:22], INK), (key["x"][22:44], INK), (key["x"][44:], INK)]
         lines += [("", INK), ("waiting for a Safe tx", GREEN_D)]
     else:

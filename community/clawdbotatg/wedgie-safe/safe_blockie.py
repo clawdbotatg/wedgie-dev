@@ -53,16 +53,30 @@ def image(a):
     return [int(_next(r) * 2.3) for _ in range(32)], (b, c, s)
 
 
+def _disc(d, x, y, n, colf):
+    """A disc n px across at x, y, row by row; colf(px, py) -> (color, run end) for the run starting at px."""
+    r = n / 2
+    for py in range(n):
+        dy = py + 0.5 - r
+        w = (r * r - dy * dy) ** 0.5
+        px, x1 = int(r - w + 0.5), int(r + w + 0.5)
+        while px < x1:
+            c, e = colf(px, py)
+            e = min(e, x1)
+            d.hline(x + px, y + py, e - px, c)
+            px = e
+
+
 def draw(d, a, x, y, cell=4, edge=None):
-    """The blockie of address `a`, 8x8 cells of `cell` px, at x, y (8*cell square), framed in `edge`."""
+    """The blockie of address `a`, 8x8 cells of `cell` px, as a circle 8*cell across at x, y (wallets draw
+    it round), ringed in `edge`."""
     cells, hsl = image(a)
     cols = [L.color(*_rgb(*v)) for v in hsl]
-    d.fill_rect(x, y, 8 * cell, 8 * cell, cols[0])
-    for i in range(32):
-        v = cells[i]
-        if v:
-            cx, cy = i & 3, i >> 2
-            d.fill_rect(x + cx * cell, y + cy * cell, cell, cell, cols[v])
-            d.fill_rect(x + (7 - cx) * cell, y + cy * cell, cell, cell, cols[v])
+    n = 8 * cell
     if edge is not None:
-        d.rect(x - 1, y - 1, 8 * cell + 2, 8 * cell + 2, edge)
+        _disc(d, x - 1, y - 1, n + 2, lambda px, py: (edge, n + 2))
+
+    def colf(px, py):
+        cx = px // cell
+        return cols[cells[(py // cell) * 4 + (cx if cx < 4 else 7 - cx)]], (cx + 1) * cell
+    _disc(d, x, y, n, colf)
