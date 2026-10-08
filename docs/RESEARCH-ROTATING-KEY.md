@@ -1,6 +1,7 @@
 # Research: a Safe signer that changes its chip key every transaction
 
-Status 2026-10-07. Research only. Nothing here is built yet.
+Status 2026-10-08. Research only. Nothing here is built yet. Two parts: P-256 key rotation (a stopgap),
+then hash signatures (the quantum-safe fix).
 
 ## Credit
 
@@ -114,7 +115,74 @@ Keys can't leave the chip. If the wedgie breaks, its keys are gone. Options:
   private mempool is the main defense. A guard that delays owner changes not made by the rotation
   would be the next one.
 
-## The plan
+## The real fix: hash signatures (quantum-safe)
+
+Everything above still uses P-256, so it only narrows the window. To close it, drop P-256 for Safe
+signing and use hash-based one-time signatures. A quantum computer can't break a hash. P-256 stays
+for things like games proving someone holds the hardware.
+
+### How a hash signature works
+
+**Lamport, the simplest one.**
+
+- Make 512 random secrets, two for each bit of the 256-bit message hash.
+- The public key is the hash of each secret.
+- To sign, for each bit reveal the first secret if the bit is 0, the second if it's 1.
+- To check, hash each revealed secret and compare it with the public key.
+- Forging means finding a secret from its hash, which is impossible, even for a quantum computer.
+- **Use a key once.** A second signature reveals the other half of some pairs.
+
+**WOTS (Winternitz), the one to use.** Same idea, smaller.
+
+- Split the message hash into 64 digits of 4 bits (0-15), plus 3 checksum digits: 67 in all.
+- Each digit gets a secret, hashed 15 times in a row (a chain). The chain's end is public.
+- To sign digit `d`, reveal the secret after `d` hashes.
+- To check, hash it `15 - d` more times. It must land on the chain's end.
+- The checksum stops a forger from hashing a revealed value forward to raise a digit.
+- A signature is 67 x 32 bytes, about 2.1 KB. Checking costs about 500 hashes, cheap in a contract.
+- One-time, like Lamport.
+
+### On a wedgie with a Trust M (works on V1)
+
+1. **Seed.** The chip makes a random seed and keeps it in a data slot set to "pre-shared secret"
+   with read rule "never" (one permanent metadata write on that one slot). Nothing can read it.
+2. **One key per number.** For key number `n`, the chip runs `derive(seed, "wots" + n)` (TLS PRF,
+   V1 and V3). Out come 32 bytes. The RP2040 expands them into the 67 chain secrets with SHA-256.
+3. **Never reuse a number.** `n` comes from one of the chip's counters that only go up. A key
+   number is spent before it signs, even if the power goes out.
+4. **Public key.** The RP2040 hashes each chain to its end and hashes the 67 ends into one 32-byte
+   value, `pk(n)`.
+
+### On chain: the signer contract
+
+The Safe owner is a small contract that stores one value: the hash of the next public key.
+
+- **Setup.** The wedgie gives `pk(0)`. The contract stores it.
+- **Sign.** The wedgie signs `safeTxHash + pk(n+1)` with key `n`. That's what makes it rotate.
+- **Check** (`isValidSignature`, Safe's contract signatures). The contract rebuilds the 67 chain ends
+  from the signature, hashes them, and checks the result equals the stored `pk(n)`.
+- **Rotate.** `isValidSignature` can't write. So the Safe batch ends with `signer.advance(pk(n+1))`,
+  callable only by the Safe, and only for the `pk(n+1)` that was signed. Key `n` is then dead.
+- Simpler, but only for a Safe this wedgie runs alone: make the contract a Safe module instead. It
+  checks the signature, rotates, and calls `execTransactionFromModule` in one step.
+
+### What's still not quantum-safe
+
+- The account that sends the transaction and pays gas is a normal ECDSA account. It only holds
+  gas money, and a relayer can send instead.
+- Other Safe owners that are plain keys or P-256 keys. Every owner needs this for the Safe to be safe.
+- The firmware hole in `PLAN-TRUST.md`: fake firmware can still ask the chip to sign.
+- The one-time key's 32 bytes sit in RP2040 RAM while it signs.
+
+### Plan for this part
+
+1. A WOTS signer contract + Foundry tests (good signature, wrong key, reused key, wrong next key).
+2. WOTS in MicroPython on the RP2040, checked against the contract. Measure sign time.
+3. The seed slot on a spare Trust M, carefully: the metadata write is permanent.
+4. Wire it into wedgie-safe and /safe.
+5. An audit before real money.
+
+## The plan (P-256 rotation)
 
 1. **Fork test** (`tools/safefork.mjs` style, Base fork): a Safe with a P-256 owner. Run three
    transactions that each swap to an undeployed signer address, deploying it in the same Multicall3
