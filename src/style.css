@@ -271,7 +271,7 @@ html, body { overflow-x: clip; }
 .lib-sticky { position: sticky; top: 86px; height: calc(100vh - 110px); min-height: 440px; max-height: 600px; display: grid; grid-template-rows: 1fr auto; overflow: hidden; padding: 24px 16px; }
 .lib-stage { position: relative; perspective: 1100px; display: grid; place-items: center; }
 .lib-row { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; }
-.lib-item { position: absolute; left: 50%; top: 50%; width: 200px; margin: -121px 0 0 -100px; transform-style: preserve-3d; transition: transform .12s linear; will-change: transform; }
+.lib-item { position: absolute; left: 50%; top: 50%; width: 200px; margin: -126px 0 0 -100px; transform-style: preserve-3d; transition: transform .12s linear; will-change: transform; }
 .lib-item .cart { text-decoration: none; }
 .lib-plank { position: absolute; left: 4%; right: 4%; top: calc(50% + 110px); height: 42px; border-radius: 4px;
   background: linear-gradient(#e2e3e0, #c9cac6); box-shadow: 0 10px 18px rgba(20,20,20,.15), inset 0 2px 0 rgba(255,255,255,.7); }
@@ -282,7 +282,7 @@ html, body { overflow-x: clip; }
 @keyframes lib-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @media (max-width: 860px) {
   .lib-sticky { top: 76px; height: calc(100vh - 92px); }
-  .lib-item { width: 130px; margin: -81px 0 0 -65px; }
+  .lib-item { width: 130px; margin: -86px 0 0 -65px; }
   .lib-plank { top: calc(50% + 71px); height: 36px; }
 }
 
