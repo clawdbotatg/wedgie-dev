@@ -243,6 +243,7 @@ export function safe(main: HTMLElement) {
     if (app.length && !key && wedgie !== app[0]) readKey(app[0]);
   }
 
+  let keyTries = 0;
   async function readKey(w: W.Wedgie) {
     wedgie = w;
     try {
@@ -266,7 +267,14 @@ export function safe(main: HTMLElement) {
       } catch { onWedgie = null; }
       paintAll();
       if (safeAddr) { checkDeployed(); if (info && isOwner(signer)) remember(chain, safeAddr); } else findSafes();
-    } catch (e) { fail(e); wedgie = null; }
+      keyTries = 0;
+    } catch (e) {
+      // Right after a reload the port is often still held by the page that just closed, or the wedgie is busy:
+      // the first asks fail. Try again on our own instead of waiting for the wedgie to change (Austin: the list
+      // came up empty after a reload until he went to /connect and back).
+      if (!key && ++keyTries <= 6 && W.wedgies().includes(w)) { await sleep(800 * keyTries); wedgie = null; paintWedgie(); return; }
+      fail(e); wedgie = null;
+    }
   }
 
   async function checkDeployed() {
