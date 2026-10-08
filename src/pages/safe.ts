@@ -127,6 +127,7 @@ export function safe(main: HTMLElement) {
     <div class="safe-box recess" id="s-queue" hidden></div>
     <div class="safe-box recess" id="s-owner" hidden></div>
     <div class="safe-box recess" id="s-new" hidden></div>
+    <div class="safe-box recess" id="s-wc" hidden></div>
     <p class="safe-msg" id="s-msg" hidden></p>
   </section>`;
   const $ = (id: string) => document.getElementById(id)!;
@@ -162,7 +163,7 @@ export function safe(main: HTMLElement) {
   const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
   const chainOpts = (at: number) => Object.entries(CHAINS).map(([id, c]) => `<option value="${id}"${+id === at ? " selected" : ""}>${esc(c.name)}${c.test ? " (test)" : ""}</option>`).join("");
   /** Run one thing at a time; buttons say so while it runs. */
-  async function job(fn: () => Promise<void>) {
+  async function job(fn: () => Promise<unknown>) {
     if (busy) return;
     busy = true; paintAll();
     try { await fn(); } catch (e) { fail(e); } finally { busy = false; paintAll(); }
@@ -629,14 +630,14 @@ export function safe(main: HTMLElement) {
    * One signature on a new Safe transaction. Enough on its own (1 of N, next in line) and signed by the
    * wallet: it runs right away. Otherwise into Safe's queue, where every owner sees it.
    */
-  async function propose(t: E.SafeTx, who: "wedgie" | "wallet", what: string) {
+  async function propose(t: E.SafeTx, who: "wedgie" | "wallet", what: string): Promise<string | null> {
     if (who === "wallet") say(`Sign it in your wallet: ${what}.`);
     const sig = who === "wedgie" ? await wedgieSig(t) : await walletSig(t);
     if (info!.threshold === 1 && +t.nonce === info!.nonce && account) {
-      await send(chain, safeAddr, E.execData(t, E.packSignatures([sig])), say);
+      const rc = await send(chain, safeAddr, E.execData(t, E.packSignatures([sig])), say);
       await load(true);
       say(`Done: ${what}.`);
-      return;
+      return rc.transactionHash as string;
     }
     say("Putting it in the Safe's queue.");
     await post(`${api(chain)}/safes/${safeAddr}/multisig-transactions/`, { ...t, contractTransactionHash: E.safeTxHash(chain, safeAddr, t),
@@ -645,6 +646,7 @@ export function safe(main: HTMLElement) {
     const left = info!.threshold - 1;
     say(left ? `In the queue with ${who === "wedgie" ? "the wedgie's" : "your"} signature: ${what}. ${plural(left, "more owner")} to sign, then Execute.`
       : `Signed: ${what}. Press Execute (a browser wallet pays the gas).`);
+    return null;
   }
 
   async function signQueued(t: any, who: "wedgie" | "wallet") {
@@ -706,7 +708,76 @@ export function safe(main: HTMLElement) {
     ($("n-to") as HTMLInputElement).value = ""; $("n-to").dispatchEvent(new Event("input")); ($("n-amt") as HTMLInputElement).value = ""; ($("n-data") as HTMLInputElement).value = "";
   }
 
-  function paintAll() { paintWedgie(); paintWallet(); paintList(); paintCreate(); paintSafe(); paintAdd(); paintQueue(); paintOwner(); paintNew(); }
+  // ---- WalletConnect: this Safe in an app (Uniswap, …); its batches signed on the wedgie (src/safe/walletconnect.ts) ----
+  let wcm: typeof import("../safe/walletconnect") | null = null, wcSessions: import("../safe/walletconnect").Session[] = [];
+  let asks: import("../safe/walletconnect").Ask[] = [];
+  const WC_ON = "wedgie.wc";       // set once an app was connected here: WalletKit starts with the page from then on
+  async function wcStart() {
+    if (wcm) return wcm;
+    const m = await import("../safe/walletconnect");
+    await m.start({
+      onAsk: (a) => { asks.push(a); paintAll(); if (!eqA(a.safe, safeAddr)) say(`${a.dapp.name} is waiting for Safe ${short(a.safe)}: open it to sign.`); },
+      onChange: () => { m.sessions().then((l) => { wcSessions = l; paintWc(); }); },
+      onError: (msg) => say(msg, true),
+      receipt: (c, h) => rpc(c, "eth_getTransactionReceipt", [h]).then((x: any) => x),
+    });
+    wcm = m;
+    return m;
+  }
+  try { if (localStorage.getItem(WC_ON)) wcStart().catch(() => {}); } catch {}
+
+  function paintWc() {
+    const box = $("s-wc");
+    box.hidden = !(safeAddr && info && (isOwner(signer) || isOwner(account)));
+    if (box.hidden) return;
+    if (!document.getElementById("wc-uri")) {     // built once per Safe: keep a pasted link across repaints
+      box.innerHTML = `<h2>Use this Safe in an app</h2>
+        <p class="fine">In the app (Uniswap, Aave, …) pick WalletConnect, copy its link, and paste it here. The app's
+        transactions come here; the wedgie signs them, approve + swap as one.</p>
+        <p class="wc-pair"><input id="wc-uri" placeholder="wc:…" spellcheck="false" autocomplete="off"> <button class="btn btn-sm" id="wc-go">Connect</button></p>
+        <div id="wc-list"></div><div id="wc-asks"></div>`;
+      $("wc-go").onclick = () => job(async () => {
+        const el = $("wc-uri") as HTMLInputElement, m = await wcStart();
+        say("Connecting to the app.");
+        await m.pair(el.value, safeAddr, chain);
+        el.value = "";
+        try { localStorage.setItem(WC_ON, "1"); } catch {}
+        say("Connected. Use the app: what it asks for shows up here.");
+      });
+    }
+    const mine = wcSessions.filter((x) => eqA(x.safe, safeAddr) && x.chainId === chain);
+    $("wc-list").innerHTML = mine.length ? `<ul class="safe-list">${mine.map((x) => `<li>${x.dapp.icon ? `<img class="wc-icon" src="${esc(x.dapp.icon)}" alt="">` : ""}<b>${esc(x.dapp.name)}</b> <span class="fine">${esc(x.dapp.url.replace(/^https?:\/\//, ""))}</span> <button class="btn btn-sm" data-wcoff="${esc(x.topic)}"${dis()}>Disconnect</button></li>`).join("")}</ul>` : "";
+    $("wc-list").querySelectorAll<HTMLButtonElement>("[data-wcoff]").forEach((b) => b.onclick = () => job(() => wcm!.disconnect(b.dataset.wcoff!)));
+    const here = asks.filter((a) => eqA(a.safe, safeAddr) && a.chainId === chain);
+    $("wc-asks").innerHTML = here.map((a, k) => `<div class="wc-ask"><p><b>${esc(a.dapp.name)}</b> asks for ${plural(a.calls.length, "call")}${a.calls.length > 1 ? ", run as one" : ""}:</p>
+      <ol>${a.calls.map((c) => `<li>${address(c.to, { link: CHAINS[chain].scan, size: "sm", chain })}${c.value ? ` + ${esc(E.fmt(c.value, 18))} ETH` : ""} <span class="fine">${(c.data.length - 2) / 2} bytes of data</span></li>`).join("")}</ol>
+      <p>${isOwner(signer) ? `<button class="btn btn-green" data-wcsign="${k}"${dis(!key)}>Sign with wedgie</button> ` : ""}${isOwner(account) ? `<button class="btn" data-wcwallet="${k}"${dis()}>Sign with wallet</button> ` : ""}<button class="btn btn-sm" data-wcno="${k}"${dis()}>Reject</button></p></div>`).join("");
+    const run = (a: (typeof asks)[0], who: "wedgie" | "wallet") => job(async () => {
+      try {
+        if (!account) account = await wallet(chain);       // it sends the Safe tx and pays the gas
+        const t = a.calls.length === 1 ? safeTx(a.calls[0].to, a.calls[0].value.toString(), a.calls[0].data)
+          : { ...safeTx(E.MULTISEND_CALL_ONLY, "0", E.multiSendData(a.calls)), operation: 1 };
+        const hash = await propose(t, who, `${a.dapp.name}: ${plural(a.calls.length, "call")}`);
+        asks = asks.filter((x) => x !== a);
+        if (hash) await wcm!.answerDone(a, hash);
+        else await wcm!.answerError(a.topic, a.id, "It's in the Safe's queue: more owners have to sign before it runs.");
+      } catch (e: any) {
+        asks = asks.filter((x) => x !== a);
+        await wcm!.answerError(a.topic, a.id, e?.message || "Rejected").catch(() => {});
+        throw e;
+      }
+    });
+    box.querySelectorAll<HTMLButtonElement>("[data-wcsign]").forEach((b) => b.onclick = () => run(here[+b.dataset.wcsign!], "wedgie"));
+    box.querySelectorAll<HTMLButtonElement>("[data-wcwallet]").forEach((b) => b.onclick = () => run(here[+b.dataset.wcwallet!], "wallet"));
+    box.querySelectorAll<HTMLButtonElement>("[data-wcno]").forEach((b) => b.onclick = () => {
+      const a = here[+b.dataset.wcno!];
+      asks = asks.filter((x) => x !== a);
+      wcm!.answerError(a.topic, a.id, "Rejected on wedgie.dev").catch(() => {});
+      paintAll();
+    });
+  }
+
+  function paintAll() { paintWedgie(); paintWallet(); paintList(); paintCreate(); paintSafe(); paintAdd(); paintQueue(); paintOwner(); paintNew(); paintWc(); }
 
   W.onChange(paintWedgie);
   if (W.armed()) W.start();

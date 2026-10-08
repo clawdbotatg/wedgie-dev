@@ -609,3 +609,9 @@ body.test-mode .top, body.test-mode .foot { display: none; }
 .addr-in-av[hidden] { display: none; }
 .safe-owner { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
 .safe-owner .addr-in { flex: 1; }
+/* /safe: an app connected over WalletConnect, and what it asks for */
+.wc-pair input { font-family: var(--mono); width: min(100%, 420px); }
+.wc-icon { width: 22px; height: 22px; border-radius: 6px; vertical-align: middle; margin-right: 6px; }
+.wc-ask { border-top: 1px solid rgba(0,0,0,.08); margin-top: 12px; padding-top: 4px; }
+.wc-ask ol { margin: 6px 0; padding-left: 22px; }
+.wc-ask li { margin: 6px 0; }

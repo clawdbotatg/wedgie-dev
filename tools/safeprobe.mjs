@@ -19,6 +19,7 @@ import { homedir } from "node:os";
 import { spawn } from "node:child_process";
 import crypto from "node:crypto";
 import { fakeWedgies } from "./fakewedgies.mjs";
+import { SignClient } from "@walletconnect/sign-client";
 import * as E from "../src/safe/eth.ts";
 
 const base = (process.argv[2] || "http://localhost:4173").replace(/\/$/, ""), out = process.argv[3];
@@ -191,11 +192,41 @@ check((await owners(mine)).some((o) => eq(o, signer)), "on chain: the wedgie's s
 check((await rpc("eth_getCode", [signer, "latest"])).length > 2, "on chain: its signer contract was deployed first");
 check(await page.isHidden("#s-add") && /Your wedgie is an owner/.test(await page.textContent("#s-safe")) && /Set up on Base/.test(await page.textContent("#s-wedgie")), "page: an owner now, set up, Add box gone");
 
+// 1b: WalletConnect (the real relay): an app connects to this Safe (1 of 2 now), asks for 2 calls with
+// wallet_sendCalls; the wedgie signs one MultiSendCallOnly batch, the wallet executes it, the app gets the hash
+const dapp = await SignClient.init({ projectId: "3a8170812b534d0ff9d794f19a901d64",
+  metadata: { name: "WC probe", description: "test app", url: "https://probe.example", icons: [] } });
+const { uri, approval } = await dapp.connect({ optionalNamespaces: { eip155: { chains: ["eip155:8453"],
+  methods: ["wallet_sendCalls", "wallet_getCapabilities", "wallet_getCallsStatus", "eth_sendTransaction"], events: ["chainChanged", "accountsChanged"] } } });
+await page.fill("#wc-uri", uri);
+await page.click("#wc-go");
+const session = await approval();
+check(session.namespaces.eip155.accounts.some((a) => eq(a, `eip155:8453:${mine}`)), "WalletConnect: the app sees this Safe on Base");
+const wcAsk = (method, params) => dapp.request({ topic: session.topic, chainId: "eip155:8453", request: { method, params } });
+const caps = await wcAsk("wallet_getCapabilities", [mine, ["0x2105"]]);
+check(caps?.["0x2105"]?.atomic?.status === "supported", "WalletConnect: atomic batches supported on Base");
+await wait(() => /WC probe/.test(document.querySelector("#wc-list")?.textContent || ""), null, 20000, "the app listed");
+const wa = E.checksum(E.hex(crypto.randomBytes(20))), wb = E.checksum(E.hex(crypto.randomBytes(20)));
+const sent = wcAsk("wallet_sendCalls", [{ version: "2.0.0", chainId: "0x2105", from: mine, atomicRequired: true,
+  calls: [{ to: wa, value: "0x5af3107a4000" }, { to: wb, value: "0xb5e620f48000", data: "0x" }] }]);
+await wait(() => document.querySelector("[data-wcsign]"), null, 30000, "the app's 2 calls shown");
+if (out) await page.screenshot({ path: `${out}/safe-1b-wc.png`, fullPage: true });
+const asked0 = await asks();
+await page.click("[data-wcsign]");
+const res = await sent;
+const last = await page.evaluate(() => window.__ports[0]._st.appAsks.filter((m) => m.type === "safe_sign").at(-1).tx);
+check(await asks() === asked0 + 1 && eq(last.to, E.MULTISEND_CALL_ONLY) && last.operation === 1, "WalletConnect: one wedgie signature, a MultiSendCallOnly batch");
+check(BigInt(await rpc("eth_getBalance", [wa, "latest"])) === 100000000000000n && BigInt(await rpc("eth_getBalance", [wb, "latest"])) === 200000000000000n,
+  "on chain: both calls ran, in one Safe transaction");
+const st = await wcAsk("wallet_getCallsStatus", [res.id]);
+check(/^0x[0-9a-f]{64}$/.test(res.id) && st.status === 200 && st.receipts[0].transactionHash === res.id, `WalletConnect: the app got ${short(res.id)}, status 200`);
+await dapp.disconnect({ topic: session.topic, reason: { code: 6000, message: "done" } });
+
 // 2: 2 of 2, proposed by the wedgie: 1 of 2 is enough, so it runs at once
 await page.selectOption("#o-th", "2");
 await page.click("#o-th-go");
 await says(/Done: 2 of 2 must sign/, "threshold changed");
-check(await asks() === 1, "the wedgie was asked (safe_sign)");
+check(await asks() === 2, "the wedgie was asked (safe_sign; the first was WalletConnect's)");
 check(await num(mine, "getThreshold()") === 2, "on chain: 2 of 2, on the wedgie's signature alone");
 
 // 2b: Add an owner (2 of 2 -> 2 of 3), signed with the wedgie: 1 of 2 isn't enough, so queue, wallet, execute

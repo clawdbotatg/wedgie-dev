@@ -156,6 +156,11 @@ export function newSafeData(x: string, y: string, owners: string[], threshold: n
   return call("aggregate3((address,bool,bytes)[])", [{ dyn: cat(word(calls.length), encode(calls)) }]);
 }
 
+/** Safe's MultiSendCallOnly 1.4.1: a Safe tx with operation 1 (DELEGATECALL) to it runs a batch of plain calls. */
+export const MULTISEND_CALL_ONLY = "0x9641d764fc13c8b624c04430c7356c1c7c8102e2";
+export const multiSendData = (calls: { to: string; value: bigint; data: string }[]) => call("multiSend(bytes)", [dynBytes(cat(
+  ...calls.map((c) => { const d = bytes(c.data); return cat(new Uint8Array([0]), bytes(c.to), word(c.value), word(d.length), d); })))]);
+
 export const addOwnerData = (owner: string, threshold: number) => call("addOwnerWithThreshold(address,uint256)", [aword(owner), word(threshold)]);
 
 // ---- a browser wallet's signature (eth_signTypedData_v4) ----
