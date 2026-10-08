@@ -60,12 +60,14 @@ export function ensAddress(name: string): Promise<string | null> {
 }
 
 const avatars = new Map<string, Promise<string | null>>();
-/** The name's avatar picture (ENS's metadata service), once it has loaded, or null. */
+/** The name's avatar picture (ENS's metadata service) as a blob: URL, or null. Fetched, not an <img src>:
+ *  this site is cross-origin isolated (COEP require-corp, for the emulator) and that blocks other sites' images. */
 export function ensAvatar(name: string): Promise<string | null> {
-  if (!avatars.has(name)) avatars.set(name, new Promise((ok) => {
-    const url = `https://metadata.ens.domains/mainnet/avatar/${encodeURIComponent(name)}`, img = new Image();
-    img.onload = () => ok(url); img.onerror = () => ok(null); img.src = url;
-  }));
+  if (!avatars.has(name)) avatars.set(name, (async () => {
+    const r = await fetch(`https://metadata.ens.domains/mainnet/avatar/${encodeURIComponent(name)}`);
+    if (!r.ok || !(r.headers.get("content-type") || "").startsWith("image/")) return null;
+    return URL.createObjectURL(await r.blob());
+  })().catch(() => null));
   return avatars.get(name)!;
 }
 
