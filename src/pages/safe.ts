@@ -739,6 +739,18 @@ export function safe(main: HTMLElement) {
   }
   try { if (localStorage.getItem(WC_ON)) wcStart().catch(() => {}); } catch {}
 
+  // an app's logo, fetched as a blob: the site's COEP (require-corp) blocks other sites' <img src>
+  const icons = new Map<string, string | null>();
+  const icon = (u?: string) => {
+    if (!u) return "";
+    if (!icons.has(u)) {
+      icons.set(u, null);
+      fetch(u).then((r) => (r.ok && (r.headers.get("content-type") || "").startsWith("image/") ? r.blob() : null))
+        .then((b) => { if (b) { icons.set(u, URL.createObjectURL(b)); paintWc(); } }, () => {});
+    }
+    const b = icons.get(u);
+    return b ? `<img class="wc-icon" src="${b}" alt="">` : "";
+  };
   function paintWc() {
     const box = $("s-wc");
     box.hidden = !(safeAddr && info && (isOwner(signer) || isOwner(account)));
@@ -759,7 +771,7 @@ export function safe(main: HTMLElement) {
       });
     }
     const mine = wcSessions.filter((x) => eqA(x.safe, safeAddr) && x.chainId === chain);
-    $("wc-list").innerHTML = mine.length ? `<ul class="safe-list">${mine.map((x) => `<li>${x.dapp.icon ? `<img class="wc-icon" src="${esc(x.dapp.icon)}" alt="">` : ""}<b>${esc(x.dapp.name)}</b> <span class="fine">${esc(x.dapp.url.replace(/^https?:\/\//, ""))}</span> <button class="btn btn-sm" data-wcoff="${esc(x.topic)}"${dis()}>Disconnect</button></li>`).join("")}</ul>` : "";
+    $("wc-list").innerHTML = mine.length ? `<ul class="safe-list">${mine.map((x) => `<li>${icon(x.dapp.icon)}<b>${esc(x.dapp.name)}</b> <span class="fine">${esc(x.dapp.url.replace(/^https?:\/\//, ""))}</span> <button class="btn btn-sm" data-wcoff="${esc(x.topic)}"${dis()}>Disconnect</button></li>`).join("")}</ul>` : "";
     $("wc-list").querySelectorAll<HTMLButtonElement>("[data-wcoff]").forEach((b) => b.onclick = () => job(() => wcm!.disconnect(b.dataset.wcoff!)));
     const here = asks.filter((a) => eqA(a.safe, safeAddr) && a.chainId === chain);
     $("wc-asks").innerHTML = here.map((a, k) => `<div class="wc-ask"><p><b>${esc(a.dapp.name)}</b> asks for ${plural(a.calls.length, "call")}${a.calls.length > 1 ? ", run as one" : ""}:</p>
