@@ -34,6 +34,7 @@ const CHAINS: Record<number, Chain> = {
 const api = (chain: number) => `https://api.safe.global/tx-service/${CHAINS[chain].key}/api/v1`;
 const appLink = (chain: number, safe: string, path = "home") => `https://app.safe.global/${path}?safe=${CHAINS[chain].key}:${safe}`;
 const LINE_MAX = 6000;      // the wedgie drops a USB line over 6 KB
+const DATA_MAX = 12000;     // wedgie-safe 1c401ff+: bigger data goes in safe_data pieces, up to this many bytes
 
 async function get(url: string) {
   const r = await fetch(url);
@@ -106,6 +107,7 @@ export function safe(main: HTMLElement) {
   const $ = (id: string) => document.getElementById(id)!;
   const q = new URLSearchParams(location.search);
   let key: { x: string; y: string } | null = null, signer = "", wedgie: W.Wedgie | null = null, asking = false, noKey = false;
+  let chunk = 0;          // hex chars per safe_data piece (its hello's safe_chunk), 0: this app can't take pieces
   let account = "", chain = 8453, safeAddr = "", info: Info | null = null, queue: any[] = [], creating = false, busy = false;
   const deployed: Record<number, boolean | undefined> = {};
   let mineSafes: { chain: number; wedgie: string[]; wallet: string[] } = { chain: 0, wedgie: [], wallet: [] };
@@ -167,7 +169,9 @@ export function safe(main: HTMLElement) {
         return;
       }
       noKey = false;
-      key = h.safe; signer = E.signerAddress(key!.x, key!.y);
+      key = h.safe; signer = E.signerAddress(key!.x, key!.y); chunk = +h.safe_chunk || 0;
+      // newer apps work out the address themselves and show it: the two must agree
+      if (h.signer && !eqA(h.signer, signer)) { key = null; signer = ""; throw new Error(`The wedgie says its address is ${h.signer}, this page works out ${E.signerAddress(h.safe.x, h.safe.y)}. Not using it: tell us.`); }
       paintAll();
       checkDeployed();
       findSafes();
@@ -402,11 +406,25 @@ export function safe(main: HTMLElement) {
     const tx = { chainId: chain, safe: safeAddr, to: t.to, value: String(t.value), data: t.data || "0x", operation: +t.operation,
       safeTxGas: String(t.safeTxGas), baseGas: String(t.baseGas), gasPrice: String(t.gasPrice), gasToken: t.gasToken || Z,
       refundReceiver: t.refundReceiver || Z, nonce: +t.nonce };      // only the fields: the wedgie reads one line of at most 6 KB
-    if (JSON.stringify({ id: 1000, type: "safe_sign", tx }).length > LINE_MAX) throw new Error("This transaction is too big for the wedgie to read (over 6 KB). Sign it another way.");
+    const big = JSON.stringify({ id: 1000, type: "safe_sign", tx }).length > LINE_MAX;
+    const n = (tx.data.length - 2) / 2;
+    if (big && (!chunk || n > DATA_MAX))
+      throw new Error(chunk ? `This transaction has ${n} bytes of data: a wedgie takes up to ${DATA_MAX}. Sign it another way.`
+        : "This transaction is too big for the wedgie to read in one go: update the Safe signer app on it (its page, Software).");
     asking = true; paintAll();
     say("Look at the wedgie: check what it shows, then press A to sign (Y says no).");
     try {
-      const g = await W.withRepl(wedgie, (r) => r.request({ type: "safe_sign", tx }, 200000));
+      const g = await W.withRepl(wedgie, async (r) => {
+        if (!big) return r.request({ type: "safe_sign", tx }, 200000);
+        say("Sending the transaction to the wedgie in pieces.");
+        const hex = tx.data.slice(2);
+        for (let o = 0; o < hex.length; o += chunk) {        // its data first, then the tx with data "@"
+          const a = await r.request({ type: "safe_data", at: o / 2, hex: hex.slice(o, o + chunk) }, 20000);
+          if (a.type !== "safe_data") throw new Error(a.error || "The wedgie didn't take a piece.");
+        }
+        say("Look at the wedgie: check what it shows, then press A to sign (Y says no).");
+        return r.request({ type: "safe_sign", tx: { ...tx, data: "@" } }, 200000);
+      });
       if (g.type === "refused") throw new Error("The wedgie said no.");
       if (g.type !== "safe_sig") throw new Error(g.error || "The wedgie didn't sign.");
       if (g.safeTxHash !== E.safeTxHash(chain, safeAddr, t)) throw new Error("The wedgie signed a different hash: not sent.");

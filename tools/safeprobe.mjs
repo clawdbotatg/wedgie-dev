@@ -5,7 +5,8 @@
 //   1. a 1-of-1 Safe the wallet owns: the page shows the wedgie's signer; Add it with my wallet (deploys the
 //      signer contract, runs at once)
 //   2. Change the threshold to 2: proposed by the wedgie (A on it), run at once (1 of 2 was enough)
-//   3. New transaction, 0.001 ETH, signed with the wedgie: into the queue; Sign with wallet; Execute
+//   3. New transaction, 0.001 ETH, signed with the wedgie: into the queue; Sign with wallet; Execute.
+//      Then an 8 KB contract call: the wedgie gets it in safe_data pieces
 //   4. Make a new Safe: wallet + wedgie, 2 of 2, one transaction, then the page opens it
 // (Safe's real API: tools/safelive.mjs.) Needs anvil and Node 23+.
 // Serve dist first (npm run build && npx vite preview --port 4173), then: node tools/safeprobe.mjs [url] [outdir]
@@ -40,8 +41,15 @@ const { privateKey, publicKey } = crypto.generateKeyPairSync("ec", { namedCurve:
 const jwk = publicKey.export({ format: "jwk" });
 const b64 = (s) => "0x" + Buffer.from(s, "base64url").toString("hex");
 const key = { x: b64(jwk.x), y: b64(jwk.y) }, signer = E.signerAddress(key.x, key.y);
+let pieces = "";            // safe_data, as wedgie-safe takes it: hex pieces, then data "@"
+function safeData(m) {
+  if (m.at === 0) pieces = "";
+  if (m.at * 2 !== pieces.length) return { type: "error", error: "bad piece" };
+  pieces += m.hex;
+  return { type: "safe_data", have: pieces.length / 2 };
+}
 function safeSign(m) {
-  const t = m.tx, h = E.safeTxHash(t.chainId, t.safe, t);
+  const t = m.tx.data === "@" ? { ...m.tx, data: "0x" + pieces } : m.tx, h = E.safeTxHash(t.chainId, t.safe, t);
   const sha = (b) => crypto.createHash("sha256").update(b).digest();
   const auth = Buffer.concat([sha("wedgie.dev"), Buffer.from("0500000000", "hex")]);
   const cdj = `{"type":"webauthn.get","challenge":"${Buffer.from(h.slice(2), "hex").toString("base64url")}","origin":"https://wedgie.dev"}`;
@@ -65,10 +73,11 @@ const shell = readdirSync(cache).filter((d) => d.startsWith("chromium_headless_s
 const browser = await chromium.launch({ executablePath: `${cache}/${shell}/${process.platform === "linux" ? "chrome-headless-shell-linux64" : "chrome-headless-shell-mac-arm64"}/chrome-headless-shell` });
 const ctx = await browser.newContext({ viewport: { width: 1100, height: 1600 } });
 await ctx.exposeBinding("__safeSign", (_, m) => safeSign(m));
+await ctx.exposeBinding("__safeData", (_, m) => safeData(m));
 await ctx.addInitScript(fakeWedgies, [
   { uid: "aa11bb22cc5afe01", machine: "Raspberry Pi Pico with RP2040", files: { "main.py": 1, "slot.py": 1, "wedgiedrive.py": 1, "wedgie.py": 'VERSION = "0.3.26"',
     "apps.json": JSON.stringify([{ mod: "safe", name: "Safe signer" }]), "safe.py": 1 }, chip: "none",
-    hello: { running: "safe", safe: key }, app: { safe_sign: "__safeSign" } },
+    hello: { running: "safe", safe: key, signer, safe_chunk: 4000 }, app: { safe_sign: "__safeSign", safe_data: "__safeData" } },
 ]);
 // the browser wallet: anvil, on Base
 await ctx.exposeBinding("__rpc", (_, method, params) => rpc(method, params).catch((e) => ({ __err: e.message })));
@@ -164,6 +173,23 @@ await page.click("[data-exec]");
 await says(/Done: it ran/, "executed");
 check(BigInt(await rpc("eth_getBalance", [to, "latest"])) === 10n ** 15n, "on chain: 0.001 ETH sent (wedgie + wallet, packed, executed)");
 check(/Nothing waiting/.test(await page.textContent("#s-queue")), "page: the queue is empty");
+
+// 3b: a contract call too big for one USB line (8 KB of data): sent to the wedgie in safe_data pieces
+const big = "0x12345678" + "cd".repeat(8000);
+const callee = E.checksum(E.hex(crypto.randomBytes(20)));
+await page.fill("#n-to", callee);
+await page.fill("#n-amt", "");
+await page.click("#s-new details summary");
+await page.fill("#n-data", big);
+await page.click("#n-wedgie");
+await says(/In the queue with the wedgie's signature/, "big one queued");
+const kinds = await page.evaluate(() => window.__ports[0]._st.appAsks.map((m) => m.type));
+check(kinds.filter((k) => k === "safe_data").length === 5 && kinds.at(-1) === "safe_sign", `8 KB of data: ${kinds.filter((k) => k === "safe_data").length} safe_data pieces, then safe_sign with data "@"`);
+await page.click("[data-wsign]");
+await says(/That's enough: press Execute/, "wallet signed the big one");
+await page.click("[data-exec]");
+await says(/Done: it ran/, "big one executed");
+check(/Nothing waiting/.test(await page.textContent("#s-queue")), "on chain: the 8 KB call ran (wedgie's signature over pieces + wallet)");
 
 // 4: a new Safe: wallet + wedgie, 2 of 2
 await page.click("#s-new-safe");
