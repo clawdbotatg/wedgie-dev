@@ -110,6 +110,10 @@
     {
       "source": "/safe",
       "destination": "/index.html"
+    },
+    {
+      "source": "/safe/:id",
+      "destination": "/index.html"
     }
   ],
   "trailingSlash": false

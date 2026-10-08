@@ -1,13 +1,15 @@
 // /safe through its buttons, on a Base fork: a fake wedgie running the Safe signer (fakewedgies: its hello
 // carries a key, its safe_sign is answered by a P-256 key here, signing what safe.py signs), window.ethereum
 // = an anvil account (the browser wallet), the page's public RPC = the fork, Safe's Transaction Service faked
-// in memory. One Safe's life, then a new one:
-//   1. a 1-of-1 Safe the wallet owns: the page shows the wedgie's signer; Add it with my wallet (deploys the
-//      signer contract, runs at once)
+// in memory. /safe lists the Safes; each opens at /safe/<chain>:<address>. One Safe's life, then a new one:
+//   0. an old page's "last Safe" in localStorage doesn't open itself any more (/safe is the list)
+//   1. a 1-of-1 Safe the wallet owns, from the list: the page shows the wedgie's signer; Add it with my
+//      wallet (sets up the signer contract, runs at once)
 //   2. Change the threshold to 2: proposed by the wedgie (A on it), run at once (1 of 2 was enough)
 //   3. New transaction, 0.001 ETH, signed with the wedgie: into the queue; Sign with wallet; Execute.
 //      Then an 8 KB contract call: the wedgie gets it in safe_data pieces
-//   4. Make a new Safe: wallet + wedgie, 2 of 2, one transaction, then the page opens it
+//   4. back to the list: the Safe is the wedgie's now. Make a new Safe: wallet + wedgie, 2 of 2, one
+//      transaction, then its page; the list has both
 // (Safe's real API: tools/safelive.mjs.) Needs anvil and Node 23+.
 // Serve dist first (npm run build && npx vite preview --port 4173), then: node tools/safeprobe.mjs [url] [outdir]
 import { chromium } from "playwright-core";
@@ -35,6 +37,7 @@ const view = (to, data) => rpc("eth_call", [{ to, data }, "latest"]);
 const owners = async (safe) => E.addrs(await view(safe, E.selector("getOwners()")));
 const num = async (safe, sig) => Number(BigInt(await view(safe, E.selector(sig))));
 const eq = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
+const short = (a) => a.slice(0, 6) + "…" + a.slice(-4);
 
 // the wedgie: a P-256 key, and safe.py's answer to safe_sign
 const { privateKey, publicKey } = crypto.generateKeyPairSync("ec", { namedCurve: "P-256" });
@@ -96,7 +99,8 @@ await ctx.addInitScript((me) => {
 // the page's public RPC for Base = the fork
 await ctx.route("https://mainnet.base.org/**", async (r) => r.fulfill({ headers: { "access-control-allow-origin": "*" }, contentType: "application/json", body: await rpcRaw(r.request().postData()) }));
 // Safe's Transaction Service, in memory (owners from the chain)
-const txs = new Map();     // safeTxHash -> the API's multisig transaction
+const txs = new Map();
+const known = [mine];      // Safes the fake API can list     // safeTxHash -> the API's multisig transaction
 const sigOwner = (sig) => (E.bytes(sig)[64] === 0 ? E.checksum("0x" + sig.slice(26, 66)) : E.checksum(me));   // contract: r = owner; EOA: the one wallet here
 await ctx.route("https://api.safe.global/**", async (r) => {
   const u = new globalThis.URL(r.request().url()), p = u.pathname.replace(/^\/tx-service\/\w+\/api\/v1/, ""), cors = { "access-control-allow-origin": "*" };
@@ -119,7 +123,12 @@ await ctx.route("https://api.safe.global/**", async (r) => {
     const n = await num(m[1], "nonce()"), th = await num(m[1], "getThreshold()");
     return json({ results: [...txs.values()].filter((t) => eq(t.safe, m[1]) && +t.nonce >= n).map((t) => ({ ...t, confirmationsRequired: th })).sort((a, b) => a.nonce - b.nonce) });
   }
-  if ((m = p.match(/^\/owners\/(0x\w+)\/safes\/$/))) return json({ safes: eq(m[1], me) ? [mine] : [] });
+  if ((m = p.match(/^\/owners\/(0x\w+)\/safes\/$/))) {     // Base only; the Safes this probe knows, by their owners on chain
+    if (!u.pathname.includes("/tx-service/base/")) return json({ safes: [] });
+    const out = [];
+    for (const sf of known) if ((await owners(sf)).some((o) => eq(o, m[1]))) out.push(sf);
+    return json({ safes: out });
+  }
   json({}, 404);
 });
 
@@ -134,22 +143,29 @@ const wait = (fn, arg, ms, what) => page.waitForFunction(fn, arg, { timeout: ms 
 const says = (re, what) => wait((re) => new RegExp(re).test(document.querySelector("#s-msg").textContent), re.source, 60000, what);
 const asks = () => page.evaluate(() => (window.__ports[0]._st.appAsks || []).length);
 
-// 1: the wallet's 1-of-1 Safe (from "Your wallet's Safes"): add the wedgie
+// 0 + 1: /safe with an old "last Safe" saved: still the list. The wallet's Safe, from the list: add the wedgie
+await page.goto(`${base}/`);
+await page.evaluate((m) => localStorage.setItem("wedgie.safe", "base:" + m), mine);
 await page.goto(`${base}/safe`);
-await wait(() => document.querySelector(".safe-addr"), null, 30000, "the wedgie's signer address");
+await wait(() => document.querySelector("#s-wedgie .safe-addr"), null, 30000, "the wedgie's signer address");
 check(eq(await page.textContent("#s-wedgie .safe-addr"), signer), `signer address shown: ${signer}`);
-await wait(() => /Not on Base yet/.test(document.querySelector("#s-wedgie").textContent), null, 20000, "not deployed yet, says so");
+check(new globalThis.URL(page.url()).pathname === "/safe" && !(await page.isHidden("#s-list")) && !(await page.isHidden("#s-create")), "an old saved Safe doesn't open itself: /safe is the list, with Make a new Safe");
+await wait(() => /None yet/.test(document.querySelector("#s-list").textContent), null, 20000, "the wedgie has no Safes yet");
 await page.click("#w-go");
-await wait((s) => document.querySelector(`[data-open="${s}"]`), mine, 20000, "the wallet's Safe listed");
-await page.click(`[data-open="${mine}"]`);
+await wait((s) => document.querySelector(`.safe-row[href$="${s}"]`), mine, 20000, "the wallet's Safe listed");
+check(/Your wallet's Safes[\s\S]*1 of 1 owner/.test(await page.textContent("#s-list")), "listed under the wallet's Safes, 1 of 1");
+if (out) await page.screenshot({ path: `${out}/safe-0-list.png`, fullPage: true });
+await page.click(`.safe-row[href$="${mine}"]`);
 await wait(() => !document.querySelector("#s-add")?.hidden, null, 30000, "the Add box");
+check(new globalThis.URL(page.url()).pathname === `/safe/base:${mine}`, `its own page: /safe/base:${short(mine)}`);
 check(/1 of 1 owner must sign/.test(await page.textContent("#s-safe")) && /1 ETH/.test(await page.textContent("#s-safe")), "the Safe: 1 of 1, 1 ETH");
+check(/Not set up on Base yet/.test(await page.textContent("#s-wedgie")), "the wedgie: not set up on Base yet");
 if (out) await page.screenshot({ path: `${out}/safe-1-add.png`, fullPage: true });
 await page.click("#a-go");
 await says(/Done: add owner/, "added");
 check((await owners(mine)).some((o) => eq(o, signer)), "on chain: the wedgie's signer is an owner");
 check((await rpc("eth_getCode", [signer, "latest"])).length > 2, "on chain: its signer contract was deployed first");
-check(await page.isHidden("#s-add") && /Your wedgie is an owner/.test(await page.textContent("#s-safe")) && /Deployed on Base/.test(await page.textContent("#s-wedgie")), "page: an owner now, deployed, Add box gone");
+check(await page.isHidden("#s-add") && /Your wedgie is an owner/.test(await page.textContent("#s-safe")) && /Set up on Base/.test(await page.textContent("#s-wedgie")), "page: an owner now, set up, Add box gone");
 
 // 2: 2 of 2, proposed by the wedgie: 1 of 2 is enough, so it runs at once
 await page.selectOption("#o-th", "2");
@@ -191,20 +207,26 @@ await page.click("[data-exec]");
 await says(/Done: it ran/, "big one executed");
 check(/Nothing waiting/.test(await page.textContent("#s-queue")), "on chain: the 8 KB call ran (wedgie's signature over pieces + wallet)");
 
-// 4: a new Safe: wallet + wedgie, 2 of 2
-await page.click("#s-new-safe");
+// 4: back to the list (no reload): the Safe is the wedgie's now. Then a new one: wallet + wedgie, 2 of 2
+await page.click('a[href="/safe"][data-nav]');
+await wait((s) => /Your wedgie's Safes/.test(document.querySelector("#s-list").textContent) && document.querySelector(`.safe-row[href$="${s}"]`) && !/Your wallet's Safes/.test(document.querySelector("#s-list").textContent), mine, 30000, "the list: the Safe is the wedgie's now");
 await page.click("#c-me");
 await wait(() => /of 2 owners/.test(document.querySelector("#c-of").textContent), null, 10000, "2 owners counted");
 await page.selectOption("#c-th", "2");
 if (out) await page.screenshot({ path: `${out}/safe-4-new.png`, fullPage: true });
 await page.click("#c-go");
-await says(/Made your Safe: 0x/, "made");
-const made = (await msg()).match(/0x[0-9a-fA-F]{40}/)[0];
+await says(/Made your Safe on Base/, "made");
+const made = new globalThis.URL(page.url()).pathname.match(/0x[0-9a-fA-F]{40}/)?.[0] || "0x";
 const os = await owners(made);
 check(os.length === 2 && os.some((o) => eq(o, signer)) && os.some((o) => eq(o, me)), `on chain: new Safe ${made} owned by the wedgie and the wallet`);
 check(await num(made, "getThreshold()") === 2, "on chain: 2 of 2");
-check(new globalThis.URL(page.url()).search.includes(made) && /2 of 2 owners must sign/.test(await page.textContent("#s-safe")), "page: opened the new Safe, 2 of 2");
+await wait(() => /2 of 2 owners must sign/.test(document.querySelector("#s-safe").textContent), null, 20000, "its page, 2 of 2");
+check(/2 of 2 owners must sign/.test(await page.textContent("#s-safe")), "page: opened the new Safe's own page, 2 of 2");
 if (out) await page.screenshot({ path: `${out}/safe-4-made.png`, fullPage: true });
+await page.goBack();
+await wait((a) => [...document.querySelectorAll("#s-list .safe-row")].filter((r) => a.some((x) => r.getAttribute("href").endsWith(x))).length === 2, [mine, made], 30000, "the list has both (Back button)");
+check(true, "Back: the list has both Safes (the new one before Safe's API has it)");
+if (out) await page.screenshot({ path: `${out}/safe-5-list.png`, fullPage: true });
 
 check(!errs.length, "no page errors " + errs.join("; "));
 await browser.close();

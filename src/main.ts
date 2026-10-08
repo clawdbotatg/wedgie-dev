@@ -22,7 +22,7 @@ const onUpdate = path === "/update";
 const onBuild = path === "/build";
 const onCode = path === "/code";
 const onDebug = path === "/debug";
-const onSafe = path === "/safe";
+const onSafe = path === "/safe" || path.startsWith("/safe/");   // the list, or one Safe (/safe/<chain>:<address>)
 
 const app = document.getElementById("app")!;
 app.innerHTML = `
