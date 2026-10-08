@@ -522,12 +522,14 @@ body.test-mode .top, body.test-mode .foot { display: none; }
 /* /safe */
 .safe-page { justify-content: flex-start; max-width: 720px; margin: 0 auto; }
 /* /safe: who's signing, top right under Connected: the wedgie, then the browser wallet */
-.safe-ids { position: fixed; top: 92px; right: 22px; z-index: 19; display: flex; flex-direction: column; align-items: flex-end; gap: 16px; }
-.safe-id { display: flex; align-items: center; gap: 12px; padding: 10px 20px; min-height: 52px; box-sizing: border-box; border-radius: 999px; background: var(--card); box-shadow: 0 1px 0 rgba(0,0,0,.06), 0 6px 16px -8px rgba(0,0,0,.3); font-size: 14px; }
+.safe-ids { position: fixed; top: 88px; right: 22px; z-index: 19; display: flex; flex-direction: column; align-items: flex-end; gap: 12px; }
+.safe-id { display: flex; align-items: center; gap: 10px; padding: 0 18px; height: 46px; box-sizing: border-box; border-radius: 999px; background: var(--card); box-shadow: 0 1px 0 rgba(0,0,0,.06), 0 6px 16px -8px rgba(0,0,0,.3); font-size: 14px; }
 .safe-id[hidden] { display: none; }
-.safe-id .btn-sm { height: 40px; padding: 0 18px; font-size: 15px; }
-.safe-id .addr-av { width: 30px; height: 30px; }
-.safe-id-wallet .btn-wallet { height: 52px; padding: 0 26px; font-size: 17px; }
+.safe-id .btn-sm { height: 34px; padding: 0 14px; font-size: 14px; }
+.safe-id .addr-av { width: 28px; height: 28px; }
+.safe-id-wallet .btn-wallet { height: 46px; padding: 0 22px; font-size: 16px; }
+.top #s-me { margin-left: auto; }
+@media (max-width: 640px) { .top #s-me .safe-id-tag, .top #s-me .addr-copy { display: none; } .top #s-me { padding: 0 12px; } }
 .safe-id-tag { font-size: 13px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 .safe-id-wallet { background: #e6eefb; }
 .safe-id-wallet:has(.btn-wallet) { padding: 0; background: none; box-shadow: none; }

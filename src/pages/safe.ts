@@ -130,6 +130,7 @@ export function safe(main: HTMLElement) {
     <p class="safe-msg" id="s-msg" hidden></p>
   </section>`;
   const $ = (id: string) => document.getElementById(id)!;
+  document.getElementById("connect-btn")?.before($("s-me"));   // the wedgie's address sits beside its Connected button
   let key: { x: string; y: string } | null = null, signer = "", wedgie: W.Wedgie | null = null, asking = false, noKey = false;
   let chunk = 0;          // hex chars per safe_data piece (its hello's safe_chunk), 0: this app can't take pieces
   let onWedgie: string[] | null = null;   // the wedgie's own list ("8453:0x.."), null: its app keeps none
