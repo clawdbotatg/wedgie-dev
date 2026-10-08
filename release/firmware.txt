@@ -21,7 +21,8 @@ cb2cd953508b9be62f720c17f44bc08e7934802b441a5b8af8932d1751d45290  logo.bin
 317fedfebc4febd4bf8f11dc0d73f31825fbfccf060c100e3cffd1d8fad0cfe8  main.py
 fd14acf8f9289379b35066e45c01b035b5a21c7b0a15a57791a902da1c69bcfc  optiga.mpy
 ba422f72ca334b9681bf77e6cbb972bc6b0733d410d05cfe772c00529354ae2f  p256.mpy
-e15b6e864c55022e8c480a9956d2174d8ddd19c3f5c2567965aa1b1ab1d2c663  safe.py
+7cc3a813f99f1c33a768fcb4c417705250ceba51cf0ccd242d9087c8d17e4e5b  safe.py
+ebb05bac073a564d54741c5ff029132e66ca2001260c080fb9c171481901304e  safe_addr.py
 f5465cbfa72b6ea201d7993d09d0c4c163cf40fa1313f7938204bc32c12c94f5  safe_keccak.py
 3024f60d440b2494fdc24d7dc374e5e435de2d424168fa237c46b9c999c4194a  save.mpy
 b309a614c0edb73cd496b5d0f48258387313ddc591890cd47bfe504b277319cc  slot.mpy
@@ -36,4 +37,4 @@ b309a614c0edb73cd496b5d0f48258387313ddc591890cd47bfe504b277319cc  slot.mpy
 @app  {"mod":"frog","name":"Frog","entry":"run","files":["frog.py"]}
 @app  {"mod":"grove","name":"Crystal Grove","entry":"run","files":["grove.py"]}
 @app  {"mod":"keypad","name":"Keypad","entry":"run","files":["keypad.py"]}
-@app  {"mod":"safe","name":"Safe signer","entry":"run","usb":true,"files":["safe.py","safe_keccak.py"]}
+@app  {"mod":"safe","name":"Safe signer","entry":"run","usb":true,"files":["safe.py","safe_keccak.py","safe_addr.py"]}
