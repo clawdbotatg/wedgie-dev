@@ -81,6 +81,7 @@ def show(path="logo.bin", keep=False):
             return
         except OSError:
             pass
+    bl = Pin(BL, Pin.OUT, value=0)  # first: a restart leaves the old picture on the panel, lit
     try:
         with open(path, "rb") as f:
             head = f.read(10)
@@ -91,7 +92,6 @@ def show(path="logo.bin", keep=False):
             f.readinto(box)
     except (OSError, ValueError):
         return
-    bl = Pin(BL, Pin.OUT, value=0)
     cs, dc, rst = Pin(CS, Pin.OUT, value=1), Pin(DC, Pin.OUT, value=1), Pin(RST, Pin.OUT, value=1)
     spi = SPI(1, SPI_HZ, polarity=0, phase=0, sck=Pin(SCK), mosi=Pin(MOSI), miso=None)
     t = setup(spi, dc, cs, rst)

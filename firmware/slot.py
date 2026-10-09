@@ -370,12 +370,16 @@ def let_in(job="", full=False):
     if not W.SEALED or W.is_open():
         W.set_open()
         return True
+    global _paused
     ok = _asking(lambda: __import__("hatch").ask())
     if ok:
         W.set_open()
         if full:
             _drop()
         else:
+            _paused = True              # the app draws nothing until the computer stops it: Frog drew its
+            L._on_show = _hold          # picture back over this screen (Austin, 2026-10-09). Ticks: _guard;
+                                        # an entry app's own loop: its next show() waits in _hold
             ui.progress(W.doing(job).replace("...", ""), "the computer is starting", False)   # the app is still loaded: no bar's RAM (the computer fills it)
     return ok
 
@@ -450,6 +454,15 @@ def serve(_=None):
             handle(m)
 
 
+def _hold():
+    """lcd._on_show after a yes to a computer's job: the app's push waits here, so the boot screen stays
+    clean, until the computer's Ctrl-C (a KeyboardInterrupt in the sleep). At most 3 s: a computer that
+    never takes over gets its app back (and a show() from a Timer can't hang here for good)."""
+    t = time.ticks_ms()
+    while _paused and time.ticks_diff(time.ticks_ms(), t) < 3000:
+        time.sleep_ms(20)
+
+
 def _interrupt():
     """lcd._on_show after a yes to a Ctrl-C while an entry app runs: stop it as Ctrl-C would."""
     L._on_show = L._on_keys = None
@@ -494,8 +507,9 @@ def step(board=True):
 
 
 def init():
-    global d, keys, app, state, _poll, _started
+    global d, keys, app, state, _poll, _started, _paused
     _started = time.ticks_ms()
+    _paused = False                     # main.py again on the same heap (LEAVE): a yes's hold is over
     d = L.LCD()
     keys = L.Keys()
     _poll = select.poll()
@@ -528,6 +542,8 @@ def run():
             step()
             time.sleep_ms(20)
     except KeyboardInterrupt:
+        if L._on_show is _hold:         # the computer's Ctrl-C: its own screens push again
+            L._on_show = None
         stop()
         raise
 

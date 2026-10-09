@@ -28,6 +28,7 @@ _t = None
 _vbus = None
 _adc = None
 _pins = ()
+_gp24 = False       # VBUS is GP24, so it can wake the chip from dormant
 
 
 def shown():
@@ -62,13 +63,14 @@ def _percent(mv):
 
 def start(d, Timer):
     """Watch the power from now on. d: the slot's LCD. Never raises: a board it can't read runs as before."""
-    global _d, _t, _vbus, _adc, _pins
+    global _d, _t, _vbus, _adc, _pins, _gp24
     try:
         _d = d
         try:
             _vbus = Pin("WL_GPIO2", Pin.IN)         # a Pico W / Pico 2 W
         except (ValueError, TypeError):
             _vbus = Pin(24, Pin.IN)
+            _gp24 = "RP2040" in sys.implementation._machine     # the register addresses below are RP2040's
         _adc = ADC(29)
         _pins = [Pin(p, Pin.IN, Pin.PULL_UP) for p in L.KEYS.values()]
         for p in _pins:                             # any press is activity, whatever reads the keys
@@ -128,6 +130,33 @@ def corner(d, x0, y0, x1, y1):
     d.fill_rect(bx + 2, y + 3, 12 * pct // 100 or 1, 5, ui.RED if pct <= 15 else ui.GREEN)
 
 
+def _wake(on):
+    """Which pins end dormant (RP2040 IO_BANK0 DORMANT_WAKE_INTE0-3; MicroPython has no call for it):
+    any button going low, VBUS (GP24) going high. Edges latched before are cleared first."""
+    r = [0, 0, 0, 0]
+    if on:
+        for g in L.KEYS.values():
+            r[g >> 3] |= 4 << (4 * (g & 7))         # EDGE_LOW
+        r[3] |= 8 << 0                              # GP24 EDGE_HIGH
+    for i in range(4):
+        machine.mem32[0x400140F0 + 4 * i] = 0xFFFFFFFF  # INTR: clear latched edges
+        machine.mem32[0x40014160 + 4 * i] = r[i]
+
+
+def _black(d):
+    """Panel RAM all black, the framebuffer untouched (allocates nothing: lcd's row buffer)."""
+    r = L._ROWS
+    for i in range(len(r)):
+        r[i] = 0
+    d._cmd(0x2A, b"\x00\x00\x00\xef")
+    d._cmd(0x2B, b"\x00\x00\x00\xef")
+    d._cmd(0x2C)
+    d.dc(1); d.cs(0)
+    for _ in range(240 * 240 * 2 // len(r)):
+        d.spi.write(r)
+    d.cs(1)
+
+
 def _down():
     for p in _pins:
         if p.value() == 0:
@@ -137,10 +166,13 @@ def _down():
 
 def sleep():
     """Screen off, chip asleep, until any button (or USB comes back). Blocks right here, inside the Timer
-    callback, so the app is frozen as it was. Off: backlight, panel, the Pico's LED, the CPU between checks (its ticks wait); the waking press is let go before it goes on. A press wakes the lightsleep (its IRQ), so a quick tap counts."""
+    callback, so the app is frozen as it was. Off: backlight, panel, the Pico's LED, and (0.3.29) the crystal:
+    dormant, every clock stopped, ticks frozen, until a button or USB (_wake). Tested on a real RP2040: wakes
+    at 125 MHz with USB back. The waking press is let go before it goes on."""
     d = _d
     duty = d.bl.duty_u16()
     d.backlight(0)
+    _black(d)                                       # a restart while asleep (USB in) shows black, not the app
     d._cmd(0x28)                                    # panel: display off
     d._cmd(0x10)                                    # panel: sleep in (it keeps its picture)
     led = None
@@ -152,14 +184,22 @@ def sleep():
     try:
         while _last == t0 and not _down() and _vbus.value() == 0:
             try:
-                machine.lightsleep(200)
+                if _gp24:
+                    _wake(True)
+                    machine.lightsleep()            # dormant: the crystal stops too, until a _wake pin
+                else:
+                    machine.lightsleep(200)         # VBUS on the radio (a Pico W): can't wake on it, so check
             except Exception:
                 time.sleep_ms(200)
     finally:
+        if _gp24:
+            _wake(False)
         if led and on:
             led.value(1)
         d._cmd(0x11)                                # sleep out: 5 ms before the next command
         time.sleep_ms(5)
+        if not L._on_show:                          # (slot._hold: a computer's job is starting)
+            d.show()                                # the app's screen back (the framebuffer kept it)
         d._cmd(0x29)                                # display on
         d.bl.duty_u16(duty)
         t = time.ticks_ms()

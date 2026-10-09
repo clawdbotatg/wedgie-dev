@@ -225,6 +225,9 @@ class LCD(framebuf.FrameBuffer):
         self.bl.freq(1000)
         self.buffer = _BUF
         super().__init__(self.buffer, self.width, self.height, framebuf.GS4_HMSB)
+        global _art, _artrow
+        _art = _artrow = None   # a new owner (an app starting): the last screen's art() goes, or the boot
+                                # logo stays over an app that never fill()s (Frog after an update)
         if not _s.up:       # after the boot logo the panel is already up; resetting it would blank it
             self.backlight(0)
             t = _s.setup(self.spi, self.dc, self.cs, self.rst)
