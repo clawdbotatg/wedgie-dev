@@ -1,4 +1,4 @@
-// wedgie.dev/safe: a wedgie as a signer on a Safe. The wedgie runs the Safe signer app
+// wedgie.dev/safe: a wedgie as a signer on a Safe. The wedgie runs the Safe Signer app
 // (clawdbotatg/wedgie-safe): its key lives in the Trust M chip, it shows each transaction and signs on A.
 // Its key is a Safe owner through Safe's passkey signer contract (eth.ts signerAddress, no RPC).
 // Two views, one page (history.pushState between them, so the wedgie's key is read once):
@@ -224,7 +224,7 @@ export function safe(main: HTMLElement) {
     if (!W.supported()) h += `<p class="fine">This browser can't talk to a wedgie over USB. Use Chrome, Edge or Brave on a computer.</p>`;
     else if (!W.armed()) h += `<p><a class="btn btn-green" href="/connect">Connect a wedgie</a></p>`;
     else if (!ws.length) h += `<p class="fine">Plug it in. Not showing? <a href="/connect">Connect</a> it first.</p>`;
-    else if (!app.length) h += `<p class="fine">It isn't running the Safe signer yet. <a class="btn btn-sm btn-green" href="/connect/${esc(ws[0].short)}">Install Safe signer</a> (on its page, Software).</p>`;
+    else if (!app.length) h += `<p class="fine">It isn't running the Safe Signer yet. <a class="btn btn-sm btn-green" href="/connect/${esc(ws[0].short)}">Install Safe Signer</a> (on its page, Software).</p>`;
     else if (!key) h += noKey ? `<p><b>Press A on the wedgie to make its key.</b> The chip makes it and never lets it out.</p>` : `<p class="fine">Reading its key.</p>`;
     else {
       if (safeAddr) {
@@ -603,7 +603,7 @@ export function safe(main: HTMLElement) {
 
   /** The wedgie signs t; the page checks it signed the same hash, and that its signer contract can be checked on chain. */
   async function wedgieSig(t: E.SafeTx) {
-    if (!wedgie || !key) throw new Error("No wedgie running the Safe signer.");
+    if (!wedgie || !key) throw new Error("No wedgie running the Safe Signer.");
     if (!(await hasCode(chain, signer))) { deployed[chain] = false; throw new Error(`The wedgie's signer contract isn't on ${CHAINS[chain].name} yet: Deploy it (above) first. Safe checks its signatures through it.`); }
     const tx = { chainId: chain, safe: safeAddr, to: t.to, value: String(t.value), data: t.data || "0x", operation: +t.operation,
       safeTxGas: String(t.safeTxGas), baseGas: String(t.baseGas), gasPrice: String(t.gasPrice), gasToken: t.gasToken || Z,
@@ -612,7 +612,7 @@ export function safe(main: HTMLElement) {
     const n = (tx.data.length - 2) / 2;
     if (big && (!chunk || n > DATA_MAX))
       throw new Error(chunk ? `This transaction has ${n} bytes of data: a wedgie takes up to ${DATA_MAX}. Sign it another way.`
-        : "This transaction is too big for the wedgie to read in one go: update the Safe signer app on it (its page, Software).");
+        : "This transaction is too big for the wedgie to read in one go: update the Safe Signer app on it (its page, Software).");
     asking = true; paintAll();
     say("Look at the wedgie: check what it shows, then press A to sign (Y says no).");
     try {

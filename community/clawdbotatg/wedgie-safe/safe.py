@@ -1,4 +1,4 @@
-# Safe signer: the wedgie signs Safe{Wallet} transactions with a key that lives in its Trust M chip.
+# Safe Signer: the wedgie signs Safe{Wallet} transactions with a key that lives in its Trust M chip.
 #
 # The key: made once, on the wedgie, in the chip's key slot 2 (A on its screen). It never leaves the chip.
 # Its public key is saved (/saves/safe/key) because the chip hands it out only when it makes the key.
@@ -29,7 +29,7 @@ import save
 import ui
 from ui import WHITE, INK, MUTED, GREEN_D, RED
 
-FW = "safe-5"
+FW = "safe-6"
 RP_ID = b"wedgie.dev"
 FIELDS = '"origin":"https://wedgie.dev"'
 ASK_MS = 120000
@@ -566,17 +566,21 @@ def sign(digest):
 # ---- screens ----------------------------------------------------------------------------------
 
 def draw_home():
+    """The title, its Safe owner address (the same on every chain) as a big blockie and big text."""
     d.fill(WHITE)
     ui.band(d)
-    y = ui.title(d, "Safe signer", 56) + 20
-    if key:                             # its Safe owner address (the same on every chain), nothing else
-        lines = [(signer, INK, ADDR)] if signer \
-            else [(key["x"][:22], INK), (key["x"][22:44], INK), (key["x"][44:], INK)]
+    ui.title(d, "Safe Signer", 42, 1)
+    if key and signer:
+        import safe_blockie
+        safe_blockie.draw(d, signer, 84, 70, 9, MUTED)
+        for i in range(3):
+            d.center_text(signer[i * 14:i * 14 + 14], 154 + i * 22, INK, 2)
+    elif key:
+        _draw([(key["x"][:22], INK), (key["x"][22:44], INK), (key["x"][44:], INK)], 80, 220)
     else:
-        lines = [("No key", INK, BIG)]
+        _draw([("No key", INK, BIG)], 90, 180)
     if note:
-        lines.append((note, MUTED))
-    _draw(lines, y, 240)
+        d.center_text(note[:ui.COLS_SMALL], 226 if key else 170, MUTED)
     if not key:
         ui.buttons(d, "make a key", "not now")
     d.show()

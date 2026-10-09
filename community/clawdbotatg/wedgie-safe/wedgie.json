@@ -2,7 +2,7 @@
   "apps": [
     {
       "mod": "safe",
-      "name": "Safe signer",
+      "name": "Safe Signer",
       "about": "Sign Safe{Wallet} transactions with a key in the Trust M chip. A signs, Y says no.",
       "files": [
         "safe.py",

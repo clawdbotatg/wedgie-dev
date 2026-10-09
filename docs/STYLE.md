@@ -12,7 +12,9 @@ only shrink. A new screen that breaks a rule fails the build.
 
 Every screen: as few words as possible, drawn as big as they fit. A question is the job and what
 matters about it, nothing else: "Update firmware", "0.3.30", a green check (signed). No sentences
-explaining the buttons; A yes / Y no already says it.
+explaining the buttons; A yes / Y no already says it. White space left over means something can be
+bigger: center it and scale it up (the Safe Signer's home: its blockie 72 px, its address at scale 2).
+App names are Title Case ("Safe Signer"). Apps get the same rules in `public/code.md`.
 
 ## 1. Busy = the boot loader
 

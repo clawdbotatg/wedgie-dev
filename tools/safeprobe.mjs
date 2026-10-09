@@ -1,4 +1,4 @@
-// /safe through its buttons, on a Base fork: a fake wedgie running the Safe signer (fakewedgies: its hello
+// /safe through its buttons, on a Base fork: a fake wedgie running the Safe Signer (fakewedgies: its hello
 // carries a key, its safe_sign is answered by a P-256 key here, signing what safe.py signs), window.ethereum
 // = an anvil account (the browser wallet), the page's public RPC = the fork, Safe's Transaction Service faked
 // in memory. /safe lists the Safes; each opens at /safe/<chain>:<address>. One Safe's life, then a new one:
@@ -93,7 +93,7 @@ await ctx.exposeBinding("__safeList", () => safeList());
 await ctx.exposeBinding("__safeNote", (_, m) => safeNote(m));
 await ctx.addInitScript(fakeWedgies, [
   { uid: "aa11bb22cc5afe01", machine: "Raspberry Pi Pico with RP2040", files: { "main.py": 1, "slot.py": 1, "wedgiedrive.py": 1, "wedgie.py": 'VERSION = "0.3.26"',
-    "apps.json": JSON.stringify([{ mod: "safe", name: "Safe signer" }]), "safe.py": 1 }, chip: "none",
+    "apps.json": JSON.stringify([{ mod: "safe", name: "Safe Signer" }]), "safe.py": 1 }, chip: "none",
     hello: { running: "safe", safe: key, signer, safe_chunk: 4000 }, app: { safe_sign: "__safeSign", safe_data: "__safeData", safe_list: "__safeList", safe_note: "__safeNote" } },
 ]);
 // the browser wallet: anvil, on Base

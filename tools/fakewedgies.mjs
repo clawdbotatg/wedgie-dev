@@ -81,7 +81,7 @@ export function fakeWedgies(specs) {
       if (cmpV(version() || "0", "0.3.0") >= 0 && slot()) h.jobs = cmpV(version(), "0.3.10") >= 0 ? 2 : 1;
       if (cmpV(version() || "0", "0.3.11") >= 0 && slot()) h.ram = 52000;
       if (cmpV(version() || "0", "0.3.16") >= 0 && slot()) h.bin = 4096;     // raw puts (job.py RAW)
-      Object.assign(h, st.hello);     // an app's own hello fields (Safe signer: { running: "safe", safe: {x, y} })
+      Object.assign(h, st.hello);     // an app's own hello fields (Safe Signer: { running: "safe", safe: {x, y} })
       return JSON.stringify(h);
     };
     const answer = (stdout) => push("OK" + stdout + "\x04\x04>");

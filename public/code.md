@@ -238,6 +238,11 @@ import loader; loader.what("enemies")                          # the line under 
 |---|---|---|
 | ![page](https://wedgie.dev/img/look/page.png) | ![ask](https://wedgie.dev/img/look/ask.png) | ![progress](https://wedgie.dev/img/look/progress.png) |
 
+- **Few words, big.** Every screen: as few words as fit the job, drawn as big as they fit. Space left
+  over means something can be bigger: center it and scale it up (scale 2 or 3, a bigger picture).
+  A question is the action and the one fact that matters ("Send", "0.5 ETH"), never sentences
+  explaining A and Y.
+- **Names are Title Case:** your app's name in `wedgie.json` and its title on screen ("Safe Signer").
 - **Palette:** `ui.WHITE` (screen), `ui.INK` (text), `ui.MUTED` (second lines, hints), `ui.GREEN`
   (yes, the A button), `ui.GREEN_D` (green text on white), `ui.GREY`, `ui.RED` (no, errors, the Y
   button). The waistband is `ui.band(d, y)`.

@@ -1,4 +1,4 @@
-// The Safe signer app (clawdbotatg/wedgie-safe) on a virtual RP2040 (rp2040js, the real MicroPython build
+// The Safe Signer app (clawdbotatg/wedgie-safe) on a virtual RP2040 (rp2040js, the real MicroPython build
 // and its real heap: tools/rp2040/chip.mjs), the way /safe drives it: hello (its key), then safe_sign for
 // a plain send, an add owner (of itself), a removal, and a MultiSend batch as big as /safe lets through
 // (one USB line just under 6 KB, a page per action), A pressed through every page; and one answered Y.
@@ -25,7 +25,7 @@ if (appDir) {               // a local checkout instead of the shelf's copy: its
   F.app(a, Object.fromEntries(a.files.filter((n) => existsSync(join(appDir, n))).map((n) => [n, readFileSync(join(appDir, n))])));
 }
 const cart = F.carts.find((c) => c.mod === "safe");
-console.log(`Safe signer (${appDir || "the shelf's copy"}): ${cart.files.join(" ")}`);
+console.log(`Safe Signer (${appDir || "the shelf's copy"}): ${cart.files.join(" ")}`);
 
 // a key, as the app saves it after making one in the chip (the public half only matters here)
 const key = { x: "0x" + "11".repeat(32), y: "0x" + "22".repeat(32) };
