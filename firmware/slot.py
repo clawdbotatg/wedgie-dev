@@ -288,8 +288,8 @@ def ask(job="", checked=False, v=""):
     if not checked:
         return False
     W.asked_ms = None
-    head, to, _ = (job or "Install").partition(" to ")
-    ok = ui.ask(d, head, ms=ASK_MS, big=str(v or "")[:12] if to else "")
+    head = (job or "Install").partition(" to ")[0]     # wedgie.dev titles an update just "Update firmware"
+    ok = ui.ask(d, head, ms=ASK_MS, big=str(v or "?")[:12] if head.startswith("Update") else "")
     W.asked_ms = time.ticks_diff(ui.drawn, _rx)
     return ok
 

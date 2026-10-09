@@ -272,7 +272,7 @@ try {
   await page.waitForTimeout(3000);
   const req = (msg, ms = 10000) => page.evaluate(([msg, ms]) => new Promise((res) => { const off = window.vw.onOutput((l) => { if (l.includes(`"id": ${msg.id},`) || l.includes(`"id": ${msg.id}}`)) { off(); res(JSON.parse(l)); } }); window.vw.write(JSON.stringify(msg) + "\n"); setTimeout(() => { off(); res(null); }, ms); }), [msg, ms]);
   // the update question: few words, big (the job, its version, a green check; Austin, 2026-10-09)
-  const upd = page.evaluate(() => window.vw.exec("import slot; slot.ask('Update firmware to 0.3.30', True, '0.3.30')"));
+  const upd = page.evaluate(() => window.vw.exec("import slot; slot.ask('Update firmware', True, '0.3.32')"));
   await page.waitForTimeout(800);
   await page.locator(".vw").screenshot({ path: `${out}/emu-update-ask.png` });
   await page.evaluate(() => window.vw.press("Y", 150));

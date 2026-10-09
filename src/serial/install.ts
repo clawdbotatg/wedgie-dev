@@ -269,7 +269,7 @@ async function job(r: Repl, m: Manifest, title: string, write: string[], del: st
     bytes: write.reduce((t, n) => t + (m.files.find((f) => f.name === n)?.size || 0), 0),    // the wedgie's bar weighs the file part by it
     ...(binOf.get(r) ? { raw: true } : {}) }, 120000);
   asked.catch(() => {});
-  const close = (await import("../ui/askmodal")).askModal(title, true);
+  const close = (await import("../ui/askmodal")).askModal(title, true, m.version);
   let v: any;
   try { v = await asked; }
   catch {

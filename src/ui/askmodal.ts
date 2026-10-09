@@ -16,23 +16,25 @@ function wrap(s: string, n: number) {
 }
 
 /** The wedgie's own question screen (firmware/slot.py ask), drawn the same way. */
-export function askScreen(job: string, checked = false) {
+export function askScreen(job: string, checked = false, version = "") {
   const c = document.createElement("canvas");
   c.width = c.height = 240;
   const g = c.getContext("2d")!;
   g.fillStyle = P.WHITE; g.fillRect(0, 0, 240, 240);
   [[P.GREEN, 10], [P.GREY, 19], [P.RED, 28]].forEach(([col, y]) => { g.fillStyle = col as string; g.fillRect(0, y as number, 240, 5); });
   g.textAlign = "center"; g.textBaseline = "top"; g.fillStyle = P.INK;
-  if (checked) {                                  // the job, its version for an update, a green check
-    const [head, v = ""] = (job || "Install").split(" to ");
+  if (checked) {                                  // the job, its version for an update, a small green check
+    const [head, to = ""] = (job || "Install").split(" to ");
+    const v = head.startsWith("Update") ? version || to || "?" : "";
     const t = wrap(head, 15).slice(0, 2), y = Math.max(64 + t.length * 24 + 12, 108);
     g.font = "16px Silkscreen, monospace";
     t.forEach((s, i) => g.fillText(s, 120, 64 + i * 24));
-    const sc = v.length <= 7 ? 3 : 2, w = 8 * sc * v.length + (v ? 12 : 0), x = (240 - w - 34) / 2;
+    const sc = v.length <= 8 ? 3 : 2, w = 8 * sc * v.length + (v ? 8 : 0), x = (240 - w - 16) / 2;
     g.textAlign = "left"; g.font = `${8 * sc}px Silkscreen, monospace`;
     if (v) g.fillText(v, x, y + 8 + (24 - 8 * sc) / 2);
-    g.strokeStyle = P.GREEN_D; g.lineWidth = 4; g.lineCap = "square";
-    g.beginPath(); g.moveTo(x + w + 2, y + 19); g.lineTo(x + w + 12, y + 29); g.lineTo(x + w + 32, y + 9); g.stroke();
+    const cy = v ? y + 14 : y + 8;
+    g.strokeStyle = P.GREEN_D; g.lineWidth = 3; g.lineCap = "square";
+    g.beginPath(); g.moveTo(x + w + 1, cy + 6); g.lineTo(x + w + 5, cy + 10); g.lineTo(x + w + 15, cy + 1); g.stroke();
     g.textAlign = "center";
   } else {
     const title = job ? wrap(job + "?", 15).slice(0, 2) : ["LET THIS", "COMPUTER IN?"];
@@ -49,7 +51,7 @@ export function askScreen(job: string, checked = false) {
 }
 
 /** Show it; returns close(). */
-export function askModal(job: string, checked = false): () => void {
+export function askModal(job: string, checked = false, version = ""): () => void {
   const el = document.createElement("div");
   el.className = "panel-wrap";
   el.innerHTML = `<div class="card bt-ask ask-a" role="dialog" aria-live="assertive" aria-label="Press A on your wedgie">
@@ -58,7 +60,7 @@ export function askModal(job: string, checked = false): () => void {
   </div>`;
   document.body.appendChild(el);
   let w: Wedgie3D | null = null, t = 0, closed = false;
-  place3D(el.querySelector<HTMLElement>(".ask-3d")!, { interactive: false, eager: true, screen: askScreen(job, checked) }).then((x) => {
+  place3D(el.querySelector<HTMLElement>(".ask-3d")!, { interactive: false, eager: true, screen: askScreen(job, checked, version) }).then((x) => {
     w = x;
     if (closed) return w?.destroy();
     let down = false;

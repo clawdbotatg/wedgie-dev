@@ -89,18 +89,18 @@ drawn = 0       # ticks_ms when the last ask() finished drawing its question (th
 
 
 def check(d, x, y, c=GREEN_D):
-    """A check mark, 34 x 26, its top left at (x, y)."""
+    """A small check mark, 16 x 13, its top left at (x, y): a quiet "signed"."""
+    for i in range(5):
+        d.fill_rect(x + i, y + 5 + i, 3, 3, c)
     for i in range(11):
-        d.fill_rect(x + i, y + 10 + i, 6, 6, c)
-    for i in range(21):
-        d.fill_rect(x + 10 + i, y + 20 - i, 6, 6, c)
+        d.fill_rect(x + 4 + i, y + 9 - i, 3, 3, c)
 
 
 def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None, scary=False, big=None):
     """A yes/no question: A yes, Y no, no answer in `ms` is a no. Only real presses count (a press
     sent over USB can't answer). True for yes. scary: white on red, for a yes that hands over
     everything (full control: slot.let_in). big: a short word drawn huge under the question with a
-    green check after it ("" for the check alone): a signed install's version."""
+    small green check after it ("" for the check alone): a signed update's version."""
     k = keys or L.Keys(physical=True)
     k.pressed()                             # a key already down doesn't count
     bg, fg = (RED, WHITE) if scary else (WHITE, INK)
@@ -111,12 +111,12 @@ def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None, scary=Fa
         band(d)
     y = max(title(d, question, 48 if big is None else 64, 2, fg) + 12, 108)
     if big is not None:
-        sc = 3 if len(big) <= 7 else 2
-        w = 8 * sc * len(big) + (12 if big else 0)
-        x = (240 - w - 34) // 2
+        sc = 3 if len(big) <= 8 else 2
+        w = 8 * sc * len(big) + (8 if big else 0)
+        x = (240 - w - 16) // 2
         if big:
             d.big_text(big, x, y + 8 + (24 - 8 * sc) // 2, fg, sc)
-        check(d, x + w, y + 7)
+        check(d, x + w, y + 14 if big else y + 8)
         y = 168
     for s in lines:
         for x in wrap(s):
