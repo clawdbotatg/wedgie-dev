@@ -11,7 +11,7 @@ RP2350), a Waveshare Pico-LCD-1.3 hat (240x240 screen, 5-way joystick, A/B/X/Y),
 wedgie firmware: a boot logo, the one app it boots straight into, saves that outlast apps, and a USB
 protocol. Everything is MIT: https://wedgie.dev
 
-**The current firmware is 0.3.26.** If a wedgie's `hello` says older, update it first
+**The current firmware is 0.3.27.** If a wedgie's `hello` says older, update it first
 (`wedgie.py update`, below): everything here assumes current firmware.
 
 **Three guides cover everything** (this one first):
@@ -90,7 +90,8 @@ REPL, its files outside `/saves/`, or its secure chip on its own. The only way i
 wedgie's own screen answered by a **real press** (a `press` request can't answer it):
 
 - **One job** (`{"type":"open","for":"Update firmware"}`; wedgie.py and the site send it for you): the
-  wedgie asks "<job>?"; A says yes, Y or a minute with no answer says no. Allow 65 s for the reply.
+  same red **FULL CONTROL?** question as below (0.3.27+: a computer's own title never goes on a calm
+  screen that gives it the REPL); A says yes, Y or a minute with no answer says no. Allow 65 s for the reply.
   After a yes, hello says `"open": true` and Ctrl-C (0x03) works as usual until its app starts again.
 - **Full control** (`{"type":"open","full":true}`, `wedgie.py unlock`, or just pressing Ctrl-C, e.g.
   mpremote's): a white-on-red **FULL CONTROL?** question. After A the app stops and the screen says
@@ -123,7 +124,7 @@ crashes at start or keeps USB from answering. Hold **Y**: no WEDGIE drive this t
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.26","fw":"wedgie-0.3.26","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.27","fw":"wedgie-0.3.27","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":2,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -137,7 +138,7 @@ crashes at start or keeps USB from answering. Hold **Y**: no WEDGIE drive this t
     {"id":12,"type":"ping"}              -> {"type":"pong"}     (is it there, nothing else)
     {"id":8,"type":"stop"}               -> {"type":"ok"}       (stops its app)
     {"id":9,"type":"reboot"}             -> {"type":"rebooting"} (a full restart: the port drops)
-    {"id":10,"type":"open","for":"..."}  -> {"type":"open"} or {"type":"refused"}  (asks the person)
+    {"id":10,"type":"open","for":"..."}  -> {"type":"open"} or {"type":"refused"}  (asks the person, in red)
     {"id":11,"type":"open","full":true}  -> the same, asked in red: full control
 
 hello's fields: `version` the firmware, `running` the app on screen (null: none), `chip` the secure

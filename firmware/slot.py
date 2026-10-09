@@ -277,18 +277,14 @@ ASK_MS = 60000      # no answer to "let this computer in?" in a minute is a no
 
 
 def ask(job="", note=""):
-    """Let the computer do `job` (what it says it wants, e.g. "Update firmware to 0.2.8")? ui.ask: only a
-    real press answers, A yes, Y no. Nothing comes off USB meanwhile, so the computer waits. note: a
-    checked job (job.py: signed files only) says so; otherwise the job is the computer's word, so the
-    screen says a yes gives it full access."""
-    import os
-    ls = os.listdir()
-    wallet = "usbwallet.mpy" in ls or "usbwallet.py" in ls
-    lines = ["The computer gets full access for this one job."] + (["Its wallet key too."] if wallet else [])
-    if note:
-        lines = [note, "Only those files change."]
+    """Let the computer do `job` (what it says it wants, e.g. "Install Safe signer")? ui.ask: only a
+    real press answers, A yes, Y no. Nothing comes off USB meanwhile, so the computer waits. Only for a
+    checked job (job.py: signed files only; note says so): anything that gives the computer the REPL asks
+    the red question (hatch.ask, let_in), never this calm one with the computer's own title on it."""
+    if not note:
+        return False
     W.asked_ms = None
-    ok = ui.ask(d, (job + "?") if job else "Let this computer in?", lines + ["Didn't ask for this? Y."], ms=ASK_MS)
+    ok = ui.ask(d, (job + "?") if job else "Install?", [note, "Only those files change.", "Didn't ask for this? Y."], ms=ASK_MS)
     W.asked_ms = time.ticks_diff(ui.drawn, _rx)
     return ok
 
@@ -366,11 +362,13 @@ def let_in(job="", full=False):
     """{"type": "open"}: may this computer have the REPL? Asks the person, unless they already said
     yes for this job (or nothing is sealed: the emulator). Yes turns Ctrl-C on (wedgie.set_open) until
     main.py starts again. False only after a no: the caller restarts it (_restart).
-    full ({"type": "open", "full": true}, or a Ctrl-C: hatch.py): the escape hatch, the red question."""
+    Always the red question (hatch.py), whatever the computer calls its job: a yes gives it everything, so
+    it never looks like a normal install (Austin, 2026-10-08: a site said "Install Safe signer?" over a
+    calm screen and got full access). full ({"type": "open", "full": true}, or a Ctrl-C) also stops the app."""
     if not W.SEALED or W.is_open():
         W.set_open()
         return True
-    ok = _asking(lambda: __import__("hatch").ask() if full else ask(job))
+    ok = _asking(lambda: __import__("hatch").ask())
     if ok:
         W.set_open()
         if full:
