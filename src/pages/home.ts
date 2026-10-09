@@ -96,7 +96,7 @@ export function home(main: HTMLElement): Promise<unknown> {
     <div class="sec-head">
       <span class="kicker">Software</span>
       <h2>A growing app store.</h2>
-      <p>Games, tools, a wallet, and more every week. Pick one in the browser and it's on your wedgie.</p>
+      <p>Games, tools, a wallet. More every week.</p>
     </div>
     <div class="lib" id="lib">
       <div class="lib-sticky card">
@@ -106,7 +106,7 @@ export function home(main: HTMLElement): Promise<unknown> {
     </div>
     <div class="sec-head lib-after">
       <h2>Built by anyone.</h2>
-      <p>Every app is open source, in its own GitHub repo. Write one yourself, or have your agent make one, and send it in. <a href="/code">How</a></p>
+      <p>Open source. Make one, or have your agent make one. <a href="/code">How</a></p>
     </div>
   </section>
 
