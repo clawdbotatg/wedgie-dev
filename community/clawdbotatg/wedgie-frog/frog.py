@@ -272,14 +272,15 @@ hud_shown = None
 def hud():
     global hud_shown
     st = stage()
-    k = (frog["name"], st, frog["food"], frog["joy"])
+    r = ui.right() if hasattr(ui, "right") else 236     # left of the battery, when one shows (firmware 0.3.28+)
+    k = (frog["name"], st, frog["food"], frog["joy"], r)
     if k == hud_shown:
         return
     hud_shown = k
     lcd.fill_rect(0, 0, 240, TOP, ui.WHITE)
     lcd.text(frog["name"], 4, 4, ui.INK)
     s = STAGES[st][0]
-    lcd.text(s, 236 - 8 * len(s), 4, ui.MUTED)
+    lcd.text(s, r - 8 * len(s), 4, ui.MUTED)
     for x, label, v, c in ((4, "food", frog["food"], ui.GREEN), (124, "joy", frog["joy"], JOY)):
         lcd.text(label, x, 20, ui.MUTED)
         bx = x + 8 * len(label) + 4

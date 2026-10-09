@@ -48,13 +48,20 @@
     },
     {
       "repo": "clawdbotatg/wedgie-frog",
-      "sha": "5fa187b87f447628252a6a7dc97e2d1873ae02b5",
-      "approved": "2026-10-03",
-      "at": "2026-10-03T23:57:29Z",
+      "sha": "f9ad2ec96ace6764d82d25dcff530c5a9497345a",
+      "at": "2026-10-09T04:56:54Z",
+      "approved": "2026-10-09",
       "v": {
-        "frog": "71630fd360d9"
+        "frog": "f656e9d83b1c"
       },
       "past": [
+        {
+          "sha": "5fa187b87f447628252a6a7dc97e2d1873ae02b5",
+          "at": "2026-10-03T23:57:29Z",
+          "v": {
+            "frog": "71630fd360d9"
+          }
+        },
         {
           "sha": "1ebd30c87d74144c9cb292c6302cdd35bd7142d3",
           "at": "2026-10-03T23:09:42Z",

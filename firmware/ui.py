@@ -33,6 +33,14 @@ def wrap(s, n=COLS_SMALL):
     return [x for x in out if x] or [""]
 
 
+def right():
+    """Where an app's text in the top-right corner should end (its x). On a battery the charge takes the
+    corner (power.py), so this moves left; call it at each draw, it changes when USB comes and goes."""
+    import sys
+    p = sys.modules.get("power")
+    return p.BOX[0] - 2 if p and p.shown() else 236
+
+
 def band(d, y=10):
     """The waistband: green, grey, red stripes across the top."""
     for i, c in enumerate((GREEN, GREY, RED)):

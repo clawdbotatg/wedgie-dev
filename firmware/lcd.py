@@ -37,6 +37,8 @@ _BUF = bytearray(240 * 240 // 2)
 _ROWS = bytearray(240 * 4 * 2)
 _on_show = None     # loader.py: called at the app's first show(), i.e. its first screen
 _on_keys = None     # slot.py: called when the app reads its keys (an app on a still screen only does that)
+_on_frame = None    # power.py: (lcd, x0, y0, x1, y1) before a box goes out, to draw the battery over it
+_busy = False       # a box is going out to the panel (power.py waits for the next tick)
 _art = None         # (x, y, w, h, file, offset): a full-color picture on flash shown over that box (art())
 _artrow = None      # one of its rows, read from the file
 
@@ -252,6 +254,16 @@ class LCD(framebuf.FrameBuffer):
             return
         if _on_show:
             _on_show()
+        global _busy
+        _busy = True
+        try:
+            self._push(x0, y0, x1, y1)
+        finally:
+            _busy = False
+
+    def _push(self, x0, y0, x1, y1):
+        if _on_frame:
+            _on_frame(self, x0, y0, x1, y1)
         self._cmd(0x2A, [0x00, x0, 0x00, x1 - 1])
         self._cmd(0x2B, [0x00, y0, 0x00, y1 - 1])
         self._cmd(0x2C)

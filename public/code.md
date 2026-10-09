@@ -249,6 +249,11 @@ import loader; loader.what("enemies")                          # the line under 
   Its title says what you're doing ("Loading level 3"), the line under the bar the step ("tiles"). It
   draws straight to the screen (not your framebuffer) and costs about 9 KB of RAM while it's up; your
   next `d.show()` covers it.
+- **The top-right corner is the battery's** on a wedgie running on one (0.3.28+): the firmware draws the
+  charge there over your frame and sleeps the wedgie after 20 s with no press (the waking press never
+  reaches your app). Right-align your own top-right text to `ui.right()` (236 normally, further left
+  while the battery shows; call it at each draw: it changes when USB comes and goes). For older firmware:
+  `ui.right() if hasattr(ui, "right") else 236`.
 - An app that uses `ui` needs `"fw": "0.3.5"` in its wedgie.json entry.
 
 ## Saves (and starting at level 8)

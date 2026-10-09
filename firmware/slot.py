@@ -54,7 +54,7 @@ def empty():
     d.center_text("no software", top, INK, 2)
     d.center_text("pick what it runs at", top + 28, MUTED)
     d.center_text("wedgie.dev/connect", top + 44, GREEN_D)
-    d.text(W.short(), 240 - 8 * 6 - 6, 6, MUTED)
+    d.text(W.short(), ui.right() - 8 * 6, 6, MUTED)
     d.show()
 
 
@@ -169,6 +169,8 @@ def stop():
             t.deinit()
         except Exception:
             pass
+    if "power" in sys.modules:
+        sys.modules["power"].stop()
     if mod and hasattr(mod, "stop"):
         try:
             mod.stop()
@@ -498,6 +500,12 @@ def init():
     keys = L.Keys()
     _poll = select.poll()
     _poll.register(sys.stdin, select.POLLIN)
+    if _RealTimer:                      # a board: a battery shows its charge, sleeps when idle (power.py)
+        try:
+            import power
+            power.start(d, _RealTimer)
+        except Exception as e:
+            sys.print_exception(e)
     app = W.active()
     if app and keys.pins["X"].value() == 0:    # X held while plugging in: start without the app (a way
         app = None                              # back in when an app won't let USB work)

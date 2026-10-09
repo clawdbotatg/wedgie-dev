@@ -11,7 +11,7 @@ RP2350), a Waveshare Pico-LCD-1.3 hat (240x240 screen, 5-way joystick, A/B/X/Y),
 wedgie firmware: a boot logo, the one app it boots straight into, saves that outlast apps, and a USB
 protocol. Everything is MIT: https://wedgie.dev
 
-**The current firmware is 0.3.27.** If a wedgie's `hello` says older, update it first
+**The current firmware is 0.3.28.** If a wedgie's `hello` says older, update it first
 (`wedgie.py update`, below): everything here assumes current firmware.
 
 **Three guides cover everything** (this one first):
@@ -124,7 +124,7 @@ crashes at start or keeps USB from answering. Hold **Y**: no WEDGIE drive this t
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.27","fw":"wedgie-0.3.27","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.28","fw":"wedgie-0.3.28","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":2,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -248,7 +248,9 @@ straight apart, rocking gently end to end, never twisting. Reassemble in reverse
   29 KB (16 colors, 0.3.24+; it was 115 KB). Free RAM for an app on an RP2040: about 130-150 KB
   (`hello`'s `ram` says); an RP2350 has several times that.
 - 240x240; the panel is 16-bit color, the firmware draws in 16 colors (the boot logo in full color); a full-screen push takes ~25 ms (code.md has the measured costs).
-- No battery built in (a Waveshare Pico-UPS-B hat works; its sensor is on I²C1, GP6/GP7).
+- No battery built in. A LiPo on VSYS (the atomic wedgie) works: off USB, the firmware (0.3.28+,
+  `power.py`) shows the charge in the top-right corner over every app (read from VSYS on GP29) and puts
+  the wedgie to sleep after 20 s with no press; any button wakes it, and that press goes to nobody.
 
 ## First boot, in order
 
