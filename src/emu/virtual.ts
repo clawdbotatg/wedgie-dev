@@ -32,7 +32,6 @@ const CSS = `
 .vw .k.down .cap{filter:brightness(1.45) saturate(1.3)}
 .vw .arrow{fill:#b9b8b3}
 .vw .arrow.down{fill:#f2b233}
-.vw .kl{font:700 11px/1 system-ui,sans-serif;fill:#fff;pointer-events:none}
 `;
 function pct(a: number, b: number) { return ((a / b) * 100).toFixed(3) + "%"; }
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));

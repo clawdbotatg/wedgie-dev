@@ -1,7 +1,11 @@
-# Safe Signer: the wedgie signs Safe{Wallet} transactions with a key that lives in its Trust M chip.
+# Safe Signer: the wedgie signs Safe{Wallet} transactions with a key that lives in its secure chip, an
+# ATECC608 or an OPTIGA Trust M (whichever it has).
 #
-# The key: made once, on the wedgie, in the chip's key slot 2 (A on its screen). It never leaves the chip.
-# Its public key is saved (/saves/safe/key) because the chip hands it out only when it makes the key.
+# The key: made once, on the wedgie (A on its screen), in the Trust M's key slot 2 or the ATECC608's slot 0.
+# It never leaves the chip. An ATECC608 as shipped can't hold a key until its config is written and locked:
+# the question says so, and the yes locks it (for good; the old Wallet's table, atecc.CONFIG).
+# Its public key is saved (/saves/safe/key, with which chip) because the Trust M hands it out only when it
+# makes the key.
 # On chain the key is a passkey-style Safe owner: Safe's SafeWebAuthnSignerFactory makes a small signer
 # contract from (x, y), and that contract's address is added as an owner of the Safe.
 #
@@ -16,7 +20,7 @@
 #   -> {"id":1,"type":"safe_sig","safeTxHash":"0x..","x":"0x..","y":"0x..","r":"0x..","s":"0x..",
 #       "authenticatorData":"0x..","clientDataFields":"\"origin\":\"https://wedgie.dev\""}
 #   -> {"id":1,"type":"refused"} (Y, or no answer in 2 minutes) or {"type":"error","error":".."}
-#   hello answers also carry "safe": {"x","y"} (or null: no key yet) and "signer": its Safe owner address
+#   hello answers also carry "safe": {"x","y","chip"} (or null: no key yet) and "signer": its Safe owner address
 #   (safe_addr.py; the home screen shows it, wedgie.dev/safe checks it against its own).
 #   {"type":"safe_list"} -> {"type":"safe_list","safes":["8453:0x..", ...]}: the Safes this wedgie knows it's
 #   in, newest first, so any computer can list them. {"type":"safe_note","chainId":8453,"safe":"0x.."} adds
@@ -29,7 +33,7 @@ import save
 import ui
 from ui import WHITE, INK, MUTED, GREEN_D, RED
 
-FW = "safe-6"
+FW = "safe-7"
 RP_ID = b"wedgie.dev"
 FIELDS = '"origin":"https://wedgie.dev"'
 ASK_MS = 120000
@@ -99,7 +103,7 @@ MULTISEND = ("0x9641d764fc13c8b624c04430c7356c1c7c8102e2", "0x38869bf66a61cf6bdb
 d = None
 keys = None
 _poll = None
-key = None          # {"x": "0x..", "y": "0x.."} or None
+key = None          # {"x": "0x..", "y": "0x..", "chip": "ATECC608" | "OPTIGA Trust M"} or None (no chip: a Trust M)
 signer = None       # its Safe owner address, "0x.." checksummed (safe_addr.py), or None
 note = ""           # one line under the home screen (the last thing that happened)
 dirty = True
@@ -508,25 +512,60 @@ def webauthn_digest(h):
 
 # ---- the chip ---------------------------------------------------------------------------------
 
-def _chip():
-    import optiga
-    return optiga, optiga.Chip()
+N = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551     # P-256's order
+
+
+def _atecc():
+    """The ATECC608 if one answers on GP4/GP5, else None (then it's a Trust M)."""
+    try:
+        import atecc
+        a = atecc.ATECC608(sda=4, scl=5)
+        a.wake()
+        a.sleep()
+        return a
+    except MemoryError:                 # out of memory isn't "no ATECC608"
+        raise
+    except Exception:
+        return None
 
 
 def _unload():
-    for m in ("optiga", "trustm"):
+    for m in ("optiga", "trustm", "atecc"):
         if m in sys.modules:
             del sys.modules[m]
     gc.collect()
+
+
+def key_question():
+    """What the yes to "Make a key?" does on this wedgie's chip."""
+    try:
+        a = _atecc()
+        if not a:
+            return ["Replaces chip key slot 2."]
+        if not a.lock_state()["configLocked"]:
+            return ["Locks the chip for good.", "Can't undo."]
+        return ["Replaces chip key slot 0."]
+    except Exception:                   # make_key says what went wrong
+        return ["Replaces the chip's key."]
+    finally:
+        _unload()
 
 
 def make_key():
     global key
     ui.progress("Making your key", "in the chip", False)
     try:
-        o, c = _chip()
-        pub = c.genkey(o.KEY2)                  # 65 bytes: 04 X Y
-        key = {"x": hx(pub[1:33]), "y": hx(pub[33:65])}
+        a = _atecc()
+        if a:
+            if not a.lock_state()["configLocked"]:
+                a.write_config()                # checked byte for byte, then locked: permanent
+                a.lock_config()
+            x, y = a.genkey_new(0)
+            key = {"x": "0x%064x" % x, "y": "0x%064x" % y, "chip": "ATECC608"}
+        else:
+            import optiga
+            pub = optiga.Chip().genkey(optiga.KEY2)     # 65 bytes: 04 X Y
+            key = {"x": hx(pub[1:33]), "y": hx(pub[33:65]), "chip": "OPTIGA Trust M"}
         save.store("key", key)
         save.delete("signer")                   # a new key, a new address
         save.delete("safes")                    # and none of the old key's Safes
@@ -556,11 +595,19 @@ def find_signer():
 
 
 def sign(digest):
+    """(r, s) by the key's chip, s low (N - s is the same signature)."""
     try:
-        o, c = _chip()
-        return c.sign(o.KEY2, digest)
+        if key.get("chip") == "ATECC608":
+            a = _atecc()
+            if not a:
+                raise OSError("the key is in an ATECC608 and none answered")
+            r, s = a.sign(digest, 0)
+        else:
+            import optiga
+            r, s = optiga.Chip().sign(optiga.KEY2, digest)
     finally:
         _unload()
+    return r, (N - s if s > N // 2 else s)
 
 
 # ---- screens ----------------------------------------------------------------------------------
@@ -753,7 +800,7 @@ def run():
     while True:
         for k in keys.pressed():
             if k == "A" and not key:
-                if ui.ask(d, "Make a key?", ["Replaces chip key slot 2."]):
+                if ui.ask(d, "Make a key?", key_question()):
                     try:
                         make_key()
                         note = "key made"

@@ -12,7 +12,7 @@ only shrink. A new screen that breaks a rule fails the build.
 
 Every screen: as few words as possible, drawn as big as they fit. A question is the job and what
 matters about it, nothing else: "Update firmware", "0.3.30", a green check (signed). No sentences
-explaining the buttons; A yes / Y no already says it. White space left over means something can be
+explaining the buttons; a green yes bar and a red no bar already say it. White space left over means something can be
 bigger: center it and scale it up (the Safe Signer's home: its blockie 72 px, its address at scale 2).
 App names are Title Case ("Safe Signer"). Apps get the same rules in `public/code.md`.
 
@@ -49,10 +49,10 @@ System screens and every app's own UI (text, hints, yes/no, errors) use the pale
 | `ui.WHITE` | `#fefefe` | the screen |
 | `ui.INK` | `#1a1b1a` | text |
 | `ui.MUTED` | `#787b78` | second lines, hints, the step under the bar |
-| `ui.GREEN` | `#22c452` | yes, go, the A button, the waistband's top stripe |
+| `ui.GREEN` | `#22c452` | yes, go, the green button (A), the waistband's top stripe |
 | `ui.GREEN_D` | `#168c34` | green text on white |
 | `ui.GREY` | `#a9aaab` | the waistband's middle stripe |
-| `ui.RED` | `#e3312c` | no, errors, the Y button, the waistband's bottom stripe |
+| `ui.RED` | `#e3312c` | no, errors, the red button (Y), the waistband's bottom stripe |
 
 - Never re-type a palette color (`color(34, 196, 82)`): use `ui.GREEN`.
 - Never use lcd's raw colors (`L.WHITE`, `L.RED`, `L.BLUE`...) for anything a person reads. They
@@ -64,15 +64,20 @@ System screens and every app's own UI (text, hints, yes/no, errors) use the pale
 | `ui.page` | `ui.ask` | `ui.progress` |
 |---|---|---|
 | ![page](../public/img/look/page.png) | ![ask](../public/img/look/ask.png) | ![progress](../public/img/look/progress.png) |
-| a message: white, the waistband, a big title, lines, a hint at the bottom | a yes/no question: A yes, Y no, only real presses count | busy (section 1) |
+| a message: white, the waistband, a big title, lines, a hint at the bottom | a yes/no question: green yes, red no, only real presses count | busy (section 1) |
 
 Every system screen is one of these. An app's own UI (its menus, its game over, its errors) uses
 them too. An app that draws text without `import ui` fails the test.
 
 ## 4. Buttons and words
 
-- **A (green)** is yes, go, again. **Y (red)** is no, back. The same on every screen.
-- The hint sits at the bottom in `ui.MUTED`: "A  play again".
+- **The green button** (A) is yes, go, again. **The red button** (Y) is no, back. The same on every
+  screen. B and X are grey.
+- **Never a button letter on a screen** (Austin, 2026-10-09): the case has no letters, so "A", "press
+  Y" mean nothing to the person holding it. Show the button's color: in any text through `ui.say`
+  (`ui.page` lines and hint, `ui.ask` lines), `{g}` `{r}` `{k}` draw a green, red, grey square. Hosts
+  say "the green button", never "A". test_style.py fails on a drawn letter.
+- The hint sits at the bottom in `ui.MUTED`: "{g} play again".
 - Text: 8 px font. Scale 1 fits 28 characters across, scale 2 fits 15 (`ui.COLS_SMALL`, `ui.COLS_BIG`).
   `ui.wrap` breaks lines, `ui.title` draws a big one.
 - Words: plain and short. Say what is happening or what to do. No "..." on a screen.

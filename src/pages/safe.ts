@@ -1,5 +1,5 @@
 // wedgie.dev/safe: a wedgie as a signer on a Safe. The wedgie runs the Safe Signer app
-// (clawdbotatg/wedgie-safe): its key lives in the Trust M chip, it shows each transaction and signs on A.
+// (clawdbotatg/wedgie-safe): its key lives in the secure chip (ATECC608 or Trust M), it shows each transaction and signs on A.
 // Its key is a Safe owner through Safe's passkey signer contract (eth.ts signerAddress, no RPC).
 // Two views, one page (history.pushState between them, so the wedgie's key is read once):
 //   /safe                    the wedgie, a browser wallet (optional: pays gas, can sign as an owner), every
@@ -225,7 +225,7 @@ export function safe(main: HTMLElement) {
     else if (!W.armed()) h += `<p><a class="btn btn-green" href="/connect">Connect a wedgie</a></p>`;
     else if (!ws.length) h += `<p class="fine">Plug it in. Not showing? <a href="/connect">Connect</a> it first.</p>`;
     else if (!app.length) h += `<p class="fine">It isn't running the Safe Signer yet. <a class="btn btn-sm btn-green" href="/connect/${esc(ws[0].short)}">Install Safe Signer</a> (on its page, Software).</p>`;
-    else if (!key) h += noKey ? `<p><b>Press A on the wedgie to make its key.</b> The chip makes it and never lets it out.</p>` : `<p class="fine">Reading its key.</p>`;
+    else if (!key) h += noKey ? `<p><b>Press the green button on the wedgie to make its key.</b> The chip makes it and never lets it out.</p>` : `<p class="fine">Reading its key.</p>`;
     else {
       if (safeAddr) {
         const d = deployed[chain];
@@ -614,7 +614,7 @@ export function safe(main: HTMLElement) {
       throw new Error(chunk ? `This transaction has ${n} bytes of data: a wedgie takes up to ${DATA_MAX}. Sign it another way.`
         : "This transaction is too big for the wedgie to read in one go: update the Safe Signer app on it (its page, Software).");
     asking = true; paintAll();
-    say("Look at the wedgie: check what it shows, then press A to sign (Y says no).");
+    say("Look at the wedgie: check what it shows, then press the green button to sign (red says no).");
     try {
       const g = await W.withRepl(wedgie, async (r) => {
         if (!big) return r.request({ type: "safe_sign", tx }, 200000);
@@ -624,7 +624,7 @@ export function safe(main: HTMLElement) {
           const a = await r.request({ type: "safe_data", at: o / 2, hex: hex.slice(o, o + chunk) }, 20000);
           if (a.type !== "safe_data") throw new Error(a.error || "The wedgie didn't take a piece.");
         }
-        say("Look at the wedgie: check what it shows, then press A to sign (Y says no).");
+        say("Look at the wedgie: check what it shows, then press the green button to sign (red says no).");
         return r.request({ type: "safe_sign", tx: { ...tx, data: "@" } }, 200000);
       });
       if (g.type === "refused") throw new Error("The wedgie said no.");

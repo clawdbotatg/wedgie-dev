@@ -116,13 +116,13 @@ const shelfOn = (mod) => `document.querySelector('#d-shelf .cart-slot[data-mod="
 const pickApp = async (mod, what) => { await page.click(`#d-shelf .cart-slot[data-mod="${mod}"] .cart`); return wait(new Function(`return ${shelfOn(mod)}`), null, 30000, what); };
 const hashed0 = (await st(2, "hashed")) || 0;
 await page.click(`#d-shelf .cart-slot[data-mod="buttons"] .cart`);
-await wait(() => /Press A on the wedgie/.test(document.querySelector("#d-status")?.textContent || ""), null, 5000, "sealed: the page says to press A on the wedgie");
-await wait(() => document.querySelector(".ask-a .ask-3d"), null, 5000, "sealed: the Press A modal is up");
+await wait(() => /Press the green button on the wedgie/.test(document.querySelector("#d-status")?.textContent || ""), null, 5000, "sealed: the page says to press the green button");
+await wait(() => document.querySelector(".ask-a .ask-3d"), null, 5000, "sealed: the press-green modal is up");
 await page.waitForTimeout(2500);
 await shoot({ path: `${out}/connect-ask${phone ? "-phone" : ""}.png` });
 await wait(new Function(`return ${shelfOn("buttons")}`), null, 30000, "Buttons on, running");
 check((await st(2, "asks")) === 1, "sealed: it asked its person once");
-check(!(await page.$(".ask-a")), "the Press A modal is gone once it answered");
+check(!(await page.$(".ask-a")), "the press-green modal is gone once it answered");
 check((await files(2)).includes("buttons.py"), "buttons.py is on it");
 const a1 = await appsOn(2);
 check(a1?.length === 1 && a1[0].mod === "buttons" && /^[0-9a-f]{12}$/.test(a1[0].v), "apps.json: just buttons, with its version: " + JSON.stringify(a1));

@@ -255,7 +255,7 @@ try {
   check(deepHello[0]?.type === "hello", `a request too deep to decode is dropped, hello still answers (${deepHello[0]?.type})`);
 
   // the look-and-feel kit (firmware/ui.py): a page, for code.md's pictures
-  const pg = await page.evaluate(() => window.vw.exec("import slot, lcd, ui\nslot.stop()\nd = lcd.LCD()\nui.page(d, 'Game over', [('score 120', ui.INK), ('best 340', ui.MUTED)], 'A  play again')\nprint('page ok')"));
+  const pg = await page.evaluate(() => window.vw.exec("import slot, lcd, ui\nslot.stop()\nd = lcd.LCD()\nui.page(d, 'Game over', [('score 120', ui.INK), ('best 340', ui.MUTED)], '{g} play again')\nprint('page ok')"));
   await page.waitForTimeout(500);
   await page.locator(".vw").screenshot({ path: `${out}/emu-ui-page.png` });
   check(/page ok/.test(pg), "ui.page draws");

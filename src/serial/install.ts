@@ -124,7 +124,7 @@ export async function takeOver(r: Repl, ask = askHint, job = "", title = doing(j
 export const doing = (job: string) => job.replace(/ to \S+$/, "")
   .replace(/^(Update|Install|Uninstall|Save|Run)\b/, (v) => ({ Update: "Updating", Install: "Installing", Uninstall: "Uninstalling", Save: "Saving", Run: "Running" } as Record<string, string>)[v]) || "This computer has it";
 
-export const ASK_TEXT = "Press A on the wedgie to let this computer in";
+export const ASK_TEXT = "Press the green button on the wedgie to let this computer in";
 /** Where a page shows ASK_TEXT while the wedgie waits for its person ("" when they answered). */
 export let askHint: (s: string) => void = () => {};
 /** The last question's time: site = ms from the click to the request going out (what the site did
@@ -263,7 +263,7 @@ async function job(r: Repl, m: Manifest, title: string, write: string[], del: st
   fetched.catch(() => {});
   askHint(ASK_TEXT); onProgress(0, ASK_TEXT);
   const rel = late ? null : await relP;
-  // the job goes first; the page's "Press A" modal loads while the wedgie asks
+  // the job goes first; the page's "Press green" modal loads while the wedgie asks
   const site = performance.now() - (askStart || performance.now()), sent = Date.now();
   const asked = r.request({ type: "job", job: title, ...(rel ? { release: rel.text, sig: rel.sig } : { version: m.version }), write, delete: del, apps: apps && JSON.stringify(apps),
     bytes: write.reduce((t, n) => t + (m.files.find((f) => f.name === n)?.size || 0), 0),    // the wedgie's bar weighs the file part by it
@@ -288,7 +288,7 @@ async function job(r: Repl, m: Manifest, title: string, write: string[], del: st
   lastAsk = { site: Math.round(site), wedgie: v.asked_ms ?? null, what: title };
   if (v.port) return withRepl(v.port as Wedgie, async (r2) => {
     const h = await r2.hello(1500).catch(() => null);
-    if (!h?.job) throw new Error("the wedgie restarted without the install (did someone press Y?)");
+    if (!h?.job) throw new Error("the wedgie restarted without the install (did someone press the red button?)");
     if (lastAsk) lastAsk.wedgie = h.asked_ms ?? null;      // the go that carried it went out on the old port
     if (h.bin) binOf.set(r2, h.bin);
     return rest(r2);

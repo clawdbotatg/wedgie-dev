@@ -12,7 +12,7 @@ export function debug(main: HTMLElement) {
   <section class="test-page">
     <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
     <h1>Debug a wedgie</h1>
-    <p id="g-text">Plug in the wedgie. The report needs you to press A on it: that gives this computer full access, for this one report.</p>
+    <p id="g-text">Plug in the wedgie. The report needs you to press its green button: that gives this computer full access, for this one report.</p>
     <div id="g-list"></div>
     <div class="test-actions" id="g-actions"></div>
     <pre class="recess" id="g-out" hidden></pre>
@@ -30,7 +30,7 @@ export function debug(main: HTMLElement) {
 
   async function run(w: W.Wedgie) {
     busy = true; paint();
-    $("g-text").innerHTML = "<b>Press A on the wedgie.</b> It asks: Debug and read logs?";
+    $("g-text").innerHTML = "<b>Press the green button on the wedgie.</b> It asks: Debug and read logs?";
     let got: any = null, err = "";
     try {
       const code = await fetch("/device/debug.py", { cache: "no-cache" }).then((r) => r.text());

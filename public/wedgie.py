@@ -26,8 +26,8 @@
 A wedgie (firmware 0.2+) runs one app: it boots straight into it and the app gets every button.
 hello/shot/press talk to the firmware over JSON lines while the app runs and never interrupt it.
 The rest stop it (Ctrl-C), use MicroPython's raw REPL, then start the app again by running main.py.
-Firmware 0.2.5+ is sealed: the first of those asks on the wedgie's screen and waits for you to press A
-there. A yes is for that one command: the next one asks again.
+Firmware 0.2.5+ is sealed: the first of those asks on the wedgie's screen and waits for you to press the
+green button there. A yes is for that one command: the next one asks again.
 update, use, install and run soft-reset it (a fresh heap for new firmware or a new app).
 Only one program can hold the port: close the wedgie's page on wedgie.dev (and mpremote) first.
 
@@ -166,12 +166,12 @@ class Wedgie:
             data += self.s.read(4096)
 
     def let_in(self, job=""):
-        """0.2.5+ is sealed: Ctrl-C does nothing until its person presses A on the wedgie's own screen
-        ({"type": "open"}; Y or a minute with no answer is a no). A yes lasts until its app starts again."""
+        """0.2.5+ is sealed: Ctrl-C does nothing until its person presses the green button on the
+        wedgie's own screen ({"type": "open"}; red or a minute with no answer is a no). A yes lasts until its app starts again."""
         h = self.hello(1.0)
         if not h or not h.get("sealed") or h.get("open"):
             return
-        sys.stderr.write("press A on the wedgie to let this computer in\n")
+        sys.stderr.write("press the green button on the wedgie to let this computer in\n")
         try:
             v = self.request({"type": "open", "for": job}, 65)
         except TimeoutError:
@@ -539,7 +539,7 @@ def job(wg, title, write, delete, apps):
     # to delete their core names (wedgie.py, slot.py, ...)
     h0 = wg.hello(1.5) or {}
     bin_ = h0.get("bin") or 0           # 0.3.16+: raw bytes, 4 KB a put (base64 lines cost it ~1 s a KB)
-    sys.stderr.write("press A on the wedgie: %s?\n" % title)
+    sys.stderr.write("press the green button on the wedgie: %s?\n" % title)
     try:
         v = wg.request({"type": "job", "job": title, "release": rel, "sig": sig, "write": write, "delete": delete,
                         "apps": None if apps is None else json.dumps(apps), "raw": bool(bin_)}, 120)
@@ -554,7 +554,7 @@ def job(wg, title, write, delete, apps):
             if h:
                 break
         if not (h and h.get("job")):
-            sys.exit("the wedgie restarted without the install (did someone press Y?)")
+            sys.exit("the wedgie restarted without the install (did someone press the red button?)")
         bin_ = h.get("bin") or 0
         v = {"type": "go"}
     if v.get("type") == "refused":
@@ -657,7 +657,7 @@ def main():
             if not h.get("sealed") or h.get("open"):
                 print("it's open already: Ctrl-C works (mpremote too)")
             else:
-                sys.stderr.write("press A on the wedgie (the red screen) to give this computer full control\n")
+                sys.stderr.write("press the green button on the wedgie (the red screen) to give this computer full control\n")
                 try:
                     v = wg.request({"type": "open", "full": True}, 65)
                 except TimeoutError:

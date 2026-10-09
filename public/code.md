@@ -124,8 +124,8 @@ def run():                        # wedgie.json: "entry": "run"
             time.sleep_ms(left)   # the firmware answers USB in here: always sleep a little
 ```
 
-The app gets every button; there's no menu and nothing that leaves it. Convention: A = yes/fire,
-Y = no/back. Keep the joystick for movement. Show the controls on the title screen.
+The app gets every button; there's no menu and nothing that leaves it. Convention: A (green) = yes/fire,
+Y (red) = no/back; B and X are grey. Keep the joystick for movement. Show the controls on the title screen.
 
 ## Fast graphics: what things cost
 
@@ -225,8 +225,8 @@ game's own art (sprites, levels, backgrounds) can use any colors you like.
 ```python
 import lcd, ui
 d = lcd.LCD()
-ui.page(d, "Game over", [("score 120", ui.INK), ("best 340", ui.MUTED)], "A  play again")
-if ui.ask(d, "Delete your save?", ["It can't come back."]):   # A yes, Y no; only real presses count
+ui.page(d, "Game over", [("score 120", ui.INK), ("best 340", ui.MUTED)], "{g} play again")
+if ui.ask(d, "Delete your save?", ["It can't come back."]):   # green yes, red no; only real presses count
     save.delete("best")
 bar = ui.progress("Loading level 3", "tiles")                  # the boot logo and the boot bar
 if bar:
@@ -241,15 +241,18 @@ import loader; loader.what("enemies")                          # the line under 
 - **Few words, big.** Every screen: as few words as fit the job, drawn as big as they fit. Space left
   over means something can be bigger: center it and scale it up (scale 2 or 3, a bigger picture).
   A question is the action and the one fact that matters ("Send", "0.5 ETH"), never sentences
-  explaining A and Y.
+  explaining the buttons.
+- **No button letters on screen.** The case has none: a screen never says "A" or "press Y". In
+  `ui.page` lines and hints, `ui.ask` lines and `ui.say(d, text, y)`, `{g}` `{r}` `{k}` draw a green,
+  red, grey square: `"{g} play again"`, `"Press {r} to quit"`.
 - **Names are Title Case:** your app's name in `wedgie.json` and its title on screen ("Safe Signer").
 - **Palette:** `ui.WHITE` (screen), `ui.INK` (text), `ui.MUTED` (second lines, hints), `ui.GREEN`
-  (yes, the A button), `ui.GREEN_D` (green text on white), `ui.GREY`, `ui.RED` (no, errors, the Y
+  (yes, the green button), `ui.GREEN_D` (green text on white), `ui.GREY`, `ui.RED` (no, errors, the red
   button). The waistband is `ui.band(d, y)`.
 - **Text:** 8 px font. Scale 1 fits 28 characters across, scale 2 fits 15 (`ui.COLS_SMALL`,
   `ui.COLS_BIG`). `ui.wrap(text, n)` breaks words into lines; `ui.title(d, text, y)` draws a big one.
 - **Buttons mean the same everywhere:** A (green) is yes / go / again, Y (red) is no / back. Put the
-  hint at the bottom in `ui.MUTED` ("A  play again"), as `ui.page` does.
+  hint at the bottom in `ui.MUTED` ("{g} play again"), as `ui.page` does.
 - **Slow things show `ui.progress`**, never a bar of your own and never "loading..." or "please wait".
   Its title says what you're doing ("Loading level 3"), the line under the bar the step ("tiles"). It
   draws straight to the screen (not your framebuffer) and costs about 9 KB of RAM while it's up; your

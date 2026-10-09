@@ -1,6 +1,6 @@
 ---
 name: wedgie
-description: Everything about a wedgie (Raspberry Pi Pico + Waveshare Pico-LCD-1.3 240x240 screen, joystick, A/B/X/Y, a secure chip on I2C, running MicroPython + wedgie firmware) - talking to it directly over USB (find its port, hello, its screen, buttons, files, the lock and the A press, full control), wedgie.py, building one from parts, first boot, finding what's wrong and fixing it, firmware and apps. Use for "my wedgie is plugged in", "what's on my wedgie's screen", "update my wedgie", "build a wedgie", "my wedgie is broken / won't ...", "make an app for my wedgie" (then code.md), "use the secure chip" (then trustm.md).
+description: Everything about a wedgie (Raspberry Pi Pico + Waveshare Pico-LCD-1.3 240x240 screen, joystick, A/B/X/Y, a secure chip on I2C, running MicroPython + wedgie firmware) - talking to it directly over USB (find its port, hello, its screen, buttons, files, the lock and the green-button press, full control), wedgie.py, building one from parts, first boot, finding what's wrong and fixing it, firmware and apps. Use for "my wedgie is plugged in", "what's on my wedgie's screen", "update my wedgie", "build a wedgie", "my wedgie is broken / won't ...", "make an app for my wedgie" (then code.md), "use the secure chip" (then trustm.md).
 ---
 
 # Wedgie
@@ -11,7 +11,7 @@ RP2350), a Waveshare Pico-LCD-1.3 hat (240x240 screen, 5-way joystick, A/B/X/Y),
 wedgie firmware: a boot logo, the one app it boots straight into, saves that outlast apps, and a USB
 protocol. Everything is MIT: https://wedgie.dev
 
-**The current firmware is 0.3.34.** If a wedgie's `hello` says older, update it first
+**The current firmware is 0.3.35.** If a wedgie's `hello` says older, update it first
 (`wedgie.py update`, below): everything here assumes current firmware.
 
 **Three guides cover everything** (this one first):
@@ -49,20 +49,22 @@ while time.time() < end:
 ```
 
 5. Lines that don't start with `{` are logs (an app's `print()`). **No answer at all:** it's showing
-   "wedgie broke" (read the screen to your person; A there asks for full control), its app reads USB
+   "wedgie broke" (read the screen to your person; the green button there asks for full control), its app reads USB
    itself (`"usb": true`, rare), it isn't running wedgie firmware (`wedgie.py update`), or it's stuck:
    unplug it and plug it back in.
 
 **What needs nobody:** `hello`, `shot` (its screen), `press` (a button, as if pressed: it drives an
 app but can never answer a question on the wedgie), `chip` (prove the secure chip works), `ls`, and
-`get` / `rm` inside `/saves/`. **Everything else needs your person to press A on the wedgie's own
-screen** (installs, updates, other files, the REPL, the chip's keys). Tell them what will appear and
-that they should press A, before you ask.
+`get` / `rm` inside `/saves/`. **Everything else needs your person to press the green button on the
+wedgie's own screen** (installs, updates, other files, the REPL, the chip's keys). Tell them what will appear and
+that they should press the green button, before you ask.
+**The case's buttons have no letters on them:** to your person, A is "the green button", Y "the red
+button", B and X "the grey buttons". The letters are only names in `press` and `lcd.Keys()`.
 
 ## Your tools: wedgie.py
 
 One file: `curl -O https://wedgie.dev/wedgie.py`, then `python3 wedgie.py <command>` (or
-`uv run --with pyserial python3 wedgie.py <command>`). "A" = your person presses A on the wedgie.
+`uv run --with pyserial python3 wedgie.py <command>`). "A" = your person presses the green button on the wedgie.
 
     python3 wedgie.py list                 every wedgie on USB: port, ID, firmware
     python3 wedgie.py hello                what it is and runs (JSON)
@@ -83,7 +85,7 @@ One file: `curl -O https://wedgie.dev/wedgie.py`, then `python3 wedgie.py <comma
 `--port /dev/cu.usbmodemXXXX` or `--id A1B2C3` picks one when several are plugged in. The person can
 also do all of it by clicking at https://wedgie.dev/connect (Chrome or Edge).
 
-## The lock and the A press
+## The lock and the green-button press
 
 A wedgie is **locked** (hello says `"sealed": true`). Ctrl-C does nothing and no computer can reach its
 REPL, its files outside `/saves/`, or its secure chip on its own. The only way in is a question on the
@@ -91,10 +93,10 @@ wedgie's own screen answered by a **real press** (a `press` request can't answer
 
 - **One job** (`{"type":"open","for":"Update firmware"}`; wedgie.py and the site send it for you): the
   same red **FULL CONTROL?** question as below (0.3.27+: a computer's own title never goes on a calm
-  screen that gives it the REPL); A says yes, Y or a minute with no answer says no. Allow 65 s for the reply.
+  screen that gives it the REPL); green (A) says yes, red (Y) or a minute with no answer says no. Allow 65 s for the reply.
   After a yes, hello says `"open": true` and Ctrl-C (0x03) works as usual until its app starts again.
 - **Full control** (`{"type":"open","full":true}`, `wedgie.py unlock`, or just pressing Ctrl-C, e.g.
-  mpremote's): a white-on-red **FULL CONTROL?** question. After A the app stops and the screen says
+  mpremote's): a white-on-red **FULL CONTROL?** question. After a yes the app stops and the screen says
   **COMPUTER HAS FULL ACCESS / didn't want that? unplug it now**. It stays open until it restarts or is
   unplugged. mpremote gives up after ~10 s: if your person was slower, run it again (it's open by then).
   Ctrl-C in the first 3 s after it starts is ignored (a connecting tool's leftover bytes).
@@ -105,7 +107,7 @@ wedgie's own screen answered by a **real press** (a `press` request can't answer
   Expect a `refused` answer, then its `ready` line.
 - The lock is in the firmware, not the app: it turns Ctrl-C off before any app runs, so no app can
   leave a computer a way in. An app is code on the wedgie, though, and can do anything once installed;
-  installing one is what the A press guards.
+  installing one is what the green-button press guards.
 
 ## Plugging in, and resets (read before scripting a wedgie)
 
@@ -124,7 +126,7 @@ crashes at start or keeps USB from answering. Hold **Y**: no WEDGIE drive this t
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.34","fw":"wedgie-0.3.34","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.35","fw":"wedgie-0.3.35","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":2,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -317,8 +319,9 @@ The full API with templates and measured speeds is in code.md; the essentials:
   `big_text(s, x, y, c, scale)`, `center_text(s, y, c, scale)`, `backlight(pct)`. Colors:
   `lcd.color(r, g, b)` (the nearest of the 16), or `BLACK WHITE RED GREEN BLUE YELLOW GREY DARK`.
 - `lcd.Keys()`: `pressed()` (names that went down since the last call) and `held(name)`. Names:
-  `A B X Y up down left right press`. A = yes, Y = no/back.
-- `ui`: the palette (`WHITE INK MUTED GREEN GREEN_D GREY RED`), `page`, `ask`, `progress`, `band`,
+  `A B X Y up down left right press`. A (green) = yes, Y (red) = no/back, B and X are grey. Never show a
+  letter on screen: `{g}` `{r}` `{k}` in `ui` text draw a green / red / grey square.
+- `ui`: the palette (`WHITE INK MUTED GREEN GREEN_D GREY RED`), `page`, `ask`, `progress`, `say`, `band`,
   `title`, `wrap`, `buttons` (code.md, "Look and feel").
 - `save`: `store(name, value)`, `load(name, default)`, `delete(name)`, `names()`, in `/saves/<app>/`.
 - `wedgie`: `uid()`, `short()`, `board()`, `VERSION`, `chip()` (proves the chip, as the USB `chip`

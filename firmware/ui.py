@@ -5,7 +5,7 @@
 #
 #   import lcd, ui
 #   d = lcd.LCD()
-#   ui.page(d, "Game over", [("score 120", ui.INK)], hint="A  play again")
+#   ui.page(d, "Game over", [("score 120", ui.INK)], hint="{g} play again")   # {g} = a green square
 #   if ui.ask(d, "Delete your save?", ["It can't come back."]): ...
 #   bar = ui.progress("Loading level 3", "tiles"); bar and bar.to(0.5)   # the boot bar (loader.screen)
 import time
@@ -14,10 +14,10 @@ import lcd as L
 WHITE = L.color(254, 254, 254)     # the screen
 INK = L.color(26, 27, 26)          # text
 MUTED = L.color(120, 123, 120)     # second lines, hints
-GREEN = L.color(34, 196, 82)       # the waistband's top stripe; yes; the A button
+GREEN = L.color(34, 196, 82)       # the waistband's top stripe; yes; the green button
 GREEN_D = L.color(22, 140, 52)     # green text on white
 GREY = L.color(169, 170, 171)      # the waistband's middle stripe
-RED = L.color(227, 49, 44)         # the waistband's bottom stripe; no; errors; the Y button
+RED = L.color(227, 49, 44)         # the waistband's bottom stripe; no; errors; the red button
 
 SMALL, BIG = 8, 16                 # text heights: scale 1 and 2 (8 px font)
 COLS_SMALL, COLS_BIG = 28, 15      # characters that fit across the screen at each
@@ -61,6 +61,40 @@ def title(d, s, y=48, lines=2, c=INK):
     return y + len(t) * 14
 
 
+# The case's buttons have no letters on them, so a screen never names one ("A", "press Y"): it shows the
+# button's color. In any text drawn through say(), {g} {r} {k} are a green, red, grey square.
+_KEY = {"g": GREEN, "r": RED, "k": GREY}
+
+
+def say(d, s, y, c=INK, scale=1, edge=INK):
+    """center_text, with {g} {r} {k} drawn as a square of that button's color (an `edge` line around it)."""
+    if "{" not in s:
+        return d.center_text(s, y, c, scale)
+    parts = []
+    while s:
+        j = s.find("{")
+        if j < 0 or s[j + 2:j + 3] != "}" or s[j + 1:j + 2] not in _KEY:
+            parts.append(s)
+            break
+        if j:
+            parts.append(s[:j])
+        parts.append(_KEY[s[j + 1]])
+        s = s[j + 3:]
+    w = 8 * scale
+    x = (240 - w * sum(len(p) if isinstance(p, str) else 1 for p in parts)) // 2
+    for p in parts:
+        if isinstance(p, str):
+            if scale == 1:
+                d.text(p, x, y, c)
+            else:
+                d.big_text(p, x, y, c, scale)
+            x += w * len(p)
+        else:
+            d.fill_rect(x, y - 1, w, w, edge)
+            d.fill_rect(x + 1, y, w - 2, w - 2, p)
+            x += w
+
+
 def page(d, head, lines=(), hint="", show=True):
     """The standard screen: white, the waistband, a big title, lines of (text, color), a hint at the
     bottom. Nothing else on a system screen."""
@@ -69,20 +103,20 @@ def page(d, head, lines=(), hint="", show=True):
     y = title(d, head, 72) + 12
     for s, c in lines:
         for x in wrap(s):
-            d.center_text(x, y, c)
+            say(d, x, y, c)
             y += 14
     if hint:
-        d.center_text(hint[:COLS_SMALL], 222, MUTED)
+        say(d, hint[:COLS_SMALL + 2], 222, MUTED)
     if show:
         d.show()
 
 
 def buttons(d, yes="yes", no="no"):
-    """The two answer bars at the bottom: A (green) and Y (red), as on the case."""
+    """The two answer bars at the bottom: green and red, the colors of the case's yes and no buttons."""
     d.fill_rect(0, 184, 240, 26, GREEN)
-    d.center_text(("A  " + yes)[:COLS_BIG], 189, WHITE, 2)
+    d.center_text(yes[:COLS_BIG], 189, WHITE, 2)
     d.fill_rect(0, 214, 240, 26, RED)
-    d.center_text(("Y  " + no)[:COLS_BIG], 219, WHITE, 2)
+    d.center_text(no[:COLS_BIG], 219, WHITE, 2)
 
 
 drawn = 0       # ticks_ms when the last ask() finished drawing its question (the slot reports it)
@@ -97,7 +131,7 @@ def check(d, x, y, c=GREEN_D):
 
 
 def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None, scary=False, big=None):
-    """A yes/no question: A yes, Y no, no answer in `ms` is a no. Only real presses count (a press
+    """A yes/no question: green yes, red no, no answer in `ms` is a no. Only real presses count (a press
     sent over USB can't answer). True for yes. scary: white on red, for a yes that hands over
     everything (full control: slot.let_in). big: what it's about, drawn huge under a one-line question
     (scale 3, a word a line, or scale 2 for long words) with a small green check after its last line:
@@ -131,7 +165,7 @@ def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None, scary=Fa
         for x in wrap(s):
             if y > 168:
                 break
-            d.center_text(x, y, fg)
+            say(d, x, y, fg, 1, fg)
             y += 14
     buttons(d, yes, no)
     if scary:                               # the no bar is red on red: a white line keeps it a button

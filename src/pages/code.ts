@@ -111,7 +111,7 @@ export function code(main: HTMLElement) {
       </div>
       <ul>
         <li><b>One palette.</b> <code>ui.INK</code>, <code>ui.MUTED</code>, <code>ui.GREEN</code> (yes), <code>ui.RED</code> (no), the waistband <code>ui.band</code>.</li>
-        <li><b>Buttons mean the same everywhere.</b> A (green) is yes / go / again, Y (red) is no / back.</li>
+        <li><b>Buttons mean the same everywhere.</b> Green (A) is yes / go / again, red (Y) is no / back. The case has no letters on it: never put one on the screen, show <code>{g}</code> / <code>{r}</code> (a green / red square) instead.</li>
         <li><b>Slow things show the boot bar,</b> never a bar of your own.</li>
       </ul>
       <p class="fine">The details: <a href="/code.md">code.md</a>, "Look and feel".</p>

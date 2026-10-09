@@ -7,12 +7,14 @@
    of showing the boot loader (ui.progress, titled with what it's doing);
  - a file but lcd.py uses lcd's raw colors (L.WHITE, L.RED, L.BLUE...) for anything (they aren't the palette);
  - an app file that draws text doesn't use the kit (import ui);
+ - a screen names a button by its letter ("A  try again", "Press Y"): the case has no letters, show {g} {r} {k};
  the site and wedgie.py
  - src/ui/palette.ts drifts from ui.py;
  - anything but files.ts writeFile / wedgie.py Wedgie.put writes a file on a wedgie (those two move its
    bar and refuse to write without the busy screen up);
  - takeOver / take_over is called without the job (the wedgie's screen and question say it);
- - the two copies of BUSY_PY (files.ts, wedgie.py) differ.
+ - the two copies of BUSY_PY (files.ts, wedgie.py) differ;
+ - the site or wedgie.py tells a person to press a button by its letter ("Press A"): say "the green button".
 KNOWN lists what isn't on the guide yet. It may only shrink: fix one, take it off.
 Game art (sprites, levels, backgrounds) may use any colors of its own.   python3 tools/test_style.py"""
 import json, os, re, sys
@@ -47,6 +49,8 @@ app_files = {f.replace(".mpy", ".py") for c in carts for f in c["files"] if f.en
 DRAWS = re.compile(r"(center_text|\.text|big_text|_band|draw_msg|page|ask|progress|screen|what|show|title)\(")
 # Busy in words: a line that is only "working" / "loading" / "please wait" / "busy" (any case, any dots),
 # or any line ending "..." ("Loading level 3" says what, so it's a fine title for ui.progress).
+# A button by its letter in drawn text: "A  yes", "Press Y", "Y no". The case has no letters.
+LETTER = re.compile(r"""["'](?:[ABXY] |[^"'\n]*\b(?:[Pp]ress|[Hh]old)\s+[ABXY]\b|[^"'\n]*\b[ABXY]\s+(?:yes|no|to)\b)""")
 BUSY = re.compile(r"""["'](\s*(working|loading|please wait|busy|wait)\W*|[^"'\n]*\.\.\.)["']""", re.I)
 
 for n in sorted(os.listdir(fw)):
@@ -71,10 +75,19 @@ for n in sorted(os.listdir(fw)):
                     if re.search(r'\.replace\(\s*"\.\.\."', line) or re.search(r'\+ "\.\.\." \+', line):
                         continue                # taking "..." off, or shortening an address
                     fail(f, "busy", "says it's busy in words (%r): show the boot loader, ui.progress(what it's doing, the step)" % m.group(1))
+    if n not in ("lcd.py",):
+        for line in c.splitlines():
+            if LETTER.search(line):
+                fail(f, "letter", "names a button by its letter (%s): show its color, {g} {r} {k}" % line.strip()[:60])
     if n not in ("lcd.py",) and re.search(r"\bL\.(WHITE|BLACK|RED|GREEN|BLUE|YELLOW|GREY|DARK)\b", c):
         fail(f, "raw colors", "uses lcd's raw colors (L.WHITE, L.RED...): use the ui palette")
     if n in app_files and re.search(r"(center_text|\.text|big_text)\(", c) and not re.search(r"^\s*import .*\bui\b|^\s*from ui import", c, re.M):
         fail(f, "kit", "an app that draws text without the kit: import ui (ui.page / ui.ask / ui.progress, the palette)")
+
+for f in ["public/wedgie.py", "public/drive.html"] + ["src/%s/%s" % (d, x) for d in ("pages", "serial", "ui") for x in sorted(os.listdir(os.path.join(root, "src", d))) if x.endswith(".ts")]:
+    for i, line in enumerate(read(f).splitlines(), 1):
+        if "wedgie.py press" not in line and re.search(r"\b[Pp]ress (?:<[^>]*>)?[ABXY]\b|\(press [ABXY]\)", line):
+            fail(f, "letter", "line %d tells a person a button's letter: say its color (the green button)" % i)
 
 ts = read("src/ui/palette.ts")
 for k, (r, g, b) in pal.items():

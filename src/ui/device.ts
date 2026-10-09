@@ -21,7 +21,6 @@ export function deviceSvg(screen: Screen, opts: { cls?: string } = {}) {
       <rect x="276" y="${y}" width="44" height="28" rx="11" fill="url(#bw${i})" />
       <rect class="cap" x="280" y="${y + 2}" width="36" height="22" rx="9" fill="${fill}" />
       <rect x="283" y="${y + 4}" width="30" height="7" rx="3.5" fill="#fff" opacity=".22" />
-      <text x="298" y="${y + 18}" text-anchor="middle" class="kl">${k}</text>
     </g>`;
   return `<svg class="wedgie ${opts.cls || ""}" viewBox="-14 -8 368 214" role="img" aria-label="a wedgie">
   <defs>

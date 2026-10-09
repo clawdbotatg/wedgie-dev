@@ -59,9 +59,9 @@ def empty():
 def _ended(why=None):
     name = app.get("name", app["mod"])
     if why:
-        _band(name, [(why[:56], RED)], "A  try again")
+        _band(name, [(why[:56], RED)], "{g} try again")
     else:
-        _band(name, [("ended", MUTED)], "A  start it again")
+        _band(name, [("ended", MUTED)], "{g} start again")
 
 
 def open_app():
@@ -278,7 +278,7 @@ ASK_MS = 60000      # no answer to "let this computer in?" in a minute is a no
 
 def ask(job="", checked=False, v=""):
     """Let the computer do `job` (what it says it wants, e.g. "Install Safe signer", "Update firmware to
-    0.3.30")? ui.ask: only a real press answers, A yes, Y no. Nothing comes off USB meanwhile, so the
+    0.3.30")? ui.ask: only a real press answers, green yes, red no. Nothing comes off USB meanwhile, so the
     computer waits. Only for a checked job (job.py: only files signed by wedgie.dev go on, so the green
     check): anything that gives the computer the REPL asks the red question (hatch.ask, let_in), never
     this calm one with the computer's own title on it. Few words, big (Austin, 2026-10-09): the job,

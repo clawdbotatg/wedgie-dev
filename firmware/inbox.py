@@ -2,7 +2,7 @@
 # that can save a file but has no serial port talks to a wedgie this way. A host-written file in the
 # drive's top folder is fed, byte by byte, through the one USB line reader (wedgie.lines(): no new
 # buffer), so each of its lines is handled exactly like one from USB serial, with the same rules: any
-# job still needs a real A press on the wedgie. Answers go out on USB serial as usual, and once a request
+# job still needs a real press of the green button on the wedgie. Answers go out on USB serial as usual, and once a request
 # came in through a file, into ANSWER.TXT too (answer(): a phone can't read the serial port).
 #
 # Imported only once the host has written something (wedgie._dropped). A file is read once per power-up

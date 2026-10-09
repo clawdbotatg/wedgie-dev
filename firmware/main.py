@@ -23,7 +23,7 @@ def stuck(e):
     try:
         import lcd, ui
         d = lcd.LCD()
-        ui.page(d, "wedgie broke", [("%s" % e, ui.RED), ("", ui.MUTED), ("A  give a computer full control", ui.INK), ("B  try again", ui.INK)])
+        ui.page(d, "wedgie broke", [("%s" % e, ui.RED), ("", ui.MUTED), ("{g} full control", ui.INK), ("{k} try again", ui.INK)])
     except Exception:
         pass
     from machine import Pin
@@ -32,9 +32,9 @@ def stuck(e):
         time.sleep_ms(20)
     while True:
         if a.value() == 0:
-            try:            # the escape hatch's red question (hatch.py). If it can't even draw, A on "wedgie broke" stands
+            try:            # the escape hatch's red question (hatch.py). If it can't even draw, green on "wedgie broke" stands
                 if not ui.ask(d, "FULL CONTROL?", ["This computer could run any code and make the chip sign anything: send your money.",
-                                                   "Didn't ask for this? Press Y."], yes="full control", no="no", scary=True):
+                                                   "Didn't ask? Press {r}"], yes="full control", no="no", scary=True):
                     return False
             except Exception:
                 pass

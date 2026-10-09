@@ -110,7 +110,6 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 22px; }
 .lcd-big { font-size: 19px; letter-spacing: 1px; }
 .lcd-sub { font-size: 8px; fill: #6b6e6b; }
 .lcd-txt { font-size: 10px; fill: #e6e6e6; }
-.kl { font: 800 11px var(--font); fill: #fff; opacity: .85; pointer-events: none; }
 .wedgie .k .cap { transition: filter .08s; }
 .wedgie .k.down .cap { filter: brightness(1.45) saturate(1.3); }
 .wedgie .k.done .cap { stroke: #22c452; stroke-width: 3; }
@@ -534,7 +533,7 @@ body.test-mode .top, body.test-mode .foot { display: none; }
 /* Press A on your wedgie (ui/askmodal.ts) */
 .ask-a { width: min(520px, 100%); }
 .ask-a .ask-3d { height: 260px; }
-.ask-key { display: inline-block; background: #278c3c; color: #fff; border-radius: 999px; padding: 0 .45em; animation: askpulse 1s ease-in-out infinite; }
+.ask-key { display: inline-block; background: #22c452; width: .9em; height: .9em; border-radius: .15em; vertical-align: -.08em; animation: askpulse 1s ease-in-out infinite; }
 @keyframes askpulse { 50% { box-shadow: 0 0 0 8px rgba(39,140,60,.25); } }
 /* /code: the look-and-feel card's pictures */
 .look-row { display: flex; gap: 12px; flex-wrap: wrap; margin: 8px 0; }
