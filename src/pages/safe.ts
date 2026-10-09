@@ -138,7 +138,7 @@ export function safe(main: HTMLElement) {
   let account = "", busy = false;
   // the view: null = the list; else one Safe
   let chain = 8453, safeAddr = "", info: Info | null = null, queue: any[] = [];
-  let rows: Row[] = [], listing = false;
+  let rows: Row[] = [], listing = false, listPct = 8;
   let newChain = 8453, showWallet = false;   // the wallet's own Safes: folded away (the wedgie's are the point)
   const OFF = "wedgie.safe.wallet-off";      // Disconnect sticks: no reconnecting by itself on the next visit
   const deployed: Record<number, boolean | undefined> = {};
@@ -321,7 +321,13 @@ export function safe(main: HTMLElement) {
   // ---- /safe: every Safe the wedgie (and the wallet) owns, on every chain ----
   async function findSafes() {
     if (!signer && !account) return;
-    listing = true; paintList();
+    listing = true; listPct = 8; paintList();
+    // the bar: asking Safe's API on every chain is the first 70%, reading each Safe from its chain the rest
+    let asked = 0, read = 0, nAsk = Object.keys(CHAINS).length * ((signer ? 1 : 0) + (account ? 1 : 0)), nRead = 0;
+    const tick = () => {
+      listPct = Math.max(8, nRead ? 70 + 30 * read / nRead : 70 * asked / nAsk);
+      const f = document.getElementById("l-fill"); if (f) f.style.width = `${listPct}%`;
+    };
     const found = new Map<string, Row>();
     const add = (c: number, a: string, who: "wedgie" | "wallet") => {
       const k = `${c}:${a.toLowerCase()}`, r = found.get(k) || { chain: c, addr: E.checksum(a), wedgie: false, wallet: false };
@@ -337,14 +343,15 @@ export function safe(main: HTMLElement) {
       }
     };
     await Promise.all(Object.keys(CHAINS).map(Number).map(async (c) => {
-      if (signer) for (const s of await of(c, signer)) add(c, s, "wedgie");
-      if (account) for (const s of await of(c, account)) add(c, s, "wallet");
+      if (signer) { for (const s of await of(c, signer)) add(c, s, "wedgie"); asked++; tick(); }
+      if (account) { for (const s of await of(c, account)) add(c, s, "wallet"); asked++; tick(); }
     }));
     for (const k of signer ? remembered() : []) { const [ck, a] = k.split(":"); if (KEYS[ck]) add(KEYS[ck], a, "wedgie"); }
     for (const k of onWedgie || []) { const [c, a] = k.split(":"); if (CHAINS[+c] && E.isAddress(a)) add(+c, a, "wedgie"); }
     const list = [...found.values()];
+    nRead = list.length;
     for (let i = 0; i < list.length; i += 4)      // a few at a time: public RPCs rate-limit a burst
-      await Promise.all(list.slice(i, i + 4).map(async (r) => { try { r.info = await readSafe(r.chain, r.addr); } catch (e: any) { r.info = null; r.err = msgOf(e); r.gone = !!e?.gone; } }));
+      await Promise.all(list.slice(i, i + 4).map(async (r) => { try { r.info = await readSafe(r.chain, r.addr); } catch (e: any) { r.info = null; r.err = msgOf(e); r.gone = !!e?.gone; } read++; tick(); }));
     for (const r of list) {          // the chain is the truth: who really is an owner now
       if (!r.info) continue;
       r.wedgie = !!signer && r.info.owners.some((o) => eqA(o, signer));
@@ -371,7 +378,7 @@ export function safe(main: HTMLElement) {
     const mine = rows.filter((r) => r.wedgie), theirs = rows.filter((r) => !r.wedgie);
     let h = `<h2>Your wedgie's Safes</h2>`;
     h += mine.length ? `<ul class="safe-list safe-rows">${mine.map(row).join("")}</ul>`
-      : listing ? `<p class="fine">Looking on every chain.</p>` : `<p class="fine">${key ? "None yet. Make one below, or add your wedgie to a Safe you already have." : "Plug in your wedgie to see its Safes."}</p>`;
+      : listing ? `<div class="meter"><div class="meter-track"><div class="meter-fill" id="l-fill" style="width:${listPct}%"></div></div><p class="fine">Looking on every chain.</p></div>` : `<p class="fine">${key ? "None yet. Make one below, or add your wedgie to a Safe you already have." : "Plug in your wedgie to see its Safes."}</p>`;
     if (theirs.length) h += showWallet
       ? `<p class="fine"><button class="btn btn-sm" id="l-wallet">Hide your wallet's Safes</button> Open one to add your wedgie as an owner.</p><ul class="safe-list safe-rows">${theirs.map(row).join("")}</ul>`
       : `<p class="fine"><button class="btn btn-sm" id="l-wallet">Your wallet's Safes (${theirs.length})</button> to add your wedgie to one</p>`;
