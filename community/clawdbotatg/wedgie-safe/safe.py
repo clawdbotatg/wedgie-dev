@@ -29,7 +29,7 @@ import save
 import ui
 from ui import WHITE, INK, MUTED, GREEN_D, RED
 
-FW = "safe-4"
+FW = "safe-5"
 RP_ID = b"wedgie.dev"
 FIELDS = '"origin":"https://wedgie.dev"'
 ASK_MS = 120000
@@ -306,7 +306,7 @@ def _bytes_at(data, off):
 
 
 def _uniswap(tx):
-    """SwapRouter02 multicall(deadline, [exactInput, unwrapWETH9?]) as lines, or None."""
+    """SwapRouter02 multicall(deadline, [exactInput, unwrapWETH9?]) as (title, lines), or None."""
     data, safe = tx["data"], tx["safe"]
     b = data[4:]
     arr = int.from_bytes(b[32:64], "big")
@@ -331,44 +331,44 @@ def _uniswap(tx):
         return None
     pay = "%s ETH" % amount(tx["value"], 18) if tx["value"] else _amt(tx, a, amt_in)
     get = "%s ETH" % amount(min_out, 18) if eth_out else _amt(tx, z, min_out)
-    return [("swap on Uniswap", INK), ("pay " + pay, INK), ("get at least", MUTED), (get, INK),
-            ("to this Safe", GREEN_D) if to == safe else ("to " + short(to) + "!", RED)]
+    return "Swap", [("pay", MUTED), (pay, INK, BIG), ("get at least", MUTED), (get, INK, BIG),
+                    ("to this Safe", GREEN_D) if to == safe else ("to " + short(to) + "!", RED)]
 
 
 def _roles(tx, sel):
-    """Zodiac Roles (the daily budget): what each setting call does, or None."""
+    """Zodiac Roles (the daily budget): what each setting call does, as (title, lines), or None."""
     data = tx["data"]
     if sel == "957ed2b3" and len(data) >= 4 + 32 * 7:      # assignRoles(module, keys[], memberOf[])
         o = int.from_bytes(_arg(data, 2), "big")
         on = data[4 + o + 32 + 31] == 1
-        return [("budget: %s key" % ("allow" if on else "drop"), INK if on else RED)] + \
+        return "Budget", [("%s key" % ("allow" if on else "drop"), INK if on else RED)] + \
             _addr_lines("", _aarg(data, 0), INK if on else RED)[1:]
     if sel == "610b5925" and len(data) == 36:               # enableModule(key)
-        return [("budget: allow key", INK)] + _addr_lines("", _aarg(data, 0))[1:]
+        return "Budget", [("allow key", INK)] + _addr_lines("", _aarg(data, 0))[1:]
     if sel == "e009cfde" and len(data) == 68:               # disableModule(prev, key)
-        return [("budget: drop key", RED)] + _addr_lines("", _aarg(data, 1), RED)[1:]
+        return "Budget", [("drop key", RED)] + _addr_lines("", _aarg(data, 1), RED)[1:]
     t = _aarg(data, 1) if len(data) >= 68 else ""
     what = _tok(tx, t)[0] or ("ETH sends" if t == MULTICALL3 else short(t))
     if sel == "0c6c76b8" and len(data) == 68:               # scopeTarget(role, target)
-        return [("budget: may use", INK), (what, INK)]
+        return "Budget", [("may use", MUTED), (what, INK, BIG)]
     if sel == "0172a43a" and len(data) == 68:               # revokeTarget(role, target)
-        return [("budget: no longer uses", INK), (what, INK)]
+        return "Budget", [("no longer uses", MUTED), (what, INK, BIG)]
     if sel == "7508dd98":                                   # scopeFunction(role, target, selector, conditions, options)
         try:
             r = _rule(data, t)
         except Exception:
             r = None
-        return r or [("budget: rules for", INK), (what, INK), ("it can't read the rule", RED)]
+        return "Budget", r or [("rule for", MUTED), (what, INK, BIG), ("it can't read the rule", RED)]
     if sel == "a8ec43ee" and len(data) == 4 + 32 * 6:       # setAllowance(key, balance, max, refill, period, ts)
         k = binascii.hexlify(_arg(data, 0)).decode()
         refill, per = int.from_bytes(_arg(data, 3), "big"), int.from_bytes(_arg(data, 4), "big")
         if k in LIMITS:
             name, sym, dec, why = LIMITS[k]
-            return [(name, MUTED), ("%s %s" % (amount(refill, dec), sym), INK, BIG),
-                    (why if per == 86400 else "every %ds" % per, MUTED if per == 86400 else RED)]
-        return [("budget: up to", INK), ("%d units, unknown limit" % refill, RED)]
+            return name[0].upper() + name[1:], [("%s %s" % (amount(refill, dec), sym), INK, BIG),
+                                                 (why if per == 86400 else "every %ds" % per, MUTED if per == 86400 else RED)]
+        return "Budget", [("up to", MUTED), ("%d units, unknown limit" % refill, RED)]
     if sel == "2916a9af":                                   # setTransactionUnwrapper
-        return [("budget: read batches", INK)]
+        return "Budget", [("read batches", INK)]
     return None
 
 
@@ -390,94 +390,93 @@ def _rule(data, target):
     c = _conds(data)
     sel = binascii.hexlify(data[68:72]).decode()
     if sel == "a9059cbb" and c == [(0, 5, 5, ""), (0, 1, 0, ""), (0, 1, 28, K_USDC)]:
-        return [("USDC rule", MUTED), ("sends to anyone", INK), ("up to the daily limit", INK)]
+        return [("USDC", INK, BIG), ("to anyone,", INK), ("up to the daily limit", INK)]
     if sel == "a9059cbb" and len(c) == 7 and c[:3] == [(0, 0, 2, ""), (0, 5, 5, ""), (0, 5, 5, "")] and \
             c[3][:3] == (1, 1, 16) and len(c[3][3]) == 64 and c[4:] == [(1, 1, 28, K_FEE), (2, 1, 0, ""), (2, 1, 28, K_USDC)]:
         r = "0x" + c[3][3][24:]
-        return [("USDC rule", MUTED), ("fees, up to the fee cap", INK)] + _addr_lines("to", r, INK if r in NAMES else RED) + \
-            [("others: up to the daily limit", INK)]
+        return [("USDC", INK, BIG), ("fees up to the fee cap", INK)] + _addr_lines("to", r, INK if r in NAMES else RED) + \
+            [("others up to the daily limit", INK)]
     if target == MULTICALL3 and sel == "174dea71" and c == [(0, 5, 5, ""), (0, 4, 0, ""), (0, 0, 29, K_ETH), (1, 3, 0, ""),
                                                             (3, 1, 0, ""), (3, 1, 0, ""), (3, 1, 0, ""), (3, 2, 0, "")]:
-        return [("ETH rule", MUTED), ("sends to anyone", INK), ("up to the daily limit", INK)]
+        return [("ETH", INK, BIG), ("to anyone,", INK), ("up to the daily limit", INK)]
     return None
 
 
-def _me(what, a, c):
-    """'add owner' / 'remove owner', saying so when the owner is this wedgie."""
+def _owner(a, c):
+    """An owner being added or removed: THIS wedgie, big, when it's this one; else its address."""
     if signer and a == signer.lower():
-        return (what + ": THIS wedgie", c)
-    return (what, c)
+        return [("THIS wedgie", c, BIG)]
+    return _addr_lines("", a, c)[1:]
+
+
+def _then(n):
+    return ("then %d signer%s" % (n, "" if n == 1 else "s"), INK)
 
 
 def describe(tx):
-    """What the transaction does, as (text, color) lines: at most 6."""
+    """What the transaction does: (title, lines of (text, color[, kind])), at most 6 lines. Few words, big
+    (wedgie-dev docs/STYLE.md rule 0): the title is the action, the amount or the one fact that matters big."""
     data, to, safe = tx["data"], tx["to"], tx["safe"]
     sel = binascii.hexlify(data[:4]).decode() if len(data) >= 4 else ""
     out = []
     if tx["operation"] == 1:
         out.append(("DELEGATECALL: can do anything", RED))
     if not data:
-        return out + [("send", MUTED), ("%s ETH" % amount(tx["value"], 18), INK, BIG)] + _who(to, safe)
+        return "Send", out + [("%s ETH" % amount(tx["value"], 18), INK, BIG)] + _who(to, safe)
     if tx["value"] and to not in ROUTERS:
         out.append(("+ %s ETH" % amount(tx["value"], 18), RED))
+    n1, n2 = lambda: int.from_bytes(_arg(data, 1), "big"), lambda: int.from_bytes(_arg(data, 2), "big")
     if to == safe and sel == "0d582f13" and len(data) == 68:
-        return out + [_me("add owner", _aarg(data, 0), INK)] + _addr_lines("", _aarg(data, 0))[1:] + \
-            [("then %d signer(s) needed" % int.from_bytes(_arg(data, 1), "big"), INK)]
+        return "Add owner", out + _owner(_aarg(data, 0), INK) + [_then(n1())]
     if to == safe and sel == "f8dc5dd9" and len(data) == 100:
-        return out + [_me("remove owner", _aarg(data, 1), RED)] + _addr_lines("", _aarg(data, 1), RED)[1:] + \
-            [("then %d signer(s) needed" % int.from_bytes(_arg(data, 2), "big"), INK)]
+        return "Remove owner", out + _owner(_aarg(data, 1), RED) + [_then(n2())]
     if to == safe and sel == "e318b52b" and len(data) == 100:
-        return out + [("swap owner", RED), (_aarg(data, 1)[:22] + "..", RED), ("for", MUTED)] + \
-            _addr_lines("", _aarg(data, 2))[1:]
+        return "Swap owner", out + [(_aarg(data, 1)[:22] + "..", RED), ("for", MUTED)] + _addr_lines("", _aarg(data, 2))[1:]
     if to == safe and sel == "694e80c3" and len(data) == 36:
-        return out + [("change: %d signer(s) needed" % int.from_bytes(_arg(data, 0), "big"), INK)]
+        return "Signers needed", out + [("%d" % int.from_bytes(_arg(data, 0), "big"), INK, BIG)]
     if to == safe and sel == "610b5925" and len(data) == 36:
         m = _aarg(data, 0)
-        return out + [("turn on module", INK if m in MODULES else RED)] + \
-            ([(MODULES[m], INK)] if m in MODULES else _addr_lines("", m, RED)[1:])
+        return "Turn on module", out + ([(MODULES[m], INK)] if m in MODULES else _addr_lines("", m, RED)[1:])
     if to == safe and sel == "e009cfde" and len(data) == 68:
         m = _aarg(data, 1)
-        return out + [("turn off module", RED)] + ([(MODULES[m], RED)] if m in MODULES else _addr_lines("", m, RED)[1:])
+        return "Turn off module", out + ([(MODULES[m], RED)] if m in MODULES else _addr_lines("", m, RED)[1:])
     if to == RECOVERY and sel == "be0e54d7" and len(data) == 68:
-        return out + [("recovery: add guardian", INK)] + _addr_lines("", _aarg(data, 0))[1:] + \
-            [("it can replace your keys", MUTED), ("after a 7-day wait", MUTED)]
+        return "Add guardian", out + _addr_lines("", _aarg(data, 0))[1:] + [("can replace your keys", MUTED), ("after 7 days", MUTED)]
     if to == RECOVERY and sel == "936f7d86" and len(data) == 100:
-        return out + [("recovery: drop guardian", RED)] + _addr_lines("", _aarg(data, 1), RED)[1:]
+        return "Drop guardian", out + _addr_lines("", _aarg(data, 1), RED)[1:]
     if to == RECOVERY and sel == "0ba234d6" and len(data) == 4:
-        return out + [("cancel a recovery", INK)]
+        return "Cancel recovery", out
     if to == PASSKEY_FACTORY and sel == "0d2f0489":
-        return out + [("make a passkey signer", INK), ("(changes nothing yet)", MUTED)]
+        return "Passkey signer", out + [("changes nothing yet", MUTED)]
     if to == MODULE_FACTORY and sel == "f1ab873c" and _aarg(data, 0) == ROLES_COPY:
-        return out + [("set up a daily budget", INK), ("(Zodiac Roles)", MUTED)]
+        return "Set up budget", out
     if sel == "095ea7b3" and len(data) == 68:
         sp, n = _aarg(data, 0), int.from_bytes(_arg(data, 1), "big")
-        if not n:
-            return out + [("allowance back to 0", INK), ("for " + _name(sp, safe), INK)]
-        c = INK if sp in ROUTERS else RED
-        return out + [("let " + _name(sp, safe) + " take", c), (_amt(tx, to, n), c)]
+        c = INK if not n or sp in ROUTERS else RED
+        return "Approve", out + [(_amt(tx, to, n) if n else "0", c, BIG), ("for " + _name(sp, safe), c)]
     if to in UNISWAP and sel == "5ae401dc":
         try:
             u = _uniswap(tx)
         except Exception:
             u = None
         if u:
-            return out + u
+            return u[0], out + u[1]
     if to in ROUTERS:
         mine = binascii.unhexlify(safe[2:]) in data
-        return out + [("swap via " + ROUTERS[to], INK)] + \
-            ([("pay %s ETH" % amount(tx["value"], 18), INK)] if tx["value"] else []) + \
+        return "Swap", out + [("via " + ROUTERS[to], INK)] + \
+            ([("pay", MUTED), ("%s ETH" % amount(tx["value"], 18), INK, BIG)] if tx["value"] else []) + \
             [("pays this Safe", GREEN_D) if mine else ("doesn't pay this Safe!", RED)]
     r = _roles(tx, sel) if to != safe else None
     if r:
-        return out + r
+        return r[0], out + r[1]
     if sel == "a9059cbb" and len(data) == 68:
         tok = TOKENS.get((tx["chainId"], to))
         n = int.from_bytes(_arg(data, 1), "big")
         if not tok:
-            return out + [("send %d of token" % n, INK)] + _addr_lines("", to, RED)[1:] + _who(_aarg(data, 0), safe)
+            return "Send", out + [("%d of token" % n, INK)] + _addr_lines("", to, RED)[1:] + _who(_aarg(data, 0), safe)
         r = _aarg(data, 0)
-        return out + [("fee" if r == RELAY else "send", MUTED), ("%s %s" % (amount(n, tok[1]), tok[0]), INK, BIG)] + _who(r, safe)
-    return out + [("call " + sel + ", %d bytes, on" % len(data), RED)] + _addr_lines("", to, RED)[1:]
+        return "Fee" if r == RELAY else "Send", out + [("%s %s" % (amount(n, tok[1]), tok[0]), INK, BIG)] + _who(r, safe)
+    return "Contract call", out + [("%s, %d bytes, on" % (sel, len(data)), RED)] + _addr_lines("", to, RED)[1:]
 
 
 def batch(tx):
@@ -569,14 +568,12 @@ def sign(digest):
 def draw_home():
     d.fill(WHITE)
     ui.band(d)
-    y = ui.title(d, "Safe signer", 48) + 14
-    if key:
-        h, a = _addr_lines("your Safe owner address", signer)
-        lines = [h, GAP, GAP, a, GAP, ("same on every chain", MUTED)] if signer \
-            else [("your key", MUTED), (key["x"][:22], INK), (key["x"][22:44], INK), (key["x"][44:], INK)]
-        lines += [("", INK), ("waiting for a Safe tx", GREEN_D)]
+    y = ui.title(d, "Safe signer", 56) + 20
+    if key:                             # its Safe owner address (the same on every chain), nothing else
+        lines = [(signer, INK, ADDR)] if signer \
+            else [(key["x"][:22], INK), (key["x"][22:44], INK), (key["x"][44:], INK)]
     else:
-        lines = [("No key yet.", INK), ("The chip makes one and", MUTED), ("never lets it out.", MUTED)]
+        lines = [("No key", INK, BIG)]
     if note:
         lines.append((note, MUTED))
     _draw(lines, y, 240)
@@ -585,12 +582,15 @@ def draw_home():
     d.show()
 
 
-def _screen(head, lines, yes, k):
-    """One page of the question; True on a real A, False on Y or no answer."""
+def _screen(head, lines, yes, k, foot=""):
+    """One page of the question: the action big, its lines, which Safe small at the bottom. True on a
+    real A, False on Y or no answer."""
     d.fill(WHITE)
     ui.band(d)
-    ui.title(d, head, 40, 1)
-    _draw(lines, 62)
+    ui.title(d, head, 42, 1)
+    _draw(lines, 68, 166)
+    if foot:
+        d.center_text(foot[:ui.COLS_SMALL], 170, MUTED)
     ui.buttons(d, yes, "no")
     d.show()
     t0 = time.ticks_ms()
@@ -606,22 +606,21 @@ def confirm(tx, h):
     """The transaction on the screen, a page per action in a batch. True only on A through every page."""
     k = L.Keys(physical=True)
     k.pressed()
-    top = [("%s  nonce %d" % (CHAINS.get(tx["chainId"], "chain %d" % tx["chainId"]), tx["nonce"]), INK),
-           ("Safe " + short(tx["safe"]), MUTED)]
+    foot = "%s  Safe %s" % (CHAINS.get(tx["chainId"], "chain %d" % tx["chainId"]), short(tx["safe"]))
     tail = [("pays a gas refund", RED)] if tx["gasPrice"] else []
-    pic = (hx(h), MUTED, PIC)       # the phone and computer draw the same blockie of this hash
+    pic = (hx(h), MUTED, PIC)       # the phone and computer draw the same blockie of this hash (if it fits)
     acts = batch(tx)
     if acts is None:
-        return _screen("Sign for Safe?", top + describe(tx) + tail + [pic], "sign", k)
+        head, lines = describe(tx)
+        return _screen(head, lines + tail + [pic], "sign", k, foot)
     n = len(acts)
-    if not _screen("Safe batch", top + [("%d actions in one transaction" % n, INK),
-                                         ("A shows each one", MUTED)] + tail + [pic], "next", k):
+    if not _screen("Batch", [("%d actions" % n, INK, BIG)] + tail + [pic], "next", k, foot):
         return False
-    tail.append(("tx " + short(hx(h)), MUTED))
     for i, a in enumerate(acts):
         last = i == n - 1
-        if not _screen("%d of %d" % (i + 1, n), describe(a) + ([("", INK)] + tail if last else []),
-                       "sign all" if last else "next", k):
+        head, lines = describe(a)
+        if not _screen(head, lines + (tail if last else []), "sign all" if last else "next", k,
+                       "%d/%d %s" % (i + 1, n, foot)):
             return False
     return True
 
@@ -642,13 +641,13 @@ def on_sign(mid, t):
     h = safe_tx_hash(tx)
     gc.collect()
     if not confirm(tx, h):
-        note = "said no to nonce %d" % tx["nonce"]
+        note = "said no"
         W.send({"id": mid, "type": "refused", "safeTxHash": hx(h)})
         return
     ui.progress("Signing", "in the chip", False)
     auth, dg = webauthn_digest(h)
     r, s = sign(dg)
-    note = "signed nonce %d" % tx["nonce"]
+    note = "signed"
     try:
         keep_safe(tx["chainId"], tx["safe"])
     except Exception as e:              # the list is a convenience: never lose a signature over it
@@ -750,8 +749,7 @@ def run():
     while True:
         for k in keys.pressed():
             if k == "A" and not key:
-                if ui.ask(d, "Make a new key?", ["The chip makes it and keeps it.",
-                                                  "It replaces anything in the chip's key slot 2."]):
+                if ui.ask(d, "Make a key?", ["Replaces chip key slot 2."]):
                     try:
                         make_key()
                         note = "key made"
