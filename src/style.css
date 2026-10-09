@@ -268,6 +268,7 @@ html, body { overflow-x: clip; }
 .wedge-label i::after { content: ""; position: absolute; left: -5.5px; bottom: -8px; border: 7px solid transparent; border-top: 9px solid #168c34; border-bottom: 0; }
 /* the software library: carts on a shelf, flipped through by scrolling (home.ts library) */
 .lib { height: calc(60vh + var(--n, 6) * 38vh); position: relative; }
+.lib-after { margin: 60px 0 0; }
 .lib-sticky { position: sticky; top: 86px; height: calc(100vh - 110px); min-height: 440px; max-height: 600px; display: grid; grid-template-rows: 1fr auto; overflow: hidden; padding: 24px 16px; }
 .lib-stage { position: relative; perspective: 1100px; display: grid; place-items: center; }
 .lib-row { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; }

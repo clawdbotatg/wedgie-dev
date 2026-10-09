@@ -95,14 +95,18 @@ export function home(main: HTMLElement): Promise<unknown> {
   <section id="library" class="sec">
     <div class="sec-head">
       <span class="kicker">Software</span>
-      <h2>A shelf full of carts.</h2>
-      <p>Games, tools, a wallet. One app at a time, swapped in from the browser. Or have your agent make a new one.</p>
+      <h2>A growing app store.</h2>
+      <p>Games, tools, a wallet, and more every week. Pick one in the browser and it's on your wedgie.</p>
     </div>
     <div class="lib" id="lib">
       <div class="lib-sticky card">
         <div class="lib-stage"><div class="lib-row"></div><div class="lib-plank"></div></div>
         <div class="lib-cap"><h3></h3><p></p></div>
       </div>
+    </div>
+    <div class="sec-head lib-after">
+      <h2>Built by anyone.</h2>
+      <p>Every app is open source, in its own GitHub repo. Write one yourself, or have your agent make one, and send it in. <a href="/code">How</a></p>
     </div>
   </section>
 
