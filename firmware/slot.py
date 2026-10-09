@@ -47,12 +47,11 @@ def _band(title, lines, hint=""):
 
 
 def empty():
-    """The wedgie's own home: the boot logo, "No software", and where to get some, big."""
+    """The wedgie's own home: where to get software (wedgie.dev, big, over the logo), then "No software"."""
     import loader
     y = loader.logo(d)
-    top = y + 16 if y else 110
-    d.center_text("No software", top, MUTED, 2)
-    d.center_text("wedgie.dev", top + 30, INK, 3)
+    d.center_text("wedgie.dev", 30, INK, 3)
+    d.center_text("No software", y + 18 if y else 110, MUTED, 2)
     d.text(W.short(), ui.right() - 8 * 6, 6, MUTED)
     d.show()
 
