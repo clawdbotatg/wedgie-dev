@@ -1,60 +1,44 @@
-// A pretend wedgie for the 3D models around the site: a few apps, hard-coded, on a 240x240 canvas the
-// model shows as its screen. Like the real one (firmware/slot.py) it runs one app and every button is
-// the app's. Left alone it drives itself, and now and then restarts into the next app (what picking
-// another at wedgie.dev/connect does); any press takes over.
+// A pretend wedgie for the 3D models around the site: real screens of the shelf's apps (tools/screens.mjs)
+// on a 240x240 canvas the model shows as its screen. Like the real one (firmware/slot.py) it runs one app
+// and every button is the app's. Left alone it drives itself, and now and then restarts into the next app
+// (what picking another at wedgie.dev/connect does); any press takes over.
 import type { Wedgie3D } from "./wedgie3d";
 
 type App = { name: string; draw: () => void; key?: (k: string) => void };
 
 const img = (name: string) => { const i = new Image(); i.src = `/screens/${name}.png`; return i; };
 const SHOTS = {
-  hello: img("hello"), demo: img("demo"), demo2: img("demo-2"), clear: img("clear-sign"),
-  wallet: ["wallet-home", "wallet-chart", "wallet-send", "wallet-receive", "wallet-signing"].map(img),
+  safe: ["safe-home", "safe-sign"].map(img),
+  frog: ["frog", "frog-feed", "frog-eat"].map(img),
+  bunker: ["bunker-title", "bunker", "bunker-2"].map(img),
 };
 
 export function createDemo(id = "WEDGIE", opts: { boot?: boolean } = {}) {
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = 240;
   const g = canvas.getContext("2d")!;
-  const held = new Set<string>(), seen = new Set<string>();
-  let cur = 0, demoScene = 0, walletPage = 0;
+  const held = new Set<string>();
+  let cur = 0, safePage = 0, frogPage = 0, bunkerPage = 0;
   let w3d: Wedgie3D | null = null;
 
   const pic = (i: HTMLImageElement) => { g.fillStyle = "#000"; g.fillRect(0, 0, 240, 240); if (i.complete) g.drawImage(i, 0, 0); };
-  const text = (s: string, x: number, y: number, c: string, px = 8, align: CanvasTextAlign = "left") => {
-    g.fillStyle = c; g.font = `${px}px Silkscreen, monospace`; g.textAlign = align; g.textBaseline = "top"; g.fillText(s, x, y);
-  };
 
+  // Safe signer: home, then a transaction comes in from the computer; A signs, Y says no (both: home)
   const apps: App[] = [
-    { name: "Hello", draw: () => pic(SHOTS.hello) },
-    { name: "Buttons", draw: drawButtons, key: (k) => seen.add(k) },
-    { name: "Demo", draw: () => pic(demoScene ? SHOTS.demo2 : SHOTS.demo), key: (k) => { if (k === "A") demoScene ^= 1; } },
-    { name: "Wallet look", draw: () => pic(SHOTS.wallet[walletPage]), key: (k) => {
-      if (k === "right") walletPage = (walletPage + 1) % SHOTS.wallet.length;
-      if (k === "left") walletPage = (walletPage + SHOTS.wallet.length - 1) % SHOTS.wallet.length;
-      if (k === "A" && walletPage === 2) walletPage = 4;           // send -> signing
-      if (k === "Y") walletPage = 0;
+    { name: "Safe signer", draw: () => pic(SHOTS.safe[safePage]), key: (k) => {
+      if (k === "sign") safePage = 1;
+      else if (k === "A" || k === "Y") safePage = 0;
     } },
-    { name: "Clear sign", draw: () => pic(SHOTS.clear) },
+    { name: "Frog", draw: () => pic(SHOTS.frog[frogPage]), key: (k) => {
+      if (k === "A") frogPage = frogPage === 0 ? 1 : frogPage === 1 ? 2 : 0;
+      if (k === "Y") frogPage = 0;
+    } },
+    { name: "Demon Bunker", draw: () => pic(SHOTS.bunker[bunkerPage]), key: (k) => {
+      if (k === "A" && bunkerPage === 0) bunkerPage = 1;
+      else if (k === "up" && bunkerPage) bunkerPage = 2;
+      else if (k === "down" && bunkerPage) bunkerPage = 1;
+    } },
   ];
-
-  function drawButtons() {                   // keytest.py, roughly: every key, lit while held
-    g.fillStyle = "#000"; g.fillRect(0, 0, 240, 240);
-    text("KEY TEST", 4, 4, "#ffdc00");
-    const S = 34, JX = 20, JY = 96;
-    const box: Record<string, [number, number, number, number, string]> = {
-      up: [JX + S + 4, JY - S - 4, S, S, "UP"], down: [JX + S + 4, JY + S + 4, S, S, "DN"], left: [JX, JY, S, S, "LT"],
-      right: [JX + 2 * (S + 4), JY, S, S, "RT"], press: [JX + S + 4, JY, S, S, "IN"],
-      A: [170, 14, 52, 46, "A"], B: [170, 70, 52, 46, "B"], X: [170, 126, 52, 46, "X"], Y: [170, 182, 52, 46, "Y"],
-    };
-    for (const [k, [x, y, w, h, l]] of Object.entries(box)) {
-      const on = held.has(k);
-      g.fillStyle = on ? "#00ff00" : "#1e1e1e"; g.fillRect(x, y, w, h);
-      g.strokeStyle = on ? "#fff" : seen.has(k) ? "#22c452" : "#787878"; g.lineWidth = 1; g.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
-      text(l, x + w / 2, y + h / 2 - 4, on ? "#000" : "#fff", 8, "center");
-    }
-    text(`${seen.size}/9 keys seen`, 4, 216, seen.size === 9 ? "#00ff00" : "#fff");
-  }
 
   // Boot: the device's own boot screen (splash.py's underwear, loader.py's bar filling grey, then green).
   const logo = new Image();
@@ -80,18 +64,15 @@ export function createDemo(id = "WEDGIE", opts: { boot?: boolean } = {}) {
   }
 
   // Left alone, it shows itself off: a few presses in each app ("" = a restart into the next one,
-  // boot screen and all). Any real press pauses it a while.
+  // boot screen and all; "sign" = a Safe transaction arriving over USB). Any real press pauses it a while.
   const TOUR: [string, number][] = [
-    ["right", 1400], ["right", 1400], ["A", 2200], ["Y", 1600], ["", 1400],     // Wallet look, then restart
-    ["", 3200],                                                                  // Clear sign
-    ["", 2600],                                                                  // Hello
-    ["up", 900], ["A", 600], ["X", 600], ["Y", 600], ["press", 600], ["", 1600], // Buttons
-    ["A", 2000], ["A", 1800], ["", 1800]];                                      // Demo, back to Wallet look
-  const START = 3;                    // Wallet look first: the showiest
-  cur = START;
+    ["sign", 2400], ["A", 3600], ["", 2600],                                   // Safe signer, then restart
+    ["A", 2400], ["A", 1800], ["", 2400],                                      // Frog
+    ["A", 1600], ["up", 1800], ["", 2000]];                                    // Demon Bunker, back to Safe signer
+  cur = 0;
   let step = 0, timer = 0, idleUntil = 0;
   function restart() {                // the next app, like picking it at wedgie.dev: the wedgie reboots into it
-    cur = (cur + 1) % apps.length; demoScene = 0; walletPage = 0; seen.clear();
+    cur = (cur + 1) % apps.length; safePage = frogPage = bunkerPage = 0;
     boot(() => {});
   }
   function tour() {
@@ -99,6 +80,7 @@ export function createDemo(id = "WEDGIE", opts: { boot?: boolean } = {}) {
       if (performance.now() < idleUntil) { tour(); return; }
       const [k] = TOUR[step % TOUR.length];
       if (!k) restart();
+      else if (k === "sign") { apps[cur].key?.(k); draw(); }
       else { key(k, true); w3d?.keyVisual(k, true); setTimeout(() => { key(k, false); w3d?.keyVisual(k, false); }, 160); }
       step++;
       tour();

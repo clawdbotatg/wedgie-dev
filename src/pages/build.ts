@@ -69,10 +69,10 @@ const GRAMS: Record<string, number> = { lid: 11, base: 15, stick: 0.2, a: 0.1, b
 // key: in the URL. chip: the name carts.json's "chip" uses. addr: its I2C addresses (two on one bus can't share).
 type Chip = { key: string; name: string; group: string; about: string; addr: number[]; price: number; buy: string[][]; chip?: string };
 const CHIPS: Chip[] = [
-  { key: "atecc", chip: "ATECC608", name: "ATECC608", group: "Secure chip", about: "Adafruit ATECC608 breakout (4314). Keeps keys; the Wallet uses it.", addr: [0x60], price: 4.95,
+  { key: "trustm", chip: "OPTIGA Trust M", name: "Trust M", group: "Secure chip", about: "Adafruit Infineon OPTIGA Trust M breakout (4351). Keeps keys; the Safe signer uses it.", addr: [0x30], price: 4.95,
+    buy: [["https://www.adafruit.com/product/4351", "Adafruit"], ["https://www.amazon.com/s?k=adafruit+optiga+trust+m", "Amazon"], ["https://www.digikey.com/en/products/result?keywords=adafruit%204351", "DigiKey"]] },
+  { key: "atecc", chip: "ATECC608", name: "ATECC608", group: "Secure chip", about: "Adafruit ATECC608 breakout (4314). Keeps keys.", addr: [0x60], price: 4.95,
     buy: [["https://www.adafruit.com/product/4314", "Adafruit"], ["https://www.amazon.com/s?k=adafruit+4314+ATECC608", "Amazon"], ["https://www.digikey.com/en/products/detail/adafruit-industries-llc/4314/10419053", "DigiKey"]] },
-  { key: "trustm", chip: "OPTIGA Trust M", name: "Trust M", group: "Secure chip", about: "Adafruit Infineon OPTIGA Trust M breakout (4351). Keeps keys.", addr: [0x30], price: 4.95,
-    buy: [["https://www.adafruit.com/product/4351", "Adafruit"]] },
   ...board("Motion", `
     lis3dh    LIS3DH accelerometer        A 2809      18     4.95  3-axis, tap detection
     msa311    MSA311 accelerometer        A 5309      62     4.50  the cheapest 3-axis
@@ -176,7 +176,7 @@ const SCREENS: Record<string, string[]> = {
 };
 // Ready-made wedgies: each is just a /build link, like any shared one.
 const PRESETS = [
-  { name: "Wallet", q: "app=buttons&pico=nulllab&chip=atecc&chip2=none&lid=white&base=black&a=green&b=darkgrey&x=darkgrey&y=red&stick=darkgrey" },
+  { name: "Wallet", q: "app=buttons&pico=nulllab&chip=trustm&chip2=none&lid=white&base=black&a=green&b=darkgrey&x=darkgrey&y=red&stick=darkgrey" },
   { name: "Game", q: "app=buttons&pico=nulllab&chip=none&chip2=none&lid=purple&base=black&a=yellow&b=skyblue&x=mint&y=magenta&stick=yellow" },
   { name: "Plain", q: "app=buttons&pico=nulllab&chip=none&chip2=none&lid=white&base=black&a=green&b=darkgrey&x=darkgrey&y=red&stick=darkgrey" },
 ];
@@ -190,7 +190,7 @@ function read(carts: Cart[]): Build {
   const colors: Record<string, string> = {};
   for (const p of PARTS) { const c = COLORS[q.get(p.key) || ""]; colors[p.key] = c && fits(p, c) ? q.get(p.key)! : p.def; }
   const pico = picoOf(q.get("pico") || "") ? q.get("pico")! : PICOS[0].key;
-  return { app, pico, chips: fitChips(carts, app, [q.get("chip") ?? "atecc", q.get("chip2") ?? "none"]), colors };
+  return { app, pico, chips: fitChips(carts, app, [q.get("chip") ?? "trustm", q.get("chip2") ?? "none"]), colors };
 }
 // The app's chip goes in (first slot) if it needs one. Unknown boards, or one whose I2C address the
 // other board already uses, come out.

@@ -2,6 +2,7 @@
 import { place3D, pageShown } from "../ui/place3d";
 
 const CASE = "https://raw.githubusercontent.com/clawdbotatg/clawd-pico-case/main/stl/current/";
+const ATOMIC = "https://raw.githubusercontent.com/clawdbotatg/clawd-pico-case/main/stl/atomic-wedgie/";
 
 /** Returns once the hero wedgie is up (the loader waits for it). */
 export function home(main: HTMLElement): Promise<unknown> {
@@ -30,7 +31,7 @@ export function home(main: HTMLElement): Promise<unknown> {
     <div class="parts">
       <div class="card part"><div class="num">1</div><div class="part-3d" data-part="pico"></div><h3>A Pico</h3><p>The brain: a Raspberry Pi Pico 2 W with headers. Any Pico-shaped board runs the same code; the printed case fits the USB-C RP2040 kind.</p><div class="buy"><a class="btn btn-xs" href="https://www.amazon.com/s?k=raspberry+pi+pico+with+header&i=electronics" target="_blank" rel="noopener">Amazon</a><a class="btn btn-xs" href="https://www.adafruit.com/product/6315" target="_blank" rel="noopener">Adafruit</a><a class="btn btn-xs" href="https://www.microcenter.com/product/692334/raspberry-pi-pico-2w-with-header" target="_blank" rel="noopener">Micro Center</a></div></div>
       <div class="card part"><div class="num">2</div><div class="part-3d" data-part="hat"></div><h3>The screen hat</h3><p>Waveshare Pico-LCD-1.3: a 240×240 screen, a joystick, and four buttons. The Pico plugs straight in.</p><div class="buy"><a class="btn btn-xs" href="https://www.amazon.com/dp/B092VVCBQP" target="_blank" rel="noopener">Amazon</a><a class="btn btn-xs" href="https://www.waveshare.com/pico-lcd-1.3.htm" target="_blank" rel="noopener">Waveshare</a><a class="btn btn-xs" href="https://thepihut.com/products/1-3-ips-lcd-display-module-for-raspberry-pi-pico-240x240" target="_blank" rel="noopener">The Pi Hut</a></div></div>
-      <div class="card part"><div class="num">3</div><div class="part-3d" data-part="chip"></div><h3>The chip</h3><p>Adafruit's ATECC608 breakout, plus a STEMMA QT / Qwiic cable with bare wire ends. The wires push into the header; the chip gets wedged between the boards.</p><div class="buy"><a class="btn btn-xs" href="https://www.amazon.com/s?k=ATECC608&i=electronics" target="_blank" rel="noopener">Amazon</a><a class="btn btn-xs" href="https://www.adafruit.com/product/4314" target="_blank" rel="noopener">Adafruit</a><a class="btn btn-xs" href="https://www.digikey.com/en/products/detail/adafruit-industries-llc/4314/10419053" target="_blank" rel="noopener">DigiKey</a></div></div>
+      <div class="card part"><div class="num">3</div><div class="part-3d" data-part="chip"></div><h3>The chip</h3><p>Adafruit's <a href="https://www.adafruit.com/product/4351" target="_blank" rel="noopener">OPTIGA Trust M breakout</a>, plus a STEMMA QT / Qwiic cable with bare wire ends. The wires push into the header; the chip gets wedged between the boards.</p><div class="buy"><a class="btn btn-xs" href="https://www.adafruit.com/product/4351" target="_blank" rel="noopener">Adafruit</a><a class="btn btn-xs" href="https://www.digikey.com/en/products/result?keywords=adafruit%204351" target="_blank" rel="noopener">DigiKey</a><a class="btn btn-xs" href="https://www.amazon.com/s?k=adafruit+optiga+trust+m&i=electronics" target="_blank" rel="noopener">Amazon</a></div><p class="fine">(You can also use an <a href="https://www.adafruit.com/product/4314" target="_blank" rel="noopener">ATECC608</a>.)</p></div>
     </div>
 
     <div class="assembly" id="assembly">
@@ -61,6 +62,7 @@ export function home(main: HTMLElement): Promise<unknown> {
           <a class="btn btn-sm" href="${CASE}joystick.stl" download>Joystick</a>
           <a class="btn btn-sm" href="${CASE}button.stl" download>Button ×4</a>
         </div>
+        <p class="fine">Colors: white lid, black base, grey joystick, buttons 2 grey, 1 green, 1 red. <b>Atomic wedgie</b> (Waveshare RP2040-Plus with a battery): print its own red <a href="${ATOMIC}base.stl" download>base</a> and black <a href="${ATOMIC}reset-button.stl" download>RESET button</a> instead of the base.</p>
         <p class="fine">Source, measurements, and every iteration: <a href="https://github.com/clawdbotatg/clawd-pico-case" target="_blank" rel="noopener">clawd-pico-case</a>. Why it's called a wedgie: <a href="/lore.md" target="_blank">the lore</a>.</p>
       </div>
     </div>
@@ -106,7 +108,7 @@ export function home(main: HTMLElement): Promise<unknown> {
 
   <section id="agents" class="sec agents">
     <a class="btn btn-lg" href="/skill.md" target="_blank"><span class="bot" aria-hidden="true">🤖</span> skill.md</a>
-    <a class="btn btn-lg" href="/code">Software</a>
+    <a class="btn btn-lg" href="/code">Create software</a>
     <a class="btn btn-lg" href="/build">Customize</a>
   </section>
 `;

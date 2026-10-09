@@ -31,7 +31,7 @@ const HEADER = (() => {
 
 const STEPS: Step[] = [
   { t: "Lay out the parts",
-    p: `A Pico with headers, the Waveshare Pico-LCD-1.3 hat, the ATECC608 breakout, and a STEMMA QT / Qwiic cable with bare ends. For tools: small cutters or scissors, a wire stripper, a strip of tape, and one breadboard jumper pin.`,
+    p: `A Pico with headers, the Waveshare Pico-LCD-1.3 hat, the Adafruit OPTIGA Trust M breakout (or an ATECC608), and a STEMMA QT / Qwiic cable with bare ends. For tools: small cutters or scissors, a wire stripper, a strip of tape, and one breadboard jumper pin.`,
     shot: "parts" },
   { t: "Cut the wires short",
     p: `The cable comes long. Keep the plug and cut all four wires <b>short and even</b>, just long enough to reach from the chip to the header when the chip lies flat between the boards. Long wires bunch up and push on the back of the screen.`,

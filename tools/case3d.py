@@ -4,12 +4,12 @@
 # bottom-left, +y toward the joystick, +z out of the screen). We take the lid, base, the four button
 # caps (one mesh there: split here by x, A is the largest x) and the joystick cap, merge duplicate
 # vertices, quantize to uint16 inside each part's box, and write public/3d/wedgie.bin + wedgie.json.
-#   python3 tools/case3d.py /path/to/clawd-pico-case [rev]        (rev default v1.3, the current release)
+#   python3 tools/case3d.py /path/to/clawd-pico-case [rev]        (rev default v1.7: the base printed now; v1.9 has no render)
 import sys, re, json, base64, struct
 from pathlib import Path
 
 case = Path(sys.argv[1])
-rev = sys.argv[2] if len(sys.argv) > 2 else "v1.3"
+rev = sys.argv[2] if len(sys.argv) > 2 else "v1.7"
 html = (case / "renders" / rev / "viewer.html").read_text()
 parts = {p["name"]: p for p in json.loads(re.search(r"const PARTS = (\[.*?\]);\n", html, re.S).group(1))}
 
