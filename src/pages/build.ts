@@ -70,7 +70,7 @@ const GRAMS: Record<string, number> = { lid: 11, base: 15, stick: 0.2, a: 0.1, b
 type Chip = { key: string; name: string; group: string; about: string; addr: number[]; price: number; buy: string[][]; chip?: string };
 const CHIPS: Chip[] = [
   { key: "trustm", chip: "OPTIGA Trust M", name: "Trust M", group: "Secure chip", about: "Adafruit Infineon OPTIGA Trust M breakout (4351). Keeps keys; the Safe signer uses it.", addr: [0x30], price: 4.95,
-    buy: [["https://www.mouser.com/ProductDetail/Adafruit/4351", "Mouser"], ["https://www.ebay.com/itm/175631680612", "eBay"], ["https://www.digikey.com/en/products/detail/adafruit-industries-llc/4351/10650641", "DigiKey"], ["https://www.adafruit.com/product/4351", "Adafruit"]] },
+    buy: [["https://www.mouser.com/ProductDetail/Adafruit/4351?qs=d0WKAl%252BL4KbhnNU%252BCwzWmQ%3D%3D", "Mouser"], ["https://www.ebay.com/itm/175631680612", "eBay"], ["https://www.digikey.com/en/products/detail/adafruit-industries-llc/4351/10650641", "DigiKey"], ["https://www.adafruit.com/product/4351", "Adafruit"]] },
   { key: "atecc", chip: "ATECC608", name: "ATECC608", group: "Secure chip", about: "Adafruit ATECC608 breakout (4314). Keeps keys.", addr: [0x60], price: 4.95,
     buy: [["https://www.adafruit.com/product/4314", "Adafruit"], ["https://www.amazon.com/s?k=adafruit+4314+ATECC608", "Amazon"], ["https://www.digikey.com/en/products/detail/adafruit-industries-llc/4314/10419053", "DigiKey"]] },
   ...board("Motion", `
