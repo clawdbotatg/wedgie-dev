@@ -278,15 +278,18 @@ def _saves_only(p):
 ASK_MS = 60000      # no answer to "let this computer in?" in a minute is a no
 
 
-def ask(job="", note=""):
-    """Let the computer do `job` (what it says it wants, e.g. "Install Safe signer")? ui.ask: only a
-    real press answers, A yes, Y no. Nothing comes off USB meanwhile, so the computer waits. Only for a
-    checked job (job.py: signed files only; note says so): anything that gives the computer the REPL asks
-    the red question (hatch.ask, let_in), never this calm one with the computer's own title on it."""
-    if not note:
+def ask(job="", checked=False, v=""):
+    """Let the computer do `job` (what it says it wants, e.g. "Install Safe signer", "Update firmware to
+    0.3.30")? ui.ask: only a real press answers, A yes, Y no. Nothing comes off USB meanwhile, so the
+    computer waits. Only for a checked job (job.py: only files signed by wedgie.dev go on, so the green
+    check): anything that gives the computer the REPL asks the red question (hatch.ask, let_in), never
+    this calm one with the computer's own title on it. Few words, big (Austin, 2026-10-09): the job,
+    the version it puts on when it's an update (v: the one job.py holds the signed list to), the check."""
+    if not checked:
         return False
     W.asked_ms = None
-    ok = ui.ask(d, (job + "?") if job else "Install?", [note, "Only those files change.", "Didn't ask for this? Y."], ms=ASK_MS)
+    head, to, _ = (job or "Install").partition(" to ")
+    ok = ui.ask(d, head, ms=ASK_MS, big=str(v or "")[:12] if to else "")
     W.asked_ms = time.ticks_diff(ui.drawn, _rx)
     return ok
 
@@ -301,7 +304,7 @@ def _job(mid, m):
     v = m.get("version")
     if not v and "release" in m:
         v = str(m["release"]).split("\n")[1][8:]
-    if not ask(title, "checked: wedgie.dev release " + str(v or "")[:12]):
+    if not ask(title, True, v):
         W.send({"id": mid, "type": "refused", "asked_ms": W.asked_ms})
         return False
     if not W.SEALED:                    # the emulator: its flash is new at every restart, so no install

@@ -6,8 +6,6 @@ import { P } from "./palette";
 import { place3D } from "./place3d";
 import type { Wedgie3D } from "./wedgie3d";
 
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
-
 function wrap(s: string, n: number) {
   const out = [""];
   for (const w of s.split(/\s+/)) {
@@ -25,12 +23,24 @@ export function askScreen(job: string, checked = false) {
   g.fillStyle = P.WHITE; g.fillRect(0, 0, 240, 240);
   [[P.GREEN, 10], [P.GREY, 19], [P.RED, 28]].forEach(([col, y]) => { g.fillStyle = col as string; g.fillRect(0, y as number, 240, 5); });
   g.textAlign = "center"; g.textBaseline = "top"; g.fillStyle = P.INK;
-  const title = job ? wrap(job + "?", 15).slice(0, 2) : ["LET THIS", "COMPUTER IN?"];
-  g.font = "16px Silkscreen, monospace";
-  title.forEach((s, i) => g.fillText(s, 120, 48 + i * 24));
-  g.font = "9px Silkscreen, monospace";
-  (checked ? ["Only those files change."] : ["The computer gets full", "access for this one job."]).concat(["", "Didn't ask for this? Y."])
-    .forEach((s, i) => g.fillText(s, 120, 108 + i * 14));
+  if (checked) {                                  // the job, its version for an update, a green check
+    const [head, v = ""] = (job || "Install").split(" to ");
+    const t = wrap(head, 15).slice(0, 2), y = Math.max(64 + t.length * 24 + 12, 108);
+    g.font = "16px Silkscreen, monospace";
+    t.forEach((s, i) => g.fillText(s, 120, 64 + i * 24));
+    const sc = v.length <= 7 ? 3 : 2, w = 8 * sc * v.length + (v ? 12 : 0), x = (240 - w - 34) / 2;
+    g.textAlign = "left"; g.font = `${8 * sc}px Silkscreen, monospace`;
+    if (v) g.fillText(v, x, y + 8 + (24 - 8 * sc) / 2);
+    g.strokeStyle = P.GREEN_D; g.lineWidth = 4; g.lineCap = "square";
+    g.beginPath(); g.moveTo(x + w + 2, y + 19); g.lineTo(x + w + 12, y + 29); g.lineTo(x + w + 32, y + 9); g.stroke();
+    g.textAlign = "center";
+  } else {
+    const title = job ? wrap(job + "?", 15).slice(0, 2) : ["LET THIS", "COMPUTER IN?"];
+    g.font = "16px Silkscreen, monospace";
+    title.forEach((s, i) => g.fillText(s, 120, 48 + i * 24));
+    g.font = "9px Silkscreen, monospace";
+    ["The computer gets full", "access for this one job.", "", "Didn't ask for this? Y."].forEach((s, i) => g.fillText(s, 120, 108 + i * 14));
+  }
   g.fillStyle = P.GREEN; g.fillRect(0, 184, 240, 26);
   g.fillStyle = P.RED; g.fillRect(0, 214, 240, 26);
   g.fillStyle = P.WHITE; g.font = "16px Silkscreen, monospace";
@@ -44,9 +54,7 @@ export function askModal(job: string, checked = false): () => void {
   el.className = "panel-wrap";
   el.innerHTML = `<div class="card bt-ask ask-a" role="dialog" aria-live="assertive" aria-label="Press A on your wedgie">
     <h3>Press <span class="ask-key">A</span> on your wedgie</h3>
-    <p>It's asking <b>${esc(job || "Let this computer in")}?</b> The green button says yes, the red one says no.</p>
     <div class="ask-3d"></div>
-    <p class="fine">Only a press on the wedgie itself counts. No answer in a minute is a no.</p>
   </div>`;
   document.body.appendChild(el);
   let w: Wedgie3D | null = null, t = 0, closed = false;

@@ -8,6 +8,12 @@ same rules in `public/code.md` ("Look and feel").
 fake wedgies). Anything not on the guide yet is listed in `KNOWN` in test_style.py, and that list may
 only shrink. A new screen that breaks a rule fails the build.
 
+## 0. Few words, big (Austin, 2026-10-09)
+
+Every screen: as few words as possible, drawn as big as they fit. A question is the job and what
+matters about it, nothing else: "Update firmware", "0.3.30", a green check (signed). No sentences
+explaining the buttons; A yes / Y no already says it.
+
 ## 1. Busy = the boot loader
 
 When a wedgie is doing something that takes time, it shows the boot screen: the logo, a title saying

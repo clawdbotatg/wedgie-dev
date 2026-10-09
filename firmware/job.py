@@ -185,7 +185,7 @@ def resume(j):
 
 
 def run(mid, m, ask, show=None):
-    """Ask, then check and take the files. ask(job, note) -> bool is the slot's yes/no screen (the slot
+    """Ask, then check and take the files. ask(job, checked, version) -> bool is the slot's yes/no screen (the slot
     asks a 0.3.10+ job itself before loading this, and passes a yes); show(title, what, p) draws the
     progress screen (the moment A is pressed, then as files arrive)."""
     show = show or (lambda *a: None)
@@ -193,16 +193,15 @@ def run(mid, m, ask, show=None):
     try:
         if late:
             rules(m)
-            note = "checked: wedgie.dev release " + str(m.get("version") or "")[:12]
+            version = m.get("version")
         else:
             version, files = check(m, sig=False)
-            note = "checked: wedgie.dev release " + version
     except ValueError as e:
         W.send({"id": mid, "type": "error", "error": str(e)})
         return
     write = list(m.get("write") or [])
     title = str(m.get("job") or "Update")[:60]
-    if not ask(title, note):
+    if not ask(title, True, version):
         W.send({"id": mid, "type": "refused"})
         return
     title = W.doing(title)

@@ -271,6 +271,12 @@ try {
   await bootHello();
   await page.waitForTimeout(3000);
   const req = (msg, ms = 10000) => page.evaluate(([msg, ms]) => new Promise((res) => { const off = window.vw.onOutput((l) => { if (l.includes(`"id": ${msg.id},`) || l.includes(`"id": ${msg.id}}`)) { off(); res(JSON.parse(l)); } }); window.vw.write(JSON.stringify(msg) + "\n"); setTimeout(() => { off(); res(null); }, ms); }), [msg, ms]);
+  // the update question: few words, big (the job, its version, a green check; Austin, 2026-10-09)
+  const upd = page.evaluate(() => window.vw.exec("import slot; slot.ask('Update firmware to 0.3.30', True, '0.3.30')"));
+  await page.waitForTimeout(800);
+  await page.locator(".vw").screenshot({ path: `${out}/emu-update-ask.png` });
+  await page.evaluate(() => window.vw.press("Y", 150));
+  check((await upd).trim() === "False", "the update question: Y says no");
   await page.evaluate(() => window.vw.exec("import slot, sys\n_a = slot.ask\ndef _ask2(*a, **k):\n    print('@asked', 'job' in sys.modules)\n    return _a(*a, **k)\nslot.ask = _ask2"));
   const exi = await req({ id: 69, type: "sums", names: [], exists: ["hello.py", "buttons.py", "nope.py"] });
   check(exi?.sums?.["hello.py"] === 1 && exi.sums["nope.py"] === null && exi.apps?.[0]?.mod === "hello", `sums (exists only) before the question: ${JSON.stringify(exi?.sums)}`);
