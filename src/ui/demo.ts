@@ -63,31 +63,30 @@ export function createDemo(id = "WEDGIE", opts: { boot?: boolean } = {}) {
     draw();
   }
 
-  // Left alone, it shows itself off: a few presses in each app ("" = a restart into the next one,
-  // boot screen and all; "sign" = a Safe transaction arriving over USB). Any real press pauses it a while.
+  // It shows itself off: a few steps in each app ("" = a restart into the next one, boot screen and all;
+  // "sign" = a Safe transaction arriving over USB). Any real press jumps to the next step right away.
   const TOUR: [string, number][] = [
-    ["sign", 2400], ["A", 3600], ["", 2600],                                   // Safe signer, then restart
-    ["A", 2400], ["A", 1800], ["", 2400],                                      // Frog
-    ["A", 1600], ["up", 1800], ["", 2000]];                                    // Demon Bunker, back to Safe signer
+    ["sign", 1300], ["A", 2000], ["", 1000],                                   // Safe signer, then restart
+    ["A", 1300], ["A", 1100], ["", 1300],                                      // Frog
+    ["A", 1000], ["up", 1100], ["", 1300]];                                    // Demon Bunker, back to Safe signer
   cur = 0;
-  let step = 0, timer = 0, idleUntil = 0;
+  let step = 0, timer = 0;
   function restart() {                // the next app, like picking it at wedgie.dev: the wedgie reboots into it
     cur = (cur + 1) % apps.length; safePage = frogPage = bunkerPage = 0;
-    boot(() => {});
+    boot(() => {}, 700);
+  }
+  function next() {
+    const [k] = TOUR[step % TOUR.length];
+    if (!k) restart();
+    else if (k === "sign") { apps[cur].key?.(k); draw(); }
+    else { key(k, true); w3d?.keyVisual(k, true); setTimeout(() => { key(k, false); w3d?.keyVisual(k, false); }, 160); }
+    step++;
   }
   function tour() {
-    timer = window.setTimeout(() => {
-      if (performance.now() < idleUntil) { tour(); return; }
-      const [k] = TOUR[step % TOUR.length];
-      if (!k) restart();
-      else if (k === "sign") { apps[cur].key?.(k); draw(); }
-      else { key(k, true); w3d?.keyVisual(k, true); setTimeout(() => { key(k, false); w3d?.keyVisual(k, false); }, 160); }
-      step++;
-      tour();
-    }, TOUR[step % TOUR.length][1]);
+    clearTimeout(timer);
+    timer = window.setTimeout(() => { next(); tour(); }, TOUR[step % TOUR.length][1]);
   }
-  function boot(then: () => void) {
-    const BOOT = 1200;           // green (0.85) at ~1.0 s: right as the fly-in lands (wedgie3d GROW)
+  function boot(then: () => void, BOOT = 1200) {   // first boot: green (0.85) at ~1.0 s, as the fly-in lands (wedgie3d GROW)
     const t0 = performance.now();
     bootT = 0;
     const tick = () => {
@@ -109,8 +108,8 @@ export function createDemo(id = "WEDGIE", opts: { boot?: boolean } = {}) {
 
   return {
     canvas,
-    /** a person pressed something: they drive now; the tour waits until they've been idle a while */
-    key(k: string, down: boolean) { idleUntil = performance.now() + 12000; key(k, down); },
+    /** a person pressed something: the next step now (the press shows on the model), then the tour goes on */
+    key(_k: string, down: boolean) { if (down && bootT >= 1) { next(); tour(); } },
     attach(w: Wedgie3D | null) { w3d = w; },
     stop() { clearTimeout(timer); },
   };
