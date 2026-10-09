@@ -99,8 +99,9 @@ def check(d, x, y, c=GREEN_D):
 def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None, scary=False, big=None):
     """A yes/no question: A yes, Y no, no answer in `ms` is a no. Only real presses count (a press
     sent over USB can't answer). True for yes. scary: white on red, for a yes that hands over
-    everything (full control: slot.let_in). big: a short word drawn huge under the question with a
-    small green check after it ("" for the check alone): a signed update's version."""
+    everything (full control: slot.let_in). big: what it's about, drawn huge under a one-line question
+    (scale 3, a word a line, or scale 2 for long words) with a small green check after its last line:
+    a signed update's version, a signed app's name."""
     k = keys or L.Keys(physical=True)
     k.pressed()                             # a key already down doesn't count
     bg, fg = (RED, WHITE) if scary else (WHITE, INK)
@@ -109,15 +110,23 @@ def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None, scary=Fa
         d.center_text("! WARNING !", 14, WHITE, 2)
     else:
         band(d)
-    y = max(title(d, question, 48 if big is None else 64, 2, fg) + 12, 108)
-    if big is not None:
-        sc = 3 if len(big) <= 8 else 2
-        w = 8 * sc * len(big) + (8 if big else 0)
-        x = (240 - w - 16) // 2
-        if big:
-            d.big_text(big, x, y + 8 + (24 - 8 * sc) // 2, fg, sc)
-        check(d, x + w, y + 14 if big else y + 8)
+    if big:
+        t = big.split()
+        sc = 3 if max(len(w) for w in t) <= 8 else 2
+        t = wrap(big, 8 if sc == 3 else 13)[:2]
+        h = 8 * sc + 4
+        y = 34 + (150 - (36 + h * len(t) - 4)) // 2      # the block centered between band and buttons
+        d.center_text(question[:COLS_BIG], y, fg, 2)
+        y += 36
+        for i, s in enumerate(t):
+            w = 8 * sc * len(s)
+            x = (240 - w - (24 if i == len(t) - 1 else 0)) // 2
+            d.big_text(s, x, y, fg, sc)
+            y += h
+        check(d, x + w + 8, y - h + (8 * sc - 13) // 2)
         y = 168
+    else:
+        y = max(title(d, question, 48, 2, fg) + 12, 108)
     for s in lines:
         for x in wrap(s):
             if y > 168:

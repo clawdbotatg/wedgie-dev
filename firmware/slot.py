@@ -47,13 +47,12 @@ def _band(title, lines, hint=""):
 
 
 def empty():
-    """The wedgie's own home: the boot logo, and where to pick what it runs."""
+    """The wedgie's own home: the boot logo, "No software", and where to get some, big."""
     import loader
     y = loader.logo(d)
     top = y + 16 if y else 110
-    d.center_text("no software", top, INK, 2)
-    d.center_text("pick what it runs at", top + 28, MUTED)
-    d.center_text("wedgie.dev/connect", top + 44, GREEN_D)
+    d.center_text("No software", top, MUTED, 2)
+    d.center_text("wedgie.dev", top + 30, INK, 3)
     d.text(W.short(), ui.right() - 8 * 6, 6, MUTED)
     d.show()
 
@@ -289,7 +288,12 @@ def ask(job="", checked=False, v=""):
         return False
     W.asked_ms = None
     head = (job or "Install").partition(" to ")[0]     # wedgie.dev titles an update just "Update firmware"
-    ok = ui.ask(d, head, ms=ASK_MS, big=str(v or "?")[:12] if head.startswith("Update") else "")
+    if head.startswith("Update"):
+        ok = ui.ask(d, head, ms=ASK_MS, big=str(v or "?")[:12])
+    elif head.startswith("Install "):                  # "Install" over the app's name, big
+        ok = ui.ask(d, "Install", ms=ASK_MS, big=head[8:])
+    else:
+        ok = ui.ask(d, head + "?", ms=ASK_MS)
     W.asked_ms = time.ticks_diff(ui.drawn, _rx)
     return ok
 

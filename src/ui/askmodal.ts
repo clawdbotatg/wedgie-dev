@@ -23,19 +23,25 @@ export function askScreen(job: string, checked = false, version = "") {
   g.fillStyle = P.WHITE; g.fillRect(0, 0, 240, 240);
   [[P.GREEN, 10], [P.GREY, 19], [P.RED, 28]].forEach(([col, y]) => { g.fillStyle = col as string; g.fillRect(0, y as number, 240, 5); });
   g.textAlign = "center"; g.textBaseline = "top"; g.fillStyle = P.INK;
-  if (checked) {                                  // the job, its version for an update, a small green check
-    const [head, to = ""] = (job || "Install").split(" to ");
-    const v = head.startsWith("Update") ? version || to || "?" : "";
-    const t = wrap(head, 15).slice(0, 2), y = Math.max(64 + t.length * 24 + 12, 108);
-    g.font = "16px Silkscreen, monospace";
-    t.forEach((s, i) => g.fillText(s, 120, 64 + i * 24));
-    const sc = v.length <= 8 ? 3 : 2, w = 8 * sc * v.length + (v ? 8 : 0), x = (240 - w - 16) / 2;
-    g.textAlign = "left"; g.font = `${8 * sc}px Silkscreen, monospace`;
-    if (v) g.fillText(v, x, y + 8 + (24 - 8 * sc) / 2);
-    const cy = v ? y + 14 : y + 8;
-    g.strokeStyle = P.GREEN_D; g.lineWidth = 3; g.lineCap = "square";
-    g.beginPath(); g.moveTo(x + w + 1, cy + 6); g.lineTo(x + w + 5, cy + 10); g.lineTo(x + w + 15, cy + 1); g.stroke();
-    g.textAlign = "center";
+  if (checked) {                                  // as slot.ask: the question, then what it's about big, a small check
+    const head = (job || "Install").split(" to ")[0];
+    const [q, big] = head.startsWith("Update") ? [head, version || job.split(" to ")[1] || "?"]
+      : head.startsWith("Install ") ? ["Install", head.slice(8)] : [head + "?", ""];
+    if (big) {
+      const sc = Math.max(...big.split(/\s+/).map((w) => w.length)) <= 8 ? 3 : 2;
+      const t = wrap(big, sc === 3 ? 8 : 13).slice(0, 2), h = 8 * sc + 4;
+      let y = 34 + Math.floor((150 - (36 + h * t.length - 4)) / 2), x = 0, w = 0;
+      g.font = "16px Silkscreen, monospace"; g.fillText(q.slice(0, 15), 120, y); y += 36;
+      g.textAlign = "left"; g.font = `${8 * sc}px Silkscreen, monospace`;
+      t.forEach((s, i) => { w = 8 * sc * s.length; x = (240 - w - (i === t.length - 1 ? 24 : 0)) / 2; g.fillText(s, x, y); y += h; });
+      const cx = x + w + 8, cy = y - h + (8 * sc - 13) / 2;
+      g.strokeStyle = P.GREEN_D; g.lineWidth = 3; g.lineCap = "square";
+      g.beginPath(); g.moveTo(cx + 1, cy + 6); g.lineTo(cx + 5, cy + 10); g.lineTo(cx + 15, cy + 1); g.stroke();
+      g.textAlign = "center";
+    } else {
+      g.font = "16px Silkscreen, monospace";
+      wrap(q, 15).slice(0, 2).forEach((s, i) => g.fillText(s, 120, 48 + i * 24));
+    }
   } else {
     const title = job ? wrap(job + "?", 15).slice(0, 2) : ["LET THIS", "COMPUTER IN?"];
     g.font = "16px Silkscreen, monospace";

@@ -277,6 +277,11 @@ try {
   await page.locator(".vw").screenshot({ path: `${out}/emu-update-ask.png` });
   await page.evaluate(() => window.vw.press("Y", 150));
   check((await upd).trim() === "False", "the update question: Y says no");
+  const ins = page.evaluate(() => window.vw.exec("import slot; slot.ask('Install Safe Signer', True, '0.3.32')"));
+  await page.waitForTimeout(800);
+  await page.locator(".vw").screenshot({ path: `${out}/emu-install-ask.png` });
+  await page.evaluate(() => window.vw.press("Y", 150));
+  check((await ins).trim() === "False", "the install question: Y says no");
   await page.evaluate(() => window.vw.exec("import slot, sys\n_a = slot.ask\ndef _ask2(*a, **k):\n    print('@asked', 'job' in sys.modules)\n    return _a(*a, **k)\nslot.ask = _ask2"));
   const exi = await req({ id: 69, type: "sums", names: [], exists: ["hello.py", "buttons.py", "nope.py"] });
   check(exi?.sums?.["hello.py"] === 1 && exi.sums["nope.py"] === null && exi.apps?.[0]?.mod === "hello", `sums (exists only) before the question: ${JSON.stringify(exi?.sums)}`);
