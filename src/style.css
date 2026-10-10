@@ -551,6 +551,8 @@ body.test-mode .top, body.test-mode .foot { display: none; }
 .safe-id-wallet .btn-wallet { height: 46px; padding: 0 22px; font-size: 16px; }
 .top #s-me { margin-left: auto; }
 @media (max-width: 640px) { .top #s-me .safe-id-tag, .top #s-me .addr-copy { display: none; } .top #s-me { padding: 0 12px; } }
+.top #s-me .addr-hex { white-space: nowrap; word-break: normal; }
+@media (max-width: 520px) { .top #s-me .addr-txt { display: none; } .top #s-me { padding: 0 8px; } }   /* a phone: just its picture */
 .safe-id-tag { font-size: 13px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 .safe-id-wallet { background: #e6eefb; }
 .safe-id-wallet:has(.btn-wallet) { padding: 0; background: none; box-shadow: none; }
