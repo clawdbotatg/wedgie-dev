@@ -634,3 +634,4 @@ body.in-app .safe-dock { right: 96px; }   /* the iPhone app's underwear button s
   background-size: 28px 28px, 100% 100%; animation: safe-wait .8s linear infinite; transition: width .6s; }
 @keyframes safe-wait { to { background-position: 28px 0, 0 0; } }
 @media (prefers-reduced-motion: reduce) { .safe-msg .meter-fill, #s-dock-msg .meter-fill { animation: none; } }
+body.dock-running #s-msg { display: none; }

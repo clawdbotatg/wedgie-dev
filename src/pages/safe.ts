@@ -643,6 +643,7 @@ export function safe(main: HTMLElement) {
     const dock = $("s-dock");
     dock.hidden = !(safeAddr && t);
     document.body.classList.toggle("has-dock", !dock.hidden);
+    document.body.classList.toggle("dock-running", !dock.hidden && !!running);   // the dock shows the progress: no second bar
     document.body.classList.toggle("in-app", Drive.inApp());
     if (dock.hidden) return;
     const what = t.dataDecoded?.method || (t.data && t.data !== "0x" ? "contract call" : `send ${E.fmt(BigInt(t.value), 18)} ETH`);
