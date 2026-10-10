@@ -42,7 +42,20 @@ struct DrivePanel: View {
                             .autocorrectionDisabled()
                         Button("Send this") { Task { await drive.send(line) } }
                     }
+                }
 
+                Section("Log") {
+                    if drive.log.isEmpty { Text("nothing yet").foregroundStyle(.secondary) }
+                    ForEach(drive.log) { l in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("\(l.at.formatted(date: .omitted, time: .standard)) · \(label(l.kind))")
+                                .font(.caption).foregroundStyle(color(l.kind))
+                            Text(l.text).font(.system(.footnote, design: .monospaced)).textSelection(.enabled)
+                        }
+                    }
+                }
+
+                if drive.state == .here {
                     Section {
                         ForEach(drive.files) { f in
                             Button { Task { await drive.open(f.name) } } label: {
@@ -67,16 +80,6 @@ struct DrivePanel: View {
                     }
                 }
 
-                Section("Log") {
-                    if drive.log.isEmpty { Text("nothing yet").foregroundStyle(.secondary) }
-                    ForEach(drive.log) { l in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("\(l.at.formatted(date: .omitted, time: .standard)) · \(label(l.kind))")
-                                .font(.caption).foregroundStyle(color(l.kind))
-                            Text(l.text).font(.system(.footnote, design: .monospaced)).textSelection(.enabled)
-                        }
-                    }
-                }
             }
             .navigationTitle("WEDGIE drive")
             .navigationBarTitleDisplayMode(.inline)
