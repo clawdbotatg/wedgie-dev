@@ -51,6 +51,14 @@ struct WebView: UIViewRepresentable {
     func updateUIView(_ uiView: WKWebView, context: Context) {}
 
     final class Coordinator: NSObject, WKUIDelegate, WKNavigationDelegate, WKScriptMessageHandlerWithReply {
+        /// A wallet link (rainbow://...) opens the wallet a moment late: WalletConnect sends the request and opens the
+        /// wallet at the same time, and once this app is behind the wallet its page stops, request half sent.
+        /// The wallet then sat for a minute before it could sign (Austin, 10-10).
+        static func openOutside(_ u: URL) {
+            if u.scheme?.hasPrefix("http") == true { return UIApplication.shared.open(u) }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { UIApplication.shared.open(u) }
+        }
+
         static func ours(_ host: String?) -> Bool {
             guard let h = host?.lowercased() else { return false }
             return h == "wedgie.dev" || h.hasSuffix(".wedgie.dev")
@@ -92,7 +100,7 @@ struct WebView: UIViewRepresentable {
         // window.open / target=_blank → Safari.
         func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
                      for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-            if let u = navigationAction.request.url, u.scheme != nil, u.scheme != "about" { UIApplication.shared.open(u) }   // a site, or a wallet (rainbow://)
+            if let u = navigationAction.request.url, u.scheme != nil, u.scheme != "about" { Self.openOutside(u) }   // a site, or a wallet (rainbow://)
             return nil
         }
 
@@ -102,7 +110,7 @@ struct WebView: UIViewRepresentable {
             // A wallet's own link (rainbow://, metamask://, wc:): WalletConnect opening the wallet app.
             if let u = navigationAction.request.url, let sch = u.scheme?.lowercased(),
                !["http", "https", "about", "blob", "data", "javascript"].contains(sch) {
-                UIApplication.shared.open(u)
+                Self.openOutside(u)
                 return decisionHandler(.cancel)
             }
             if navigationAction.navigationType == .linkActivated,
