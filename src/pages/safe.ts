@@ -95,8 +95,9 @@ async function wallet(chain: number): Promise<string> {
   return E.checksum(from);
 }
 async function send(chain: number, to: string, data: string, say: (s: string, pct?: number) => void, value = "0x0"): Promise<any> {
+  say("Getting your wallet.", 4);
   const from = await wallet(chain);
-  say("Confirm it in your wallet.", 5);
+  say("Opening your wallet: confirm it there.", 10);
   const hash = await eth().request({ method: "eth_sendTransaction", params: [{ from, to, data, value }] });
   for (let i = 0; i < 160; i++) {
     say("Sent. Waiting for it to land in a block.", 20 + 50 * (1 - 0.85 ** i));
@@ -622,7 +623,7 @@ export function safe(main: HTMLElement) {
     $("s-refresh").onclick = () => job(() => load());
     box.querySelectorAll<HTMLButtonElement>("[data-sign]").forEach((b) => b.onclick = () => job(() => signQueued(queue[+b.dataset.sign!], "wedgie")));
     box.querySelectorAll<HTMLButtonElement>("[data-wsign]").forEach((b) => b.onclick = () => job(() => signQueued(queue[+b.dataset.wsign!], "wallet")));
-    box.querySelectorAll<HTMLButtonElement>("[data-exec]").forEach((b) => b.onclick = () => job(async () => { running = queue[+b.dataset.exec!]; try { await execute(running); } finally { running = null; } }));
+    box.querySelectorAll<HTMLButtonElement>("[data-exec]").forEach((b) => b.onclick = () => job(async () => { running = queue[+b.dataset.exec!]; paintDock(); try { await execute(running); } finally { running = null; } }));
     paintDock();
   }
   /** Stuck to the bottom of the screen while a transaction is ready to run (Austin): its Execute, then its progress. */
@@ -639,7 +640,7 @@ export function safe(main: HTMLElement) {
     $("s-dock-tx").innerHTML = `<span class="safe-dock-what"><b>#${esc(t.nonce)}</b> ${esc(what)} → ${eqA(t.to, safeAddr) ? "this Safe" : address(t.to, { size: "sm", chain })}</span>
       ${running ? "" : `<button class="btn btn-green" id="s-dock-go"${dis()}>Execute</button>`}`;
     $("s-dock-msg").hidden = !running;
-    $("s-dock-go")?.addEventListener("click", () => job(async () => { running = t; try { await execute(t); } finally { running = null; } }));
+    $("s-dock-go")?.addEventListener("click", () => job(async () => { running = t; paintDock(); try { await execute(t); } finally { running = null; } }));
   }
   /** After a sign: the queue is at the bottom, so take the page there (once it's repainted). */
   const toQueue = () => requestAnimationFrame(() => $("s-queue").scrollIntoView({ behavior: "smooth", block: "center" }));
@@ -735,6 +736,7 @@ export function safe(main: HTMLElement) {
   /** Every owner's signature from Safe's API, packed; a browser wallet sends it (and pays the gas). */
   async function execute(t: any) {
     if (+t.nonce !== info!.nonce) throw new Error(`#${info!.nonce} runs first: a Safe runs its transactions in order.`);
+    say("Getting it ready.", 2);
     const sigs = (t.confirmations || []).map((c: any) => ({ owner: c.owner,
       signature: c.signature || E.hex(E.cat(E.aword(c.owner), E.word(0), new Uint8Array([1]))) }));   // an approveHash on chain
     await send(chain, safeAddr, E.execData(t, E.packSignatures(sigs)), say);

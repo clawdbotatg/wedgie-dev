@@ -629,3 +629,8 @@ body.in-app .safe-dock { right: 96px; }   /* the iPhone app's underwear button s
 /* A phone zooms into any field under 16px when it's tapped, and stays zoomed: the bottom bar ended up off screen */
 @media (pointer: coarse) { input, select, textarea { font-size: 16px !important; } }
 .safe-dock-what { font-size: 15px; }
+/* a bar that's waiting still moves: stripes slide across it */
+.safe-msg .meter-fill, #s-dock-msg .meter-fill { background: repeating-linear-gradient(-45deg, rgba(255,255,255,.28) 0 10px, transparent 10px 20px), var(--green-fill);
+  background-size: 28px 28px, 100% 100%; animation: safe-wait .8s linear infinite; transition: width .6s; }
+@keyframes safe-wait { to { background-position: 28px 0, 0 0; } }
+@media (prefers-reduced-motion: reduce) { .safe-msg .meter-fill, #s-dock-msg .meter-fill { animation: none; } }
