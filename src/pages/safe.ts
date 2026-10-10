@@ -687,13 +687,14 @@ export function safe(main: HTMLElement) {
   }
 
   /**
-   * One signature on a new Safe transaction. Enough on its own (1 of N, next in line) and signed by the
-   * wallet: it runs right away. Otherwise into Safe's queue, where every owner sees it.
+   * One signature on a new Safe transaction, into Safe's queue, where every owner sees it. Never run from
+   * here, even when one is enough: the dock's Execute does that, so the wallet opens only on a tap (Austin).
+   * run: a WalletConnect app waiting for a tx hash; one signature enough and next in line, it runs now.
    */
-  async function propose(t: E.SafeTx, who: "wedgie" | "wallet", what: string): Promise<string | null> {
+  async function propose(t: E.SafeTx, who: "wedgie" | "wallet", what: string, run = false): Promise<string | null> {
     if (who === "wallet") say(`Sign it in your wallet: ${what}.`);
     const sig = who === "wedgie" ? await wedgieSig(t) : await walletSig(t);
-    if (info!.threshold === 1 && +t.nonce === info!.nonce && account) {
+    if (run && info!.threshold === 1 && +t.nonce === info!.nonce && account) {
       const rc = await send(chain, safeAddr, E.execData(t, E.packSignatures([sig])), say);
       await settle(+t.nonce);
       say(`Done: ${what}.`);
@@ -846,7 +847,7 @@ export function safe(main: HTMLElement) {
         if (!account) account = await wallet(chain);       // it sends the Safe tx and pays the gas
         const t = a.calls.length === 1 ? safeTx(a.calls[0].to, a.calls[0].value.toString(), a.calls[0].data)
           : { ...safeTx(E.MULTISEND_CALL_ONLY, "0", E.multiSendData(a.calls)), operation: 1 };
-        const hash = await propose(t, who, `${a.dapp.name}: ${plural(a.calls.length, "call")}`);
+        const hash = await propose(t, who, `${a.dapp.name}: ${plural(a.calls.length, "call")}`, true);
         asks = asks.filter((x) => x !== a);
         if (hash) await wcm!.answerDone(a, hash);
         else await wcm!.answerError(a.topic, a.id, "It's in the Safe's queue: more owners have to sign before it runs.");
