@@ -626,3 +626,6 @@ body.test-mode .top, body.test-mode .foot { display: none; }
 .safe-dock-what { min-width: 0; font-size: 17px; }
 body.has-dock main { padding-bottom: 130px; }
 body.in-app .safe-dock { right: 96px; }   /* the iPhone app's underwear button sits bottom right */
+/* A phone zooms into any field under 16px when it's tapped, and stays zoomed: the bottom bar ended up off screen */
+@media (pointer: coarse) { input, select, textarea { font-size: 16px !important; } }
+.safe-dock-what { font-size: 15px; }
