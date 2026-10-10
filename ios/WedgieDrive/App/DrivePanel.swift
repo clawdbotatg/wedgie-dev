@@ -1,7 +1,102 @@
-// The drive panel: pick the WEDGIE drive once, send requests, see the files and every answer.
+// The drive panel: one simple screen in wedgie.dev's look (find the drive, plugged in or not). Its details (test
+// buttons, files, the log, Forget) are one tap away in DriveDetails.
 import SwiftUI
 
+private let paper = Color(red: 0.957, green: 0.957, blue: 0.945)      // --paper #f4f4f1
+private let ink = Color(red: 0.102, green: 0.106, blue: 0.102)        // --ink #1a1b1a
+private let muted = Color(red: 0.42, green: 0.43, blue: 0.42)         // --muted #6b6e6b
+private let green = LinearGradient(colors: [Color(red: 0.275, green: 0.804, blue: 0.392), Color(red: 0.086, green: 0.549, blue: 0.204)],
+                                   startPoint: .top, endPoint: .bottom)   // --green-fill
+private let greenEdge = Color(red: 0.059, green: 0.431, blue: 0.157)  // #0f6e28
+
+/// wedgie.dev's big green pill button.
+struct PillButton: View {
+    let title: String
+    let action: () -> Void
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 22, weight: .heavy, design: .rounded))
+                .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.2), radius: 0, y: 1)
+                .frame(maxWidth: .infinity, minHeight: 64)
+                .background(Capsule().fill(green))
+                .background(Capsule().fill(greenEdge).offset(y: 4))
+                .shadow(color: Color(red: 0.086, green: 0.549, blue: 0.204).opacity(0.45), radius: 12, y: 8)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 struct DrivePanel: View {
+    @EnvironmentObject var drive: Drive
+    @Environment(\.dismiss) private var dismiss
+    @State private var picking = false
+    @State private var details = false
+
+    var body: some View {
+        ZStack {
+            paper.ignoresSafeArea()
+            VStack(spacing: 0) {
+                HStack {
+                    Spacer()
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark").font(.system(size: 17, weight: .heavy)).foregroundStyle(muted)
+                            .frame(width: 40, height: 40).background(Circle().fill(.white))
+                    }
+                }
+                Spacer()
+                ZStack(alignment: .topTrailing) {
+                    Image("Underwear").resizable().scaledToFit().frame(width: 150, height: 150)
+                    Circle().fill(drive.state == .here ? Color(red: 0.133, green: 0.769, blue: 0.322) : Color.gray.opacity(0.5))
+                        .frame(width: 26, height: 26).overlay(Circle().stroke(paper, lineWidth: 4)).offset(x: 6, y: 10)
+                }
+                Text(title)
+                    .font(.system(size: 34, weight: .heavy, design: .rounded)).foregroundStyle(ink)
+                    .multilineTextAlignment(.center).padding(.top, 28)
+                Text(subtitle)
+                    .font(.system(size: 19, weight: .medium, design: .rounded)).foregroundStyle(muted)
+                    .multilineTextAlignment(.center).padding(.top, 10)
+                Spacer()
+                switch drive.state {
+                case .unpicked: PillButton(title: "Find my wedgie") { picking = true }
+                case .here: PillButton(title: "Done") { dismiss() }
+                case .away: EmptyView()
+                }
+                Button("Details") { details = true }
+                    .font(.system(size: 16, weight: .bold, design: .rounded)).foregroundStyle(muted)
+                    .padding(.top, 22)
+            }
+            .padding(.horizontal, 28).padding(.vertical, 20)
+        }
+        .fileImporter(isPresented: $picking, allowedContentTypes: [.folder]) { r in
+            switch r {
+            case .success(let url): drive.picked(url)
+            case .failure(let e): drive.note(.error, "picker: \(e.localizedDescription)")
+            }
+        }
+        .sheet(isPresented: $details) { DriveDetails() }
+    }
+
+    private var title: String {
+        switch drive.state {
+        case .unpicked: return "Find your wedgie"
+        case .away: return "Plug in your wedgie"
+        case .here: return "Connected"
+        }
+    }
+
+    private var subtitle: String {
+        switch drive.state {
+        case .unpicked: return "Plug it in, then tap the button."
+        case .away: return "It connects by itself."
+        case .here: return "Your wedgie is plugged in."
+        }
+    }
+}
+
+/// Everything else: test requests, the drive's files, the log, Forget the drive.
+struct DriveDetails: View {
     @EnvironmentObject var drive: Drive
     @Environment(\.dismiss) private var dismiss
     @State private var picking = false
@@ -82,7 +177,7 @@ struct DrivePanel: View {
                 }
 
             }
-            .navigationTitle("WEDGIE drive")
+            .navigationTitle("Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
             .fileImporter(isPresented: $picking, allowedContentTypes: [.folder]) { r in
