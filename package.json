@@ -27,6 +27,7 @@
     "@micropython/micropython-webassembly-pyscript": "1.26.0",
     "@reown/walletkit": "^1.6.0",
     "@walletconnect/core": "^2.25.0",
+    "@walletconnect/ethereum-provider": "^2.26.0",
     "@walletconnect/utils": "^2.25.0",
     "blo": "^2.1.1",
     "three": "^0.186.1",

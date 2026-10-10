@@ -99,6 +99,12 @@ struct WebView: UIViewRepresentable {
         // A tapped link off wedgie.dev goes to Safari; the site itself stays here.
         func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                      decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+            // A wallet's own link (rainbow://, metamask://, wc:): WalletConnect opening the wallet app.
+            if let u = navigationAction.request.url, let sch = u.scheme?.lowercased(),
+               !["http", "https", "about", "blob", "data", "javascript"].contains(sch) {
+                UIApplication.shared.open(u)
+                return decisionHandler(.cancel)
+            }
             if navigationAction.navigationType == .linkActivated,
                let u = navigationAction.request.url, u.scheme?.hasPrefix("http") == true, !Self.ours(u.host) {
                 UIApplication.shared.open(u)

@@ -73,9 +73,25 @@ const view = (chain: number, to: string, data: string) => rpc(chain, "eth_call",
 const hasCode = async (chain: number, a: string) => (await rpc(chain, "eth_getCode", [a, "latest"])).length > 2;
 
 // ---- a browser wallet (EIP-1193): pays the gas, and can sign as an owner ----
-const eth = () => (window as any).ethereum;
+// No wallet in the browser (a phone, the iPhone app): WalletConnect to Rainbow, MetaMask or any other, loaded
+// only then. Its own storage prefix: the page's WalletKit (wedgie as a wallet for other apps) keeps its own.
+let wcp: any = null;
+const WCP = "wedgie.safe.wc";        // set once a wallet connected this way: its session is restored on the next visit
+const eth = () => (window as any).ethereum || wcp;
+async function walletConnect() {
+  if (wcp) return wcp;
+  const { EthereumProvider } = await import("@walletconnect/ethereum-provider");
+  const ids = Object.keys(CHAINS).map(Number);
+  const p = await EthereumProvider.init({ projectId: "3a8170812b534d0ff9d794f19a901d64", showQrModal: true,
+    optionalChains: ids as [number, ...number[]], rpcMap: Object.fromEntries(ids.map((c) => [c, CHAINS[c].rpc])),
+    metadata: { name: "wedgie Safe", description: "A wedgie as a Safe signer", url: location.origin, icons: [location.origin + "/img/sticker.webp"] },
+    customStoragePrefix: "wedgie-safe" } as any);
+  p.on("disconnect", () => { try { localStorage.removeItem(WCP); } catch {} });
+  return wcp = p;
+}
 async function wallet(chain: number): Promise<string> {
-  if (!eth()) throw new Error("No browser wallet in this browser (MetaMask, Rabby, Coinbase Wallet...).");
+  if (!eth()) await walletConnect();
+  if (wcp && !(window as any).ethereum && !wcp.session) { await wcp.connect({ optionalChains: [chain] }); try { localStorage.setItem(WCP, "1"); } catch {} }
   const [from] = await eth().request({ method: "eth_requestAccounts" });
   const want = "0x" + chain.toString(16);
   if ((await eth().request({ method: "eth_chainId" })) !== want) {
@@ -309,8 +325,8 @@ export function safe(main: HTMLElement) {
   function paintWallet() {
     // up top, under the wedgie: the browser wallet (pays gas, can sign as an owner too)
     const box = $("s-wallet");
-    box.hidden = !eth();
-    box.innerHTML = !eth() ? "" : !account ? `<button class="btn btn-sm btn-wallet" id="w-go"${dis()}>Connect wallet</button>`
+    box.hidden = false;
+    box.innerHTML = !account ? `<button class="btn btn-sm btn-wallet" id="w-go"${dis()}>Connect wallet</button>`
       : `<span class="safe-id-tag">wallet</span>${address(account)}${isOwner(account) ? `<span class="good">owner</span>` : ""}
       <button class="btn btn-sm" id="w-off"${dis()}>Disconnect</button>`;
     $("w-go")?.addEventListener("click", () => job(async () => {
@@ -323,14 +339,16 @@ export function safe(main: HTMLElement) {
       try { localStorage.setItem(OFF, "1"); } catch {}
       // MetaMask and most others forget this site's permission; a wallet that can't, the page still stops using
       try { await eth().request({ method: "wallet_revokePermissions", params: [{ eth_accounts: {} }] }); } catch {}
+      if (wcp && !(window as any).ethereum) { try { localStorage.removeItem(WCP); await wcp.disconnect(); } catch {} }
       rows = rows.filter((r) => r.wedgie).map((r) => ({ ...r, wallet: false }));
       paintAll();
     });
   }
-  eth()?.on?.("accountsChanged", (a: string[]) => {
+  const onAccounts = (a: string[]) => {
     if (localStorage.getItem(OFF)) return;
     account = a[0] ? E.checksum(a[0]) : ""; paintAll(); if (!safeAddr) findSafes();
-  });
+  };
+  eth()?.on?.("accountsChanged", onAccounts);
 
   // ---- /safe: every Safe the wedgie (and the wallet) owns, on every chain ----
   async function findSafes() {
@@ -832,7 +850,9 @@ export function safe(main: HTMLElement) {
 
   W.onChange(paintWedgie);
   if (W.armed()) W.start();
-  if (!localStorage.getItem(OFF))
+  if (!(window as any).ethereum && localStorage.getItem(WCP) && !localStorage.getItem(OFF))
+    walletConnect().then((p) => { p.on("accountsChanged", onAccounts); if (p.session && p.accounts[0]) onAccounts(p.accounts); }, () => {});
+  else if (!localStorage.getItem(OFF))
     eth()?.request({ method: "eth_accounts" }).then((a: string[]) => { if (a?.[0]) { account = E.checksum(a[0]); paintAll(); if (!safeAddr) findSafes(); } }, () => {});
   show();
 }
