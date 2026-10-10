@@ -8,7 +8,7 @@
 import SwiftUI
 import WebKit
 
-let home = URL(string: "https://wedgie.dev/")!
+let home = URL(string: "https://wedgie.dev/safe")!     // the app is for signing (Austin, 10-10)
 
 private let bridgeJS = """
 (() => {
