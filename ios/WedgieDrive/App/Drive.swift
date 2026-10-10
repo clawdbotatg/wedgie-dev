@@ -214,6 +214,32 @@ enum DriveError: LocalizedError {
         }
     }
 
+    /// Safe Signer test: sign a 0 ETH call from the newest Safe the wedgie knows to itself. Nonce 999999, so it can
+    /// never run on chain. Needs a "My Safes" answer in the log first.
+    func testSign() async {
+        guard let safe = knownSafes().first else { note(.error, "tap My Safes first (no Safes in the log yet)"); return }
+        let p = safe.split(separator: ":").map(String.init)
+        guard p.count == 2, let chain = Int(p[0]) else { note(.error, "can't read Safe \(safe)"); return }
+        let z = "0x" + String(repeating: "0", count: 40)
+        let tx: [String: Any] = ["chainId": chain, "safe": p[1], "to": p[1], "value": "0", "data": "0x", "operation": 0,
+                                 "safeTxGas": "0", "baseGas": "0", "gasPrice": "0", "gasToken": z, "refundReceiver": z, "nonce": 999999]
+        guard let d = try? JSONSerialization.data(withJSONObject: ["type": "safe_sign", "tx": tx], options: [.sortedKeys]) else { return }
+        note(.info, "press green on the wedgie to sign")
+        await send(String(decoding: d, as: UTF8.self))
+    }
+
+    /// The Safes in the newest safe_list answer in the log ("8453:0x..").
+    private func knownSafes() -> [String] {
+        for l in log where l.kind == .answer {
+            for line in l.text.split(separator: "\n") {
+                guard let o = (try? JSONSerialization.jsonObject(with: Data(line.utf8))) as? [String: Any],
+                      o["type"] as? String == "safe_list", let s = o["safes"] as? [String] else { continue }
+                return s
+            }
+        }
+        return []
+    }
+
     func open(_ name: String) async {
         do {
             if let t = try await io.read(name) { note(.info, "\(name):\n\(t)") } else { note(.error, "\(name) isn't there") }

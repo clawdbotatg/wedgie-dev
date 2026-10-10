@@ -30,6 +30,12 @@ struct DrivePanel: View {
                             Button("Ask to connect") { Task { await drive.send(#"{"type":"open"}"#) } }
                                 .buttonStyle(.bordered)
                         }
+                        HStack {
+                            Button("My Safes") { Task { await drive.send(#"{"type":"safe_list"}"#) } }
+                                .buttonStyle(.bordered)
+                            Button("Test sign") { Task { await drive.testSign() } }
+                                .buttonStyle(.bordered)
+                        }
                         TextField("a JSON request", text: $line, axis: .vertical)
                             .font(.system(.body, design: .monospaced))
                             .textInputAutocapitalization(.never)
