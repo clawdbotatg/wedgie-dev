@@ -24,7 +24,28 @@ let open: (() => void) | undefined;
 let waiting: { res: (p: any) => void; rej: (e: Error) => void } | null = null;
 let onChange: (p: any | null) => void = () => {};
 
-const provider = async () => { const c = getAccount(config).connector; return c ? await c.getProvider() : null; };
+const provider = async () => { const c = getAccount(config).connector; const p: any = c ? await c.getProvider() : null; if (p) lateLink(p); return p; };
+
+// WalletConnect opens the wallet (rainbow://) at the same moment it sends the request. On a phone the page then
+// stops behind the wallet with the request half sent, and the wallet sat for minutes before it could sign
+// (Austin, 10-10). So: take the wallet link away from it, and open the wallet ourselves once the request is out.
+const LINK = "WALLETCONNECT_DEEPLINK_CHOICE";
+const linked = new WeakSet<object>();
+function lateLink(p: any) {
+  const ev = p?.signer?.client?.events;
+  if (!ev || linked.has(p)) return;
+  linked.add(p);
+  const take = () => { try { const v = localStorage.getItem(LINK); if (v) { localStorage.setItem(LINK + ".late", v); localStorage.removeItem(LINK); } } catch {} };
+  take();
+  ev.on("session_request_sent", ({ id, topic }: { id: number; topic: string }) => {
+    take();
+    let href = "";
+    try { href = JSON.parse(localStorage.getItem(LINK + ".late") || "null")?.href || ""; } catch {}
+    if (!href) return;
+    const u = `${href.replace(/\/$/, "")}/wc?requestId=${id}&sessionTopic=${topic}`;
+    window.open(u, /^https?:/.test(u) ? "_blank" : "_self", "noreferrer noopener");
+  });
+}
 
 function Bridge() {
   const { openConnectModal, connectModalOpen } = useConnectModal();
@@ -68,4 +89,4 @@ export async function connect(): Promise<any> {
   return new Promise((res, rej) => { waiting = { res, rej }; open?.(); });
 }
 
-export const disconnect = () => wDisconnect(config).catch(() => {});
+export const disconnect = () => { try { localStorage.removeItem(LINK + ".late"); } catch {} return wDisconnect(config).catch(() => {}); };
