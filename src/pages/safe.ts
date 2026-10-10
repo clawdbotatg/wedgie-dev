@@ -94,12 +94,12 @@ async function wallet(chain: number): Promise<string> {
   }
   return E.checksum(from);
 }
-async function send(chain: number, to: string, data: string, say: (s: string) => void, value = "0x0"): Promise<any> {
+async function send(chain: number, to: string, data: string, say: (s: string, pct?: number) => void, value = "0x0"): Promise<any> {
   const from = await wallet(chain);
-  say("Confirm it in your wallet.");
+  say("Confirm it in your wallet.", 5);
   const hash = await eth().request({ method: "eth_sendTransaction", params: [{ from, to, data, value }] });
-  say("Sent. Waiting for it to land in a block.");
   for (let i = 0; i < 160; i++) {
+    say("Sent. Waiting for it to land in a block.", 20 + 50 * (1 - 0.85 ** i));
     const r = await eth().request({ method: "eth_getTransactionReceipt", params: [hash] });
     if (r) { if (r.status !== "0x1") throw new Error(`It failed on chain: ${CHAINS[chain].scan}/tx/${hash}`); return r; }
     await sleep(1500);
@@ -164,10 +164,13 @@ export function safe(main: HTMLElement) {
   const old = new URLSearchParams(location.search).get("safe")?.match(/^(\w+):(0x[0-9a-fA-F]{40})$/);
   if (old && KEYS[old[1]]) history.replaceState(null, "", route(KEYS[old[1]], E.checksum(old[2])));
 
-  const say = (s: string, bad = false) => {
+  /** The message box. A number instead of bad: a progress bar under it, that far along (0-100). */
+  const say = (s: string, bad: boolean | number = false) => {
     const el = $("s-msg");
     el.hidden = !s;
-    el.innerHTML = bad ? `<b class="bad">${esc(s)}</b>` : esc(s);
+    el.innerHTML = typeof bad === "number"
+      ? `${esc(s)}<div class="meter"><div class="meter-track"><div class="meter-fill" style="width:${Math.max(8, Math.min(100, bad))}%"></div></div></div>`
+      : bad ? `<b class="bad">${esc(s)}</b>` : esc(s);
   };
   const fail = (e: any) => { say(msgOf(e), true); };
   const eqA = (a: string, b: string) => !!a && !!b && a.toLowerCase() === b.toLowerCase();
@@ -674,7 +677,7 @@ export function safe(main: HTMLElement) {
     const sig = who === "wedgie" ? await wedgieSig(t) : await walletSig(t);
     if (info!.threshold === 1 && +t.nonce === info!.nonce && account) {
       const rc = await send(chain, safeAddr, E.execData(t, E.packSignatures([sig])), say);
-      await load(true);
+      await settle(+t.nonce);
       say(`Done: ${what}.`);
       return rc.transactionHash as string;
     }
@@ -700,13 +703,23 @@ export function safe(main: HTMLElement) {
     say(u && (u.confirmations || []).length >= (u.confirmationsRequired ?? info!.threshold) ? "Signed. That's enough: press Execute." : "Signed. It shows in Safe{Wallet} too.");
   }
 
+  /** After nonce n ran: the RPC and Safe's API catch up seconds later, so read again until both have moved on. */
+  async function settle(n: number) {
+    for (let i = 0; i < 20; i++) {
+      say("It ran. Updating the Safe.", 75 + 20 * (1 - 0.8 ** i));
+      await load(true);
+      if (info && info.nonce > n && !queue.some((x) => +x.nonce <= n)) return;
+      await sleep(2000);
+    }
+  }
+
   /** Every owner's signature from Safe's API, packed; a browser wallet sends it (and pays the gas). */
   async function execute(t: any) {
     if (+t.nonce !== info!.nonce) throw new Error(`#${info!.nonce} runs first: a Safe runs its transactions in order.`);
     const sigs = (t.confirmations || []).map((c: any) => ({ owner: c.owner,
       signature: c.signature || E.hex(E.cat(E.aword(c.owner), E.word(0), new Uint8Array([1]))) }));   // an approveHash on chain
     await send(chain, safeAddr, E.execData(t, E.packSignatures(sigs)), say);
-    await load(true);
+    await settle(+t.nonce);
     say("Done: it ran.");
   }
 
