@@ -167,6 +167,13 @@ enum DriveError: LocalizedError {
         }
     }
 
+    /// Back to no drive picked, to walk through picking it again.
+    func forget() {
+        UserDefaults.standard.removeObject(forKey: DriveIO.bookmarkKey)
+        state = .unpicked; name = ""; files = []; lastAnswer = nil
+        note(.info, "forgot the drive")
+    }
+
     func tick() async {
         guard !checking, state != .unpicked else { return }
         checking = true

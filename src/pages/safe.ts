@@ -16,6 +16,7 @@
 // wedgie itself (safe_list: the Safes it signed for or was told about, wedgie-safe safe-4+; the page tells it
 // with safe_note), and this browser's own memory (per wedgie). Each is checked on chain before it's shown.
 import * as W from "../serial/wedgies";
+import * as Drive from "../serial/drive";
 import * as E from "../safe/eth";
 import { address, addressInput, addressOf, watch } from "../safe/address";
 
@@ -133,6 +134,15 @@ export function safe(main: HTMLElement) {
   const $ = (id: string) => document.getElementById(id)!;
   document.getElementById("connect-btn")?.before($("s-me"));   // the wedgie's address sits beside its Connected button
   let key: { x: string; y: string } | null = null, signer = "", wedgie: W.Wedgie | null = null, asking = false, noKey = false;
+  // In the iPhone app there's no serial port: the wedgie is reached through its WEDGIE drive (serial/drive.ts).
+  const DRIVE = { key: -1, state: "ready", running: "safe", short: "", log: "" } as unknown as W.Wedgie;
+  let driveState = "";
+  const ask = <T,>(w: W.Wedgie, fn: (r: Drive.Asker) => Promise<T>): Promise<T> => w === DRIVE ? Drive.withDrive(fn) : ask(w, fn);
+  const present = (w: W.Wedgie) => w === DRIVE ? driveState === "here" : W.wedgies().includes(w);
+  if (Drive.inApp()) {
+    const look = async () => { const s = await Drive.status().catch(() => "away"); if (s !== driveState) { driveState = s; if (s !== "here") { wedgie = null; key = null; signer = ""; } paintAll(); } };
+    look(); setInterval(look, 1500);
+  }
   let chunk = 0;          // hex chars per safe_data piece (its hello's safe_chunk), 0: this app can't take pieces
   let onWedgie: string[] | null = null;   // the wedgie's own list ("8453:0x.."), null: its app keeps none
   let account = "", busy = false;
@@ -184,7 +194,7 @@ export function safe(main: HTMLElement) {
     const k = `${c}:${a.toLowerCase()}`;
     if (!wedgie || onWedgie === null || onWedgie.includes(k)) return;
     try {
-      const r = await W.withRepl(wedgie, (r) => r.request({ type: "safe_note", chainId: c, safe: a }, 5000));
+      const r = await ask(wedgie, (r) => r.request({ type: "safe_note", chainId: c, safe: a }, 5000));
       if (r.type === "ok") onWedgie = [k, ...onWedgie.filter((x) => x !== k)];
     } catch {}
   }
@@ -218,11 +228,14 @@ export function safe(main: HTMLElement) {
 
   // ---- the wedgie ----
   function paintWedgie() {
-    const ws = W.wedgies().filter((w) => w.state === "ready");
+    const ws = Drive.inApp() ? (driveState === "here" ? [DRIVE] : []) : W.wedgies().filter((w) => w.state === "ready");
     const app = ws.filter((w) => w.running === "safe");
     let h = "";
-    if (!W.supported()) h += `<p class="fine">This browser can't talk to a wedgie over USB. Use Chrome, Edge or Brave on a computer.</p>`;
-    else if (!W.armed()) h += `<p><a class="btn btn-green" href="/connect">Connect a wedgie</a></p>`;
+    if (Drive.inApp() && !ws.length) h += driveState === "unpicked"
+      ? `<p>Plug in your wedgie, then <button class="btn btn-sm btn-green" id="s-drive">Find it</button></p>`
+      : `<p class="fine">Plug in your wedgie. <button class="btn btn-sm" id="s-drive">Help</button></p>`;
+    else if (!Drive.inApp() && !W.supported()) h += `<p class="fine">This browser can't talk to a wedgie over USB. Use Chrome, Edge or Brave on a computer.</p>`;
+    else if (!Drive.inApp() && !W.armed()) h += `<p><a class="btn btn-green" href="/connect">Connect a wedgie</a></p>`;
     else if (!ws.length) h += `<p class="fine">Plug it in. Not showing? <a href="/connect">Connect</a> it first.</p>`;
     else if (!app.length) h += `<p class="fine">It isn't running the Safe Signer yet. <a class="btn btn-sm btn-green" href="/connect/${esc(ws[0].short)}">Install Safe Signer</a> (on its page, Software).</p>`;
     else if (!key) h += noKey ? `<p><b>Press the green button on the wedgie to make its key.</b> The chip makes it and never lets it out.</p>` : `<p class="fine">Reading its key.</p>`;
@@ -240,6 +253,7 @@ export function safe(main: HTMLElement) {
     me.hidden = !signer;
     me.innerHTML = signer ? `<span class="safe-id-tag">wedgie</span>${address(signer)}` : "";
     $("s-deploy")?.addEventListener("click", () => job(deploy));
+    $("s-drive")?.addEventListener("click", () => Drive.panel());
     if (app.length && !key && wedgie !== app[0]) readKey(app[0]);
   }
 
@@ -247,11 +261,11 @@ export function safe(main: HTMLElement) {
   async function readKey(w: W.Wedgie) {
     wedgie = w;
     try {
-      const h = await W.withRepl(w, (r) => r.request({ type: "hello" }, 5000));
+      const h = await ask(w, (r) => r.request({ type: "hello" }, 5000));
       if (!h.safe) {                  // no key yet: the wedgie's own A makes it; look again in a moment
         noKey = true; paintWedgie();
         await sleep(3000);
-        if (W.wedgies().includes(w)) { wedgie = null; paintWedgie(); }
+        if (present(w)) { wedgie = null; paintWedgie(); }
         return;
       }
       noKey = false;
@@ -262,7 +276,7 @@ export function safe(main: HTMLElement) {
       if (om && KEYS[om[1]]) remember(KEYS[om[1]], om[2]);     // checked on chain like every other before it's listed
       try { localStorage.removeItem("wedgie.safe"); } catch {}
       try {
-        const l = await W.withRepl(w, (r) => r.request({ type: "safe_list" }, 5000));
+        const l = await ask(w, (r) => r.request({ type: "safe_list" }, 5000));
         onWedgie = l.type === "safe_list" && Array.isArray(l.safes) ? l.safes : null;
       } catch { onWedgie = null; }
       paintAll();
@@ -272,7 +286,7 @@ export function safe(main: HTMLElement) {
       // Right after a reload the port is often still held by the page that just closed, or the wedgie is busy:
       // the first asks fail. Try again on our own instead of waiting for the wedgie to change (Austin: the list
       // came up empty after a reload until he went to /connect and back).
-      if (!key && ++keyTries <= 6 && W.wedgies().includes(w)) { await sleep(800 * keyTries); wedgie = null; paintWedgie(); return; }
+      if (!key && ++keyTries <= 6 && present(w)) { await sleep(800 * keyTries); wedgie = null; paintWedgie(); return; }
       fail(e); wedgie = null;
     }
   }
@@ -619,7 +633,7 @@ export function safe(main: HTMLElement) {
     asking = true; paintAll();
     say("Look at the wedgie: check what it shows, then press the green button to sign (red says no).");
     try {
-      const g = await W.withRepl(wedgie, async (r) => {
+      const g = await ask(wedgie, async (r) => {
         if (!big) return r.request({ type: "safe_sign", tx }, 200000);
         say("Sending the transaction to the wedgie in pieces.");
         const hex = tx.data.slice(2);

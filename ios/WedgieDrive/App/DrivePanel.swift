@@ -16,6 +16,7 @@ struct DrivePanel: View {
                         Text(status).font(.headline)
                     }
                     Button(drive.state == .unpicked ? "Pick the WEDGIE drive" : "Pick the drive again") { picking = true }
+                    if drive.state != .unpicked { Button("Forget the drive", role: .destructive) { drive.forget() } }
                 } footer: {
                     if drive.state == .unpicked {
                         Text("Plug in your wedgie, tap Pick, then choose WEDGIE under Locations and tap Open. You only do this once.")
