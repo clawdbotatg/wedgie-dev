@@ -1,3 +1,4 @@
+import * as Drive from "./serial/drive";
 import "@fontsource-variable/nunito/wght.css";
 import "@fontsource/dm-mono/500.css";
 import "@fontsource/silkscreen/400.css";
@@ -54,7 +55,19 @@ btn.addEventListener("click", (e) => {
   if (onConnect) connectNew().catch(() => {});
   else allow().then(() => { location.href = "/connect"; }, () => {});
 });
-watchCount((n) => {
+// In the iPhone app there's no serial port: the button follows the WEDGIE drive instead (serial/drive.ts), and a
+// tap opens the app's drive panel (pick the drive, see it).
+if (Drive.inApp()) {
+  btn.addEventListener("click", (e) => { e.preventDefault(); e.stopImmediatePropagation(); Drive.panel(); }, true);
+  const look = async () => {
+    const s = await Drive.status().catch(() => "away");
+    btn.classList.toggle("on", s === "here");
+    btn.classList.toggle("ask", s === "unpicked");
+    lbl.innerHTML = s === "here" ? "Connected" : s === "unpicked" ? "Find wedgie" : "Connect";
+    btn.setAttribute("aria-label", s === "here" ? "wedgie connected" : "Connect a wedgie");
+  };
+  look(); setInterval(look, 1500);
+} else watchCount((n) => {
   seen = n;
   const ask = !n && supported();
   btn.classList.toggle("on", n > 0);
