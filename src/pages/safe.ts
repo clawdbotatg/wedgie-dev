@@ -167,12 +167,21 @@ export function safe(main: HTMLElement) {
   if (old && KEYS[old[1]]) history.replaceState(null, "", route(KEYS[old[1]], E.checksum(old[2])));
 
   /** The message box. A number instead of bad: a progress bar under it, that far along (0-100). */
+  // While a bar is up it keeps creeping (1-2% every half second, slower near the end), so a wait never looks
+  // stuck; each new step jumps it ahead if it's behind (Austin).
+  let barAt = 0, creep = 0;
+  const paintBar = () => document.querySelectorAll<HTMLElement>("#s-msg .meter-fill, #s-dock-msg .meter-fill").forEach((f) => f.style.width = `${barAt}%`);
   const say = (s: string, bad: boolean | number = false) => {
     const el = $("s-msg");
     el.hidden = !s;
-    $("s-dock-msg").innerHTML = el.innerHTML = typeof bad === "number"
-      ? `${esc(s)}<div class="meter"><div class="meter-track"><div class="meter-fill" style="width:${Math.max(8, Math.min(100, bad))}%"></div></div></div>`
+    const bar = typeof bad === "number";
+    if (bar) barAt = Math.max(barAt, Math.max(8, Math.min(100, bad)));
+    $("s-dock-msg").innerHTML = el.innerHTML = bar
+      ? `${esc(s)}<div class="meter"><div class="meter-track"><div class="meter-fill" style="width:${barAt}%"></div></div></div>`
       : bad ? `<b class="bad">${esc(s)}</b>` : esc(s);
+    clearInterval(creep);
+    if (bar) creep = window.setInterval(() => { barAt = Math.min(97, barAt + Math.max(0.3, Math.min(2, (97 - barAt) * 0.04))); paintBar(); }, 500);
+    else barAt = 0;
   };
   const fail = (e: any) => { say(msgOf(e), true); };
   const eqA = (a: string, b: string) => !!a && !!b && a.toLowerCase() === b.toLowerCase();
