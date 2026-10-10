@@ -34,8 +34,7 @@ app.innerHTML = `
 <footer class="foot">
   <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
   <p>Hardware, case, firmware, and this site are MIT licensed. Build it, fork it, sell it.</p>
-  <p class="fine"><a href="/safe">Safe</a> ·
-  <a href="https://github.com/clawdbotatg/wedgie-dev" target="_blank" rel="noopener">wedgie-dev</a> ·
+  <p class="fine"><a href="https://github.com/clawdbotatg/wedgie-dev" target="_blank" rel="noopener">wedgie-dev</a> ·
   <a href="https://github.com/clawdbotatg/clawd-pico-case" target="_blank" rel="noopener">case</a> ·
   <a href="https://github.com/austintgriffith/picowallet" target="_blank" rel="noopener">picowallet</a></p>
 </footer>
