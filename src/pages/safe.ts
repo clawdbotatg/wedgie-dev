@@ -135,6 +135,7 @@ export function safe(main: HTMLElement) {
     <div class="safe-box recess" id="s-wc" hidden></div>
     <div class="safe-box recess" id="s-queue" hidden></div>
     <p class="safe-msg" id="s-msg" hidden></p>
+    <div class="safe-dock" id="s-dock" hidden><div class="safe-dock-row" id="s-dock-tx"></div><div id="s-dock-msg"></div></div>
   </section>`;
   const $ = (id: string) => document.getElementById(id)!;
   document.getElementById("connect-btn")?.before($("s-me"));   // the wedgie's address sits beside its Connected button
@@ -168,7 +169,7 @@ export function safe(main: HTMLElement) {
   const say = (s: string, bad: boolean | number = false) => {
     const el = $("s-msg");
     el.hidden = !s;
-    el.innerHTML = typeof bad === "number"
+    $("s-dock-msg").innerHTML = el.innerHTML = typeof bad === "number"
       ? `${esc(s)}<div class="meter"><div class="meter-track"><div class="meter-fill" style="width:${Math.max(8, Math.min(100, bad))}%"></div></div></div>`
       : bad ? `<b class="bad">${esc(s)}</b>` : esc(s);
   };
@@ -621,7 +622,24 @@ export function safe(main: HTMLElement) {
     $("s-refresh").onclick = () => job(() => load());
     box.querySelectorAll<HTMLButtonElement>("[data-sign]").forEach((b) => b.onclick = () => job(() => signQueued(queue[+b.dataset.sign!], "wedgie")));
     box.querySelectorAll<HTMLButtonElement>("[data-wsign]").forEach((b) => b.onclick = () => job(() => signQueued(queue[+b.dataset.wsign!], "wallet")));
-    box.querySelectorAll<HTMLButtonElement>("[data-exec]").forEach((b) => b.onclick = () => job(() => execute(queue[+b.dataset.exec!])));
+    box.querySelectorAll<HTMLButtonElement>("[data-exec]").forEach((b) => b.onclick = () => job(async () => { running = queue[+b.dataset.exec!]; try { await execute(running); } finally { running = null; } }));
+    paintDock();
+  }
+  /** Stuck to the bottom of the screen while a transaction is ready to run (Austin): its Execute, then its progress. */
+  let running: any = null;
+  function paintDock() {
+    const i = info, k = i ? queue.findIndex((t) => +t.nonce === i.nonce && (t.confirmations || []).length >= (t.confirmationsRequired ?? i.threshold)) : -1;
+    const t = running || (k >= 0 ? queue[k] : null);
+    const dock = $("s-dock");
+    dock.hidden = !(safeAddr && t);
+    document.body.classList.toggle("has-dock", !dock.hidden);
+    document.body.classList.toggle("in-app", Drive.inApp());
+    if (dock.hidden) return;
+    const what = t.dataDecoded?.method || (t.data && t.data !== "0x" ? "contract call" : `send ${E.fmt(BigInt(t.value), 18)} ETH`);
+    $("s-dock-tx").innerHTML = `<span class="safe-dock-what"><b>#${esc(t.nonce)}</b> ${esc(what)} → ${eqA(t.to, safeAddr) ? "this Safe" : address(t.to, { size: "sm", chain })}</span>
+      ${running ? "" : `<button class="btn btn-green" id="s-dock-go"${dis()}>Execute</button>`}`;
+    $("s-dock-msg").hidden = !running;
+    $("s-dock-go")?.addEventListener("click", () => job(async () => { running = t; try { await execute(t); } finally { running = null; } }));
   }
   /** After a sign: the queue is at the bottom, so take the page there (once it's repainted). */
   const toQueue = () => requestAnimationFrame(() => $("s-queue").scrollIntoView({ behavior: "smooth", block: "center" }));

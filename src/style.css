@@ -617,3 +617,12 @@ body.test-mode .top, body.test-mode .foot { display: none; }
 .wc-ask { border-top: 1px solid rgba(0,0,0,.08); margin-top: 12px; padding-top: 4px; }
 .wc-ask ol { margin: 6px 0; padding-left: 22px; }
 .wc-ask li { margin: 6px 0; }
+
+/* /safe: a transaction ready to run, stuck to the bottom of the screen */
+.safe-dock { position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 50; max-width: 720px; margin: 0 auto;
+  display: grid; gap: 8px; padding: 12px 14px; border-radius: 22px; background: var(--card); box-shadow: var(--shell-shadow), 0 10px 30px -6px rgba(20,20,20,.35); }
+.safe-dock[hidden], #s-dock-msg[hidden] { display: none; }
+.safe-dock-row { display: flex; align-items: center; gap: 12px; justify-content: space-between; }
+.safe-dock-what { min-width: 0; font-size: 17px; }
+body.has-dock main { padding-bottom: 130px; }
+body.in-app .safe-dock { right: 96px; }   /* the iPhone app's underwear button sits bottom right */
