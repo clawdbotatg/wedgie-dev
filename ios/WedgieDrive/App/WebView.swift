@@ -92,7 +92,7 @@ struct WebView: UIViewRepresentable {
         // window.open / target=_blank → Safari.
         func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
                      for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-            if let u = navigationAction.request.url, u.scheme?.hasPrefix("http") == true { UIApplication.shared.open(u) }
+            if let u = navigationAction.request.url, u.scheme != nil, u.scheme != "about" { UIApplication.shared.open(u) }   // a site, or a wallet (rainbow://)
             return nil
         }
 

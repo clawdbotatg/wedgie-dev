@@ -73,25 +73,14 @@ const view = (chain: number, to: string, data: string) => rpc(chain, "eth_call",
 const hasCode = async (chain: number, a: string) => (await rpc(chain, "eth_getCode", [a, "latest"])).length > 2;
 
 // ---- a browser wallet (EIP-1193): pays the gas, and can sign as an owner ----
-// No wallet in the browser (a phone, the iPhone app): WalletConnect to Rainbow, MetaMask or any other, loaded
-// only then. Its own storage prefix: the page's WalletKit (wedgie as a wallet for other apps) keeps its own.
+// No wallet in the browser (a phone, the iPhone app): RainbowKit (Rainbow, MetaMask, any WalletConnect wallet),
+// loaded only then (safe/rainbow.ts). wcp is the connected wallet's provider.
 let wcp: any = null;
 const WCP = "wedgie.safe.wc";        // set once a wallet connected this way: its session is restored on the next visit
 const eth = () => (window as any).ethereum || wcp;
-async function walletConnect() {
-  if (wcp) return wcp;
-  const { EthereumProvider } = await import("@walletconnect/ethereum-provider");
-  const ids = Object.keys(CHAINS).map(Number);
-  const p = await EthereumProvider.init({ projectId: "3a8170812b534d0ff9d794f19a901d64", showQrModal: true,
-    optionalChains: ids as [number, ...number[]], rpcMap: Object.fromEntries(ids.map((c) => [c, CHAINS[c].rpc])),
-    metadata: { name: "wedgie Safe", description: "A wedgie as a Safe signer", url: location.origin, icons: [location.origin + "/img/sticker.webp"] },
-    customStoragePrefix: "wedgie-safe" } as any);
-  p.on("disconnect", () => { try { localStorage.removeItem(WCP); } catch {} });
-  return wcp = p;
-}
+const rainbow = () => import("../safe/rainbow");
 async function wallet(chain: number): Promise<string> {
-  if (!eth()) await walletConnect();
-  if (wcp && !(window as any).ethereum && !wcp.session) { await wcp.connect({ optionalChains: [chain] }); try { localStorage.setItem(WCP, "1"); } catch {} }
+  if (!eth()) { wcp = await (await rainbow()).connect(); try { localStorage.setItem(WCP, "1"); } catch {} }
   const [from] = await eth().request({ method: "eth_requestAccounts" });
   const want = "0x" + chain.toString(16);
   if ((await eth().request({ method: "eth_chainId" })) !== want) {
@@ -339,7 +328,7 @@ export function safe(main: HTMLElement) {
       try { localStorage.setItem(OFF, "1"); } catch {}
       // MetaMask and most others forget this site's permission; a wallet that can't, the page still stops using
       try { await eth().request({ method: "wallet_revokePermissions", params: [{ eth_accounts: {} }] }); } catch {}
-      if (wcp && !(window as any).ethereum) { try { localStorage.removeItem(WCP); await wcp.disconnect(); } catch {} }
+      if (wcp && !(window as any).ethereum) { try { localStorage.removeItem(WCP); } catch {} wcp = null; (await rainbow()).disconnect(); }
       rows = rows.filter((r) => r.wedgie).map((r) => ({ ...r, wallet: false }));
       paintAll();
     });
@@ -851,7 +840,12 @@ export function safe(main: HTMLElement) {
   W.onChange(paintWedgie);
   if (W.armed()) W.start();
   if (!(window as any).ethereum && localStorage.getItem(WCP) && !localStorage.getItem(OFF))
-    walletConnect().then((p) => { p.on("accountsChanged", onAccounts); if (p.session && p.accounts[0]) onAccounts(p.accounts); }, () => {});
+    rainbow().then((r) => r.start(async (p) => {
+      wcp = p;
+      if (!p) return onAccounts([]);
+      p.on?.("accountsChanged", onAccounts);
+      onAccounts(await p.request({ method: "eth_accounts" }));
+    }), () => {});
   else if (!localStorage.getItem(OFF))
     eth()?.request({ method: "eth_accounts" }).then((a: string[]) => { if (a?.[0]) { account = E.checksum(a[0]); paintAll(); if (!safeAddr) findSafes(); } }, () => {});
   show();
