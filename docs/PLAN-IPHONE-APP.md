@@ -20,7 +20,9 @@ The app (`ios/WedgieDrive`) is on Austin's phone. On a real RP2040 and an iPhone
 `REQ-<n>.TXT`, the answer read back from `ANSWER.TXT` in ~3 s; after an unplug and replug the app sent
 again with no picker (unknown 1: the bookmark survives); iOS reads the new ANSWER.TXT, not a cached copy
 (unknown 2). From a Mac, `tools/drivebench.py` sent 20 requests in a row, all answered in ~1 s (the
-drive frees a deleted request's RAM: `wedgiedrive._reclaim`; macOS never reuses a freed cluster). Still
+drive frees a deleted request's RAM: `wedgiedrive._reclaim`; macOS never reuses a freed cluster). 2026-10-10: a Safe signature over the drive works (the app's My Safes + Test sign buttons, wedgie-safe on
+0.3.35, iPhone 17 Pro): the safeTxHash matched one computed on the Mac. Next: /safe and Instant Wallet use the
+drive in the app. Still
 open: the Mac's "Disk Not Ejected Properly" (Austin: keep it writable everywhere for now), TestFlight.
 
 ## What was proven first (2026-10-03, a real RP2040 wedgie and an iPhone)

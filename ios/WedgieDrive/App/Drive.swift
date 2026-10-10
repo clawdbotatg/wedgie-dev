@@ -138,6 +138,11 @@ enum DriveError: LocalizedError {
     func note(_ kind: LogLine.Kind, _ text: String) {
         log.insert(LogLine(kind: kind, text: text), at: 0)
         if log.count > 300 { log.removeLast() }
+        // Also to Documents/log.txt, so a Mac can read it: devicectl device copy from --domain-type appDataContainer
+        let f = URL.documentsDirectory.appending(path: "log.txt")
+        let line = "\(Date().formatted(date: .omitted, time: .standard)) \(kind) \(text)\n"
+        if let h = try? FileHandle(forWritingTo: f) { h.seekToEndOfFile(); h.write(Data(line.utf8)); try? h.close() }
+        else { try? Data(line.utf8).write(to: f) }
     }
 
     func start() {
