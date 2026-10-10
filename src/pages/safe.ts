@@ -124,10 +124,10 @@ export function safe(main: HTMLElement) {
     <div class="safe-box recess" id="s-create" hidden></div>
     <div class="safe-box recess" id="s-safe" hidden></div>
     <div class="safe-box recess" id="s-add" hidden></div>
-    <div class="safe-box recess" id="s-queue" hidden></div>
     <div class="safe-box recess" id="s-owner" hidden></div>
     <div class="safe-box recess" id="s-new" hidden></div>
     <div class="safe-box recess" id="s-wc" hidden></div>
+    <div class="safe-box recess" id="s-queue" hidden></div>
     <p class="safe-msg" id="s-msg" hidden></p>
   </section>`;
   const $ = (id: string) => document.getElementById(id)!;
@@ -591,13 +591,16 @@ export function safe(main: HTMLElement) {
       if (n >= need) btns.push(first ? `<button class="btn btn-sm btn-green" data-exec="${k}"${dis()}>Execute</button>` : `<span class="fine">runs after #${i.nonce}</span>`);
       return `<li><b>#${esc(t.nonce)}</b> ${esc(what)} → ${eqA(t.to, safeAddr) ? "this Safe" : address(t.to, { link: CHAINS[chain].scan, size: "sm", chain })} <span class="fine">${n}/${need} signed</span> ${btns.join(" ")}</li>`;
     }).join("");
-    box.innerHTML = `<h2>Waiting to sign</h2>${items ? `<ul class="safe-list">${items}</ul>` : `<p class="fine">Nothing waiting.</p>`}
+    const ready = /data-exec/.test(items);
+    box.innerHTML = `<h2>${ready ? "Ready: press Execute" : "Waiting to sign"}</h2>${items ? `<ul class="safe-list">${items}</ul>` : `<p class="fine">Nothing waiting.</p>`}
       <p><button class="btn btn-sm" id="s-refresh"${dis()}>Refresh</button></p>`;
     $("s-refresh").onclick = () => job(() => load());
     box.querySelectorAll<HTMLButtonElement>("[data-sign]").forEach((b) => b.onclick = () => job(() => signQueued(queue[+b.dataset.sign!], "wedgie")));
     box.querySelectorAll<HTMLButtonElement>("[data-wsign]").forEach((b) => b.onclick = () => job(() => signQueued(queue[+b.dataset.wsign!], "wallet")));
     box.querySelectorAll<HTMLButtonElement>("[data-exec]").forEach((b) => b.onclick = () => job(() => execute(queue[+b.dataset.exec!])));
   }
+  /** After a sign: the queue is at the bottom, so take the page there (once it's repainted). */
+  const toQueue = () => requestAnimationFrame(() => $("s-queue").scrollIntoView({ behavior: "smooth", block: "center" }));
   const safeTx = (to: string, value: string, data: string, nonce = nextNonce()): E.SafeTx =>
     ({ to: E.checksum(to), value, data, operation: 0, safeTxGas: "0", baseGas: "0", gasPrice: "0", gasToken: Z, refundReceiver: Z, nonce });
 
@@ -658,6 +661,7 @@ export function safe(main: HTMLElement) {
     await post(`${api(chain)}/safes/${safeAddr}/multisig-transactions/`, { ...t, contractTransactionHash: E.safeTxHash(chain, safeAddr, t),
       sender: sig.owner, signature: sig.signature, origin: "wedgie.dev/safe" });
     await load(true);
+    toQueue();
     const left = info!.threshold - 1;
     say(left ? `In the queue with ${who === "wedgie" ? "the wedgie's" : "your"} signature: ${what}. ${plural(left, "more owner")} to sign, then Execute.`
       : `Signed: ${what}. Press Execute (a browser wallet pays the gas).`);
@@ -670,6 +674,7 @@ export function safe(main: HTMLElement) {
     say("Sending the signature to Safe.");
     await post(`${api(chain)}/multisig-transactions/${t.safeTxHash}/confirmations/`, { signature: sig.signature });
     await load(true);
+    toQueue();
     const u = queue.find((x) => x.safeTxHash === t.safeTxHash);
     say(u && (u.confirmations || []).length >= (u.confirmationsRequired ?? info!.threshold) ? "Signed. That's enough: press Execute." : "Signed. It shows in Safe{Wallet} too.");
   }
