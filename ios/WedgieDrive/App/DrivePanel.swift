@@ -48,7 +48,7 @@ struct DrivePanel: View {
                 Spacer()
                 if drive.state != .unpicked { ZStack(alignment: .topTrailing) {
                     Image("Underwear").resizable().scaledToFit().frame(width: 150, height: 150)
-                    Circle().fill(drive.state == .here ? Color(red: 0.133, green: 0.769, blue: 0.322) : Color.gray.opacity(0.5))
+                    Circle().fill(drive.state == .here && !drive.readOnly ? Color(red: 0.133, green: 0.769, blue: 0.322) : Color.gray.opacity(0.5))
                         .frame(width: 26, height: 26).overlay(Circle().stroke(paper, lineWidth: 4)).offset(x: 6, y: 10)
                 } }
                 Text(title)
@@ -61,7 +61,7 @@ struct DrivePanel: View {
                 Spacer()
                 switch drive.state {
                 case .unpicked: PillButton(title: "Find my wedgie") { picking = true }
-                case .here: PillButton(title: "Done") { dismiss() }
+                case .here: if !drive.readOnly { PillButton(title: "Done") { dismiss() } }
                 case .away: EmptyView()
                 }
                 Button("Details") { details = true }
@@ -78,16 +78,17 @@ struct DrivePanel: View {
         switch drive.state {
         case .unpicked: return drive.wrongPick == nil ? "Find your wedgie" : "That's not your wedgie"
         case .away: return "Plug in your wedgie"
-        case .here: return "Connected"
+        case .here: return drive.readOnly ? "Phone mode" : "Connected"
         }
     }
 
     private var subtitle: String {
         switch drive.state {
         case .unpicked: return drive.wrongPick.map { "You picked \"\($0)\". Go back to Locations, pick WEDGIE, tap Open." }
-            ?? "Plug it in. Tap Find my wedgie, go back to Locations, pick WEDGIE, tap Open. Only once."
+            ?? "Plug it in and hold its two grey buttons for 5 seconds. Then tap Find my wedgie, go back to Locations, pick WEDGIE, tap Open. Only once."
         case .away: return "It connects by itself."
-        case .here: return "Your wedgie is plugged in."
+        case .here: return drive.readOnly ? "Hold the two grey buttons on your wedgie for 5 seconds, until a phone shows in its corner."
+            : "Your wedgie is plugged in."
         }
     }
 }

@@ -1,5 +1,5 @@
 // wedgie.dev in a WKWebView, plus `window.wedgieDrive` for the page (only on wedgie.dev):
-//   wedgieDrive.status()      -> {state: "unpicked"|"away"|"here", name}
+//   wedgieDrive.status()      -> {state: "unpicked"|"away"|"readonly"|"here", name} (readonly: not in phone mode yet)
 //   wedgieDrive.send(line)    -> the REQ file name it wrote (one JSON request; an "id" is added if missing)
 //   wedgieDrive.list()        -> [{name, size}]
 //   wedgieDrive.read(name)    -> the file's text, or null
@@ -77,7 +77,7 @@ struct WebView: UIViewRepresentable {
                 do {
                     switch op {
                     case "status":
-                        replyHandler(["state": drive.state.rawValue, "name": drive.name], nil)
+                        replyHandler(["state": drive.state == .here && drive.readOnly ? "readonly" : drive.state.rawValue, "name": drive.name], nil)
                     case "send":
                         guard let arg, let file = await drive.send(arg) else { return replyHandler(nil, "send failed") }
                         replyHandler(file, nil)

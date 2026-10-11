@@ -64,6 +64,11 @@ actor DriveIO {
         }
     }
 
+    /// The drive is read-only until phone mode (wedgie 0.3.37+: the two grey buttons held 5 s).
+    func readOnly() throws -> Bool {
+        try with { root in (try? root.resourceValues(forKeys: [.volumeIsReadOnlyKey]))?.volumeIsReadOnly ?? false }
+    }
+
     func list() throws -> [DriveFile] {
         try with { root in
             try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: [.fileSizeKey, .isDirectoryKey])
@@ -143,6 +148,7 @@ enum DriveError: LocalizedError {
     @Published var log: [LogLine] = []
     @Published var showPanel = ProcessInfo.processInfo.arguments.contains("-panel")   // -panel: open on it (screenshots)
     @Published var lastAnswer: String?
+    @Published var readOnly = false         // plugged in, not in phone mode yet: it can't take requests
     @Published var wrongPick: String?       // the folder last picked when it wasn't the WEDGIE drive
 
     let io = DriveIO()
@@ -207,6 +213,8 @@ enum DriveError: LocalizedError {
         do {
             name = try await io.check()
             state = .here
+            let ro = (try? await io.readOnly()) ?? false
+            if ro != readOnly { readOnly = ro; note(.info, ro ? "read-only: hold the two grey buttons 5 s" : "phone mode: writable") }
         } catch DriveError.notWedgie {
             let n = (try? await io.resolve())?.lastPathComponent ?? ""
             forget()                                    // picked before this check existed: pick again
