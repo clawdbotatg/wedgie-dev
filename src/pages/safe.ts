@@ -144,7 +144,7 @@ export function safe(main: HTMLElement) {
   // In the iPhone app there's no serial port: the wedgie is reached through its WEDGIE drive (serial/drive.ts).
   const DRIVE = { key: -1, state: "ready", running: "safe", short: "", log: "" } as unknown as W.Wedgie;
   let driveState = "";
-  const ask = <T,>(w: W.Wedgie, fn: (r: Drive.Asker) => Promise<T>): Promise<T> => w === DRIVE ? Drive.withDrive(fn) : ask(w, fn);
+  const ask = <T,>(w: W.Wedgie, fn: (r: Drive.Asker) => Promise<T>): Promise<T> => w === DRIVE ? Drive.withDrive(fn) : W.withRepl(w, fn);
   const present = (w: W.Wedgie) => w === DRIVE ? driveState === "here" : W.wedgies().includes(w);
   if (Drive.inApp()) {
     const look = async () => { const s = await Drive.status().catch(() => "away"); if (s !== driveState) { driveState = s; if (s !== "here") { wedgie = null; key = null; signer = ""; } paintAll(); } };
