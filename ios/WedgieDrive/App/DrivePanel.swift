@@ -58,6 +58,7 @@ struct DrivePanel: View {
                     .font(.system(size: 19, weight: .medium, design: .rounded)).foregroundStyle(muted)
                     .multilineTextAlignment(.center).padding(.top, 10)
                 if drive.state == .unpicked { PickerHint().padding(.top, 30) }
+                if drive.knocked != nil && (drive.readOnly || drive.state == .away) { WaitBar().padding(.top, 30) }
                 Spacer()
                 switch drive.state {
                 case .unpicked: PillButton(title: "Find my wedgie") { picking = true }
@@ -79,7 +80,7 @@ struct DrivePanel: View {
     private var title: String {
         switch drive.state {
         case .unpicked: return drive.wrongPick == nil ? "Find your wedgie" : "That's not your wedgie"
-        case .away: return "Plug in your wedgie"
+        case .away: return drive.knocked != nil ? "Connecting" : "Plug in your wedgie"
         case .here: return drive.readOnly ? (drive.knocked == nil ? "Let this phone in" : "Press green") : "Connected"
         }
     }
@@ -88,7 +89,7 @@ struct DrivePanel: View {
         switch drive.state {
         case .unpicked: return drive.wrongPick.map { "You picked \"\($0)\". Go back to Locations, pick WEDGIE, tap Open." }
             ?? "Plug it in. Tap Find my wedgie, go back to Locations, pick WEDGIE, tap Open. Only once."
-        case .away: return "It connects by itself."
+        case .away: return drive.knocked != nil ? "Your wedgie is reconnecting." : "It connects by itself."
         case .here: return drive.readOnly ? (drive.knocked == nil ? "Your wedgie asks first." : "Your wedgie is asking. Press its green button.")
             : "Your wedgie is plugged in."
         }
@@ -192,7 +193,7 @@ struct DriveDetails: View {
     private var status: String {
         switch drive.state {
         case .unpicked: return "No drive picked yet"
-        case .away: return "Plug in your wedgie"
+        case .away: return drive.knocked != nil ? "Connecting" : "Plug in your wedgie"
         case .here: return "Wedgie plugged in" + (drive.name.isEmpty ? "" : " (\(drive.name))")
         }
     }
@@ -287,5 +288,21 @@ struct PickerHint: View {
         }
         .padding(.trailing, 50)
         .onAppear { withAnimation(.easeInOut(duration: 0.7).repeatForever()) { bob = true } }
+    }
+}
+
+/// After "Let this phone in": a green bar that keeps creeping (slower near the end) until it's connected.
+struct WaitBar: View {
+    @State private var start = Date()
+    var body: some View {
+        TimelineView(.animation) { t in
+            let s = t.date.timeIntervalSince(start)
+            let f = 0.95 * (1 - exp(-s / 6))
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color(white: 0.85)).frame(height: 18)
+                Capsule().fill(green).frame(width: max(18, 300 * f), height: 18)
+            }
+            .frame(width: 300)
+        }
     }
 }
