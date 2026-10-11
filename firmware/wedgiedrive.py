@@ -131,7 +131,7 @@ class Drive(usbdev.Interface):
             from time import sleep_ms
             u = usbdev.get()
             u.active(False)
-            sleep_ms(400)
+            sleep_ms(2000)                  # long enough that a phone sees it gone (0.4 s: an iPhone kept its read-only mount)
             u.active(True)
         except Exception as e:
             print("drive:", e)
