@@ -84,8 +84,8 @@ struct DrivePanel: View {
 
     private var subtitle: String {
         switch drive.state {
-        case .unpicked: return drive.wrongPick.map { "You picked \"\($0)\". Pick the drive called WEDGIE, then tap Open." }
-            ?? "Plug it in. Tap Find my wedgie, then Open."
+        case .unpicked: return drive.wrongPick.map { "You picked \"\($0)\". Go back to Locations, pick WEDGIE, tap Open." }
+            ?? "Plug it in. Tap Find my wedgie, go back to Locations, pick WEDGIE, tap Open. Only once."
         case .away: return "It connects by itself."
         case .here: return "Your wedgie is plugged in."
         }
