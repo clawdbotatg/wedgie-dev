@@ -11,7 +11,7 @@ RP2350), a Waveshare Pico-LCD-1.3 hat (240x240 screen, 5-way joystick, A/B/X/Y),
 wedgie firmware: a boot logo, the one app it boots straight into, saves that outlast apps, and a USB
 protocol. Everything is MIT: https://wedgie.dev
 
-**The current firmware is 0.3.36.** If a wedgie's `hello` says older, update it first
+**The current firmware is 0.3.37.** If a wedgie's `hello` says older, update it first
 (`wedgie.py update`, below): everything here assumes current firmware.
 
 **Three guides cover everything** (this one first):
@@ -126,7 +126,7 @@ crashes at start or keeps USB from answering. Hold **Y**: no WEDGIE drive this t
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.36","fw":"wedgie-0.3.36","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.37","fw":"wedgie-0.3.37","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":2,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -157,7 +157,9 @@ source (https://wedgie.dev/wedgie.py) is the reference if you must.
 ## No serial port? Files on the WEDGIE drive (0.3.22+)
 
 A host that can't open the serial port (an iPhone, a locked-down computer) can talk through the drive.
-Write a new file `REQ-<n>.TXT` in its top folder: one JSON request per line, the same requests as above,
+The drive is read-only until **phone mode** (0.3.37+): hold the two grey buttons for 5 s. A phone shows in
+the screen's top-right corner, the drive drops for a moment and comes back writable, until unplug (a Mac
+never sees a writable drive, so it never says "not ejected properly"). Then write a new file `REQ-<n>.TXT` in its top folder: one JSON request per line, the same requests as above,
 a new name every time. The wedgie reads it 0.7 s after the last write; anything that needs a yes still
 asks on its screen. Once a request came in as a file, every answer is also written to `ANSWER.TXT`
 (2048 bytes): the first line is `#<count>`, then the answers as JSON lines, padded with newlines. Read it

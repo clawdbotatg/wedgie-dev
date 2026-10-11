@@ -91,7 +91,7 @@ def check(name, ok):
 data, st = command(b"\x12\x00\x00\x00\x24\x00", 36); check("INQUIRY: removable, 'wedgie.dev'", st == 0 and data[1] == 0x80 and b"wedgie.dev" in data)
 data, st = command(b"\x00" * 6, 0, False);         check("TEST UNIT READY", st == 0)
 data, st = command(b"\x25" + b"\0" * 9, 8);         check("READ CAPACITY: 2048 x 512", st == 0 and struct.unpack(">II", data) == (2047, 512))
-data, st = command(b"\x1a\x00\x3f\x00\xc0\x00", 192); check("MODE SENSE(6): writable", st == 0 and not data[2] & 0x80)
+data, st = command(b"\x1a\x00\x3f\x00\xc0\x00", 192); check("MODE SENSE(6): write-protected until phone mode", st == 0 and data[2] & 0x80)
 for lba, n in ((0, 1), (1, 8), (19, 4), (27, 40), (2040, 8)):
     data, st = command(b"\x28\x00" + struct.pack(">I", lba) + b"\x00" + struct.pack(">H", n) + b"\x00", n * 512)
     check(f"READ(10) sectors {lba}..{lba + n - 1} match the image", st == 0 and data == IMG[lba * 512:(lba + n) * 512])
@@ -103,6 +103,30 @@ check("GET_MAX_LUN = 0", d.on_interface_control_xfer(0, bytes([0xA1, 0xFE, 0, 0,
 def write(lba, data):
     n = len(data) // 512
     return command(b"\x2a\x00" + struct.pack(">I", lba) + b"\x00" + struct.pack(">H", n) + b"\x00", n * 512, False, data)[1]
+
+def sense():
+    data, _ = command(b"\x03\x00\x00\x00\x12\x00", 18)
+    return data[2] & 15, data[12]
+
+# ---- read-only until phone mode (0.3.37): a write fails and changes nothing; phone() takes the medium
+# out for a moment (NOT READY), then it's back (UNIT ATTENTION once) and writable --------------------
+check("read-only: a write fails", write(40, b"x" * 512) == 1)
+check("read-only: write protected (7/27)", sense() == (7, 0x27))
+data, st = command(b"\x28\x00" + struct.pack(">I", 40) + b"\x00\x00\x01\x00", 512)
+check("read-only: the sector is unchanged", st == 0 and data == IMG[40 * 512:41 * 512] and not d.over)
+now = [10 ** 6]
+real_ticks = W.ticks_ms
+W.ticks_ms = lambda: now[0]
+d.phone()
+data, st = command(b"\x00" * 6, 0, False);        check("phone(): not ready at first", st == 1 and sense() == (2, 0x3A))
+data, st = command(b"\x28\x00" + struct.pack(">I", 0) + b"\x00\x00\x08\x00", 8 * 512)
+check("phone(): a read meanwhile fails (zeros, no big buffer)", st == 1 and data == bytes(8 * 512))
+data, st = command(b"\x12\x00\x00\x00\x24\x00", 36); check("phone(): INQUIRY still answers", st == 0)
+now[0] += 2000
+data, st = command(b"\x00" * 6, 0, False);        check("phone(): back, medium changed (6/28) once", st == 1 and sense() == (6, 0x28))
+data, st = command(b"\x00" * 6, 0, False);        check("phone(): then ready", st == 0)
+data, st = command(b"\x1a\x00\x3f\x00\xc0\x00", 192); check("phone(): MODE SENSE writable", st == 0 and not data[2] & 0x80)
+W.ticks_ms = real_ticks
 
 try:
     import fs                                # pyfatfs registers fat://

@@ -6,6 +6,8 @@
 #    press only wakes it: the app never sees it.
 # On USB power none of this happens (VSYS is then USB's 5 V, so the battery can't be read) and the corner
 # is the app's. The slot starts it on a real board only (slot.run); the emulator has no battery.
+# Phone mode (0.3.37): the two grey buttons held PHONE_S ticks make the WEDGIE drive writable (wedgiedrive.phone)
+# so a phone can write requests on it; a phone shows in the corner until unplug.
 # Runs in one real Timer (never an app's: slot._RealTimer), every TICK_MS. Integers only: nothing grows.
 import sys, time, machine
 from machine import Pin, ADC
@@ -14,6 +16,7 @@ import ui
 
 IDLE_MS = 20000
 TICK_MS = 1000
+PHONE_S = 5                     # ticks the two grey buttons are held for phone mode
 BOX = (184, 2, 55, 11)          # x, y, w, h: the corner the battery takes
 # LiPo volts (mV at VSYS) -> percent, resting. Below the last: 0.
 CURVE = ((4150, 100), (4050, 90), (3970, 80), (3900, 70), (3840, 60), (3790, 50), (3750, 40),
@@ -29,11 +32,14 @@ _vbus = None
 _adc = None
 _pins = ()
 _gp24 = False       # VBUS is GP24, so it can wake the chip from dormant
+_grey = ()          # the two grey buttons' pins (B, X)
+_held = 0           # ticks they've both been down
+phone = False       # phone mode is on: the corner shows a phone
 
 
 def shown():
-    """The battery is in the corner now."""
-    return on_battery and pct is not None
+    """The battery or the phone is in the corner now."""
+    return phone or (on_battery and pct is not None)
 
 
 def _touch(_=None):
@@ -63,7 +69,7 @@ def _percent(mv):
 
 def start(d, Timer):
     """Watch the power from now on. d: the slot's LCD. Never raises: a board it can't read runs as before."""
-    global _d, _t, _vbus, _adc, _pins, _gp24
+    global _d, _t, _vbus, _adc, _pins, _gp24, _grey
     try:
         _d = d
         try:
@@ -73,6 +79,8 @@ def start(d, Timer):
             _gp24 = "RP2040" in sys.implementation._machine     # the register addresses below are RP2040's
         _adc = ADC(29)
         _pins = [Pin(p, Pin.IN, Pin.PULL_UP) for p in L.KEYS.values()]
+        names = list(L.KEYS)
+        _grey = (_pins[names.index("B")], _pins[names.index("X")])
         for p in _pins:                             # any press is activity, whatever reads the keys
             p.irq(_touch, Pin.IRQ_FALLING, hard=True)
         _touch()
@@ -92,8 +100,26 @@ def stop():
     on_battery = False
 
 
+def _phone():
+    """The two grey buttons held PHONE_S ticks: the drive goes writable, the corner shows a phone."""
+    global _held, phone
+    wd = sys.modules.get("wedgiedrive")
+    if phone or not _grey or wd is None or wd.drive is None:
+        return
+    if _grey[0].value() or _grey[1].value():
+        _held = 0
+        return
+    _held += 1
+    if _held >= PHONE_S:
+        wd.drive.phone()
+        phone = True
+        if not L._busy and not L._on_show:
+            _d.show_rect(*BOX)
+
+
 def _tick(_=None):
     global on_battery, pct, _mv
+    _phone()
     was, before = on_battery, pct
     on_battery = False
     if _vbus.value() == 0:
@@ -121,6 +147,13 @@ def corner(d, x0, y0, x1, y1):
     bg = d.pixel(239, 0)                            # the app's background up there
     r, g, b = L.PALETTE[bg]
     fg = ui.WHITE if r + g + b < 384 else ui.INK
+    if phone:                                       # a phone: 8 x 11, its screen green (only its own corner)
+        d.fill_rect(x + w - 12, y, 12, h, bg)
+        d.rect(x + w - 10, y, 8, 11, fg)
+        d.fill_rect(x + w - 9, y + 1, 6, 7, ui.GREEN)
+        d.pixel(x + w - 7, y + 9, fg)
+        d.pixel(x + w - 6, y + 9, fg)
+        return
     d.fill_rect(x, y, w, h, bg)
     s = "%d%%" % pct
     d.text(s, x + w - 21 - 8 * len(s), y + 2, fg)
