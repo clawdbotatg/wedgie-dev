@@ -210,7 +210,8 @@ struct FolderPicker: UIViewControllerRepresentable {
     func makeCoordinator() -> Coord { Coord(done) }
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
         let p = UIDocumentPickerViewController(forOpeningContentTypes: [.folder])
-        if let path = UserDefaults.standard.string(forKey: DriveIO.pathKey) { p.directoryURL = URL(fileURLWithPath: path) }
+        let saved = UserDefaults.standard.string(forKey: DriveIO.pathKey)
+        p.directoryURL = URL(fileURLWithPath: saved.flatMap { $0.contains("userfsd") ? $0 : nil } ?? DriveIO.usualPath)
         p.delegate = context.coordinator
         return p
     }

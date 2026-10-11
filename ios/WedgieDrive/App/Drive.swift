@@ -28,6 +28,9 @@ struct LogLine: Identifiable {
 actor DriveIO {
     static let bookmarkKey = "wedgieDriveBookmark"
     static let pathKey = "wedgieDrivePath"
+    /// Where iOS mounted the WEDGIE drive on Austin's iPhone (2026-10-10). The id is the FAT volume's, and every
+    /// wedgie has the same drive.bin, so the picker starts here when nothing better is known.
+    static let usualPath = "/private/var/mobile/Library/LiveFiles/com.apple.filesystems.userfsd/F5842556-5B7B-36D1-96CA-F5201A446FCD"
 
     func resolve() throws -> URL {
         guard let data = UserDefaults.standard.data(forKey: Self.bookmarkKey) else { throw DriveError.notPicked }
@@ -172,6 +175,7 @@ enum DriveError: LocalizedError {
         defer { if ok { url.stopAccessingSecurityScopedResource() } }
         guard DriveIO.isWedgie(url) else {
             wrongPick = url.lastPathComponent
+            UserDefaults.standard.removeObject(forKey: DriveIO.pathKey)
             note(.error, "picked \(url.lastPathComponent): not the WEDGIE drive (no README.txt + SKILL.md)")
             return
         }
@@ -206,6 +210,7 @@ enum DriveError: LocalizedError {
         } catch DriveError.notWedgie {
             let n = (try? await io.resolve())?.lastPathComponent ?? ""
             forget()                                    // picked before this check existed: pick again
+            UserDefaults.standard.removeObject(forKey: DriveIO.pathKey)
             wrongPick = n
             return
         } catch {
