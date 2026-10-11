@@ -14,6 +14,11 @@ A web page can do this too (wedgie.dev/drive.html), but iOS makes you pick the f
 Send → Save to Files → WEDGIE → Save; Read → Browse → WEDGIE → pick the file. An app picks the
 WEDGIE drive **once**, keeps permission, and then reads and writes it with no taps.
 
+## Status (2026-10-10): signing works end to end (0.3.38)
+
+Read-only drive + the knock (0.3.37-0.3.38), /safe in the app, RainbowKit to execute. Everything learned, and how
+to port it to Instant Wallet: `instant-wallet/docs/WEDGIE-PHONE.md`.
+
 ## Status (2026-10-03): working, released in 0.3.22
 
 The app (`ios/WedgieDrive`) is on Austin's phone. On a real RP2040 and an iPhone: Hello sent as
