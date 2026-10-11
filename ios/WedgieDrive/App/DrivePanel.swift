@@ -210,8 +210,16 @@ struct FolderPicker: UIViewControllerRepresentable {
     func makeCoordinator() -> Coord { Coord(done) }
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
         let p = UIDocumentPickerViewController(forOpeningContentTypes: [.folder])
-        let saved = UserDefaults.standard.string(forKey: DriveIO.pathKey)
-        p.directoryURL = URL(fileURLWithPath: saved.flatMap { $0.contains("userfsd") ? $0 : nil } ?? DriveIO.usualPath)
+        // iOS only honors a folder this app was given before: the kept bookmark (a security-scoped URL) when
+        // there is one; a plain path is a guess it may ignore (it did for the usual mount, never picked yet)
+        var stale = false
+        if let b = UserDefaults.standard.data(forKey: DriveIO.bookmarkKey),
+           let u = try? URL(resolvingBookmarkData: b, options: [], relativeTo: nil, bookmarkDataIsStale: &stale) { p.directoryURL = u }
+        else {
+            let saved = UserDefaults.standard.string(forKey: DriveIO.pathKey)
+            p.directoryURL = URL(fileURLWithPath: saved.flatMap { $0.contains("userfsd") ? $0 : nil } ?? DriveIO.usualPath)
+        }
+        Drive.shared.note(.info, "picker starts at \(p.directoryURL?.path ?? "nothing")")
         p.delegate = context.coordinator
         return p
     }
