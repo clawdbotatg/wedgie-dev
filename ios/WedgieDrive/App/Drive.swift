@@ -27,6 +27,7 @@ struct LogLine: Identifiable {
 /// the security scope itself, so an unplug between calls is just an error, never a stale handle.
 actor DriveIO {
     static let bookmarkKey = "wedgieDriveBookmark"
+    static let pathKey = "wedgieDrivePath"
 
     func resolve() throws -> URL {
         guard let data = UserDefaults.standard.data(forKey: Self.bookmarkKey) else { throw DriveError.notPicked }
@@ -126,7 +127,7 @@ enum DriveError: LocalizedError {
     @Published var name = ""
     @Published var files: [DriveFile] = []
     @Published var log: [LogLine] = []
-    @Published var showPanel = false
+    @Published var showPanel = ProcessInfo.processInfo.arguments.contains("-panel")   // -panel: open on it (screenshots)
     @Published var lastAnswer: String?
 
     let io = DriveIO()
@@ -159,6 +160,8 @@ enum DriveError: LocalizedError {
         defer { if ok { url.stopAccessingSecurityScopedResource() } }
         do {
             UserDefaults.standard.set(try url.bookmarkData(), forKey: DriveIO.bookmarkKey)
+            UserDefaults.standard.set(url.path, forKey: DriveIO.pathKey)      // where the picker opens next time
+            note(.info, "drive at \(url.path)")
             note(.info, "picked \(url.lastPathComponent)" + (url.lastPathComponent.uppercased() == "WEDGIE" ? "" : " (not named WEDGIE: is it the wedgie?)"))
             state = .away
             Task { await tick(); await refreshFiles() }

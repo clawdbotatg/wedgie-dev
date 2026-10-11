@@ -46,17 +46,18 @@ struct DrivePanel: View {
                     }
                 }
                 Spacer()
-                ZStack(alignment: .topTrailing) {
+                if drive.state != .unpicked { ZStack(alignment: .topTrailing) {
                     Image("Underwear").resizable().scaledToFit().frame(width: 150, height: 150)
                     Circle().fill(drive.state == .here ? Color(red: 0.133, green: 0.769, blue: 0.322) : Color.gray.opacity(0.5))
                         .frame(width: 26, height: 26).overlay(Circle().stroke(paper, lineWidth: 4)).offset(x: 6, y: 10)
-                }
+                } }
                 Text(title)
                     .font(.system(size: 34, weight: .heavy, design: .rounded)).foregroundStyle(ink)
-                    .multilineTextAlignment(.center).padding(.top, 28)
+                    .multilineTextAlignment(.center).padding(.top, drive.state == .unpicked ? 0 : 28)
                 Text(subtitle)
                     .font(.system(size: 19, weight: .medium, design: .rounded)).foregroundStyle(muted)
                     .multilineTextAlignment(.center).padding(.top, 10)
+                if drive.state == .unpicked { PickerHint().padding(.top, 30) }
                 Spacer()
                 switch drive.state {
                 case .unpicked: PillButton(title: "Find my wedgie") { picking = true }
@@ -69,12 +70,7 @@ struct DrivePanel: View {
             }
             .padding(.horizontal, 28).padding(.vertical, 20)
         }
-        .fileImporter(isPresented: $picking, allowedContentTypes: [.folder]) { r in
-            switch r {
-            case .success(let url): drive.picked(url)
-            case .failure(let e): drive.note(.error, "picker: \(e.localizedDescription)")
-            }
-        }
+        .sheet(isPresented: $picking) { FolderPicker { drive.picked($0) }.ignoresSafeArea() }
         .sheet(isPresented: $details) { DriveDetails() }
     }
 
@@ -88,7 +84,7 @@ struct DrivePanel: View {
 
     private var subtitle: String {
         switch drive.state {
-        case .unpicked: return "Plug it in, then tap the button."
+        case .unpicked: return "Plug it in. On the next screen, tap Open."
         case .away: return "It connects by itself."
         case .here: return "Your wedgie is plugged in."
         }
@@ -203,5 +199,56 @@ struct DriveDetails: View {
 
     private func color(_ k: LogLine.Kind) -> Color {
         switch k { case .sent: .blue; case .answer: .green; case .info: .secondary; case .error: .red }
+    }
+}
+
+/// Apple's folder picker, started at the WEDGIE drive when we know where it mounts (directoryURL), so nobody has
+/// to go back out of iCloud Drive and find it under Locations.
+struct FolderPicker: UIViewControllerRepresentable {
+    let done: (URL) -> Void
+    func makeCoordinator() -> Coord { Coord(done) }
+    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+        let p = UIDocumentPickerViewController(forOpeningContentTypes: [.folder])
+        if let path = UserDefaults.standard.string(forKey: DriveIO.pathKey) { p.directoryURL = URL(fileURLWithPath: path) }
+        p.delegate = context.coordinator
+        return p
+    }
+    func updateUIViewController(_ vc: UIDocumentPickerViewController, context: Context) {}
+    final class Coord: NSObject, UIDocumentPickerDelegate {
+        let done: (URL) -> Void
+        init(_ d: @escaping (URL) -> Void) { done = d }
+        func documentPicker(_ c: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) { if let u = urls.first { done(u) } }
+    }
+}
+
+/// What Apple's picker will look like: the top of it, WEDGIE, and its blue Open with an arrow at it.
+struct PickerHint: View {
+    @State private var bob = false
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Image(systemName: "chevron.left").font(.system(size: 20, weight: .semibold)).foregroundStyle(.primary)
+                    .frame(width: 44, height: 44).background(Circle().fill(Color(white: 0.95)))
+                Text("WEDGIE").font(.system(size: 20, weight: .semibold))
+                Spacer()
+                Text("Open").font(.system(size: 19, weight: .semibold)).foregroundStyle(.white)
+                    .padding(.horizontal, 20).frame(height: 44).background(Capsule().fill(Color.blue))
+                    .overlay(Capsule().stroke(Color(red: 0.89, green: 0.19, blue: 0.17), lineWidth: 3).padding(-6))
+            }
+            .padding(14)
+            .background(RoundedRectangle(cornerRadius: 26).fill(.white).shadow(color: .black.opacity(0.12), radius: 10, y: 4))
+            HStack {
+                Spacer()
+                VStack(spacing: 2) {
+                    Image(systemName: "arrow.up").font(.system(size: 34, weight: .black))
+                    Text("tap Open").font(.system(size: 17, weight: .heavy, design: .rounded))
+                }
+                .foregroundStyle(Color(red: 0.89, green: 0.19, blue: 0.17))
+                .offset(y: bob ? 4 : -2)
+                .padding(.trailing, 18)
+            }
+            .padding(.top, 6)
+        }
+        .onAppear { withAnimation(.easeInOut(duration: 0.7).repeatForever()) { bob = true } }
     }
 }
