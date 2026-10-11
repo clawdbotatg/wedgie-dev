@@ -48,8 +48,18 @@ actor DriveIO {
         return try body(url)
     }
 
+    /// Is this folder the WEDGIE drive? Every wedgie's drive has these at its top (firmware/drive.bin).
+    nonisolated static func isWedgie(_ root: URL) -> Bool {
+        ["README.txt", "SKILL.md"].allSatisfy { FileManager.default.fileExists(atPath: root.appending(path: $0).path) }
+    }
+
     /// Is the drive plugged in? Returns its folder name, or throws why not.
-    func check() throws -> String { try with { $0.lastPathComponent } }
+    func check() throws -> String {
+        try with { root in
+            guard Self.isWedgie(root) else { throw DriveError.notWedgie }
+            return root.lastPathComponent
+        }
+    }
 
     func list() throws -> [DriveFile] {
         try with { root in
@@ -108,12 +118,13 @@ actor DriveIO {
 }
 
 enum DriveError: LocalizedError {
-    case notPicked, noAccess, away
+    case notPicked, noAccess, away, notWedgie
     var errorDescription: String? {
         switch self {
         case .notPicked: return "pick the WEDGIE drive first"
         case .noAccess: return "iOS said no to the drive: pick it again"
         case .away: return "plug in your wedgie"
+        case .notWedgie: return "that folder isn't the WEDGIE drive"
         }
     }
 }
@@ -129,6 +140,7 @@ enum DriveError: LocalizedError {
     @Published var log: [LogLine] = []
     @Published var showPanel = ProcessInfo.processInfo.arguments.contains("-panel")   // -panel: open on it (screenshots)
     @Published var lastAnswer: String?
+    @Published var wrongPick: String?       // the folder last picked when it wasn't the WEDGIE drive
 
     let io = DriveIO()
     private var timer: Timer?
@@ -158,11 +170,17 @@ enum DriveError: LocalizedError {
     func picked(_ url: URL) {
         let ok = url.startAccessingSecurityScopedResource()
         defer { if ok { url.stopAccessingSecurityScopedResource() } }
+        guard DriveIO.isWedgie(url) else {
+            wrongPick = url.lastPathComponent
+            note(.error, "picked \(url.lastPathComponent): not the WEDGIE drive (no README.txt + SKILL.md)")
+            return
+        }
+        wrongPick = nil
         do {
             UserDefaults.standard.set(try url.bookmarkData(), forKey: DriveIO.bookmarkKey)
             UserDefaults.standard.set(url.path, forKey: DriveIO.pathKey)      // where the picker opens next time
             note(.info, "drive at \(url.path)")
-            note(.info, "picked \(url.lastPathComponent)" + (url.lastPathComponent.uppercased() == "WEDGIE" ? "" : " (not named WEDGIE: is it the wedgie?)"))
+            note(.info, "picked \(url.lastPathComponent)")
             state = .away
             Task { await tick(); await refreshFiles() }
         } catch {
@@ -185,6 +203,11 @@ enum DriveError: LocalizedError {
         do {
             name = try await io.check()
             state = .here
+        } catch DriveError.notWedgie {
+            let n = (try? await io.resolve())?.lastPathComponent ?? ""
+            forget()                                    // picked before this check existed: pick again
+            wrongPick = n
+            return
         } catch {
             state = .away
         }

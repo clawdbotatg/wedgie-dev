@@ -76,7 +76,7 @@ struct DrivePanel: View {
 
     private var title: String {
         switch drive.state {
-        case .unpicked: return "Find your wedgie"
+        case .unpicked: return drive.wrongPick == nil ? "Find your wedgie" : "That's not your wedgie"
         case .away: return "Plug in your wedgie"
         case .here: return "Connected"
         }
@@ -84,7 +84,8 @@ struct DrivePanel: View {
 
     private var subtitle: String {
         switch drive.state {
-        case .unpicked: return "Plug it in. On the next screen, tap Open."
+        case .unpicked: return drive.wrongPick.map { "You picked \"\($0)\". Pick the drive called WEDGIE, then tap Open." }
+            ?? "Plug it in. Tap Find my wedgie, then Open."
         case .away: return "It connects by itself."
         case .here: return "Your wedgie is plugged in."
         }
@@ -221,34 +222,58 @@ struct FolderPicker: UIViewControllerRepresentable {
     }
 }
 
-/// What Apple's picker will look like: the top of it, WEDGIE, and its blue Open with an arrow at it.
+/// A picture of the next screen (Apple's picker), drawn as a small phone so nobody taps it: WEDGIE at the
+/// top and its blue Open in the top right, ringed, an arrow at it.
 struct PickerHint: View {
     @State private var bob = false
+    private let red = Color(red: 0.89, green: 0.19, blue: 0.17)
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                Image(systemName: "chevron.left").font(.system(size: 20, weight: .semibold)).foregroundStyle(.primary)
-                    .frame(width: 44, height: 44).background(Circle().fill(Color(white: 0.95)))
-                Text("WEDGIE").font(.system(size: 20, weight: .semibold))
-                Spacer()
-                Text("Open").font(.system(size: 19, weight: .semibold)).foregroundStyle(.white)
-                    .padding(.horizontal, 20).frame(height: 44).background(Capsule().fill(Color.blue))
-                    .overlay(Capsule().stroke(Color(red: 0.89, green: 0.19, blue: 0.17), lineWidth: 3).padding(-6))
-            }
-            .padding(14)
-            .background(RoundedRectangle(cornerRadius: 26).fill(.white).shadow(color: .black.opacity(0.12), radius: 10, y: 4))
-            HStack {
-                Spacer()
-                VStack(spacing: 2) {
-                    Image(systemName: "arrow.up").font(.system(size: 34, weight: .black))
-                    Text("tap Open").font(.system(size: 17, weight: .heavy, design: .rounded))
+        VStack(spacing: 8) {
+            Text("NEXT SCREEN").font(.system(size: 13, weight: .heavy, design: .rounded)).foregroundStyle(muted).kerning(1.2)
+            ZStack(alignment: .top) {
+                // the phone: a dark frame, its screen, the island; only its top half shows
+                UnevenRoundedRectangle(topLeadingRadius: 40, topTrailingRadius: 40).fill(Color(white: 0.12))
+                UnevenRoundedRectangle(topLeadingRadius: 33, topTrailingRadius: 33).fill(Color(white: 0.9)).padding([.top, .horizontal], 7)
+                Capsule().fill(Color(white: 0.12)).frame(width: 64, height: 18).padding(.top, 16)
+                // the picker sheet
+                VStack(spacing: 0) {
+                    HStack(spacing: 0) {
+                        Image(systemName: "chevron.left").font(.system(size: 13, weight: .bold)).foregroundStyle(ink)
+                            .frame(width: 28, height: 28).background(Circle().fill(Color(white: 0.93)))
+                        Spacer()
+                        Text("WEDGIE").font(.system(size: 14, weight: .bold)).foregroundStyle(ink)
+                        Spacer()
+                        Text("Open").font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
+                            .padding(.horizontal, 12).frame(height: 28).background(Capsule().fill(Color.blue))
+                            .overlay(Capsule().stroke(red, lineWidth: 3).padding(-5))
+                            .scaleEffect(bob ? 1.06 : 1)
+                    }
+                    .padding(.horizontal, 12).padding(.top, 12)
+                    ForEach(["README.txt", "SKILL.md"], id: \.self) { f in
+                        HStack(spacing: 8) {
+                            Image(systemName: "doc").font(.system(size: 13)).foregroundStyle(muted)
+                            Text(f).font(.system(size: 12)).foregroundStyle(muted)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 16).padding(.top, 10)
+                    }
+                    Spacer(minLength: 0)
                 }
-                .foregroundStyle(Color(red: 0.89, green: 0.19, blue: 0.17))
-                .offset(y: bob ? 4 : -2)
-                .padding(.trailing, 18)
+                .background(UnevenRoundedRectangle(topLeadingRadius: 18, topTrailingRadius: 18).fill(.white))
+                .padding(.horizontal, 7).padding(.top, 44)
             }
-            .padding(.top, 6)
+            .frame(width: 230, height: 150)
+            .mask(LinearGradient(colors: [.black, .black, .clear], startPoint: .top, endPoint: .bottom))
+            .overlay(alignment: .topTrailing) {
+                HStack(alignment: .top, spacing: 2) {
+                    Image(systemName: "arrow.up.left").font(.system(size: 26, weight: .black))
+                    Text("tap Open").font(.system(size: 16, weight: .heavy, design: .rounded)).padding(.top, 18)
+                }
+                .foregroundStyle(red)
+                .offset(x: 74, y: bob ? 84 : 90)
+            }
         }
+        .padding(.trailing, 50)
         .onAppear { withAnimation(.easeInOut(duration: 0.7).repeatForever()) { bob = true } }
     }
 }
