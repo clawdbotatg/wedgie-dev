@@ -33,7 +33,7 @@ import save
 import ui
 from ui import WHITE, INK, MUTED, GREEN_D, RED
 
-FW = "safe-8"
+FW = "safe-9"
 RP_ID = b"wedgie.dev"
 FIELDS = '"origin":"https://wedgie.dev"'
 ASK_MS = 120000
@@ -250,23 +250,28 @@ def _addr_lines(head, a, c=INK):
     return [((head + " " + n).strip() if n else head, MUTED), (a, c, ADDR)]
 
 
-def _h(line):
-    """Pixels a line takes on a page."""
+def _h(line, big=False):
+    """Pixels a line takes on a page (big: addresses with the big blockie)."""
     k = line[2] if len(line) > 2 else None
-    return (30 if len(line[0]) <= 10 else 22) if k == BIG else 38 if k == ADDR else 6 if k == "gap" else 12
+    return (30 if len(line[0]) <= 10 else 22) if k == BIG else (52 if big else 38) if k == ADDR else 6 if k == "gap" else 12
 
 
-def _draw(lines, y, bottom=182):
-    """Lines of (text, color) or (text, color, kind) from y; stops before bottom. Returns the y under them."""
+def _draw(lines, y, bottom=182, big=False):
+    """Lines of (text, color) or (text, color, kind) from y; stops before bottom. Returns the y under them.
+    big: each address gets a 48 px blockie and 3 lines of 14 (the caller checks they fit)."""
     import safe_blockie
     for l in lines:
-        if y + _h(l) > bottom:
+        if y + _h(l, big) > bottom:
             break
         s, c, k = l[0], l[1], (l[2] if len(l) > 2 else None)
         if k == BIG and len(s) <= 10:
             d.center_text(s, y + 3, c, 3)
         elif k == BIG and len(s) <= ui.COLS_BIG:
             d.center_text(s, y + 2, c, 2)
+        elif k == ADDR and big:
+            safe_blockie.draw(d, s, 30, y + 2, 6, MUTED)
+            for i in range(3):
+                d.text(s[i * 14:i * 14 + 14], 94, y + 4 + i * 15, c)
         elif k == ADDR:
             safe_blockie.draw(d, s, 12, y + 2, 4, MUTED)
             d.text(s[:22], 54, y + 6, c)
@@ -634,7 +639,7 @@ def _screen(head, lines, yes, k, foot=""):
     d.fill(WHITE)
     ui.band(d)
     ui.title(d, head, 42, 1)
-    _draw(lines, 68, 166)
+    _draw(lines, 68, 166, sum(_h(l, True) for l in lines) <= 98)    # the big blockie wherever it fits
     if foot:
         d.center_text(foot[:ui.COLS_SMALL], 170, MUTED)
     ui.buttons(d, yes, "no")
