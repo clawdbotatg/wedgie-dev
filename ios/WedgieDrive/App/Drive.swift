@@ -192,7 +192,7 @@ enum DriveError: LocalizedError {
             note(.info, "drive at \(url.path)")
             note(.info, "picked \(url.lastPathComponent)")
             state = .away
-            Task { await tick(); await refreshFiles() }
+            Task { await tick(); await refreshFiles(); if state == .here && readOnly { await knock() } }   // first pick: ask right away
         } catch {
             note(.error, "couldn't keep the drive: \(error.localizedDescription)")
         }
@@ -214,7 +214,7 @@ enum DriveError: LocalizedError {
             name = try await io.check()
             state = .here
             let ro = (try? await io.readOnly()) ?? false
-            if ro != readOnly { readOnly = ro; note(.info, ro ? "read-only: hold the two grey buttons 5 s" : "phone mode: writable") }
+            if ro != readOnly { readOnly = ro; note(.info, ro ? "read-only: not in phone mode yet" : "phone mode: writable"); if !ro { knocked = nil } }
         } catch DriveError.notWedgie {
             let n = (try? await io.resolve())?.lastPathComponent ?? ""
             forget()                                    // picked before this check existed: pick again
@@ -289,6 +289,18 @@ enum DriveError: LocalizedError {
             }
         }
         return []
+    }
+
+    @Published var knocked: Date?           // when we last knocked: the wedgie is asking on its screen
+
+    /// Ask the wedgie for phone mode (0.3.37+): read PHONE.TXT twice, 1.2 s apart. The wedgie asks "Let in
+    /// phone?"; a green press makes the drive writable and it reconnects (away, then here, writable).
+    func knock() async {
+        knocked = Date()
+        note(.info, "knock: press green on the wedgie")
+        _ = try? await io.read("PHONE.TXT")
+        try? await Task.sleep(for: .milliseconds(1200))
+        _ = try? await io.read("PHONE.TXT")
     }
 
     func open(_ name: String) async {

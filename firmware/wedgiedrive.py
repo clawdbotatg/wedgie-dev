@@ -10,9 +10,12 @@
 # serial (inbox.py, through wedgie.lines()): a phone with no serial port can talk to a wedgie this way.
 #
 # Read-only until phone mode (0.3.37, Austin): a writable drive made every Mac say "Disk Not Ejected Properly"
-# at unplug, and almost nobody talks to a wedgie from a phone. Holding the two grey buttons for 5 s (power.py)
-# calls phone(): the drive looks taken out for a moment, then comes back writable (a card reader's media
-# change: NOT READY, then UNIT ATTENTION), so the phone mounts it again and can write requests. Until unplug.
+# at unplug, and almost nobody talks to a wedgie from a phone. A read-only drive can't take a request, but the
+# wedgie sees what's read: a phone (the iPhone app) reads PHONE.TXT twice, KNOCK_MIN-KNOCK_MAX ms apart (the
+# knock); the slot then asks on the screen (slot "phone", phone.py) and a yes calls phone(): the drive turns
+# writable and USB re-enumerates (a replug), so the phone mounts it again, writable. Until unplug. Reads in the
+# first QUIET ms don't knock (a Mac reads the whole drive when it mounts it). (A card reader's media change,
+# NOT READY then UNIT ATTENTION, wasn't enough: an iPhone kept its read-only mount.)
 #
 # boot.py starts it, only at power-up (not on a soft reset). Hold Y while plugging in to skip it for
 # that boot. Adding the drive re-enumerates USB: the serial port drops and comes back about a second
@@ -28,7 +31,7 @@ _REQ_GET_MAX_LUN, _REQ_BOT_RESET = const(0xFE), const(0xFF)
 _CBW_SIG, _CSW_SIG = const(0x43425355), const(0x53425355)
 _SECTOR = const(512)
 _NO_SENSE = (0, 0, 0)
-_OUT_MS = const(1500)               # phone(): how long the medium looks taken out
+_KNOCK_MIN, _KNOCK_MAX, _QUIET = const(700), const(10000), const(8000)   # ms: see the top
 _CAP = const(12)                    # written sectors kept in RAM: 6 KB at most (the Wallet runs with ~19 KB free)
 drive = None
 
@@ -88,22 +91,50 @@ class Drive(usbdev.Interface):
         self.full = False
         self.ans = None                 # (first lba, end lba, [512-byte memoryviews]): ANSWER.TXT, set by inbox.py
         self.writable = False           # phone mode (phone()): the host may write
-        self.out = 0                    # ticks_ms phone() took the medium out (0: in)
-        self.changed = False            # back in: the next TEST UNIT READY says the medium changed
+        self.born = ticks_ms()
+        self.knock_at = self._find(b"PHONE   TXT")   # its first sector; a read of it is a knock
+        self.k1 = 0                     # ticks_ms of the last knock (0: none)
+        self.knocked = False            # two knocks: wedgie._dropped hands the slot {"type": "phone"}
+
+    def _find(self, name):
+        """The first data sector of a file in the image's top folder, or -1."""
+        b = self.img.read(0, bytearray(_SECTOR))
+        spc, res, nfats, nroot, _, _, fsz = struct.unpack_from("<BHBHHBH", b, 13)
+        root0 = res + nfats * fsz
+        data0 = root0 + nroot * 32 // _SECTOR
+        buf = bytearray(_SECTOR)
+        for s in range(root0, data0):
+            b = self.img.read(s, buf)
+            for o in range(0, _SECTOR, 32):
+                if b[o:o + 11] == name:
+                    return data0 + (struct.unpack_from("<H", b, o + 26)[0] - 2) * spc
+        return -1
+
+    def _knock(self):
+        now = ticks_ms()
+        if ticks_diff(now, self.born) < _QUIET or self.writable:
+            return
+        gap = ticks_diff(now, self.k1) if self.k1 else 0
+        if self.k1 and gap < _KNOCK_MIN:            # the same open read twice: not a second knock
+            return
+        if self.k1 and gap <= _KNOCK_MAX:
+            self.k1, self.knocked = 0, True
+        else:
+            self.k1 = now or 1
 
     def phone(self):
-        """Phone mode: take the medium out for _OUT_MS, then back writable."""
-        if not self.writable and not self.out:
-            self.out = ticks_ms() or 1
-
-    def _absent(self):
-        """True while the medium is out; once its time is up, it's back writable."""
-        if not self.out:
-            return False
-        if ticks_diff(ticks_ms(), self.out) < _OUT_MS:
-            return True
-        self.out, self.writable, self.changed = 0, True, True
-        return False
+        """Phone mode (after a yes to the knock): writable, and a replug (USB off and on) so the host mounts it again."""
+        if self.writable:
+            return
+        self.writable = True
+        try:
+            from time import sleep_ms
+            u = usbdev.get()
+            u.active(False)
+            sleep_ms(400)
+            u.active(True)
+        except Exception as e:
+            print("drive:", e)
 
     def sector(self, lba, buf):
         """Sector lba as the host sees it: ANSWER.TXT from RAM, what it wrote, else the image (read into buf)."""
@@ -197,16 +228,7 @@ class Drive(usbdev.Interface):
     def _scsi(self):
         op = self.cmd[0]
         last = self.img.sectors - 1
-        if op != 0x12 and op != 0x03 and self._absent():          # phone(): no medium for a moment
-            if op == 0x28 and not self.want % _SECTOR:              # a read: zero sectors (no buffer that big), then fail
-                self.sense, self._lba, self._left, self._ok = (2, 0x3A, 0), -1, self.want // _SECTOR, False
-                self._sector_sent(0, 0, 0)
-            else:
-                self._fail(2, 0x3A)                                 # not ready / medium not present
-        elif op == 0x00 and self.changed:                           # back, writable: tell the host once
-            self.changed = False
-            self._fail(6, 0x28)                                     # unit attention / medium may have changed
-        elif op == 0x00 or op == 0x1E or op == 0x1B or op == 0x2F or op == 0x35:   # test unit ready, prevent removal, start/stop, verify, sync
+        if op == 0x00 or op == 0x1E or op == 0x1B or op == 0x2F or op == 0x35:   # test unit ready, prevent removal, start/stop, verify, sync
             self.sense = _NO_SENSE
             self._status(True)
         elif op == 0x12:                                # INQUIRY
@@ -248,6 +270,8 @@ class Drive(usbdev.Interface):
             self._fail(5, 0x20)                         # illegal request / invalid opcode
 
     def _read(self, lba, count):
+        if lba <= self.knock_at < lba + count:
+            self._knock()
         self._lba, self._left, self._ok = lba, count, True
         self._sector_sent(0, 0, 0)
 
@@ -255,9 +279,8 @@ class Drive(usbdev.Interface):
         if not self._left:
             self._status(self._ok)
             return
-        buf = self.img.zero if self._lba < 0 else self.sector(self._lba, self.sec)
-        if self._lba >= 0:
-            self._lba += 1
+        buf = self.sector(self._lba, self.sec)
+        self._lba += 1
         self._left -= 1
         self.submit_xfer(self.ep_in, buf, self._cb_sector)
 

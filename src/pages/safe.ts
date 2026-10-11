@@ -252,7 +252,7 @@ export function safe(main: HTMLElement) {
     let h = "";
     if (Drive.inApp() && !ws.length) h += driveState === "unpicked"
       ? `<p>Plug in your wedgie, then <button class="btn btn-sm btn-green" id="s-drive">Find it</button></p>`
-      : driveState === "readonly" ? `<p><b>Hold the two grey buttons on your wedgie for 5 seconds.</b> A phone shows in its corner.</p>`
+      : driveState === "readonly" ? `<p><button class="btn btn-sm btn-green" id="s-drive">Let this phone in</button> then press green on your wedgie.</p>`
       : `<p class="fine">Plug in your wedgie. <button class="btn btn-sm" id="s-drive">Help</button></p>`;
     else if (!Drive.inApp() && !W.supported()) h += `<p class="fine">This browser can't talk to a wedgie over USB. Use Chrome, Edge or Brave on a computer.</p>`;
     else if (!Drive.inApp() && !W.armed()) h += `<p><a class="btn btn-green" href="/connect">Connect a wedgie</a></p>`;

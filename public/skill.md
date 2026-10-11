@@ -142,6 +142,7 @@ crashes at start or keeps USB from answering. Hold **Y**: no WEDGIE drive this t
     {"id":9,"type":"reboot"}             -> {"type":"rebooting"} (a full restart: the port drops)
     {"id":10,"type":"open","for":"..."}  -> {"type":"open"} or {"type":"refused"}  (asks the person, in red)
     {"id":11,"type":"open","full":true}  -> the same, asked in red: full control
+    {"type":"phone"}                     -> asks "Let in phone?"; a yes makes the WEDGIE drive writable (phone mode)
 
 hello's fields: `version` the firmware, `running` the app on screen (null: none), `chip` the secure
 chip found, `sealed` locked, `open` let in right now, `ram` bytes of free RAM, `free` bytes of free
@@ -157,9 +158,10 @@ source (https://wedgie.dev/wedgie.py) is the reference if you must.
 ## No serial port? Files on the WEDGIE drive (0.3.22+)
 
 A host that can't open the serial port (an iPhone, a locked-down computer) can talk through the drive.
-The drive is read-only until **phone mode** (0.3.37+): hold the two grey buttons for 5 s. A phone shows in
-the screen's top-right corner, the drive drops for a moment and comes back writable, until unplug (a Mac
-never sees a writable drive, so it never says "not ejected properly"). Then write a new file `REQ-<n>.TXT` in its top folder: one JSON request per line, the same requests as above,
+The drive is read-only until **phone mode** (0.3.37+): read the hidden `PHONE.TXT` twice, 1-10 s apart (not
+in the first 8 s after plug-in), uncached. The wedgie asks "Let in phone?"; after the green button the drive
+reconnects writable and a phone shows in the screen's corner, until unplug (a Mac never sees a writable
+drive, so it never says "not ejected properly"). Then write a new file `REQ-<n>.TXT` in its top folder: one JSON request per line, the same requests as above,
 a new name every time. The wedgie reads it 0.7 s after the last write; anything that needs a yes still
 asks on its screen. Once a request came in as a file, every answer is also written to `ANSWER.TXT`
 (2048 bytes): the first line is `#<count>`, then the answers as JSON lines, padded with newlines. Read it

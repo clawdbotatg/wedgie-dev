@@ -5,6 +5,7 @@
 #   Open wedgie (Windows).url  Windows: an internet shortcut to wedgie.dev/connect
 #   README.txt              what this is
 #   SKILL.md                everything about a wedgie, for an AI: public/skill.md + code.md + trustm.md
+#   PHONE.TXT (hidden)      a phone reads it twice to ask the wedgie for phone mode (wedgiedrive.py knock)
 #   ANSWER.TXT              the wedgie's answers to requests dropped on the drive (inbox.py fills it in RAM)
 #   .VolumeIcon.icns        the underwear as the drive icon on macOS          (hidden)
 #   autorun.inf + wedgie.ico  the underwear as the drive icon on Windows      (hidden)
@@ -95,6 +96,7 @@ appledouble = (root / "art/volume-appledouble.bin").read_bytes()   # macOS's own
 HIDDEN, READONLY, ARCHIVE, VOLUME = 0x02, 0x01, 0x20, 0x08
 files = [("Open wedgie.app", app_tree, READONLY), ("Open wedgie (Windows).url", url_win, READONLY), ("README.txt", readme, READONLY), ("SKILL.md", skill(), READONLY),
          ("ANSWER.TXT", bytes(ANSWER_SIZE), READONLY),
+         ("PHONE.TXT", b"A phone reads this file to ask your wedgie to let it in (phone mode).\n", READONLY | HIDDEN),
          (".VolumeIcon.icns", icns, READONLY | HIDDEN), ("autorun.inf", autorun, READONLY | HIDDEN),
          ("wedgie.ico", ico, READONLY | HIDDEN), ("._.", appledouble, READONLY | HIDDEN),
          # the drive takes writes into a few KB of RAM: tell macOS not to keep its event log or Spotlight index on it

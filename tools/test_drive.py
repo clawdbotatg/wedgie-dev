@@ -24,6 +24,7 @@ sys.modules["usbdev"] = fake
 mp = types.ModuleType("micropython"); mp.const = lambda x: x; sys.modules["micropython"] = mp
 time.ticks_ms = lambda: int(time.monotonic() * 1000)
 time.ticks_diff = lambda a, b: a - b
+time.sleep_ms = lambda ms: None
 sys.modules["machine"] = types.ModuleType("machine")
 import wedgiedrive as W
 
@@ -108,25 +109,35 @@ def sense():
     data, _ = command(b"\x03\x00\x00\x00\x12\x00", 18)
     return data[2] & 15, data[12]
 
-# ---- read-only until phone mode (0.3.37): a write fails and changes nothing; phone() takes the medium
-# out for a moment (NOT READY), then it's back (UNIT ATTENTION once) and writable --------------------
+# ---- read-only until phone mode (0.3.37): a write fails and changes nothing; a knock on PHONE.TXT;
+# phone() (after a yes) makes it writable and replugs USB, so the host mounts it again ---------------
 check("read-only: a write fails", write(40, b"x" * 512) == 1)
 check("read-only: write protected (7/27)", sense() == (7, 0x27))
 data, st = command(b"\x28\x00" + struct.pack(">I", 40) + b"\x00\x00\x01\x00", 512)
 check("read-only: the sector is unchanged", st == 0 and data == IMG[40 * 512:41 * 512] and not d.over)
+# the knock: PHONE.TXT read twice, 0.7-10 s apart, after the first 8 s (a Mac reads everything when it mounts)
 now = [10 ** 6]
 real_ticks = W.ticks_ms
 W.ticks_ms = lambda: now[0]
-d.phone()
-data, st = command(b"\x00" * 6, 0, False);        check("phone(): not ready at first", st == 1 and sense() == (2, 0x3A))
-data, st = command(b"\x28\x00" + struct.pack(">I", 0) + b"\x00\x00\x08\x00", 8 * 512)
-check("phone(): a read meanwhile fails (zeros, no big buffer)", st == 1 and data == bytes(8 * 512))
-data, st = command(b"\x12\x00\x00\x00\x24\x00", 36); check("phone(): INQUIRY still answers", st == 0)
-now[0] += 2000
-data, st = command(b"\x00" * 6, 0, False);        check("phone(): back, medium changed (6/28) once", st == 1 and sense() == (6, 0x28))
-data, st = command(b"\x00" * 6, 0, False);        check("phone(): then ready", st == 0)
-data, st = command(b"\x1a\x00\x3f\x00\xc0\x00", 192); check("phone(): MODE SENSE writable", st == 0 and not data[2] & 0x80)
+d.born = now[0]
+def read_phone():
+    command(b"\x28\x00" + struct.pack(">I", d.knock_at) + b"\x00\x00\x01\x00", 512)
+check("PHONE.TXT is on the drive", d.knock_at > 0)
+read_phone(); now[0] += 1000; read_phone()
+check("knock: not in the first 8 s", not d.knocked)
+now[0] += 9000; read_phone(); now[0] += 100; read_phone()
+check("knock: one read twice in 0.1 s is one knock", not d.knocked)
+now[0] += 1000; read_phone()
+check("knock: two reads 1 s apart knock", d.knocked)
+d.knocked = False
+now[0] += 20000; read_phone(); now[0] += 15000; read_phone()
+check("knock: 15 s apart is two first knocks", not d.knocked)
 W.ticks_ms = real_ticks
+replugs = []
+W.usbdev.get = lambda: types.SimpleNamespace(active=lambda *v: replugs.append(v))
+d.phone()
+check("phone(): USB off and on (a replug)", replugs == [(False,), (True,)])
+data, st = command(b"\x1a\x00\x3f\x00\xc0\x00", 192); check("phone(): MODE SENSE writable", st == 0 and not data[2] & 0x80)
 
 try:
     import fs                                # pyfatfs registers fat://

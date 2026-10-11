@@ -382,7 +382,12 @@ _lines = None
 def _dropped(R):
     """A line from a file dropped on the WEDGIE drive (inbox.py, imported only once the host wrote)."""
     dr = getattr(sys.modules.get("wedgiedrive"), "drive", None)
-    if dr is None or not (dr.wrote or "inbox" in sys.modules):
+    if dr is None:
+        return None
+    if dr.knocked:                      # a phone read PHONE.TXT twice: it asks for phone mode (slot "phone")
+        dr.knocked = False
+        return b'{"type":"phone"}'
+    if not (dr.wrote or "inbox" in sys.modules):
         return None
     import inbox
     return inbox.pump(dr, R)

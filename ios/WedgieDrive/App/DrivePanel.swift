@@ -61,7 +61,9 @@ struct DrivePanel: View {
                 Spacer()
                 switch drive.state {
                 case .unpicked: PillButton(title: "Find my wedgie") { picking = true }
-                case .here: if !drive.readOnly { PillButton(title: "Done") { dismiss() } }
+                case .here:
+                    if !drive.readOnly { PillButton(title: "Done") { dismiss() } }
+                    else { PillButton(title: drive.knocked == nil ? "Let this phone in" : "Ask again") { Task { await drive.knock() } } }
                 case .away: EmptyView()
                 }
                 Button("Details") { details = true }
@@ -78,16 +80,16 @@ struct DrivePanel: View {
         switch drive.state {
         case .unpicked: return drive.wrongPick == nil ? "Find your wedgie" : "That's not your wedgie"
         case .away: return "Plug in your wedgie"
-        case .here: return drive.readOnly ? "Phone mode" : "Connected"
+        case .here: return drive.readOnly ? (drive.knocked == nil ? "Let this phone in" : "Press green") : "Connected"
         }
     }
 
     private var subtitle: String {
         switch drive.state {
         case .unpicked: return drive.wrongPick.map { "You picked \"\($0)\". Go back to Locations, pick WEDGIE, tap Open." }
-            ?? "Plug it in and hold its two grey buttons for 5 seconds. Then tap Find my wedgie, go back to Locations, pick WEDGIE, tap Open. Only once."
+            ?? "Plug it in. Tap Find my wedgie, go back to Locations, pick WEDGIE, tap Open. Only once."
         case .away: return "It connects by itself."
-        case .here: return drive.readOnly ? "Hold the two grey buttons on your wedgie for 5 seconds, until a phone shows in its corner."
+        case .here: return drive.readOnly ? (drive.knocked == nil ? "Your wedgie asks first." : "Your wedgie is asking. Press its green button.")
             : "Your wedgie is plugged in."
         }
     }
