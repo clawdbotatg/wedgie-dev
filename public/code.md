@@ -157,7 +157,9 @@ The rules that follow from it:
 1. **The screen has 16 colors (0.3.24+).** The framebuffer keeps a 4-bit palette index per pixel (29 KB
    instead of 115 KB, so an RP2040 has room left). `color(r, g, b)` gives the nearest of the 16
    (`lcd.PALETTE`: the ui colors, a grey ramp, black, yellow, blue). `show_start()` is a plain `show()`
-   now and `show_wait()` does nothing; both stay so older apps run.
+   now and `show_wait()` does nothing; both stay so older apps run. Need an exact color (0.3.36+)?
+   `lcd.tint(i, r, g, b)` shows index `i` as that color until the next `fill()`; pick an `i` nothing
+   else on the screen uses (`lcd.tinted()` = the ones this screen already took, a bit each).
 2. **Push less when little changed.** A puzzle, a menu, a card game: redraw the part that changed and
    push `lcd.show(y0, y1)` (full-width rows: nothing is copied) or `lcd.show_rect(x, y, w, h)`.
    Prefer a band over many rects: each rect row costs ~45 us on its own.

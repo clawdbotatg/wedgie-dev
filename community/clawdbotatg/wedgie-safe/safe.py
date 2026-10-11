@@ -33,7 +33,7 @@ import save
 import ui
 from ui import WHITE, INK, MUTED, GREEN_D, RED
 
-FW = "safe-7"
+FW = "safe-8"
 RP_ID = b"wedgie.dev"
 FIELDS = '"origin":"https://wedgie.dev"'
 ASK_MS = 120000
@@ -240,7 +240,6 @@ def _aarg(data, i):
 
 BIG = "big"         # a line kind: big text (the amount, the limit)
 ADDR = "addr"       # a line kind: an address in full, with its blockie (safe_blockie) beside it
-PIC = "pic"         # a line kind: a blockie of the Safe tx hash and its short form
 GAP = ("", INK, "gap")  # a line: 6 px of space
 
 
@@ -254,7 +253,7 @@ def _addr_lines(head, a, c=INK):
 def _h(line):
     """Pixels a line takes on a page."""
     k = line[2] if len(line) > 2 else None
-    return (30 if len(line[0]) <= 10 else 22) if k == BIG else 38 if k in (ADDR, PIC) else 6 if k == "gap" else 12
+    return (30 if len(line[0]) <= 10 else 22) if k == BIG else 38 if k == ADDR else 6 if k == "gap" else 12
 
 
 def _draw(lines, y, bottom=182):
@@ -272,10 +271,6 @@ def _draw(lines, y, bottom=182):
             safe_blockie.draw(d, s, 12, y + 2, 4, MUTED)
             d.text(s[:22], 54, y + 6, c)
             d.text(s[22:], 54, y + 20, c)
-        elif k == PIC:
-            safe_blockie.draw(d, s, 70, y + 2, 4, MUTED)
-            d.text("tx", 112, y + 6, MUTED)
-            d.text(short(s), 112, y + 20, MUTED)
         elif s:
             d.center_text(s, y + (4 if k == BIG else 0), c)
         y += _h(l)
@@ -414,7 +409,7 @@ def _owner(a, c):
 
 
 def _then(n):
-    return ("then %d signer%s" % (n, "" if n == 1 else "s"), INK)
+    return ("%d signature%s needed" % (n, "" if n == 1 else "s"), INK)
 
 
 def describe(tx):
@@ -653,19 +648,18 @@ def _screen(head, lines, yes, k, foot=""):
     return False
 
 
-def confirm(tx, h):
+def confirm(tx):
     """The transaction on the screen, a page per action in a batch. True only on A through every page."""
     k = L.Keys(physical=True)
     k.pressed()
     foot = "%s  Safe %s" % (CHAINS.get(tx["chainId"], "chain %d" % tx["chainId"]), short(tx["safe"]))
     tail = [("pays a gas refund", RED)] if tx["gasPrice"] else []
-    pic = (hx(h), MUTED, PIC)       # the phone and computer draw the same blockie of this hash (if it fits)
     acts = batch(tx)
     if acts is None:
         head, lines = describe(tx)
-        return _screen(head, lines + tail + [pic], "sign", k, foot)
+        return _screen(head, lines + tail, "sign", k, foot)
     n = len(acts)
-    if not _screen("Batch", [("%d actions" % n, INK, BIG)] + tail + [pic], "next", k, foot):
+    if not _screen("Batch", [("%d actions" % n, INK, BIG)] + tail, "next", k, foot):
         return False
     for i, a in enumerate(acts):
         last = i == n - 1
@@ -691,7 +685,7 @@ def on_sign(mid, t):
     ui.progress("Reading the transaction", "Safe tx hash", False)
     h = safe_tx_hash(tx)
     gc.collect()
-    if not confirm(tx, h):
+    if not confirm(tx):
         note = "said no"
         W.send({"id": mid, "type": "refused", "safeTxHash": hx(h)})
         return

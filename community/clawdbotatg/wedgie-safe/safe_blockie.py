@@ -1,9 +1,11 @@
 # Blockies: the 8x8 picture an address gets in wallets (ethereum-blockies, as Instant Wallet's `blo` draws it),
-# so an address can be checked at a glance against the one on the phone or computer. Same pattern as theirs;
-# the colors are the nearest of the wedgie's 16 (lcd.PALETTE), so close, not exact.
+# so an address can be checked at a glance against the one on the phone or computer. Same pattern and, on
+# firmware 0.3.36+, the same colors: each blockie takes 3 palette slots this app never draws with
+# (lcd.tint), so two per screen are exact; a third, or older firmware, gets the nearest of the 16.
 import lcd as L
 
 _M = 0xFFFFFFFF
+_FREE = (2, 3, 5, 7, 8, 9)     # grey ramp slots: ui's colors, the safe screens' only others, aren't these
 
 
 def _i32(x):
@@ -71,7 +73,14 @@ def draw(d, a, x, y, cell=4, edge=None):
     """The blockie of address `a`, 8x8 cells of `cell` px, as a circle 8*cell across at x, y (wallets draw
     it round), ringed in `edge`."""
     cells, hsl = image(a)
-    cols = [L.color(*_rgb(*v)) for v in hsl]
+    rgb = [_rgb(*v) for v in hsl]
+    free = [i for i in _FREE if not L.tinted() >> i & 1] if hasattr(L, "tint") else []
+    if len(free) >= 3:
+        cols = free[:3]
+        for i, c in zip(cols, rgb):
+            L.tint(i, *c)
+    else:
+        cols = [L.color(*c) for c in rgb]
     n = 8 * cell
     if edge is not None:
         _disc(d, x - 1, y - 1, n + 2, lambda px, py: (edge, n + 2))

@@ -138,6 +138,33 @@ def color(r, g, b):
     return _near(r, g, b)
 
 
+_tints = 0          # the palette indexes tint() changed on this screen, a bit each
+
+
+def tint(i, r, g, b):
+    """Until the next fill() (a new screen), palette index i shows as this exact color: for a picture
+    whose colors the 16 don't have (a blockie). Draw it with i; pick an i nothing else on the screen
+    uses. tinted() says which this screen already took."""
+    global _tints
+    v = _565(r, g, b)
+    _LUT[2 * i], _LUT[2 * i + 1] = v & 255, v >> 8
+    _tints |= 1 << i
+
+
+def tinted():
+    """The palette indexes tint() changed on this screen, a bit each."""
+    return _tints
+
+
+def _untint():
+    global _tints
+    for i in range(16):
+        if _tints >> i & 1:
+            v = _565(*PALETTE[i])
+            _LUT[2 * i], _LUT[2 * i + 1] = v & 255, v >> 8
+    _tints = 0
+
+
 def index565(v):
     """The palette index nearest to a pixel as the panel takes it (the logo's and the bar's files: 2
     bytes, big-endian, read little-endian: v = b[0] | b[1] << 8)."""
@@ -228,6 +255,7 @@ class LCD(framebuf.FrameBuffer):
         global _art, _artrow
         _art = _artrow = None   # a new owner (an app starting): the last screen's art() goes, or the boot
                                 # logo stays over an app that never fill()s (Frog after an update)
+        _untint()
         if not _s.up:       # after the boot logo the panel is already up; resetting it would blank it
             self.backlight(0)
             t = _s.setup(self.spi, self.dc, self.cs, self.rst)
@@ -285,9 +313,10 @@ class LCD(framebuf.FrameBuffer):
             f.close()
 
     def fill(self, c):
-        """The whole screen one color: a new screen, so any art() on the old one goes."""
+        """The whole screen one color: a new screen, so any art() or tint() on the old one goes."""
         global _art, _artrow
         _art = _artrow = None
+        _untint()
         super().fill(c)
 
     def show_start(self):
