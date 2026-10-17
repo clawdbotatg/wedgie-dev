@@ -85,12 +85,12 @@ export function code(main: HTMLElement) {
 
     <ol class="code-steps">
       <li class="card"><span class="num">3</span><h3>On your wedgie</h3><p>Your AI can put it on with <code>wedgie.py install .</code> (the skill says how). Or push it to GitHub, open your wedgie's page in <a href="/connect">Connect</a>, and add the repo under <b>Apps from a GitHub repo</b>.</p></li>
-      <li class="card"><span class="num">4</span><h3>For everyone</h3><p>Soon: a list of games anyone can put on their wedgie, from repos people send in. Start from <a href="https://github.com/${STARTER}" target="_blank" rel="noopener">${STARTER}</a> so yours is ready.</p></li>
+      <li class="card"><span class="num">4</span><h3>For everyone</h3><p>The shelf: apps anyone can put on their wedgie at <a href="/connect">/connect</a>. Send us your repo (<a href="https://github.com/clawdbotatg/wedgie-dev/issues" target="_blank" rel="noopener">an issue</a>); we read it, sign it, and it's on. Start from <a href="https://github.com/${STARTER}" target="_blank" rel="noopener">${STARTER}</a> so yours is ready.</p></li>
     </ol>
 
     <div class="card code-fast">
       <h3>Fast graphics, the short version</h3>
-      <p class="fine">Measured on a real wedgie. A full screen push takes 18 ms of a 25 ms frame, so:</p>
+      <p class="fine">Measured on a real wedgie. A full screen push takes about 25 ms, a whole frame at 40 fps, so:</p>
       <ul>
         <li><b>Push by DMA.</b> <code>lcd.show_start()</code> sends the frame while the next one's game logic runs; <code>lcd.show_wait()</code> before drawing again.</li>
         <li><b>Push less.</b> <code>lcd.show(y0, y1)</code> sends only those rows (24 rows: 2.4 ms), <code>lcd.show_rect(x, y, w, h)</code> only that box.</li>

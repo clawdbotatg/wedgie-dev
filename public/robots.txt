@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /order/
+Disallow: /orders
+Disallow: /signin
+Disallow: /debug
+Sitemap: https://wedgie.dev/sitemap.xml

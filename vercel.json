@@ -93,6 +93,10 @@
   ],
   "rewrites": [
     {
+      "source": "/favicon.ico",
+      "destination": "/img/favicon.png"
+    },
+    {
       "source": "/connect",
       "destination": "/index.html"
     },

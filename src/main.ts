@@ -30,6 +30,12 @@ const onSafe = path === "/safe" || path.startsWith("/safe/");   // the list, or 
 const onSecret = path === "/secret";
 const onOrder = path === "/order" || path.startsWith("/order/") || path === "/orders" || path === "/signin";   // buy, one order (/order/<id>), yours, sign in
 const onLegal = path === "/terms" || path === "/privacy";
+// Each page its own tab title (the first path part; /order/<id> is an order, /safe/<x> a Safe).
+const TITLES: Record<string, string> = { connect: "Connect", assemble: "Assemble", test: "Test", update: "Update", build: "Build",
+  code: "Code", debug: "Debug", safe: "Safe", secret: "Secret chat", order: "Order", orders: "Your orders", signin: "Sign in",
+  terms: "Terms", privacy: "Privacy" };
+const title = TITLES[path.split("/")[1] || ""];
+if (title) document.title = `${title} · wedgie.dev`;
 const signedIn = !!session();
 
 const app = document.getElementById("app")!;
