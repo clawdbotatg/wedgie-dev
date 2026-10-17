@@ -149,7 +149,10 @@ export function home(main: HTMLElement): Promise<unknown> {
   </section>
 
   <section id="teaser" class="sec teaser">
-    <video controls playsinline preload="none" poster="/video/teaser.jpg" src="/video/teaser.mp4"></video>
+    <div class="teaser-box">
+      <video playsinline preload="none" poster="/video/teaser.jpg" src="/video/teaser.mp4"></video>
+      <button class="teaser-play" aria-label="Play"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg></button>
+    </div>
   </section>
 `;
 
@@ -199,6 +202,13 @@ export function home(main: HTMLElement): Promise<unknown> {
     const go = main.querySelector<HTMLAnchorElement>("#order-go")!;
     if (go.hasAttribute("href")) go.href = kit ? "/order?item=kit" : "/order";
   }));
+  // The teaser: a big green play button over it; one tap plays it with sound (autoplay would have to be muted).
+  const teaser = main.querySelector<HTMLVideoElement>(".teaser video")!;
+  main.querySelector<HTMLButtonElement>(".teaser-play")!.onclick = (e) => {
+    (e.currentTarget as HTMLElement).remove();
+    teaser.controls = true;
+    teaser.play();
+  };
   assembly(main.querySelector<HTMLElement>("#assembly")!);
   safeTx(main.querySelector<HTMLElement>(".stx")!);
   library(main.querySelector<HTMLElement>("#lib")!);
