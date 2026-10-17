@@ -4,7 +4,7 @@
 export const SELLER = "BuidlGuidl DAO LLC";
 const ADDR = "3307 S College Ave Unit 104, Fort Collins, CO 80525";
 const MAIL = "wedgie@buidlguidl.com";
-const UPDATED = "October 16, 2026";
+const UPDATED = "October 17, 2026";
 
 const TERMS = `
 <h1>Terms of Sale</h1>
@@ -56,19 +56,22 @@ const PRIVACY = `
 <p>Locked in your browser with a key only our shipping computer has. Our server, Stripe, and the blockchain never see your shipping address. We delete it once the box ships.</p>
 
 <h2>Your email</h2>
-<p>Used to send your sign-in link, your receipt, and your tracking number. The server keeps it locked until the order ships, then deletes it. To find your orders it keeps only a one-way hash of it. Our mailbox keeps copies of the emails we send you. We never sell or share your email.</p>
+<p>Used to send your sign-in link, your receipt, and your tracking number. The server keeps it locked (encrypted) with your order until the tracking email is sent, then deletes it; an order that's never paid keeps it until the order is deleted. While you're signed in, your sign-in keeps it locked too, until you sign out or 30 days pass. To find your orders it keeps a one-way hash of it. Our mailbox keeps copies of the emails we send you. We never sell or share your email.</p>
 
 <h2>Payment</h2>
 <p>Card payments are handled by Stripe, under <a href="https://stripe.com/privacy" target="_blank" rel="noopener">Stripe's privacy policy</a>. We never see your card number. Stripe may ask for a billing address; that stays with Stripe. USDC payments are public on the blockchain, like any transaction.</p>
 
 <h2>Orders</h2>
-<p>We keep what you ordered and its status. 30 days after an order ships or is canceled, we delete it.</p>
+<p>We keep what you ordered and its status. We delete an order 30 days after it ships or is canceled, or 30 days after it was made if it was never paid. An unpaid order that got some USDC is kept until it's sorted out with you.</p>
 
 <h2>Your wedgie</h2>
 <p>The site talks to a wedgie only after you tap Connect, and only in your browser. Nothing about your wedgie or its keys is sent to us.</p>
 
 <h2>Cookies</h2>
-<p>No ads, no trackers. Your browser stores your sign-in and your order links on your own computer. We count how many people reach each step of checkout, per day: just numbers, nothing about you.</p>
+<p>No ads, no trackers. Your browser stores your sign-in and your order links on your own computer. We count how many people reach each step of checkout, per day: just numbers, nothing about you. To stop abuse we keep a one-way hash of your IP address for a day (with a chat message, for its 7 days); never the address itself.</p>
+
+<h2>Chat</h2>
+<p>Messages sent with /secret are sealed on the wedgie: our server can't read them. It deletes each one after 7 days.</p>
 
 <p>Questions or a request to delete: <a href="mailto:${MAIL}">${MAIL}</a></p>`;
 

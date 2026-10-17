@@ -5,7 +5,7 @@
 //   /safe                    the wedgie, a browser wallet (optional: pays gas, can sign as an owner), every
 //                            Safe the wedgie owns on every chain (Safe's API, plus the ones made or opened in
 //                            this browser), the wallet's Safes it could join, and Make a new Safe
-//   /safe/<chain>:<address>  one Safe: owners, threshold, balance read from the chain (a public RPC); add the
+//   /safe/<chain>:<address>  one Safe: owners, threshold, balance read from the chain (/api/rpc: Alchemy); add the
 //                            wedgie as an owner from a wallet that is one, remove an owner, change the threshold
 //   - the queue (Safe's Transaction Service, api.safe.global: no key, CORS open): sign on the wedgie or the
 //     wallet, execute once enough have signed (a wallet sends it, packSignatures puts them together)
@@ -29,6 +29,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const msgOf = (e: any) => e?.message || String(e);
 
 // Every one has the P-256 precompile the wedgie's signer contract uses. key = Safe's short name (its API, app.safe.global).
+// rpc: only handed to a wallet that adds the chain; the page's own reads go through /api/rpc (readUrl)
 type Chain = { name: string; key: string; rpc: string; scan: string; usdc?: string; test?: boolean };
 const CHAINS: Record<number, Chain> = {
   8453: { name: "Base", key: "base", rpc: "https://mainnet.base.org", scan: "https://basescan.org", usdc: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" },
@@ -59,13 +60,14 @@ async function post(url: string, body: unknown) {
   if (!r.ok) throw new Error(`Safe's API said no: ${r.status} ${(await r.text()).slice(0, 300)}`);
 }
 
-// ---- the chain, read through a public RPC (no wallet needed) ----
+// ---- the chain, read through /api/rpc (the shop's Alchemy key; no wallet needed) ----
+const readUrl = (chain: number) => `${location.origin}/api/rpc?chain=${chain}`;
 let rpcId = 0;
-/** Public RPCs rate-limit a burst (a list of Safes reads several at once): wait and try again. */
+/** A burst can be rate-limited (a list of Safes reads several at once): wait and try again. */
 async function rpc(chain: number, method: string, params: unknown[]) {
   for (let i = 0; ; i++) {
     try {
-      const res = await fetch(CHAINS[chain].rpc, { method: "POST", headers: { "Content-Type": "application/json" },
+      const res = await fetch(readUrl(chain), { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jsonrpc: "2.0", id: ++rpcId, method, params }) });
       if (res.status === 429 || res.status >= 500) throw Object.assign(new Error(`${CHAINS[chain].name}: busy (${res.status})`), { again: true });
       const r = await res.json();
@@ -257,7 +259,7 @@ export function safe(main: HTMLElement) {
     window.scrollTo(0, 0);
   }
   window.addEventListener("popstate", show);
-  watch(main, CHAINS[1].rpc);   // ENS names and avatars on every address, from Ethereum
+  watch(main, readUrl(1));   // ENS names and avatars on every address, from Ethereum
   main.addEventListener("click", (e) => {        // in-page links: no reload, the wedgie stays read
     const a = (e.target as HTMLElement).closest?.("a[data-nav]") as HTMLAnchorElement | null;
     if (!a || e.metaKey || e.ctrlKey) return;
@@ -416,7 +418,7 @@ export function safe(main: HTMLElement) {
     for (const k of onWedgie || []) { const [c, a] = k.split(":"); if (CHAINS[+c] && E.isAddress(a)) add(+c, a, "wedgie"); }
     const list = [...found.values()];
     nRead = list.length;
-    for (let i = 0; i < list.length; i += 4)      // a few at a time: public RPCs rate-limit a burst
+    for (let i = 0; i < list.length; i += 4)      // a few at a time: a burst gets rate-limited
       await Promise.all(list.slice(i, i + 4).map(async (r) => { try { r.info = await readSafe(r.chain, r.addr); } catch (e: any) { r.info = null; r.err = msgOf(e); r.gone = !!e?.gone; } read++; tick(); }));
     for (const r of list) {          // the chain is the truth: who really is an owner now
       if (!r.info) continue;
@@ -571,7 +573,7 @@ export function safe(main: HTMLElement) {
     const c = chain, a = safeAddr;
     try {
       let i: Info;
-      for (let t = 0; ; t++) {       // just made: a public RPC can lag a few seconds behind, so watch before saying it isn't there
+      for (let t = 0; ; t++) {       // just made: an RPC can lag a few seconds behind, so watch before saying it isn't there
         try { i = await readSafe(c, a); break; } catch (e: any) {
           if (!e?.gone || t >= 8 || c !== chain || a !== safeAddr) throw e;
           if (!quiet) say(`Watching for the Safe on ${CHAINS[c].name}.`, 10 + 10 * t);
