@@ -12,8 +12,9 @@
 #   {"type":"put","name":n,"data":<base64>,"end":bool}  -> {"type":"ok"}   (chunks, in order)
 #   {"type":"commit"}                                    -> {"type":"done"}, then a soft reset
 #   {"type":"abort"}, a bad file, or 30 s of nothing     -> the job ends, nothing changed
-# Each file goes to a temp file, hashed as it comes; on commit every file in write must match its line
-# in the list: one that came, or one already on it (this job's sums said so), then the ones that came
+# Each file goes to a temp file, hashed as it comes. A job accepts one signed list only. On commit,
+# every required app file (and the whole core for a core update) must match that list: one that came,
+# or one hashed on the flash at commit. The host's write list cannot omit required files. Then uploads
 # are renamed into place (main.py last), the deletes happen and apps.json is written. Saves (/saves)
 # and the core's own boot files can't be deleted. 0.3.0-0.3.9 took the release in the job itself
 # (hello "jobs": 1); a job that carries one still works that way. Outside a job, {"type":"sums"} works
@@ -69,7 +70,7 @@ def _ver(v):
 
 
 def check(m, sig=True, tick=None):
-    """The job against its signed list: (version, {name: sha}) or raises ValueError. sig=False skips the
+    """The job against its signed list: (version, {name: sha}, required names) or raises ValueError. sig=False skips the
     signature (pure-Python P-256: 2.2 s on an RP2040), which run() checks after the yes.
     Signed too (0.3.12+): which app it puts on and what it may touch. The host says only which signed
     app (its mod); apps.json is written from the signed "@app" line (a host once named wedgie.set_open
@@ -84,6 +85,7 @@ def check(m, sig=True, tick=None):
         raise ValueError("older than this wedgie: %s" % version)   # 0.3.47's boot.py let a host in, still signed)
     rules(m)
     signed = W.release_apps(rel)
+    required = set(m.get("write") or ())
     if signed:                          # (a list from before 0.3.12 has none: files only, as then)
         appf = set()
         for a in signed.values():
@@ -116,6 +118,9 @@ def check(m, sig=True, tick=None):
         else:
             raise ValueError("not a job this wedgie knows: %r" % title)
         own = (signed.get(app) or {}).get("files") or ()
+        required.update(own)
+        if title == "Update firmware" or any(n in core for n in required):
+            required.update(core)
         for n in m.get("write") or []:
             if n not in core and n not in own:
                 raise ValueError("%s isn't part of this job" % n)
@@ -127,7 +132,9 @@ def check(m, sig=True, tick=None):
     for n in m.get("write") or []:
         if n not in files:
             raise ValueError("%s isn't in the signed list" % n)
-    return version, files
+    if any(n not in files for n in required):
+        raise ValueError("required file isn't in the signed list")
+    return version, files, required
 
 
 _prog = None     # [title, the boot bar, the line under it] while the job runs
@@ -213,7 +220,7 @@ def run(mid, m, ask, show=None):
             rules(m)
             version = m.get("version")
         else:
-            version, files = check(m, sig=False)
+            version, files, required = check(m, sig=False)
     except ValueError as e:
         W.send({"id": mid, "type": "error", "error": str(e)})
         return
@@ -227,11 +234,12 @@ def run(mid, m, ask, show=None):
     sig_tick = lambda f: show(title, None, plan.at("sig", f))
     if late:
         files = None
+        required = set()
         show(title, "starting", plan.at("sig"))
     else:
         show(title, "checking the signature", plan.at("sig"))
         try:
-            check(m, tick=sig_tick)
+            version, files, required = check(m, tick=sig_tick)
         except ValueError as e:
             W.send({"id": mid, "type": "error", "error": str(e)})
             return
@@ -239,7 +247,6 @@ def run(mid, m, ask, show=None):
     W.send({"id": mid, "type": "go", "asked_ms": W.asked_ms})
     sent, todo = 0, plan.files              # bytes that came, bytes still to come (less what's there already)
     got = {}                                # name -> sha256 of what arrived
-    there = {}                              # name -> sha256 of what's on it (this job's sums)
     h, f, cur = None, None, None
     poll = select.poll()
     poll.register(sys.stdin, select.POLLIN)
@@ -261,10 +268,13 @@ def run(mid, m, ask, show=None):
             line = None
             qid, t = q.get("id"), q.get("type")
             if t == "release":
+                if files is not None:
+                    W.send({"id": qid, "type": "error", "error": "one signed list per job"})
+                    return
                 show(title, "checking the signature", plan.at("sig"))
                 try:
                     m["release"], m["sig"] = q.get("release") or "", q.get("sig") or ""
-                    version, files = check(m, tick=sig_tick)
+                    version, files, required = check(m, tick=sig_tick)
                     if m.get("version") and version != m["version"]:
                         raise ValueError("the signed list is %s, not %s" % (version, m["version"]))
                 except ValueError as e:
@@ -279,7 +289,6 @@ def run(mid, m, ask, show=None):
                 show(title, "looking at what's on it", plan.at("sums"))
                 v = sums(q.get("names"), q.get("exists"))
                 for n in q.get("names") or []:
-                    there[n] = v.get(n)
                     if files and v.get(n) == files.get(n):      # already there: it won't be sent
                         try:
                             todo -= os.stat(n)[6]
@@ -334,7 +343,10 @@ def run(mid, m, ask, show=None):
                     W.send({"id": qid, "type": "error", "error": "%s isn't finished" % cur})
                     return
                 show(title, "restarting", plan.at("commit"))
-                missing = [n for n in write if n not in got and there.get(n) != files[n]]
+                # Recheck existing required files here, even when the host never asked for their sums.
+                # No live files change until the complete signed app/core has been verified.
+                existing = sums([n for n in required if n not in got])
+                missing = [n for n in required if got.get(n, existing.get(n)) != files[n]]
                 if missing:
                     W.send({"id": qid, "type": "error", "error": "not sent: " + " ".join(missing)})
                     return
@@ -344,8 +356,10 @@ def run(mid, m, ask, show=None):
                     except OSError:
                         pass
                     os.rename(_tmp(n), n)
-                    if n.endswith(".mpy"):      # its old source: MicroPython imports a .py first, so it would
-                        try:                    # run instead (the Wallet from source runs out of memory)
+                for n in required:
+                    if n.endswith(".mpy") and n[:-4] + ".py" not in required:
+                        # Remove unsigned shadows even when the signed .mpy was already present.
+                        try:
                             os.remove(n[:-4] + ".py")
                         except OSError:
                             pass

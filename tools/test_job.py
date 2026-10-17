@@ -90,7 +90,7 @@ def puts(name, data, chunk=1024):
             for o in range(0, max(len(data), 1), chunk)]
 
 
-def run(job_msg, msgs, rel_apps=True, app="hello"):
+def run(job_msg, msgs, rel_apps=True, app="hello", flash=None):
     """One job on a fresh flash running `app`. (answers, {file: bytes} after)."""
     d = tempfile.mkdtemp()
     old = os.getcwd()
@@ -104,8 +104,11 @@ def run(job_msg, msgs, rel_apps=True, app="hello"):
         for n in c["files"]:
             open(n, "wb").write(read(n))
         open("apps.json", "w").write(json.dumps([{"mod": app, "name": c["name"]}]))
+        for n, data in (flash or {}).items():
+            open(n, "wb").write(data)
         rel, sig = release(rel_apps)
-        h = Host([{"type": "release", "release": rel, "sig": sig}] + msgs)
+        first = [] if "release" in job_msg else [{"type": "release", "release": rel, "sig": sig}]
+        h = Host(first + msgs)
         W.lines = lambda size=6144: h
         W.send = lambda o: h.out.append(o)
         try:
@@ -246,6 +249,47 @@ VER[0] = W.VERSION
 out, f = run({"job": "Update firmware", "write": ["slot.mpy"], "delete": [], "apps": None},
              raw_puts("slot.mpy", big) + [{"type": "commit"}])
 check(types_(out)[-2:] == ["done", "reset"], "a signed list of this wedgie's own version goes in: %s" % types_(out))
+
+# The signed list, not the host's write list, defines the complete installed app/core.
+out, f = run({"job": "Install Buttons", "write": [], "apps": json.dumps(buttons)}, [{"type": "commit"}])
+check("done" not in types_(out) and "keytest.py" not in f and json.loads(f["apps.json"])[0]["mod"] == "hello",
+      "an omitted app file cannot activate an absent app")
+old = b"print('old unreviewed hello')\n"
+out, f = run({"job": "Install Hello", "write": [], "apps": json.dumps([{"mod": "hello"}])},
+             [{"type": "commit"}], flash={"hello.py": old})
+check("done" not in types_(out) and f["hello.py"] == old, "an omitted changed app cannot report a successful install")
+out, f = run({"job": "Update firmware", "write": [], "apps": None},
+             [{"type": "commit"}], flash={"boot.py": b"# old boot\n"})
+check("done" not in types_(out) and f["boot.py"] == b"# old boot\n", "an omitted changed core file cannot report a successful update")
+out, f = run({"job": "Update firmware", "write": [], "apps": None},
+             [{"type": "commit"}], flash={"slot.py": evil})
+check(types_(out)[-2:] == ["done", "reset"] and "slot.py" not in f,
+      "verified existing bytecode cannot be shadowed by old source")
+
+# A source twin that is itself signed and required is not an unsigned shadow.
+APPS["keytest.mpy"] = b"fixture bytecode"
+names.append("keytest.mpy")
+carts[1]["files"].append("keytest.mpy")
+try:
+    out, f = run({"job": "Install Buttons", "write": ["keytest.mpy", "keytest.py"], "apps": json.dumps(buttons)},
+                 puts("keytest.mpy", APPS["keytest.mpy"]) + puts("keytest.py", kt) + [{"type": "commit"}])
+    check(types_(out)[-2:] == ["done", "reset"] and f.get("keytest.py") == kt and f.get("keytest.mpy") == APPS["keytest.mpy"],
+          "source cleanup retains every signed required app file")
+finally:
+    carts[1]["files"].remove("keytest.mpy")
+    names.remove("keytest.mpy")
+    del APPS["keytest.mpy"]
+
+# A second authentic list cannot replace the list that approved an upload, including legacy jobs.
+rel, sig = release()
+second = {"type": "release", "release": rel, "sig": sig}
+for embedded in (False, True):
+    m = {"job": "Install Buttons", "write": ["keytest.py"], "apps": json.dumps(buttons)}
+    if embedded:
+        m.update(release=rel, sig=sig)
+    out, f = run(m, puts("keytest.py", kt) + [second, {"type": "commit"}])
+    check("done" not in types_(out) and "keytest.py" not in f and "one signed list" in str(out),
+          "a job cannot switch signed lists (embedded=%s)" % embedded)
 
 print("all ok" if not fails else "%d FAILED" % fails)
 sys.exit(1 if fails else 0)
