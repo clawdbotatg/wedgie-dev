@@ -43,7 +43,7 @@ c94e3e1188f0e7a6fbf8df03066a9b6f63be336d9f81b7279a1cdcfc784e288f  safe_key.py
 8891352abecddf9de45f4e7aa87afad8c9dd30964d5b99a9853a3758878d7f36  usbdev.mpy
 5aaa70a48ddaba01fb47b6ad65457757b27bd1be2cdaea63996d5af77fb177e2  wedgie.mpy
 2542a29749239854f282b95d5122dcc291ff88437d7ac562fa23ae16fb3086a2  wedgiedrive.mpy
-54eb9e87eb013fbf40bee09080877d718213600ce4796d6c848a51174df432f2  welcome.py
+ed2bd5b50e03bdecb7e9661fd9aeb1b26e6b9b649b50f3429eb2a170e50c5afc  welcome.py
 @app  {"mod":"blackjack","name":"Blackjack","entry":"run","files":["blackjack.py"]}
 @app  {"mod":"blocks","name":"Blocks","entry":"run","files":["blocks.py"]}
 @app  {"mod":"bunker","name":"Demon Bunker","entry":"run","files":["bunker.py","bunker_draw.py","bunker_art.mpy","bunker_game.mpy"]}

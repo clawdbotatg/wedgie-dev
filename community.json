@@ -294,13 +294,20 @@
     },
     {
       "repo": "clawdbotatg/wedgie-welcome",
-      "sha": "945a817e24b609ede24b317278a475b1ca3222cb",
-      "at": "2026-10-17T18:59:57Z",
+      "sha": "22b2b1c4174a36f7d5deb3b6b69d9b63c018d63f",
+      "at": "2026-10-17T22:10:33Z",
       "approved": "2026-10-17",
       "v": {
-        "welcome": "0717d7f421cb"
+        "welcome": "26bdbb466623"
       },
       "past": [
+        {
+          "sha": "945a817e24b609ede24b317278a475b1ca3222cb",
+          "at": "2026-10-17T18:59:57Z",
+          "v": {
+            "welcome": "0717d7f421cb"
+          }
+        },
         {
           "sha": "4a36dfb6ddde947d9e6b42c4323c2bbe7cb27175",
           "at": "2026-10-17T18:46:17Z",

@@ -515,7 +515,7 @@ def run():
         t = time.ticks_ms()
         pressed = keys.pressed()
         if flip_t is None and time.ticks_diff(t, slide_end) >= 0:
-            flip_t, flipped = t, False
+            flip_t, flipped, roll_t = t, False, None     # a roll cut short by presses stops with its slide
         if flip_t is not None:
             p = time.ticks_diff(t, flip_t)
             if p >= FLIP // 2 and not flipped:
