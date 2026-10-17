@@ -85,11 +85,12 @@ async function status(sql: Awaited<ReturnType<typeof db>>, b: any, origin: strin
     else if (s.status === "open" && o.status === "new" && !late(o)) url = s.url || undefined;
     else if (o.status === "new") o.status = await endCard(sql, o);
   }
-  let got: bigint | undefined;
+  let got: bigint | undefined, checking = false;
   if ((o.status === "new" || o.status === "expired") && o.pay === "usdc" && o.deposit) {
     const r = await settleDeposit(sql, o);
     got = r.got;
     if (r.paid) o.status = "paid";
+    else checking = !r.sure;   // a chain didn't answer: never tell a paid buyer to pay again or requote them
   }
   let tx = o.deposit ? undefined : b.tx;
   if ((o.status === "new" || o.status === "expired") && o.pay === "usdc" && !o.deposit && !tx) tx = await usdcFind(o).catch(() => null);
@@ -108,13 +109,13 @@ async function status(sql: Awaited<ReturnType<typeof db>>, b: any, origin: strin
     } else why = r.why;
   }
   if (o.status === "new" && o.pay === "usdc" && late(o)) { await sql`update orders set status = 'expired' where id = ${o.id} and status = 'new'`; o.status = "expired"; }
-  if (b.renew === true && o.status === "expired" && !got) {   // something sent already: its price holds
+  if (b.renew === true && o.status === "expired" && !got && !checking) {   // something sent already: its price holds
     const r = await renew(sql, o, origin, ip);
     if (typeof r === "string") return oops(r, 429);
     Object.assign(o, r.o); url = r.url; why = undefined;
   }
   if (o.status === "paid") await mailPaid(sql, o.id, origin);
-  return json({ ...publicView(o, got), url, why });
+  return json({ ...publicView(o, got, checking), url, why });
 }
 
 /** An expired order quoted again: today's price, a fresh 10 minutes, the same cart and sealed address. */

@@ -1,12 +1,15 @@
 // /api/admin: the shipping computer's door (wedgie-shipping orders.py on omen), Bearer SHOP_ADMIN_TOKEN.
 //   GET                          every paid, unshipped order with its sealed address (only omen can open it)
-//   POST {id, tracking}          shipped: the buyer gets an email with the tracking number; then the sealed address,
-//                                their locked email, payer, transaction and Stripe session are wiped
+//   POST {id, tracking}          shipped: the sealed address, payer, transaction and Stripe session are wiped, the buyer
+//                                gets an email with the tracking number, and only once it's sent is their locked email
+//                                wiped (mailed: false = it failed; the same POST again retries it)
 //   POST {id, cancel: true}      canceled (refund by hand), wiped the same way; new, paid or expired
 //   GET ?funnel=1                the checkout counts (api/count.ts) and orders by pay and status, last `days` (30); every canceled order
 //   POST {stock: n}              n boxes left to sell from now on (_shop.ts stockLeft); 0 = sold out
-// Each GET also marks paid the USDC orders whose deposit address now holds their price, and deletes what's done with: shipped or canceled orders and unpaid or expired ones, 30 days on.
-import { db, env, json, oops, same, settleDeposit, stockLeft, type Order } from "./_shop.js";
+// Each GET also marks paid the USDC orders made in the last 3 days whose deposit address now holds their price (older
+// ones settle when their buyer opens the order page), and deletes what's done with: shipped or canceled orders and
+// unpaid or expired ones with nothing sent, 30 days on. GET ?stock=1: just the stock count.
+import { db, env, json, oops, same, settleDeposit, stockLeft, endCard, type Order } from "./_shop.js";
 import { unlock, shippedMail, mailPaid } from "./_mail.js";
 
 const allowed = (req: Request) => {
@@ -25,17 +28,19 @@ export async function GET(req: Request) {
     const canceled = await sql`select id, pay, cents, cart, created, paid_at, shipped_at as canceled_at from orders where status = 'canceled' order by created`;
     return json({ days, counts, orders, canceled });
   }
+  if (q.get("stock")) return json({ left: await stockLeft(sql) });
   // The shipped boxes deleted here come off the stock count too, so stockLeft doesn't forget them and hand them out again.
   await sql`with gone as (delete from orders where (status in ('shipped', 'canceled') and coalesce(shipped_at, paid_at, created) < now() - interval '30 days')
-    or (status in ('new', 'expired') and created < now() - interval '30 days') returning cart, status, paid_at)
+    or (status in ('new', 'expired') and coalesce(got, 0) = 0 and created < now() - interval '30 days') returning cart, status, paid_at)
     update stock set n = n - coalesce((select sum(coalesce((cart->>'wedgie')::int, 0) + coalesce((cart->>'kit')::int, 0)) from gone
       where status = 'shipped' and paid_at >= stock.set_at), 0)::int where id = 1`;
   // USDC sent to an order's deposit address after its buyer left the page still pays it
-  const open = (await sql`select * from orders where pay = 'usdc' and deposit is not null and status in ('new', 'expired')`) as Order[];
-  for (const o of open) {
+  const open = (await sql`select * from orders where pay = 'usdc' and deposit is not null and status in ('new', 'expired')
+    and created > now() - interval '3 days'`) as Order[];
+  await Promise.all(open.map(async (o) => {
     const r = await settleDeposit(sql, o).catch(() => null);
     if (r?.paid) await mailPaid(sql, o.id, new URL(req.url).origin).catch(() => {});
-  }
+  }));
   const orders = await sql`select id, cart, cents, pay, chain, sealed, paid_at, created from orders where status = 'paid' order by paid_at`;
   return json({ orders, left: await stockLeft(sql) });
 }
@@ -52,17 +57,23 @@ export async function POST(req: Request) {
   }
   if (typeof b?.id !== "string") return oops("Which order?");
   if (b.cancel === true) {
+    // An open card checkout is ended first, so Stripe can't take money for a canceled order.
+    const [c] = (await sql`select id, stripe_session from orders where id = ${b.id} and status = 'new' and pay = 'card'`) as Order[];
+    if (c && (await endCard(sql, c).catch(() => "new")) === "new") return oops("Stripe didn't end its checkout. Try again.", 502);
     const r = await sql`update orders set status = 'canceled', shipped_at = now(), sealed = null, email_enc = null, payer = null, tx = null, stripe_session = null
       where id = ${b.id} and status in ('new', 'paid', 'expired') returning id`;
     return r.length ? json({ ok: true }) : oops("No open order with that id.", 404);
   }
   if (typeof b.tracking !== "string" || !/^[A-Z0-9]{10,40}$/i.test(b.tracking.replace(/\s/g, ""))) return oops("That isn't a tracking number.");
   const tracking = b.tracking.replace(/\s/g, "");
-  const [o] = await sql`select email_enc from orders where id = ${b.id} and status = 'paid'`;
   const r = await sql`update orders set status = 'shipped', shipped_at = now(), tracking = ${tracking},
-    sealed = null, email_enc = null, payer = null, tx = null, stripe_session = null where id = ${b.id} and status = 'paid' returning id`;
-  if (!r.length) return oops("No paid, unshipped order with that id.", 404);
-  let mailed = false;
-  if (o?.email_enc) try { await shippedMail(await unlock(o.email_enc), b.id, tracking, new URL(req.url).origin); mailed = true; } catch {}
-  return json({ ok: true, mailed });
+    sealed = null, payer = null, tx = null, stripe_session = null where id = ${b.id} and status = 'paid' returning email_enc`;
+  // Already shipped with its email still locked here: the mail failed last time, so this is the retry.
+  const [o] = r.length ? r : await sql`select email_enc from orders where id = ${b.id} and status = 'shipped' and tracking = ${tracking} and email_enc is not null`;
+  if (!o) return oops("No paid, unshipped order with that id.", 404);
+  if (!o.email_enc) return json({ ok: true, mailed: false, noEmail: true });
+  try { await shippedMail(await unlock(o.email_enc), b.id, tracking, new URL(req.url).origin); }
+  catch { return json({ ok: true, mailed: false }); }
+  await sql`update orders set email_enc = null where id = ${b.id} and status = 'shipped'`;
+  return json({ ok: true, mailed: true });
 }

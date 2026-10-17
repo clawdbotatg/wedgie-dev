@@ -260,7 +260,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
 // ---- one order ----
 const WHYNOT = [["price", "Price"], ["time", "Ran out of time"], ["pay", "Couldn't pay"], ["looking", "Just looking"]];
 type View = { id: string; cart: Cart; lines: { item: Item; qty: number; cents: number }[] | null; cents: number; pay: string; status: string; chain: number | null; usdc: string | null; payTo?: string;
-  tracking: string | null; url?: string; why?: string; left?: number; got?: string };
+  tracking: string | null; url?: string; why?: string; left?: number; got?: string; checking?: boolean };
 
 function status(id: string, box: HTMLElement, say: (s: string, bad?: boolean) => void) {
   const fromLink = location.hash.slice(1);
@@ -307,7 +307,8 @@ function status(id: string, box: HTMLElement, say: (s: string, bad?: boolean) =>
         <p><button class="btn btn-green" id="o-send"${busy ? " disabled" : ""}>Pay with this browser's wallet</button></p>`
         + (got == null ? `<p class="fine">Stuck? Paste the transaction: <input id="o-tx" placeholder="0x… transaction hash" size="40" spellcheck="false"> <button class="btn btn-sm" id="o-check">Check</button></p>` : "");
     }
-    if (v.status === "expired" && !got) {
+    if (v.checking) h += `<p class="fine">Can't reach every chain right now. Checking again…</p>`;
+    if (v.status === "expired" && !got && !v.checking) {
       count("expired");
       h += `<p><b>Time ran out.</b> Nothing was charged.</p>
       <p><button class="btn btn-green" id="o-renew"${busy ? " disabled" : ""}>Refresh price</button> <a class="btn" href="/order">Start over</a></p>
@@ -395,10 +396,10 @@ function status(id: string, box: HTMLElement, say: (s: string, bad?: boolean) =>
   async function watch() {
     if (watching) return;
     watching = true;
-    const open = () => { const w = v as View | null; return w?.status === "new" || w?.status === "expired" && !!w.got && w.got !== "0"; };
+    const open = () => { const w = v as View | null; return w?.status === "new" || w?.status === "expired" && (!!w.got && w.got !== "0" || !!w.checking); };
     for (let i = 0; i < 500 && open(); i++) {
       await sleep(2000);
-      if (v!.pay === "usdc" || mem()[id]?.tx || i < 60 || Date.now() > ends) await refresh();
+      if (v!.pay === "usdc" ? i % 3 === 2 : i < 60 || Date.now() > ends) await refresh();   // usdc: every 6 s (a read is ~12 Alchemy calls)
     }
     watching = false;
   }

@@ -56,6 +56,7 @@ export async function db() {
     await sql`alter table sessions add column if not exists email_enc text`;   // so any browser knows who's signed in
     await sql`alter table links add column if not exists ip text`;   // ipOf, for login.ts IP_HOUR; gone with the link in a day
     await sql`alter table orders add column if not exists held boolean`;   // unused since 10-15 (dust could lock the stock)
+    await sql`alter table orders add column if not exists got bigint`;   // usdc: what its deposit held when last read (settleDeposit); kept past 30 days if > 0
     await sql`create table if not exists stock (id int primary key, n int not null, set_at timestamptz not null default now())`;   // stockLeft
     await sql`create table if not exists counts (day date not null, k text not null, n int not null, primary key (day, k))`;   // api/count.ts: checkout steps, no one in them
   })().catch((e) => { ready = null; throw e; });
@@ -82,14 +83,15 @@ export function same(a: string, b: string) {   // constant time
 export type Order = {
   id: string; token_hash: string; cart: Cart; lines: Line[] | null; cents: number; pay: "card" | "usdc"; status: string; sealed: string | null;
   chain: number | null; usdc: string | null; from_block: string | null; stripe_session: string | null; tx: string | null; payer: string | null; deposit: string | null;
-  tracking: string | null; created: string; paid_at: string | null; shipped_at: string | null; held?: boolean | null;
+  tracking: string | null; created: string; paid_at: string | null; shipped_at: string | null; held?: boolean | null; got?: string | null;
 };
 
 /** What the buyer's own order page may see: never the sealed address, the payer or the session. */
-export const publicView = (o: Order, got?: bigint) => ({
+export const publicView = (o: Order, got?: bigint, checking?: boolean) => ({
   id: o.id, cart: o.cart, lines: o.lines, cents: o.cents, pay: o.pay, status: o.status, chain: o.chain, usdc: o.usdc,
   payTo: o.pay === "usdc" && (o.status === "new" || o.status === "expired") ? o.deposit || env("SHOP_PAY_TO") : undefined,
   got: got?.toString(),     // usdc sent to its deposit so far
+  checking: checking || undefined,   // a chain couldn't be read: got may be short
   left: o.status === "new" ? Math.max(0, Date.parse(o.created) + QUOTE - Date.now()) : undefined,
   tracking: o.tracking, created: o.created, paid_at: o.paid_at, shipped_at: o.shipped_at,
 });
@@ -230,7 +232,7 @@ const topicOf = (a: string) => "0x" + a.toLowerCase().replace(/^0x/, "").padStar
  * ETH: what it holds now, at Chainlink's ETH/USD on Base (skipped if that's over an hour old); plain ETH leaves no
  * log, so ETH swept before the order counts paid is missed (check the Safe by hand). Read PAY_CHAINS confirm back. */
 const ETH_USD = "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70";   // Chainlink ETH/USD on Base, 8 decimals
-export async function usdcGot(o: Order): Promise<bigint> {
+export async function usdcGot(o: Order): Promise<{ got: bigint; sure: boolean }> {
   const who = o.deposit!.toLowerCase().replace(/^0x/, "").padStart(64, "0");
   const chains = Object.keys(PAY_CHAINS).map(Number).filter((c) => env("SHOP_RPC_" + c));
   const per = await Promise.all(chains.map(async (chain) => {
@@ -241,22 +243,25 @@ export async function usdcGot(o: Order): Promise<bigint> {
       rpc(chain, "eth_getLogs", [{ address: c.usdc, fromBlock: "earliest", toBlock: at, topics: [TRANSFER, null, "0x" + who] }]) as Promise<{ data: string }[]>,
       rpc(chain, "eth_getBalance", ["0x" + who.slice(24), at])]);
     return { usdc: logs.reduce((t, l) => t + BigInt(l.data), 0n), wei: BigInt(wei) };
-  }).map((p) => p.catch(() => ({ usdc: 0n, wei: 0n }))));   // a chain that can't be read counts 0 this time
-  let got = per.reduce((t, x) => t + x.usdc, 0n);
-  const wei = per.reduce((t, x) => t + x.wei, 0n);
+  }).map((p) => p.catch(() => null)));   // a chain that can't be read counts 0 this time, and sure is false
+  const sure = per.every(Boolean);
+  let got = per.reduce((t, x) => t + (x?.usdc || 0n), 0n);
+  const wei = per.reduce((t, x) => t + (x?.wei || 0n), 0n);
   if (wei > 0n && env("SHOP_RPC_8453")) {
     const r = (await rpc(8453, "eth_call", [{ to: ETH_USD, data: "0xfeaf968c" }, "latest"])) as string;   // latestRoundData
     const price = BigInt("0x" + r.slice(2 + 64, 2 + 128)), updated = Number(BigInt("0x" + r.slice(2 + 192, 2 + 256)));
     if (price > 0n && Date.now() / 1000 - updated < 3600) got += wei * price / 10n ** 20n;   // wei * usd(1e8) -> 1e6
   }
-  return got;
+  return { got, sure };
 }
-/** A deposit order that holds its price: paid. Returns whether it is now. */
-export async function settleDeposit(sql: Awaited<ReturnType<typeof db>>, o: Order): Promise<{ paid: boolean; got: bigint }> {
-  const got = await usdcGot(o);
-  if (got < BigInt(o.usdc!)) return { paid: false, got };
+/** A deposit order that holds its price: paid. Returns whether it is now. sure: every chain was read (if not, a
+ * short got may be wrong: say so, and don't requote). */
+export async function settleDeposit(sql: Awaited<ReturnType<typeof db>>, o: Order): Promise<{ paid: boolean; got: bigint; sure: boolean }> {
+  const { got, sure } = await usdcGot(o);
+  if (got > BigInt(o.got || 0)) await sql`update orders set got = ${got.toString()} where id = ${o.id}`;
+  if (got < BigInt(o.usdc!)) return { paid: false, got, sure };
   const done = await sql`update orders set status = 'paid', paid_at = now() where id = ${o.id} and status in ('new', 'expired') returning id`;
-  return { paid: done.length > 0 || o.status === "paid", got };
+  return { paid: done.length > 0 || o.status === "paid", got, sure };
 }
 
 /** Did this transaction pay this order? The amount's last digits are unique among open orders on the
