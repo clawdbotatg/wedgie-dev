@@ -43,6 +43,7 @@ export async function db() {
     await sql`alter table orders add column if not exists email_hash text`;   // _mail.ts emailHash: finds a buyer's orders at login
     await sql`alter table orders add column if not exists email_enc text`;    // _mail.ts lock: the email, for paid + shipped; wiped when it ships
     await sql`alter table orders add column if not exists paid_mailed timestamptz`;
+    await sql`alter table orders add column if not exists paid_pinged timestamptz`;   // _mail.ts pingPaid: Telegram told
     await sql`alter table orders add column if not exists deposit text`;   // usdc: this order's own address (src/shop/deposits.ts)
     await sql`create index if not exists orders_email on orders (email_hash) where email_hash is not null`;
     await sql`drop table if exists logins`;   // the old 6-digit codes

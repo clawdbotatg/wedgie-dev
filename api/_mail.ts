@@ -4,6 +4,7 @@
 // with the order) and lock()ed (to send paid and shipped; wiped when it ships). Order tokens are tokenOf(id), so
 // a login can hand them back. All three need SHOP_MAIL_KEY: change it and old orders can't be found by email.
 // Env: SHOP_MAIL_USER, SHOP_MAIL_PASS (the app password), SHOP_MAIL_KEY (any long random string).
+// TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID: a Telegram note to the shop on each paid order (pingPaid).
 // Probes: SHOP_MAIL_FILE = append each mail there as a JSON line instead of sending it.
 import nodemailer from "nodemailer";
 import { appendFileSync } from "node:fs";
@@ -59,9 +60,24 @@ export const shippedMail = async (to: string, id: string, tracking: string, orig
 
 /** "Paid" goes out once per order (paid_mailed), if it has an email. Never throws: a failed send is tried again next time. */
 export async function mailPaid(sql: Awaited<ReturnType<typeof db>>, id: string, origin: string) {
+  await pingPaid(sql, id);
   const [o] = await sql`update orders set paid_mailed = now() where id = ${id} and status in ('paid', 'shipped') and paid_mailed is null
     and email_enc is not null returning id, lines, cents, email_enc`;
   if (!o) return;
   try { await paidMail(await unlock(o.email_enc), o as any, origin); }
   catch { await sql`update orders set paid_mailed = null where id = ${id}`.catch(() => {}); }
+}
+
+/** Telegram to the shop, once per order (paid_pinged): id, items, amount, how. Never the address or email. Never throws. */
+async function pingPaid(sql: Awaited<ReturnType<typeof db>>, id: string) {
+  const bot = env("TELEGRAM_BOT_TOKEN"), chat = env("TELEGRAM_CHAT_ID");
+  if (!bot || !chat) return;
+  const [o] = await sql`update orders set paid_pinged = now() where id = ${id} and status in ('paid', 'shipped') and paid_pinged is null
+    and paid_at > now() - interval '1 day' returning id, lines, cents, pay`;
+  if (!o) return;
+  try {
+    const r = await fetch(`https://api.telegram.org/bot${bot}/sendMessage`, { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chat, text: `💰 wedgie order ${o.id} paid: ${items(o.lines)} · ${usd(o.cents)} (${o.pay})` }) });
+    if (!r.ok) throw 0;
+  } catch { await sql`update orders set paid_pinged = null where id = ${id}`.catch(() => {}); }
 }
