@@ -15,12 +15,13 @@
 //     only). Every answer checked, every missed try counted, temperature and VSYS watched (bench.py shake);
 //  6. on its screen: each button alone, in order; the joystick's 4 diagonals (two directions, never IN);
 //     then each button again, filling the screen with its color.
-// It ends with the latest firmware and no app (one gets picked at /connect).
+// It ends with the latest firmware and Welcome (clawdbotatg/wedgie-welcome), the intro a new wedgie plays
+// until its person picks real software at /connect.
 // A wedgie already on the latest firmware also gets "Test only": steps 4-6, nothing wiped or written (the
 // second pass, once its case is on). A on its screen lets the page in; after, it goes back to its app.
 import * as W from "../serial/wedgies";
 import type { Repl } from "../serial/repl";
-import { installCore, letIn, takeOver, firmwareManifest } from "../serial/install";
+import { installCore, useApp, letIn, takeOver, firmwareManifest } from "../serial/install";
 import * as FS from "../serial/files";
 import { checkChip } from "../serial/chipcheck";
 import { usbSupported, bootDevices, isBoot, pickBoot, flashMicroPython, BOOT_PIDS } from "../serial/picoboot";
@@ -249,7 +250,13 @@ export function format(main: HTMLElement) {
             set(FW, "running", "Installing");
             status("Installing the wedgie firmware…", "Don't unplug it.");
             progress(0);
-            const got = await installCore(r, (p) => progress(p), { launcher: false });   // the core; its app gets picked at /connect
+            const got = await installCore(r, (p) => progress(p * 0.8), { launcher: false });
+            const m = await firmwareManifest();
+            const welcome = m.carts.find((c) => c.mod === "welcome");     // what it plays until its person picks an app
+            if (welcome) {
+              set(FW, "running", "Installing Welcome");
+              await useApp(r, welcome, (p) => progress(0.8 + 0.2 * p), { launcher: false, manifest: m });
+            }
             progress(null);
             const kept = backup(b.uid);
             if (kept && !($("t-wipe") as HTMLInputElement).checked) {
@@ -259,7 +266,7 @@ export function format(main: HTMLElement) {
               try { localStorage.removeItem(SAVES(b.uid)); } catch {}
               fact("Saves", `${n} file${n === 1 ? "" : "s"} put back`);
             }
-            set(FW, "pass", `wedgie ${got.version}`);
+            set(FW, "pass", `wedgie ${got.version}${welcome ? " + Welcome" : ""}`);
             await r.exec(await W.probe(), 10000);        // load the bench again (the install ran its own code)
             await r.exec(await benchPy(), 10000);
           }
