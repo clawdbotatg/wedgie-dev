@@ -13,11 +13,10 @@ Two rules over everything: hardware, firmware, apps, the website.
   that will happen, in plain words, worked out by the wedgie, never taken from the
   computer's label. Nothing happens beyond it. If it can't be said clearly, it doesn't happen.
 
+How installs follow it (0.3.53): `docs/HONEST-QUESTIONS.md`.
+
 Known gaps (2026-10-18), to close:
-- An "Install <app>" job can also replace the firmware; the screen says only "Install <app>".
-- A host can send button presses (`press`). Prove only a real press answers a question.
-- A host can reset the Trust M any time (`chip`), under an app using it.
-- Phone mode on the WEDGIE drive lets a phone write files with no question.
+- Apps choose whether a press sent over USB counts; the firmware's own questions take only real ones.
 - Physical access: BOOTSEL flashes any firmware, and the Trust M signs for any firmware.
 - Apps run with full access to the chip; only review keeps a bad one off the shelf.
 
