@@ -116,9 +116,13 @@ class Chip:
 
     def __init__(self, sda=4, scl=5):
         T.bus(sda, scl)
-        T.soft_reset()
-        self.frnr, self.acknr = 0, 3
-        self.open()
+        T.busy[0] += 1                  # trustm.busy: the host's chip check waits meanwhile
+        try:
+            T.soft_reset()
+            self.frnr, self.acknr = 0, 3
+            self.open()
+        finally:
+            T.busy[0] -= 1
 
     # ---- the I2C frames, chained both ways ----
     def _frame(self, pctr, part):
@@ -153,8 +157,12 @@ class Chip:
 
     def command(self, cmd, param=0, data=b""):
         """Any APDU: cmd, param, data -> the answer's data. Raises Error with the chip's error code."""
-        self._send(bytes([cmd, param]) + len(data).to_bytes(2, "big") + data)
-        r = self._recv()
+        T.busy[0] += 1
+        try:
+            self._send(bytes([cmd, param]) + len(data).to_bytes(2, "big") + data)
+            r = self._recv()
+        finally:
+            T.busy[0] -= 1
         if r[0] != 0:
             raise Error(cmd, self.last_error())
         return r[4:4 + int.from_bytes(r[2:4], "big")]

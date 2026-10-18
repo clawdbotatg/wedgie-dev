@@ -69,6 +69,24 @@ def _ver(v):
     return tuple(int(x) for x in v.split("."))
 
 
+def _files_of(a, signed):
+    """The files of app a (an apps.json entry) and their .py/.mpy twins: from the signed list for a shelf
+    app, from its own entry for an app from a repo, else just its module. None: nothing."""
+    if not a or not a.get("mod"):
+        return set()
+    s = signed.get(a["mod"])
+    names = (s and s.get("files")) or (a.get("files") if isinstance(a.get("files"), list) else None) or [a["mod"] + ".py"]
+    out = set()
+    for n in names:
+        if isinstance(n, str):
+            out.add(n)
+            if n.endswith(".mpy"):
+                out.add(n[:-4] + ".py")
+            elif n.endswith(".py"):
+                out.add(n[:-3] + ".mpy")
+    return out
+
+
 def check(m, sig=True, tick=None):
     """The job against its signed list: (version, {name: sha}, required names) or raises ValueError. sig=False skips the
     signature (pure-Python P-256: 2.2 s on an RP2040), which run() checks after the yes.
@@ -93,40 +111,45 @@ def check(m, sig=True, tick=None):
         core = [n for n in files if n not in appf]
         now = W.active()
         app = now and now.get("mod")    # the app it runs now
+        mine = _files_of(now, signed)   # its files: what replacing or uninstalling it may take off
         want = json.loads(m["apps"]) if m.get("apps") is not None else None
         title = str(m.get("job"))
-        # What the person said yes to is what happens: the title decides the kind of job, and the job
-        # must be exactly that (codex 2026-10-03: "Install Buttons" with no app uninstalled Hello).
+        # One job does one thing, and only what its question said (0.3.53; EXPECTATIONS.md: the person
+        # knows exactly what they say yes to). The title decides the kind (codex 2026-10-03: "Install
+        # Buttons" with no app uninstalled Hello); the question shows it (slot.ask), and here the job is
+        # held to it: "Install X" writes only X's files and takes off only the app it replaces; "Update
+        # firmware" writes only the core and takes nothing off; an uninstall takes off only its app.
         if title.startswith("Install "):        # puts on the signed app with that name
             a = signed.get(want[0].get("mod")) if want else None
             if not a or a["name"] != title[8:]:
                 raise ValueError("this job said %r but puts on %s" % (title, want and want[0].get("mod")))
-            app = a["mod"]
             e = dict((k, a[k]) for k in ("mod", "name", "entry", "usb") if k in a)
             e["v"] = str(want[0].get("v") or "")[:16]       # the site's: cosmetic, nothing runs them
             e["about"] = str(want[0].get("about") or "")[:100]
             m["apps"] = json.dumps([e])
+            may_write = set(a.get("files") or ())
+            may_delete = set() if a["mod"] == app else mine
         elif title == "Update firmware":       # keeps the app it runs, and apps.json as it says
             if want is not None and [x.get("mod") for x in want] != ([app] if app else []):
                 raise ValueError("a firmware update keeps the app it runs")
             if want:
                 m["apps"] = json.dumps([dict(now, v=str(want[0].get("v") or "")[:16])])
+            may_write, may_delete = set(core), set()
+            required.update(core)
         elif title in ("Uninstall the app", "Take its app off"):   # no app after it, nothing written
-            if want != [] or m.get("write"):
+            if want != []:
                 raise ValueError("an uninstall only takes the app off")
-            app = None
+            may_write, may_delete = set(), mine
         else:
             raise ValueError("not a job this wedgie knows: %r" % title)
-        own = (signed.get(app) or {}).get("files") or ()
-        required.update(own)
-        if title == "Update firmware" or any(n in core for n in required):
-            required.update(core)
+        if title.startswith("Install "):
+            required.update(may_write)  # the whole app, as signed
         for n in m.get("write") or []:
-            if n not in core and n not in own:
+            if n not in may_write:
                 raise ValueError("%s isn't part of this job" % n)
         for n in m.get("delete") or []:
-            if n in core or n in own:
-                raise ValueError("can't delete %s" % n)
+            if n not in may_delete:
+                raise ValueError("%s isn't part of this job" % n)
     elif m.get("apps") is not None:
         raise ValueError("this signed list names no apps")
     for n in m.get("write") or []:

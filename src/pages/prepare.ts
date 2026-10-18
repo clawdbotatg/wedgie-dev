@@ -14,12 +14,12 @@
 // 1 or 2 off: one checked install (the green button on its screen), it restarts, and all of it is checked again.
 import * as W from "../serial/wedgies";
 import type { Repl } from "../serial/repl";
-import { coreWithApp, firmwareManifest, type Manifest, type Cart } from "../serial/install";
+import { installCore, useApp, firmwareManifest, type Manifest, type Cart } from "../serial/install";
 import { benchSetup } from "./format";
 import { cmpVersion } from "../apps/appjson.mjs";
 
 type Job = { uid: string; key: number; state: "checking" | "installing" | "restarting" | "screen" | "ready" | "fail"; p: number; what: string;
-  lines: string[]; error?: string; at: number; installed?: boolean; gone?: boolean };
+  lines: string[]; error?: string; at: number; tried: string[]; gone?: boolean };
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 const LABEL: Record<Job["state"], string> = { checking: "Checking", installing: "Updating", restarting: "Restarting", screen: "Check its screen", ready: "Ready to ship", fail: "Not ready" };
 
@@ -67,22 +67,23 @@ export function prepare(main: HTMLElement) {
     $("p-status").className = `test-status ${busy ? "" : bad ? "bad" : list.length ? "good" : ""}`;
   }
 
-  /** What's off in its software, from file hashes (no REPL, no question). [] = the latest core + Welcome only. */
-  async function software(r: Repl): Promise<string[]> {
+  /** What's off in its software, from file hashes (no REPL, no question): the firmware, and Welcome as its
+   *  one app. Each is its own question when it's off (EXPECTATIONS.md: one job, one thing). */
+  async function software(r: Repl): Promise<{ core: string[]; app: string[] }> {
     const names = [...new Set([...m!.core, ...welcome!.files])];
     const twins = names.filter((n) => n.endsWith(".mpy")).map((n) => n.slice(0, -4) + ".py").filter((n) => !names.includes(n));
     const v = await r.request({ type: "sums", names, exists: twins }, 30000);
     if (v.type !== "sums") throw new Error(`it wouldn't list its files: ${v.error || v.type}`);
     const sha = (n: string) => m!.files.find((f) => f.name === n)?.sha256;
-    const off: string[] = [];
-    const core = m!.core.filter((n) => v.sums[n] !== sha(n));
-    if (core.length) off.push(`${core.length} firmware file${core.length > 1 ? "s" : ""} not the latest`);
-    if (welcome!.files.some((n) => v.sums[n] !== sha(n))) off.push("Welcome missing or old");
-    const mods = (v.apps || []).map((a: any) => a?.mod);
-    if (mods.length !== 1 || mods[0] !== "welcome") off.push(mods.length ? `its app is ${mods.join(", ")}, not Welcome` : "no app named");
+    const core: string[] = [], app: string[] = [];
+    const bad = m!.core.filter((n) => v.sums[n] !== sha(n));
+    if (bad.length) core.push(`${bad.length} firmware file${bad.length > 1 ? "s" : ""} not the latest`);
     const shadow = twins.filter((n) => v.sums[n]);
-    if (shadow.length) off.push(`old ${shadow.join(", ")} on it`);
-    return off;
+    if (shadow.length) core.push(`old ${shadow.join(", ")} on it`);
+    if (welcome!.files.some((n) => v.sums[n] !== sha(n))) app.push("Welcome missing or old");
+    const mods = (v.apps || []).map((a: any) => a?.mod);
+    if (mods.length !== 1 || mods[0] !== "welcome") app.push(mods.length ? `its app is ${mods.join(", ")}, not Welcome` : "no app");
+    return { core, app };
   }
 
   /** The Trust M, from the check every plug-in gets. */
@@ -100,14 +101,18 @@ export function prepare(main: HTMLElement) {
       if (w.kind !== "wedgie" || !w.version) throw new Error(w.kind === "micropython" ? "No wedgie firmware: run it through /test" : `Runs ${w.firmware || "something else"}: run it through /test`);
       if (cmpVersion(w.version, "0.3.12") < 0) throw new Error(`Firmware ${w.version} is too old for this: run it through /test`);
       await W.withRepl(w, async (r) => {
-        const off = await software(r);
+        const { core, app } = await software(r);
+        const off = core.length ? core : app;
         if (off.length) {
-          if (j.installed) throw new Error(`Still off after its update: ${off.join("; ")}`);
+          const kind = core.length ? "firmware" : "app";
+          if (j.tried.includes(kind)) throw new Error(`Still off after its update: ${off.join("; ")}`);
+          j.tried.push(kind);
           Object.assign(j, { state: "installing", what: `${off.join("; ")}. Press the green button on it.` });
           paint();
-          const ok = await coreWithApp(r, welcome!, (p, what) => { j.p = p; if (what) j.what = what; paint(); });
-          if (!ok) throw new Error("It can't take a checked install: run it through /test");
-          j.installed = true;
+          const prog = (p: number, what: string) => { j.p = p; if (what) j.what = what; paint(); };
+          // the firmware first (its own question), then Welcome (its own), each with a restart
+          const res = core.length ? await installCore(r, prog) : await useApp(r, welcome!, prog);
+          if (!res.restarted) throw new Error("It can't take a checked install: run it through /test");
           restarting = true;
           return;
         }
@@ -142,7 +147,7 @@ export function prepare(main: HTMLElement) {
     for (const w of ws) {
       if (w.state === "error") {
         const id = w.uid || "key" + w.key;      // "key<n>": a board that never said its ID
-        if (!jobs.has(id)) jobs.set(id, { uid: id, key: w.key, state: "fail", p: 0, what: "", lines: [], at: Date.now(),
+        if (!jobs.has(id)) jobs.set(id, { uid: id, key: w.key, state: "fail", p: 0, what: "", lines: [], tried: [], at: Date.now(),
           error: /No MicroPython/.test(w.error || "") ? "No MicroPython on it: run it through /test" : w.error });
         continue;
       }
@@ -152,8 +157,8 @@ export function prepare(main: HTMLElement) {
       const back = j?.state === "restarting" && (w.readyAt || 0) > j.at;          // its own restart after the update
       const again = j && (j.state === "ready" || j.state === "fail" || j.state === "screen") && j.key !== w.key && (w.readyAt || 0) > j.at + 5000;   // plugged in again
       if (j && !back && !again) continue;
-      const nj: Job = j || { uid: w.uid, key: w.key, state: "checking", p: 0, what: "", lines: [], at: 0 };
-      if (again) nj.installed = false;
+      const nj: Job = j || { uid: w.uid, key: w.key, state: "checking", p: 0, what: "", lines: [], tried: [], at: 0 };
+      if (again) nj.tried = [];
       nj.at = Date.now();
       jobs.set(w.uid, nj);
       run(w, nj);

@@ -8,7 +8,7 @@
 // Then 2 is unplugged and plugged back in: already up to date, nothing copied, no restart.
 // Serve dist first (npx vite preview), then: node tools/updateprobe.mjs [url] [outdir]
 import { chromium } from "playwright-core";
-import { readdirSync } from "node:fs";
+import { readdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { fakeWedgies } from "./fakewedgies.mjs";
 
@@ -59,6 +59,7 @@ await wait(() => document.querySelector('.upd-card[data-uid$="3d9f01"]')?.classL
 await page.evaluate(() => window.__plug(2, true));
 await wait(() => document.querySelector('.upd-card[data-uid$="3d9f01"]')?.classList.contains("fresh"), null, 30000, "replugged: already up to date");
 check((await st(2, "resets")) === resets, "replugged: no restart");
+writeFileSync(new URL("../shots/sitejobs-update.json", import.meta.url), JSON.stringify(await page.evaluate(() => window.__ports.flatMap((p) => p._st.jobLog || []))));
 check(errs.length === 0, errs.length ? "page errors: " + errs.join(" | ") : "no page errors");
 await page.screenshot({ path: `${out}/update-bench-2.png` });
 await browser.close();

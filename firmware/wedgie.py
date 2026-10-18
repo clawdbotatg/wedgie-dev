@@ -3,7 +3,7 @@
 # interrupted; from the REPL they are plain calls:  import wedgie; wedgie.shot(); wedgie.press("A")
 import sys, os, json, machine
 
-VERSION = "0.3.52"
+VERSION = "0.3.53"
 
 # The lock. main.py turns Ctrl-C off before anything else and never ends by itself, so a computer
 # can only send the slot's JSON lines: it can't stop the app, reach the REPL, or make the secure chip
@@ -169,8 +169,14 @@ def chip():
       Trust M: two Random reads, its Infineon device certificate, and its factory key's signature
       over random bytes (the host checks the signature against the certificate and the certificate
       against Infineon's roots).
-    Also the I2C lines (the breakout's pull-ups hold them high), so "no chip" can say why."""
+    Also the I2C lines (the breakout's pull-ups hold them high), so "no chip" can say why.
+    An app in the middle of a chip command: {"busy": 1}, nothing touched (this resets a Trust M, and
+    an app's command caught in that waited 10 s); the host asks again."""
     global _chip
+    for n in ("trustm", "atecc"):
+        mod = sys.modules.get(n)
+        if mod and getattr(mod, "busy", (0,))[0]:
+            return {"type": "chip", "busy": 1, "kind": None}
     import binascii, hashlib, gc
     from machine import Pin
     hx = lambda b: binascii.hexlify(b).decode()

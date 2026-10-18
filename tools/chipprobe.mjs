@@ -117,7 +117,7 @@ function job(w, title, write, del, apps, where) {
   w.h.take();
   const d = w.req({ type: "commit" }, 30000);
   if (d?.type !== "done") return `commit: ${JSON.stringify(d)}`;
-  if (!w.h.until((b) => b.includes('"ready"'), 30000, 20)) return `no ready after the restart: ${JSON.stringify(w.h.out.slice(-300))}`;
+  if (!w.h.until((b) => /"type": "ready"[^\n]*\n/.test(b), 30000, 20)) return `no ready after the restart: ${JSON.stringify(w.h.out.slice(-300))}`;
   return true;
 }
 

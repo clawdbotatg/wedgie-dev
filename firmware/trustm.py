@@ -13,6 +13,9 @@ import time
 ADDR = 0x30
 GUARD_US = 100
 TRIES = 200
+# busy[0] > 0 while a command is under way (here or in optiga.py, which shares this I2C layer): the
+# host's chip check (wedgie.chip) waits instead of resetting the chip under an app that's using it.
+busy = [0]
 
 i2c = None
 
@@ -125,10 +128,14 @@ class Session:
     """One OpenApplication session after a soft reset. Frame numbers run 0..3."""
 
     def __init__(self):
-        soft_reset()
-        self.frnr = 0
-        self.acknr = 3
-        r = self.command(0x70, 0x00, bytes.fromhex("D2760000044765" "6E41757468417070" "6C"))
+        busy[0] += 1
+        try:
+            soft_reset()
+            self.frnr = 0
+            self.acknr = 3
+            self.command(0x70, 0x00, bytes.fromhex("D2760000044765" "6E41757468417070" "6C"))
+        finally:
+            busy[0] -= 1
 
     def _send(self, apdu):
         body = bytes([(self.frnr << 2) | self.acknr]) + len(apdu + b"\x00").to_bytes(2, "big") + b"\x00" + apdu
@@ -145,8 +152,12 @@ class Session:
         return f[4:-2]                      # drop FCTR, LEN, PCTR and FCS
 
     def command(self, cmd, param, data):
-        self._send(bytes([cmd, param]) + len(data).to_bytes(2, "big") + data)
-        r = self._recv()
+        busy[0] += 1
+        try:
+            self._send(bytes([cmd, param]) + len(data).to_bytes(2, "big") + data)
+            r = self._recv()
+        finally:
+            busy[0] -= 1
         if r[0] != 0:
             raise OSError("trustm: cmd %02x failed, status %02x, %s" % (cmd, r[0], r[4:].hex()))
         return r[4:4 + int.from_bytes(r[2:4], "big")]

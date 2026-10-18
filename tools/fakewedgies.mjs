@@ -154,6 +154,9 @@ export function fakeWedgies(specs) {
         return push(JSON.stringify({ id, type: "ok", version: msg.release.split("\n")[1].slice(8) }) + "\r\n");
       }
       if (msg.type === "job" && h_jobs()) {
+        // every job a page sends, with what the wedgie held then: tools/test_sitejobs.py runs each through
+        // the real firmware/job.py check (this fake only copies a few of its rules)
+        (st.jobLog ||= []).push({ version: version(), msg, apps: apps(), files: [...st.files.keys()] });
         st.lateJobs = (st.lateJobs || 0) + (msg.release ? 0 : 1);
         st.hashAtAsk = st.hashed || 0;
         const listed = msg.release ? new Map(msg.release.split("\n").slice(2).filter(Boolean).map((l) => l.split("  ").reverse())) : null;

@@ -176,10 +176,33 @@ out, f = run({"job": "Install Buttons", "write": ["keytest.py", "battery.py"], "
              puts("keytest.py", kt) + puts("battery.py", read("battery.py")) + [{"type": "commit"}])
 check("battery.py" not in f and "done" not in types_(out), "an install writing another app's file: refused (%s)" % types_(out))
 
-# 9. an update keeps the app it runs and may write the core + that app's files
-out, f = run({"job": "Update firmware", "write": ["slot.mpy", "hello.py"], "delete": [], "apps": json.dumps([{"mod": "hello"}])},
-             puts("slot.mpy", read("slot.mpy")) + puts("hello.py", read("hello.py")) + [{"type": "commit"}])
+# 9. an update keeps the app it runs and writes only the core (0.3.53: one job, one thing)
+out, f = run({"job": "Update firmware", "write": ["slot.mpy"], "delete": [], "apps": json.dumps([{"mod": "hello"}])},
+             puts("slot.mpy", read("slot.mpy")) + [{"type": "commit"}])
 check(types_(out)[-2:] == ["done", "reset"] and json.loads(f["apps.json"])[0]["mod"] == "hello", "an update keeping its app goes in: %s" % types_(out))
+out, f = run({"job": "Update firmware", "write": ["slot.mpy", "hello.py"], "delete": [], "apps": json.dumps([{"mod": "hello"}])},
+             puts("slot.mpy", read("slot.mpy")) + puts("hello.py", b"print('new')\n") + [{"type": "commit"}], flash={"hello.py": b"print('old')\n"})
+check(f["hello.py"] == b"print('old')\n" and "done" not in types_(out), "'Update firmware' that also writes its app: refused (%s)" % types_(out))
+out, f = run({"job": "Update firmware", "write": ["slot.mpy"], "delete": ["battery.py"], "apps": json.dumps([{"mod": "hello"}])},
+             puts("slot.mpy", read("slot.mpy")) + [{"type": "commit"}], flash={"battery.py": b"x"})
+check("battery.py" in f and "done" not in types_(out), "'Update firmware' that deletes a file: refused (%s)" % types_(out))
+# an outdated app doesn't block a firmware update (the update doesn't touch it)
+out, f = run({"job": "Update firmware", "write": ["slot.mpy"], "delete": [], "apps": json.dumps([{"mod": "hello"}])},
+             puts("slot.mpy", read("slot.mpy")) + [{"type": "commit"}], flash={"hello.py": b"print('old')\n"})
+check(types_(out)[-2:] == ["done", "reset"] and f["hello.py"] == b"print('old')\n", "an update with an old app goes in, the app untouched: %s" % types_(out))
+# "Install X" writes only X's files, takes off only the app it replaces
+out, f = run({"job": "Install Buttons", "write": ["keytest.py", "slot.mpy"], "delete": ["hello.py"], "apps": json.dumps(buttons)},
+             puts("keytest.py", kt) + puts("slot.mpy", read("slot.mpy")) + [{"type": "commit"}])
+check("keytest.py" not in f and "done" not in types_(out), "'Install Buttons' that also writes the firmware: refused (%s)" % types_(out))
+out, f = run({"job": "Install Buttons", "write": ["keytest.py"], "delete": ["hello.py", "battery.py"], "apps": json.dumps(buttons)},
+             puts("keytest.py", kt) + [{"type": "commit"}], flash={"battery.py": b"x"})
+check("battery.py" in f and "hello.py" in f and "done" not in types_(out), "'Install Buttons' taking off another app's file too: refused (%s)" % types_(out))
+out, f = run({"job": "Install Buttons", "write": ["keytest.py"], "delete": ["mine.py"], "apps": json.dumps(buttons)},
+             puts("keytest.py", kt) + [{"type": "commit"}], flash={"mine.py": b"x"})
+check("mine.py" in f and "done" not in types_(out), "'Install Buttons' taking off the person's own file: refused (%s)" % types_(out))
+out, f = run({"job": "Uninstall the app", "write": [], "delete": ["hello.py", "battery.py"], "apps": "[]"},
+             [{"type": "commit"}], flash={"battery.py": b"x"})
+check("battery.py" in f and "done" not in types_(out), "an uninstall taking off more than its app: refused (%s)" % types_(out))
 
 # 10. "Update firmware" switching the app: refused
 out, f = run({"job": "Update firmware", "write": ["keytest.py"], "delete": [], "apps": json.dumps(buttons)},

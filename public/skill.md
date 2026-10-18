@@ -11,7 +11,7 @@ RP2350), a Waveshare Pico-LCD-1.3 hat (240x240 screen, 5-way joystick, A/B/X/Y),
 wedgie firmware: a boot logo, the one app it boots straight into, saves that outlast apps, and a USB
 protocol. Everything is MIT: https://wedgie.dev
 
-**The current firmware is 0.3.52.** If a wedgie's `hello` says older, update it first
+**The current firmware is 0.3.53.** If a wedgie's `hello` says older, update it first
 (`wedgie.py update`, below): everything here assumes current firmware.
 
 **Three guides cover everything** (this one first):
@@ -151,6 +151,9 @@ wedgie's own screen answered by a **real press** (a `press` request can't answer
   Ctrl-C in the first 3 s after it starts is ignored (a connecting tool's leftover bytes).
 - **Signed installs** (an app from the wedgie.dev shelf, a firmware update) ask "Install Buttons?" /
   "Update firmware?" and then take only files signed by wedgie.dev; they never open the REPL.
+  0.3.53+: a job does one thing, all of it on its question. "Update firmware" writes only the firmware
+  (its app stays as it is); "Install Buttons" writes only Buttons and takes off only the app it
+  replaces (the question says which); an uninstall takes off only its app. Anything more is refused.
 - **A no restarts the wedgie.** The question is drawn straight over the app's screen without saving it
   (saving the screen ran wedgies out of memory), so after a no it starts again from the top.
   Expect a `refused` answer, then its `ready` line.
@@ -175,13 +178,14 @@ crashes at start or keeps USB from answering. Hold **Y**: no WEDGIE drive this t
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.52","fw":"wedgie-0.3.52","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.53","fw":"wedgie-0.3.53","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":2,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
     {"id":3,"type":"press","key":"A","ms":80} -> {"type":"ok"}
     {"id":4,"type":"chip"}               -> proof the chip works: an ATECC608 hashes random bytes, a Trust M
-                                            signs them with its factory key (check it yourself)
+                                            signs them with its factory key (check it yourself).
+                                            0.3.53+: {"busy":1} while its app is using the chip: ask again
     {"id":5,"type":"ls","path":"/saves"} -> {"type":"ls","files":[[path, bytes], ...],"free":N}  (folders end in /)
     {"id":6,"type":"get","path":"/saves/x/best.json"} -> {"type":"file","i":0,"n":N,"size":S,"data":"<base64>"} x n
     {"id":7,"type":"rm","path":"/saves/x"} -> {"type":"ok","free":N}   (a folder goes with everything in it)

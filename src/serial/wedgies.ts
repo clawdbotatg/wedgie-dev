@@ -221,7 +221,13 @@ async function prove(w: Wedgie, r: Repl) {
   w.proof = { state: "checking", pass: false, detail: "checking the chip", facts: [] };
   emit();
   try {
-    const d = await r.request({ type: "chip" }, 15000);
+    let d = await r.request({ type: "chip" }, 15000);
+    // 0.3.53+: busy while its app is mid-command on the chip (this check would reset it under the app)
+    for (let i = 0; d.busy && i < 40; i++) {
+      await new Promise((res) => setTimeout(res, 250));
+      d = await r.request({ type: "chip" }, 15000);
+    }
+    if (d.busy) throw new Error("its app kept the chip busy");
     w.chip = d.chip ? { type: d.chip, serial: d.serial, configLocked: d.configLocked } : { type: "none" };
     if (!d.kind) {
       w.proof = { state: "done", pass: false, facts: [], detail: d.error ? `No chip answered, but the I2C lines have power: a data wire and the power wire are probably swapped` :

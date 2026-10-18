@@ -13,7 +13,7 @@ import * as F from "../ui/facts";
 import { cmpVersion } from "../apps/appjson.mjs";
 
 type Job = { uid: string; key: number; state: "waiting" | "updating" | "restarting" | "done" | "fresh" | "fail"; from: string; board: string;
-  p: number; what: string; error?: string; at: number; gone?: boolean };
+  p: number; what: string; error?: string; at: number; gone?: boolean; updated?: boolean };
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 const LABEL: Record<Job["state"], string> = { waiting: "Waiting", updating: "Updating", restarting: "Restarting", done: "Updated", fresh: "Already up to date", fail: "Failed" };
 
@@ -70,16 +70,21 @@ export function update(main: HTMLElement) {
     try {
       await W.withRepl(w, async (r) => {
         const res = await installCore(r, (p, what) => { j.p = p * (0.9); j.what = what; paint(); });
-        if (res.untouched) return;                           // up to date: nothing asked, it keeps running
-        if (res.restarted) { restarting = true; return; }     // a checked install (0.3.0+): its app too, and it restarted itself
+        if (res.restarted) { restarting = true; return; }     // a checked install (0.3.0+): it restarted itself
+        if (res.untouched) {                                 // the firmware is up to date; 0.3.53+: an old app is its own question
+          if (!res.outdated.length) return;
+          const a = await useApp(r, res.outdated[0], (p) => { j.p = p; paint(); });
+          restarting = a.restarted;
+          return;
+        }
         for (const c of res.outdated) await useApp(r, c, (p) => { j.p = 0.9 + 0.1 * p; paint(); }, { launcher: false });
         if (res.written || w.kind !== "wedgie") {
           await r.leave();          // the one soft reset: boots the new core (the port may drop and come back)
           restarting = true;
         } else await r.leave({ reset: false });
       });
-      if (restarting) { j.state = "restarting"; j.at = Date.now(); W.reidentify(w); }
-      else j.state = "fresh";
+      if (restarting) { j.state = "restarting"; j.at = Date.now(); j.updated = true; W.reidentify(w); }
+      else j.state = j.updated ? "done" : "fresh";
     } catch (e: any) {
       j.state = "fail";
       j.error = e?.message || String(e);
@@ -100,6 +105,8 @@ export function update(main: HTMLElement) {
           const ok = w.kind === "wedgie" && !!w.version && cmpVersion(w.version, m.version) >= 0;
           // key/at move to the wedgie that came back, so only a later replug counts as "plugged in again"
           Object.assign(j, { state: ok ? "done" : "fail", error: ok ? undefined : `came back on ${w.firmware || "?"}`, key: w.key, at: Date.now() });
+          // 0.3.53+: the firmware went on by itself; its app, if old, is the next question
+          if (ok && cmpVersion(w.version!, "0.3.53") >= 0 && !running.has(w.key)) run(w, j);
         }
         else if (Date.now() - j.at > 60000) Object.assign(j, { state: "fail", error: "didn't come back after its restart; unplug it and plug it back in" });
       }
@@ -118,6 +125,7 @@ export function update(main: HTMLElement) {
       if (j && !again) continue;
       const nj: Job = j || { uid: w.uid, key: w.key, state: "waiting", from: "", board: "", p: 0, what: "", at: Date.now() };
       nj.at = Date.now();
+      nj.updated = false;             // plugged in again: "Updated" only for what this plug-in did
       jobs.set(w.uid, nj);
       run(w, nj);
     }

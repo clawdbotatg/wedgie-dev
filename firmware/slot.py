@@ -313,10 +313,17 @@ def ask(job="", checked=False, v=""):
         return False
     W.asked_ms = None
     head = (job or "Install").partition(" to ")[0]     # wedgie.dev titles an update just "Update firmware"
+    now = W.active()                                   # what it runs: from its own flash, not the host
+    name = (now or {}).get("name") or (now or {}).get("mod") or ""
+    # Everything the job can do is on this screen (job.check holds it to exactly that, 0.3.53): an
+    # update writes only the firmware; an install puts on that app and takes off the one it replaces.
     if head.startswith("Update"):
         ok = ui.ask(d, head, ms=ASK_MS, big=str(v or "?")[:12])
     elif head.startswith("Install "):                  # "Install" over the app's name, big
-        ok = ui.ask(d, "Install", ms=ASK_MS, big=head[8:])
+        new = head[8:]
+        ok = ui.ask(d, "Install", ["replaces " + name] if name and name != new else (), ms=ASK_MS, big=new)
+    elif head in ("Uninstall the app", "Take its app off"):
+        ok = ui.ask(d, "Uninstall", ms=ASK_MS, big=name or "its app")
     else:
         ok = ui.ask(d, head + "?", ms=ASK_MS)
     W.asked_ms = time.ticks_diff(ui.drawn, _rx)

@@ -219,6 +219,7 @@ async function checkedHave(r: Repl, m: Manifest, hash?: string[], late: boolean 
   if (!h?.jobs) return null;
   if (h.uid) uidOf.set(r, h.uid);
   if (h.bin) binOf.set(r, h.bin);
+  oneThing.set(r, !!h.version && cmpVersion(h.version, ONE_THING) >= 0);
   // Before 0.3.12 a job ran on the app's chopped-up heap and job.py grew each USB line a char at a time:
   // installs ran out of memory on real boards (0.3.6, 0.3.11). They get there once through full access
   // (Austin, 2026-10-02: one "full access" question is fine); 0.3.12+ installs on a clean heap.
@@ -236,6 +237,19 @@ async function checkedHave(r: Repl, m: Manifest, hash?: string[], late: boolean 
   return { hashes: v.sums, files: Object.keys(v.sums).filter((n) => v.sums[n]), apps: v.apps || [] };
 }
 
+/** 0.3.53+: a job does one thing, all on its question (job.py check): "Update firmware" writes only the
+ *  core and takes nothing off; "Install X" writes only X and takes off only the app it replaces; an
+ *  uninstall takes off only its app. Older firmware gets the jobs it knows (an update brings its app's
+ *  files along and clears other apps' leftovers). EXPECTATIONS.md: the person knows what they say yes to. */
+const ONE_THING = "0.3.53";
+const oneThing = new WeakMap<Repl, boolean>();
+/** The files of the app it runs (its twins too), on the flash: all a 0.3.53+ job may take off. */
+function mineOf(m: Manifest, have: Have) {
+  const act = activeOf(m, have);
+  const a = (have.apps || []).find((x) => x?.mod === act);
+  const names = m.carts.find((c) => c.mod === act)?.files || (Array.isArray(a?.files) ? a.files : act ? [act + ".py"] : []);
+  return withTwins(names).filter((n) => have.hashes[n]);
+}
 const uidOf = new WeakMap<Repl, string>();     // its board ID, to find it again if a job's restart drops the port
 const binOf = new WeakMap<Repl, number>();      // 0.3.16+: the most raw bytes one put takes (hello "bin")
 let release: Promise<{ text: string; sig: string }> | null = null;
@@ -375,22 +389,26 @@ export async function installCore(r: Repl, onProgress: (p: number, what: string)
   if (ch) {
     const act = activeOf(m, ch);
     const sha = (n: string) => m.files.find((f) => f.name === n)!.sha256;
-    const keep = m.carts.find((c) => c.mod === act)?.files || [];      // its app's files come up to date too
+    const one = oneThing.get(r);
+    const cart = m.carts.find((c) => c.mod === act);
+    const keep = one ? [] : cart?.files || [];      // before 0.3.53 its app's files come up to date too
     const write = [...new Set([...m.core, ...keep])].filter((n) => ch.hashes[n] !== sha(n) || ch.hashes[twin(n) || ""]);   // sent again if its .py is there too (the job takes that off)
-    const del = others(m, ch, act);
+    const del = one ? [] : others(m, ch, act);
+    // 0.3.53+: an app out of date is its own question ("Install X"), after this one
+    const stale = one && cart && cart.files.some((n) => ch.hashes[n] !== sha(n)) ? [cart] : [];
     for (const n of write) ch.hashes[n] = sha(n);
     for (const n of del) ch.hashes[n] = null;
     const apps = await appsFor(m, ch, act);
     if (!write.length && !del.length && JSON.stringify(apps) === JSON.stringify(ch.apps)) {
       onProgress(1, "already up to date");      // nothing to ask for; it keeps running
-      return { version: m.version, written: 0, outdated: [] as Cart[], restarted: false, untouched: true };
+      return { version: m.version, written: 0, outdated: stale, restarted: false, untouched: true };
     }
     // "Update firmware", no version: the wedgie titles its progress "Updating firmware..." from this and
     // keeps 2 lines, so "to 0.3.8" was cut to a dangling "to". Its question shows the release on line 2.
     const j = await job(r, m, "Update firmware", write, del, apps, (p, w) => onProgress(0.02 + 0.96 * p, w), !!ch.late);
     if (j) {
       onProgress(1, j.sent ? `${j.sent} files updated` : "already up to date");
-      return { version: m.version, written: j.sent, outdated: m.carts.filter((c) => apps.some((a) => a.mod === c.mod && a.v !== c.v)), restarted: true, untouched: false };
+      return { version: m.version, written: j.sent, outdated: one ? stale : m.carts.filter((c) => apps.some((a) => a.mod === c.mod && a.v !== c.v)), restarted: true, untouched: false };
     }
   }
   onProgress(0, "stopping what it runs");
@@ -415,25 +433,6 @@ export async function installCore(r: Repl, onProgress: (p: number, what: string)
   return { version: m.version, written: todo.length, outdated, restarted: false, untouched: false };
 }
 
-/** /prepare: the latest core with `cart` as its one app, in one checked job (one press on its screen); it
- *  restarts itself after. False: this firmware can't take a checked install (before 0.3.12). */
-export async function coreWithApp(r: Repl, cart: Cart, onProgress: (p: number, what: string) => void) {
-  startAsk();
-  const m = await firmwareManifest();
-  const ch = await checkedHave(r, m);
-  if (!ch) return false;
-  const sha = (n: string) => m.files.find((f) => f.name === n)!.sha256;
-  const write = [...new Set([...m.core, ...cart.files])].filter((n) => ch.hashes[n] !== sha(n) || ch.hashes[twin(n) || ""]);
-  const del = others(m, ch, cart.mod);
-  for (const n of write) ch.hashes[n] = sha(n);
-  for (const n of del) ch.hashes[n] = null;
-  // "Install <name>", not "Update firmware": the wedgie holds a job to its title, and a firmware update
-  // must keep the app it runs (job.py check), so one that also put Welcome on failed after every yes.
-  // An install may write the core too (then the whole core must match the signed list).
-  if (!(await job(r, m, `Install ${cart.name}`, write, del, await appsFor(m, ch, cart.mod), onProgress, !!ch.late))) throw new Error("a file isn't in the signed release");
-  return true;
-}
-
 /** Make `cart` the app it runs: the old app's files come off, its files that differ go on, apps.json
  *  names it. Leaves the board in raw REPL; the caller restarts it (Repl.leave: a soft reset, the port
  *  stays, a fresh heap for the app). Checked for room first, so a switch that can't fit changes nothing. */
@@ -444,7 +443,7 @@ export async function useApp(r: Repl, cart: Cart, onProgress: (p: number, what: 
   if (ch) {
     const sha = (n: string) => m.files.find((f) => f.name === n)?.sha256 || "";
     const write = cart.files.filter((n) => ch.hashes[n] !== sha(n) || ch.hashes[twin(n) || ""]);    // sent again if its .py is there too (the job takes that off)
-    const del = others(m, ch, cart.mod);
+    const del = !oneThing.get(r) ? others(m, ch, cart.mod) : activeOf(m, ch) === cart.mod ? [] : mineOf(m, ch).filter((n) => !cart.files.includes(n));
     for (const n of write) ch.hashes[n] = sha(n);
     for (const n of del) ch.hashes[n] = null;
     const j = await job(r, m, `Install ${cart.name}`, write, del, await appsFor(m, ch, cart.mod), onProgress, !!ch.late);
@@ -484,7 +483,7 @@ export async function removeApp(r: Repl, opts: { manifest?: Manifest } = {}) {
     const v = extra.length ? await r.request({ type: "sums", names: [], exists: extra }, 30000).catch(() => null) : null;
     if (v?.sums) Object.assign(ch.hashes, v.sums);
   }
-  if (ch && await job(r, m, "Uninstall the app", [], others(m, ch, null), [], () => {}, !!ch.late)) return { restarted: true };
+  if (ch && await job(r, m, "Uninstall the app", [], oneThing.get(r) ? mineOf(m, ch) : others(m, ch, null), [], () => {}, !!ch.late)) return { restarted: true };
   await takeOver(r, askHint, "Uninstall the app");
   const have = await look(r, allNames(m));
   const extra = unasked(have);
