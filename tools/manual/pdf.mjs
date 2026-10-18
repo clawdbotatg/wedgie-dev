@@ -16,10 +16,10 @@ export const css = (f = "manual.css") => readFileSync(join(ROOT, "tools/manual",
 
 export const qr = (url) => QRCode.toString(url, { type: "svg", margin: 0, errorCorrectionLevel: "M", color: { dark: "#1a1b1a", light: "#0000" } });
 
-// Chromium keeps a JPEG as is but stores a webp uncompressed, so print from JPEG copies (python3 + Pillow), see-through parts white.
+// Chromium keeps a JPEG as is but stores a webp uncompressed, so print from JPEG copies (python3 + Pillow), see-through parts white, an off-white background made pure white.
 export const img = (path) => {
   const out = join(dir, path.replace(/\W/g, "_") + ".jpg");
-  execFileSync("python3", ["-c", "import sys;from PIL import Image;i=Image.open(sys.argv[1]).convert('RGBA');w=Image.new('RGB',i.size,'white');w.paste(i,mask=i);w.save(sys.argv[2],quality=85)", join(ROOT, path), out]);
+  execFileSync("python3", ["-c", "import sys;from PIL import Image;i=Image.open(sys.argv[1]).convert('RGBA');w=Image.new('RGB',i.size,'white');w.paste(i,mask=i);c=w.getpixel((2,2));w=w.point([min(255,round(v*255/c[k])) if min(c)>=235 else v for k in range(3) for v in range(256)]);w.save(sys.argv[2],quality=90)", join(ROOT, path), out]);
   return "file://" + out;
 };
 
