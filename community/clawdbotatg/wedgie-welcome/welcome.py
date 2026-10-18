@@ -29,7 +29,8 @@ WHITE, INK, MUTED, GREEN, GREEN_D, GREY, RED = ui.WHITE, ui.INK, ui.MUTED, ui.GR
 
 # The projection screen: its picture is S, SW x SH at (SX, SY), a grey frame around it.
 SX, SY, SW, SH = 30, 16, 180, 158
-FEET = 214                              # where his feet touch the stage
+FEET = 204                              # where his feet touch the stage
+APRON = 212                             # below it, the stage's front: wedgie.dev, always
 FLOOR_Y = 188
 
 
@@ -39,6 +40,20 @@ class _Buf(framebuf.FrameBuffer):
 
 S = _Buf(bytearray(SW * SH // 2), SW, SH, framebuf.GS4_HMSB)
 _T = framebuf.FrameBuffer(bytearray(128), 128, 8, framebuf.MONO_HLSB)    # one line of text, to scale up
+
+# wedgie.dev on the stage's front, drawn once at scale 2 and blitted every frame.
+class _Site(framebuf.FrameBuffer):
+    width = 160
+
+
+SITE = _Site(bytearray(160 * 16 // 2), 160, 16, framebuf.GS4_HMSB)
+SITE.fill(KEY)
+_T.fill(0)
+_T.text("wedgie.dev", 0, 0, 1)
+for _y in range(8):
+    for _x in range(80):
+        if _T.pixel(_x, _y):
+            SITE.fill_rect(_x * 2, _y * 2, 2, 2, WHITE)
 
 # ---- the guy: 12 x 18 cells of 3 px ------------------------------------------------------------------
 P, GW, GH = 3, 36, 54
@@ -432,14 +447,15 @@ def stage():
     d.fill_rect(24, 9, 192, 5, SHADE)                       # the screen's roller
     d.rect(SX - 2, SY - 2, SW + 4, SH + 4, GREY)
     d.rect(SX - 1, SY - 1, SW + 2, SH + 2, GREY)
-    d.fill_rect(0, FLOOR_Y, 240, 52, FLOOR)
+    d.fill_rect(0, FLOOR_Y, 240, APRON - FLOOR_Y, FLOOR)
     d.fill_rect(0, FLOOR_Y, 240, 2, GREY)
-    d.hline(0, 206, 240, SHADE)
-    d.hline(0, 224, 240, SHADE)
+    d.hline(0, 200, 240, SHADE)
     for vx in (40, 112, 190):
-        d.vline(vx, FLOOR_Y + 2, 16, SHADE)
+        d.vline(vx, FLOOR_Y + 2, 10, SHADE)
     for vx in (76, 150, 220):
-        d.vline(vx, 207, 17, SHADE)
+        d.vline(vx, 201, APRON - 201, SHADE)
+    d.hline(0, APRON, 240, GREY)
+    d.blit(SITE, (240 - SITE.width) // 2, APRON + 8, KEY)
     d.fill_rect(0, 0, 240, 7, RED)                          # the curtains
     d.fill_rect(0, 0, 22, FLOOR_Y, RED)
     d.fill_rect(218, 0, 22, FLOOR_Y, RED)
