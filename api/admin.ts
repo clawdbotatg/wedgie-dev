@@ -6,8 +6,8 @@
 //   POST {id, cancel: true}      canceled (refund by hand), wiped the same way; new, paid or expired
 //   GET ?funnel=1                the checkout counts (api/count.ts) and orders by pay and status, last `days` (30); every canceled order
 //   POST {stock: n}              n boxes left to sell from now on (_shop.ts stockLeft); 0 = sold out
-// Each GET also marks paid the USDC orders made in the last 3 days whose deposit address now holds their price (older
-// ones settle when their buyer opens the order page), and deletes what's done with: shipped or canceled orders and
+// Each GET also marks paid the USDC orders made in the last 3 days, or with something sent, whose deposit address now
+// holds their price (older empty ones settle when their buyer opens the order page), and deletes what's done with: shipped or canceled orders and
 // unpaid or expired ones with nothing sent, 30 days on. GET ?stock=1: just the stock count.
 import { db, env, json, oops, same, settleDeposit, stockLeft, endCard, type Order } from "./_shop.js";
 import { unlock, shippedMail, mailPaid } from "./_mail.js";
@@ -36,7 +36,7 @@ export async function GET(req: Request) {
       where status = 'shipped' and paid_at >= stock.set_at), 0)::int where id = 1`;
   // USDC sent to an order's deposit address after its buyer left the page still pays it
   const open = (await sql`select * from orders where pay = 'usdc' and deposit is not null and status in ('new', 'expired')
-    and created > now() - interval '3 days'`) as Order[];
+    and (created > now() - interval '3 days' or got > 0)`) as Order[];
   await Promise.all(open.map(async (o) => {
     const r = await settleDeposit(sql, o).catch(() => null);
     if (r?.paid) await mailPaid(sql, o.id, new URL(req.url).origin).catch(() => {});

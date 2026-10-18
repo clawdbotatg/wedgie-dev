@@ -287,7 +287,8 @@ function status(id: string, box: HTMLElement, say: (s: string, bad?: boolean) =>
     // A deposit order (got is set): its own address, any amount counts, short = send the rest. Something sent
     // already holds the price, so it stays payable after the clock runs out. Old orders: the exact amount to the Safe.
     const got = v.got != null ? BigInt(v.got) : null, owe = BigInt(v.usdc || 0) - (got || 0n);
-    if (v.pay === "usdc" && c && (v.status === "new" || v.status === "expired" && got)) {
+    // checking: a chain didn't answer, so got may be short. No amount, QR or pay button till it's read.
+    if (v.pay === "usdc" && c && !v.checking && (v.status === "new" || v.status === "expired" && got)) {
       // EIP-681: a phone wallet that scans it opens a USDC transfer with the amount filled in.
       const q = qrcode(0, "M");
       q.addData(`ethereum:${c.usdc}@${v.chain}/transfer?address=${v.payTo}&uint256=${owe}`);
