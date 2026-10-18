@@ -9,7 +9,7 @@
 # Ctrl-C does nothing until the person lets a computer in (let_in); after that it stops the app and
 # drops to the REPL, so mpremote and wedgie.dev's raw-REPL tools keep working.
 #
-# Hold X while plugging in to start without the app (the home screen; USB always works there).
+# Hold both gray buttons (B and X) while plugging in to start without the app (the home screen; USB always works there).
 #
 # App forms: a Timer app starts itself at import (hello); an app with an `entry` is called and owns
 # the CPU (demo.run). If an entry returns, the screen says so and A starts it again.
@@ -47,14 +47,14 @@ def _band(title, lines, hint=""):
 
 
 def empty():
-    """The wedgie's own home: where to get software (wedgie.dev, big, over the logo), then "No software"."""
+    """The wedgie's own home: where to get software (wedgie.dev, big) over the underwear, big (home.bin,
+    tools/homelogo.py). No "No software": a bummer, and wedgie.dev says what to do."""
     if d.width < 240:                       # a small screen (oled.py)
         import small
         return small.empty(d, W.short())
     import loader
-    y = loader.logo(d)
+    loader.logo(d, "home.bin")
     d.center_text("wedgie.dev", 30, INK, 3)
-    d.center_text("No software", y + 18 if y else 110, MUTED, 2)
     d.text(W.short(), ui.right() - 8 * 6, 6, MUTED)
     d.show()
 
@@ -502,7 +502,7 @@ def _interrupt():
 
 def _own_usb():
     """The app reads USB itself (the Wallet), once it's running: one that failed to start doesn't, so
-    the slot answers (or nothing would, and only holding X at power-up would get a computer back in)."""
+    the slot answers (or nothing would, and only holding B and X at power-up would get a computer back in)."""
     return bool(app and app.get("usb") and state in ("running", "entry"))
 
 
@@ -552,9 +552,9 @@ def init():
         except Exception as e:
             sys.print_exception(e)
     app = W.active()
-    if app and keys.pins["X"].value() == 0:    # X held while plugging in: start without the app (a way
-        app = None                              # back in when an app won't let USB work)
-        print("slot: X held, app skipped")
+    if app and keys.pins["B"].value() == 0 and keys.pins["X"].value() == 0:    # both gray buttons held while plugging in:
+        app = None                              # start without the app (a way back in when an app won't let USB work)
+        print("slot: B+X held, app skipped")
     if not (app and app.get("usb")):      # the Wallet says its own ready
         W.send(W.hello(None, type="ready", running=app and app["mod"]))
     if app:

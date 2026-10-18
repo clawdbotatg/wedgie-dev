@@ -193,15 +193,15 @@ class _Bar:
         d.cs(1)
 
 
-def logo(d):
-    """The boot logo into d's framebuffer (the screen isn't pushed): its background everywhere, the logo
+def logo(d, path="logo.bin"):
+    """The boot logo (or path, in its format: the home screen's bigger one) into d's framebuffer (the screen isn't pushed): its background everywhere, the logo
     in its box. Returns the y just under the logo (None: no logo.bin, a white screen)."""
     try:
-        with open("logo.bin", "rb") as f:
+        with open(path, "rb") as f:
             x, y, w, h = struct.unpack(">4H", f.read(8))
             bg = f.read(2)
             d.fill(lcd.index565(bg[0] | bg[1] << 8))
-            lcd.art(x, y, w, h, "logo.bin", 10)          # full color, read from flash at each show
+            lcd.art(x, y, w, h, path, 10)          # full color, read from flash at each show
         return y + h
     except (OSError, ValueError):
         import ui

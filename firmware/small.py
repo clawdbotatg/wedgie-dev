@@ -76,7 +76,6 @@ def empty(d, short):
     d.fill(WHITE)
     d.center_text("wedgie", 0, INK, 2)
     d.center_text("wedgie.dev", 26, INK)
-    d.center_text("No software", 40, INK)
     d.center_text(short, 56, INK)
     d.show()
 

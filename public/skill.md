@@ -11,7 +11,7 @@ RP2350), a Waveshare Pico-LCD-1.3 hat (240x240 screen, 5-way joystick, A/B/X/Y),
 wedgie firmware: a boot logo, the one app it boots straight into, saves that outlast apps, and a USB
 protocol. Everything is MIT: https://wedgie.dev
 
-**The current firmware is 0.3.50.** If a wedgie's `hello` says older, update it first
+**The current firmware is 0.3.51.** If a wedgie's `hello` says older, update it first
 (`wedgie.py update`, below): everything here assumes current firmware.
 
 **Three guides cover everything** (this one first):
@@ -174,7 +174,7 @@ crashes at start or keeps USB from answering. Hold **Y**: no WEDGIE drive this t
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.50","fw":"wedgie-0.3.50","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.51","fw":"wedgie-0.3.51","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":2,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -415,7 +415,7 @@ straight apart, rocking gently end to end, never twisting. Reassemble in reverse
 2. **Does hello answer?** No answer: read its screen. "wedgie broke: <error>": B tries again, A asks
    for full control so a computer can fix it (`wedgie.py debug` shows `error.log`). Black screen: the
    hat isn't fully seated, or there's no firmware (bare MicroPython shows nothing): `wedgie.py update`.
-   An app that crashes at start: hold X while plugging in, then pick another app.
+   An app that crashes at start: hold both gray buttons (B and X) while plugging in, then pick another app.
 3. **Is the chip OK?** `{"type":"chip"}` (or Hardware on its page). Not found, in order of likelihood:
    wires by color instead of plug order; SDA/SCL swapped; a data wire and the power wire swapped (the
    chip powers itself through a data pin, its LED lights, it looks like a short: it isn't, swap them);

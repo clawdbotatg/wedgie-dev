@@ -109,7 +109,7 @@ export const STEPS: Step[] = [
     p: `Press every button. Push the joystick every way and straight in. Each should click. Look for anything off: a tilted joystick, a stuck button.`,
     d: "19", ph: ["18-closed"] },
   { t: "Full test",
-    p: `Plug it in: it shows <b>No software</b>. On <a href="/test">wedgie.dev/test</a> click <b>Test only</b>. The wedgie shows a red FULL CONTROL warning: press green on the wedgie. Then the chip check, then <b>shake</b> it (tap, squeeze, light drops on each side) until the counter stops, press each button it asks for, and check each color for scratches or dead pixels. <b>PASS</b> on the wedgie and the page: done.`,
+    p: `Plug it in: it shows <b>wedgie.dev</b> and the underwear. On <a href="/test">wedgie.dev/test</a> click <b>Test only</b>. The wedgie shows a red FULL CONTROL warning: press green on the wedgie. Then the chip check, then <b>shake</b> it (tap, squeeze, light drops on each side) until the counter stops, press each button it asks for, and check each color for scratches or dead pixels. <b>PASS</b> on the wedgie and the page: done.`,
     d: "20", ph: ["20-no-software", "20-test-only", "20-full-control", "20-press-green", "20-shake", "20-buttons", "20-colors", "20-pass", "20-pass-page"],
     tip: `Need to wipe it after the case is closed? Press BOOTSEL through the small hole in the base with a paperclip while you plug it in.` },
   { t: "Box it",
