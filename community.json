@@ -301,13 +301,20 @@
     },
     {
       "repo": "clawdbotatg/wedgie-welcome",
-      "sha": "94e1b4dd2e03d840284cec0284be1e88b0aff714",
-      "at": "2026-10-18T21:37:55Z",
+      "sha": "4745573c3d30940fc59e7c0b507b694be47de3dd",
+      "at": "2026-10-18T23:05:55Z",
       "approved": "2026-10-18",
       "v": {
-        "welcome": "f2caf991bec1"
+        "welcome": "70e603cb7b27"
       },
       "past": [
+        {
+          "sha": "94e1b4dd2e03d840284cec0284be1e88b0aff714",
+          "at": "2026-10-18T21:37:55Z",
+          "v": {
+            "welcome": "f2caf991bec1"
+          }
+        },
         {
           "sha": "f658e2334143f2287a91e8e0c9498f4727e3524a",
           "at": "2026-10-18T21:22:26Z",

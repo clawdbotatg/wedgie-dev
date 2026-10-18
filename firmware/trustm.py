@@ -57,9 +57,20 @@ def state():
     return reg(0x82, 4)
 
 
+# The data link's frame numbers (frnr, acknr). One I2C link to one chip, so every Session (and optiga.Chip)
+# shares them: a Session kept its own, and once another Session reset the chip its next frame had the
+# wrong number, the chip ignored it, and it waited out wait_response's 10 s (Welcome froze 8-10 s while a
+# host checked the chip, 2026-10-18). gen: soft resets so far; a session from before the last one opens
+# the application again before its next command.
+link = [0, 3]
+gen = [0]
+
+
 def soft_reset():
     _write(b"\x88\x00\x00")
     time.sleep_ms(25)
+    link[0], link[1] = 0, 3
+    gen[0] += 1
 
 
 def wait_response(timeout_ms=10000):
@@ -125,33 +136,37 @@ def _crc(data):
 
 
 class Session:
-    """One OpenApplication session after a soft reset. Frame numbers run 0..3."""
+    """One OpenApplication session after a soft reset. Frame numbers run 0..3 (shared: link)."""
 
     def __init__(self):
         busy[0] += 1
         try:
             soft_reset()
-            self.frnr = 0
-            self.acknr = 3
-            self.command(0x70, 0x00, bytes.fromhex("D2760000044765" "6E41757468417070" "6C"))
+            self._open()
         finally:
             busy[0] -= 1
 
+    def _open(self):
+        self.gen = gen[0]
+        self.command(0x70, 0x00, bytes.fromhex("D2760000044765" "6E41757468417070" "6C"))
+
     def _send(self, apdu):
-        body = bytes([(self.frnr << 2) | self.acknr]) + len(apdu + b"\x00").to_bytes(2, "big") + b"\x00" + apdu
+        body = bytes([(link[0] << 2) | link[1]]) + len(apdu + b"\x00").to_bytes(2, "big") + b"\x00" + apdu
         _write(b"\x80" + body + _crc(body).to_bytes(2, "big"))
-        self.frnr = (self.frnr + 1) & 3
+        link[0] = (link[0] + 1) & 3
 
     def _recv(self):
         f = read_frame()
         if _crc(f[:-2]) != int.from_bytes(f[-2:], "big"):
             raise OSError("trustm: bad fcs %s" % f.hex())
-        self.acknr = (f[0] >> 2) & 3
-        ack = bytes([0x80 | self.acknr, 0, 0])
+        link[1] = (f[0] >> 2) & 3
+        ack = bytes([0x80 | link[1], 0, 0])
         _write(b"\x80" + ack + _crc(ack).to_bytes(2, "big"))
         return f[4:-2]                      # drop FCTR, LEN, PCTR and FCS
 
     def command(self, cmd, param, data):
+        if self.gen != gen[0]:              # the chip was reset under this session: open it again
+            self._open()
         busy[0] += 1
         try:
             self._send(bytes([cmd, param]) + len(data).to_bytes(2, "big") + data)

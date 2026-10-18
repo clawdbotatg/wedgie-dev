@@ -118,17 +118,17 @@ class Chip:
         T.bus(sda, scl)
         T.busy[0] += 1                  # trustm.busy: the host's chip check waits meanwhile
         try:
-            T.soft_reset()
-            self.frnr, self.acknr = 0, 3
+            T.soft_reset()                  # frame numbers: trustm.link, shared by every session
+            self.gen = T.gen[0]
             self.open()
         finally:
             T.busy[0] -= 1
 
     # ---- the I2C frames, chained both ways ----
     def _frame(self, pctr, part):
-        body = bytes([(self.frnr << 2) | self.acknr]) + (len(part) + 1).to_bytes(2, "big") + bytes([pctr]) + part
+        body = bytes([(T.link[0] << 2) | T.link[1]]) + (len(part) + 1).to_bytes(2, "big") + bytes([pctr]) + part
         T._write(b"\x80" + body + T._crc(body).to_bytes(2, "big"))
-        self.frnr = (self.frnr + 1) & 3
+        T.link[0] = (T.link[0] + 1) & 3
 
     def _send(self, apdu):
         if len(apdu) <= MAX_DATA:
@@ -148,8 +148,8 @@ class Chip:
             f = _frame(WAIT_MS)
             if T._crc(f[:-2]) != int.from_bytes(f[-2:], "big"):
                 raise OSError("optiga: bad frame checksum")
-            self.acknr = (f[0] >> 2) & 3
-            ack = bytes([0x80 | self.acknr, 0, 0])
+            T.link[1] = (f[0] >> 2) & 3
+            ack = bytes([0x80 | T.link[1], 0, 0])
             T._write(b"\x80" + ack + T._crc(ack).to_bytes(2, "big"))
             out += f[4:-2]                  # small: a chained answer is at most a few frames, once
             if f[3] & 0x07 in (0x00, 0x04):     # single or last
@@ -157,6 +157,9 @@ class Chip:
 
     def command(self, cmd, param=0, data=b""):
         """Any APDU: cmd, param, data -> the answer's data. Raises Error with the chip's error code."""
+        if self.gen != T.gen[0]:            # the chip was reset under this session (another one opened): open again
+            self.gen = T.gen[0]
+            self.open()
         T.busy[0] += 1
         try:
             self._send(bytes([cmd, param]) + len(data).to_bytes(2, "big") + data)

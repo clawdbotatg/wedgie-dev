@@ -24,7 +24,7 @@ acc497a596ea3b740743ed07d2f534644ae339a4fc70c26faa5f7ce53ab409f2  loader.mpy
 cb2cd953508b9be62f720c17f44bc08e7934802b441a5b8af8932d1751d45290  logo.bin
 c8ea59e9c47934cf50d84de15e3f549be1158a1132ec0a5af33ebb38c579a599  main.py
 349dcc68b8539c371fa7883ea343b4972eb70c1127025069c9ccc211766368c1  oled.mpy
-8d7615fa7fdb2bba8962593da08a45922414824ee956f631c97e178a957ab659  optiga.mpy
+f8404e021a509bab89a4ed947def97d5d6ad4910cad9af9970feb76dc7bb0fc0  optiga.mpy
 ba422f72ca334b9681bf77e6cbb972bc6b0733d410d05cfe772c00529354ae2f  p256.mpy
 9858dc942ff0577fbe2c921e0fd1c01cea9f57e4d9452e21cb7f9c285b8fba8e  power.mpy
 beb91a719c9d5d896e427db0d9beb2f37a505b7235f39cdae76c70961e3028c8  safe.py
@@ -39,12 +39,12 @@ c94e3e1188f0e7a6fbf8df03066a9b6f63be336d9f81b7279a1cdcfc784e288f  safe_key.py
 299617a487d8f129171acf1383ce98de909c32a40a3777d939d678196610fe36  slot.mpy
 1d96262db0d680daf2eddd896183bd047f83e03939b5ece052381ece0926ce59  small.mpy
 73c45ef2c4b60e84e1109a30790837676a035f1dc0983ad53e5c93c03f6857d9  splash.mpy
-fac6b3f53f6b67cd16dbfb42ac44b2957245f82313e156ec1482df9482c1cceb  trustm.mpy
+37e2f01c86ccb98a9b516f2d4e32a0bcb0543ca498d823f31cb6f189585a9253  trustm.mpy
 8c9a737a3a493e833338626e96de0cb4a52d130a19ae8516fa2c6aac51055d04  ui.mpy
 8891352abecddf9de45f4e7aa87afad8c9dd30964d5b99a9853a3758878d7f36  usbdev.mpy
 5ab309e6ead671eb8470bd628c170662b318d587c852f3221154b9b78a5c4a0d  wedgie.mpy
 2542a29749239854f282b95d5122dcc291ff88437d7ac562fa23ae16fb3086a2  wedgiedrive.mpy
-b5cee30e8f44875558903c743d270aab3a41775e9c9fb9126debd5ed9007087e  welcome.py
+7d7a3b128ac87f5ed49f997d6dd185c0393b7a9e9b8733d66e338d1ed9a6d5f6  welcome.py
 @app  {"mod":"blackjack","name":"Blackjack","entry":"run","files":["blackjack.py"]}
 @app  {"mod":"blocks","name":"Blocks","entry":"run","files":["blocks.py"]}
 @app  {"mod":"bunker","name":"Demon Bunker","entry":"run","files":["bunker.py","bunker_draw.py","bunker_art.mpy","bunker_game.mpy"]}

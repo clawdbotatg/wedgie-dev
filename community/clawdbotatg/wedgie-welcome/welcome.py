@@ -5,7 +5,8 @@
 #
 #   joystick left/right   walk                 up, the green button   jump
 #   red and grey buttons  wave                 joystick down          a wedgie
-#   Every press also moves the slideshow along faster. Leave him alone and he wanders on his own.
+#   Every press also moves the slideshow along faster; a grey button skips to the next slide (not on the
+#   checks, where every button is tested). Leave him alone and he wanders on his own.
 #
 # One full redraw a frame at 20 fps: the slide lives in its own 16-color buffer (S, drawn once per
 # slide), so a frame is a fill, a few rects, one blit of S, one sprite. No saves.
@@ -514,7 +515,7 @@ def s_go():
     small("for apps and updates", 96)
 
 
-SLIDES = ((s_welcome, 2600), (s_ready, 6000), (s_wedgie, 3600), (s_inside, 8000), (s_chip, 6000), (s_safe, 3600),
+SLIDES = ((s_welcome, 2600), (s_wedgie, 3600), (s_ready, 6000), (s_inside, 8000), (s_chip, 6000), (s_safe, 3600),
           (s_games, 3600), (s_make, 3600), (s_go, 6000))
 FLIP = 360                              # ms: the screen turns over between slides
 
@@ -568,8 +569,9 @@ def update(now, pressed):
             jump()
         elif k in ("B", "X", "Y", "press"):
             wave(now)
-        if flip_t is None and SLIDES[si][0] is not s_ready:     # every press moves the slideshow along faster
-            slide_end = time.ticks_add(slide_end, -1200)
+        if flip_t is None and SLIDES[si][0] is not s_ready:     # every press moves the slideshow along faster,
+            slide_end = now if k in ("B", "X") else time.ticks_add(slide_end, -1200)   # a grey one to the next
+                                                                    # slide (the checks: two presses on the line)
     dx = 0
     wedgie = keys.held("down")
     if wedgie:
