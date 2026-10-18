@@ -9,6 +9,7 @@ import { connect } from "./pages/connect";
 import { assemble } from "./pages/assemble";
 import { format } from "./pages/format";
 import { update } from "./pages/update";
+import { prepare } from "./pages/prepare";
 import { build } from "./pages/build";
 import { code } from "./pages/code";
 import { debug } from "./pages/debug";
@@ -24,6 +25,7 @@ const onAssemble = path === "/assemble";
 const onFormat = path === "/test" || path === "/format";   // /format: its old name
 if (path === "/format") history.replaceState(null, "", "/test");
 const onUpdate = path === "/update";
+const onPrepare = path === "/prepare";
 const onBuild = path === "/build";
 const onCode = path === "/code";
 const onDebug = path === "/debug";
@@ -32,7 +34,7 @@ const onSecret = path === "/secret";
 const onOrder = path === "/order" || path.startsWith("/order/") || path === "/orders" || path === "/signin";   // buy, one order (/order/<id>), yours, sign in
 const onLegal = path === "/terms" || path === "/privacy";
 // Each page its own tab title (the first path part; /order/<id> is an order, /safe/<x> a Safe).
-const TITLES: Record<string, string> = { connect: "Connect", assemble: "Assemble", test: "Test", update: "Update", build: "Build",
+const TITLES: Record<string, string> = { connect: "Connect", assemble: "Assemble", test: "Test", update: "Update", prepare: "Prepare", build: "Build",
   code: "Code", debug: "Debug", safe: "Safe", secret: "Secret chat", order: "Order", orders: "Your orders", signin: "Sign in",
   terms: "Terms", privacy: "Privacy" };
 const title = TITLES[path.split("/")[1] || ""];
@@ -98,6 +100,6 @@ if (Drive.inApp()) {
 const top = document.getElementById("top")!;
 // Ready when the page's first screen is really there: on the home page that includes the hero wedgie
 // (its files are in the loader's byte count, and it has drawn a frame). Other 3D waits for the page.
-if (onFormat || onUpdate) document.body.classList.add("test-mode");
-const up = onFormat ? (format(top), Promise.resolve()) : onUpdate ? (update(top), Promise.resolve()) : onConnect ? (connect(top), Promise.resolve()) : onAssemble ? (assemble(top), Promise.resolve()) : onBuild ? (build(top), Promise.resolve()) : onCode ? (code(top), Promise.resolve()) : onDebug ? (debug(top), Promise.resolve()) : onSafe ? (safe(top), Promise.resolve()) : onSecret ? (secret(top), Promise.resolve()) : onOrder ? (order(top), Promise.resolve()) : onLegal ? (legal(top, path.slice(1) as "terms" | "privacy"), Promise.resolve()) : home(top);
+if (onFormat || onUpdate || onPrepare) document.body.classList.add("test-mode");
+const up = onFormat ? (format(top), Promise.resolve()) : onUpdate ? (update(top), Promise.resolve()) : onPrepare ? (prepare(top), Promise.resolve()) : onConnect ? (connect(top), Promise.resolve()) : onAssemble ? (assemble(top), Promise.resolve()) : onBuild ? (build(top), Promise.resolve()) : onCode ? (code(top), Promise.resolve()) : onDebug ? (debug(top), Promise.resolve()) : onSafe ? (safe(top), Promise.resolve()) : onSecret ? (secret(top), Promise.resolve()) : onOrder ? (order(top), Promise.resolve()) : onLegal ? (legal(top, path.slice(1) as "terms" | "privacy"), Promise.resolve()) : home(top);
 up.then(() => (window as any).__wedgieReady?.(), () => (window as any).__wedgieReady?.());

@@ -184,6 +184,7 @@ export function fakeWedgies(specs) {
         const j = st.job; st.job = null;
         for (const n of j.m.write || []) if (!j.got.has(n) && !(st.files.has(n) && (await sha(st.files.get(n))) === j.listed.get(n))) return push(JSON.stringify({ id, type: "error", error: "not sent: " + n }) + "\r\n");
         for (const [n, u] of j.got) st.files.set(n, u);
+        for (const n of j.m.write || []) if (n.endsWith(".mpy")) st.files.delete(n.slice(0, -4) + ".py");   // job.py: shadows go
         for (const n of j.m.delete || []) st.files.delete(n);
         if (j.m.apps != null) st.files.set("apps.json", text(j.m.apps));
         push(JSON.stringify({ id, type: "done" }) + "\r\n");

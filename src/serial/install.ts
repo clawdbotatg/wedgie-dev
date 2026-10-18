@@ -415,6 +415,22 @@ export async function installCore(r: Repl, onProgress: (p: number, what: string)
   return { version: m.version, written: todo.length, outdated, restarted: false, untouched: false };
 }
 
+/** /prepare: the latest core with `cart` as its one app, in one checked job (one A on its screen); it
+ *  restarts itself after. False: this firmware can't take a checked install (before 0.3.12). */
+export async function coreWithApp(r: Repl, cart: Cart, onProgress: (p: number, what: string) => void) {
+  startAsk();
+  const m = await firmwareManifest();
+  const ch = await checkedHave(r, m);
+  if (!ch) return false;
+  const sha = (n: string) => m.files.find((f) => f.name === n)!.sha256;
+  const write = [...new Set([...m.core, ...cart.files])].filter((n) => ch.hashes[n] !== sha(n) || ch.hashes[twin(n) || ""]);
+  const del = others(m, ch, cart.mod);
+  for (const n of write) ch.hashes[n] = sha(n);
+  for (const n of del) ch.hashes[n] = null;
+  if (!(await job(r, m, "Update firmware", write, del, await appsFor(m, ch, cart.mod), onProgress, !!ch.late))) throw new Error("a file isn't in the signed release");
+  return true;
+}
+
 /** Make `cart` the app it runs: the old app's files come off, its files that differ go on, apps.json
  *  names it. Leaves the board in raw REPL; the caller restarts it (Repl.leave: a soft reset, the port
  *  stays, a fresh heap for the app). Checked for room first, so a switch that can't fit changes nothing. */

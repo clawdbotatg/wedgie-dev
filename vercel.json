@@ -121,6 +121,10 @@
       "destination": "/index.html"
     },
     {
+      "source": "/prepare",
+      "destination": "/index.html"
+    },
+    {
       "source": "/build",
       "destination": "/index.html"
     },
