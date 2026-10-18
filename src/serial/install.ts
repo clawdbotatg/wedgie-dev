@@ -415,7 +415,7 @@ export async function installCore(r: Repl, onProgress: (p: number, what: string)
   return { version: m.version, written: todo.length, outdated, restarted: false, untouched: false };
 }
 
-/** /prepare: the latest core with `cart` as its one app, in one checked job (one A on its screen); it
+/** /prepare: the latest core with `cart` as its one app, in one checked job (one press on its screen); it
  *  restarts itself after. False: this firmware can't take a checked install (before 0.3.12). */
 export async function coreWithApp(r: Repl, cart: Cart, onProgress: (p: number, what: string) => void) {
   startAsk();
@@ -427,7 +427,10 @@ export async function coreWithApp(r: Repl, cart: Cart, onProgress: (p: number, w
   const del = others(m, ch, cart.mod);
   for (const n of write) ch.hashes[n] = sha(n);
   for (const n of del) ch.hashes[n] = null;
-  if (!(await job(r, m, "Update firmware", write, del, await appsFor(m, ch, cart.mod), onProgress, !!ch.late))) throw new Error("a file isn't in the signed release");
+  // "Install <name>", not "Update firmware": the wedgie holds a job to its title, and a firmware update
+  // must keep the app it runs (job.py check), so one that also put Welcome on failed after every yes.
+  // An install may write the core too (then the whole core must match the signed list).
+  if (!(await job(r, m, `Install ${cart.name}`, write, del, await appsFor(m, ch, cart.mod), onProgress, !!ch.late))) throw new Error("a file isn't in the signed release");
   return true;
 }
 

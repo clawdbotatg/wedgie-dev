@@ -158,6 +158,10 @@ export function fakeWedgies(specs) {
         st.hashAtAsk = st.hashed || 0;
         const listed = msg.release ? new Map(msg.release.split("\n").slice(2).filter(Boolean).map((l) => l.split("  ").reverse())) : null;
         if (listed && (msg.write || []).some((n) => !listed.has(n))) return push(JSON.stringify({ id, type: "error", error: "not in the signed list" }) + "\r\n");
+        // job.py check: the title decides the job. A firmware update keeps the app it runs (the real one says
+        // so after the yes, in install mode; here at once).
+        if (msg.job === "Update firmware" && msg.apps != null && JSON.stringify(JSON.parse(msg.apps).map((a) => a.mod)) !== JSON.stringify(apps().slice(0, 1).map((a) => a.mod)))
+          return push(JSON.stringify({ id, type: "error", error: "a firmware update keeps the app it runs" }) + "\r\n");
         st.asks = (st.asks || 0) + 1; st.jobs = (st.jobs || 0) + 1;
         const p = st.person || {};
         return setTimeout(() => {

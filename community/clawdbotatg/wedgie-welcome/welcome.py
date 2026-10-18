@@ -1,6 +1,6 @@
 # Welcome: what a new wedgie plays until it gets real software. A little guy in his undies stands on a
-# stage; the screen behind him runs a slideshow: first its checks (a Trust M that answers, random that
-# looks random, key slots empty and unlocked, ready for its person's own key), what a wedgie is, what's inside this one (its CPU,
+# stage; the screen behind him runs a slideshow: its checks (the chip, its wires, its random, its key slots,
+# no saves, every button: see "the checks" below), what a wedgie is, what's inside this one (its CPU,
 # RAM, flash, secure chip and a few random numbers from that chip), and where to get software.
 #
 #   joystick left/right   walk                 up, the green button   jump
@@ -201,40 +201,118 @@ def _bits(b):
     return n
 
 
-def read_keys():
-    """A Trust M's key slots (KEY2-4, DATA[11]): True if all are unlocked and DATA[11] holds no Safe Signer
-    key copy, so its person can make their own key and lock it (Safe Signer locks KEY2 for good, and locks a
-    copy it finds: trustm.md). Reads metadata only. None: no Trust M answered. Runs before W.rand finds the
-    chip (a new Session resets it)."""
+# ---- the checks: what a Trust M wedgie shows on its second slide -------------------------------------
+# Run one small step a frame (a generator; each step one chip command, a few ms), so he keeps moving and
+# the rows tick green as they finish. Nothing written anywhere, so nothing wears: reads, random, SHA-256.
+#   Trust M   it answers
+#   wires     45 commands in a row (200 bytes of its certificate, 32 random bytes, SHA-256 of 200 random bytes),
+#             every answer checked; a miss gets one quiet retry (a page checking the chip over USB resets it)
+#   random    two reads differ, neither one byte over and over, about half the bits 1 (6 sigma of 512)
+#   key slot  KEY2-4 and DATA[11] unlocked, no Safe Signer key copy in DATA[11]: its person makes their own key
+#             and locks it (Safe Signer locks KEY2 for good, and locks a copy it finds: trustm.md)
+#   fresh     nothing in /saves
+#   buttons   all 9 pressed since it started (any slide); the slide waits up to 12 s for them
+# No Trust M (an ATECC608, or none): no checks slide. Its signature and its certificate's chain to Infineon
+# are checked on wedgie.dev/prepare (Infineon's newer CAs are P-384, more than this can verify).
+ROWS = ("Trust M", "wires", "random", "key slot", "fresh")
+RES = {}                                # row -> True / False, as each finishes
+BUTTONS = ("up", "down", "left", "right", "press", "A", "B", "X", "Y")
+seen = set()
+CHECK = None                            # the checks under way (a generator), None when done or not started
+done_t = None                           # when they finished
+
+
+def _bits(b):
+    n = 0
+    for x in b:
+        while x:
+            n += x & 1
+            x >>= 1
+    return n
+
+
+def _locked(m):
+    i = 2
+    while i + 2 <= len(m):
+        if (m[i] == 0xC0 and m[i + 2] >= 7) or (m[i] == 0xD0 and m[i + 2:i + 2 + m[i + 1]] == b"\xff"):
+            return True                 # operational (locked for good), or never changeable
+        i += 2 + m[i + 1]
+    return False
+
+
+def checks():
     from machine import Pin
+    import hashlib
+    tm = True
     for p in (4, 5):                    # no pull-ups: nothing on the bus (don't wait on timeouts)
-        up = Pin(p, Pin.IN, Pin.PULL_DOWN).value()
+        tm = Pin(p, Pin.IN, Pin.PULL_DOWN).value() and tm
         Pin(p, Pin.IN)
-        if not up:
-            return None
-    try:
-        import trustm
-        trustm.bus(4, 5)
-        s = trustm.Session()
-    except Exception:
-        return None
-    try:
-        for oid in (0xE0F1, 0xE0F2, 0xE0F3, 0xF1DB):
-            m, i = s.metadata(oid), 2
-            while i + 2 <= len(m):
-                if (m[i] == 0xC0 and m[i + 2] >= 7) or (m[i] == 0xD0 and m[i + 2:i + 2 + m[i + 1]] == b"\xff"):
-                    return False        # operational (locked for good), or never changeable
-                i += 2 + m[i + 1]
+    s = None
+    if tm:
         try:
-            return s.get(0xF1DB, 0, 6) != b"wsafe1"
-        except OSError:
-            return True                 # nothing in it yet
-    except Exception:
-        return False
+            import trustm
+            trustm.bus(4, 5)
+            s = trustm.Session()
+        except Exception:
+            s = None
+    RES["Trust M"] = s is not None
+    yield
+    if s:
+        def run(f):                     # one command; a miss gets one retry on a new session
+            nonlocal s
+            try:
+                return f(s)
+            except Exception:
+                s = trustm.Session()
+                return f(s)
+        ok = True
+        try:
+            for oid in (0xE0F1, 0xE0F2, 0xE0F3, 0xF1DB):
+                ok = ok and not _locked(run(lambda c: c.metadata(oid)))
+                yield
+            try:
+                ok = ok and run(lambda c: c.get(0xF1DB, 0, 6)) != b"wsafe1"
+            except OSError:
+                pass                    # nothing in it yet
+        except Exception:
+            ok = False
+        RES["key slot"] = ok
+        yield
+        try:
+            a, b = run(lambda c: c.random(32)), run(lambda c: c.random(32))
+            RES["random"] = a != b and a != a[:1] * 32 and b != b[:1] * 32 and abs(_bits(a + b) - 256) <= 68
+        except Exception:
+            RES["random"] = False
+        yield
+        ok = True
+        try:
+            cert = run(lambda c: c.get(0xE0E0, 0, 200))
+            prev = b""
+            for n in range(45):
+                k = n % 3
+                if k == 0:
+                    ok = run(lambda c: c.get(0xE0E0, 0, 200)) == cert and ok
+                elif k == 1:
+                    r = run(lambda c: c.random(32))
+                    ok = len(r) == 32 and r != prev and ok
+                    prev = r
+                else:
+                    d = os.urandom(200)
+                    ok = run(lambda c: c.command(0x30, 0xE2, b"\x01\x00\xc8" + d))[3:] == hashlib.sha256(d).digest() and ok
+                yield
+        except Exception:
+            ok = False
+        RES["wires"] = ok
+    try:
+        RES["fresh"] = not any(os.listdir("/saves/" + n) for n in os.listdir("/saves"))
+    except OSError:
+        RES["fresh"] = True             # no /saves at all
+    gc.collect()
+    yield
+    read_chip()                         # last: finding the chip for rand resets it
 
 
 def read_info():
-    INFO["keys"] = read_keys()
     name, cpu, wifi = W.board()
     INFO["cpu"] = cpu
     INFO["mhz"] = "%d MHz" % (machine.freq() // 1000000)
@@ -246,6 +324,10 @@ def read_info():
         INFO["of"] = "of " + _kb(s[0] * s[2]) + " flash"
     except Exception:
         INFO["flash"], INFO["of"] = "", ""
+    INFO["chip"], INFO["state"], INFO["from"] = ["its chip"], "", ""     # read_chip, after the checks
+
+
+def read_chip():
     try:
         W.rand(1)                       # finds the chip (half a second on a Trust M)
         src = W.rand_source()
@@ -262,30 +344,39 @@ def read_info():
         INFO["chip"] = ["OPTIGA", "Trust M"] if "Trust" in src else [src]
         INFO["state"] = "working"
         INFO["from"] = "random from the chip"
-    # its random: two reads differ, neither one byte over and over, about half the bits 1 (6 sigma of 512)
-    a, b = W.rand(32), W.rand(32)
-    INFO["random"] = (not src.startswith("os.urandom") and a != b and a != a[:1] * 32 and b != b[:1] * 32
-                      and abs(_bits(a + b) - 256) <= 68)
+
+
+def row(i):
+    """One check's row on S: its name, then a check, a red X, or nothing yet."""
+    label, y = ROWS[i], 22 + 20 * i
+    S.fill_rect(0, y, SW, 18, WHITE)
+    ok = RES.get(label)
+    big(label, y, MUTED if ok is None else INK if ok else RED, 2, 14)
+    if ok:
+        ui.check(S, 150, y + 1, GREEN_D)
+    elif ok is False:
+        big("X", y, RED, 2, 150)
+
+
+def buttons_row():
+    """The 9 buttons as squares, green once pressed, and what it all comes to."""
+    y = 138
+    for n, k in enumerate(BUTTONS):
+        S.fill_rect(14 + n * 17, y, 13, 13, GREEN if k in seen else SHADE)
+    S.fill_rect(0, y - 14, SW, 10, WHITE)
+    if any(v is False for v in RES.values()):
+        small("not ready", y - 14, RED)
+    elif CHECK is None and len(RES) == len(ROWS) and len(seen) == len(BUTTONS):
+        small("ready for your key", y - 14, GREEN_D)
+    elif CHECK is None and len(RES) == len(ROWS):
+        small("press every button", y - 14, MUTED)
 
 
 def s_ready():
-    small("this wedgie", 10)
-    if not INFO:
-        return
-    tm = INFO["chip"] == ["OPTIGA", "Trust M"]
-    rows = (("Trust M" if tm else INFO["chip"][0][:8], tm), ("random", INFO["random"]), ("key slot", INFO["keys"] is True))
-    y = 30
-    for label, ok in rows:
-        big(label, y, INK if ok else RED, 2, 14)
-        if ok:
-            ui.check(S, 150, y + 1, GREEN_D)
-        else:
-            big("X", y, RED, 2, 150)
-        y += 30
-    if all(ok for _, ok in rows):
-        small("ready for your key", 124, GREEN_D)
-    else:
-        small("not ready", 124, RED)
+    small("this wedgie", 6)
+    for i in range(len(ROWS)):
+        row(i)
+    buttons_row()
 
 
 def s_welcome():
@@ -413,7 +504,7 @@ def s_go():
     small("for apps and updates", 96)
 
 
-SLIDES = ((s_welcome, 2600), (s_ready, 8000), (s_wedgie, 3600), (s_inside, 8000), (s_chip, 6000), (s_safe, 3600),
+SLIDES = ((s_welcome, 2600), (s_ready, 6000), (s_wedgie, 3600), (s_inside, 8000), (s_chip, 6000), (s_safe, 3600),
           (s_games, 3600), (s_make, 3600), (s_go, 6000))
 FLIP = 360                              # ms: the screen turns over between slides
 
@@ -424,9 +515,9 @@ flipped = False
 
 
 def render(i):
-    if not INFO and SLIDES[i][0] is s_ready:
-        read_info()                     # not at start: a page checking the chip over USB does it then (wedgie.chip()
-                                        # resets the chip; a read of ours caught in it waits 10 s)
+    global CHECK
+    if SLIDES[i][0] is s_ready and CHECK is None and not RES:
+        CHECK = checks()                # not at start: a page checking the chip over USB at plug-in does it then
     S.fill(WHITE)
     SLIDES[i][0]()
     gc.collect()
@@ -460,13 +551,14 @@ def wave(now):
 def update(now, pressed):
     global x, h, vy, face, walk, last_in, target, next_idea, slide_end, said, say_end
     for k in pressed:
+        seen.add(k)
         last_in = now
         target = None
         if k in ("A", "up"):
             jump()
         elif k in ("B", "X", "Y", "press"):
             wave(now)
-        if flip_t is None:              # every press moves the slideshow along faster
+        if flip_t is None and SLIDES[si][0] is not s_ready:     # every press moves the slideshow along faster
             slide_end = time.ticks_add(slide_end, -1200)
     dx = 0
     wedgie = keys.held("down")
@@ -588,7 +680,8 @@ def draw(now, wedgie, dx):
 
 
 def run():
-    global si, slide_end, flip_t, flipped, last_in, next_idea, roll_t
+    global si, slide_end, flip_t, flipped, last_in, next_idea, roll_t, CHECK, done_t
+    read_info()
     render(si)
     draw(time.ticks_ms(), False, 0)     # the stage up first: reading the logo takes a moment
     lcd.show()
@@ -597,10 +690,29 @@ def run():
     slide_end = time.ticks_add(now, SLIDES[si][1])
     last_in = next_idea = now
     keys.pressed()
+    drawn = None                        # what the checks slide last showed: (results, buttons, done)
     while True:
         t = time.ticks_ms()
         pressed = keys.pressed()
+        on = SLIDES[si][0] is s_ready and flip_t is None
+        if CHECK is not None:
+            try:
+                next(CHECK)
+            except StopIteration:
+                CHECK, done_t = None, t
+        if on:
+            now_drawn = (len(RES), len(seen), CHECK is None)
+            if now_drawn != drawn:      # redraw only what changed: big() is a few ms a row
+                drawn = now_drawn
+                for i in range(len(ROWS)):
+                    row(i)
+                buttons_row()
+            if CHECK is not None and not RES.get("Trust M", True):
+                slide_end = t           # no Trust M: no checks to show
+            elif CHECK is not None or (len(seen) < len(BUTTONS) and done_t is not None and time.ticks_diff(t, done_t) < 12000):
+                slide_end = time.ticks_add(t, 400)  # wait for the checks, then up to 12 s for every button
         if flip_t is None and time.ticks_diff(t, slide_end) >= 0:
+            drawn = None
             flip_t, flipped, roll_t = t, False, None     # a roll cut short by presses stops with its slide
         if flip_t is not None:
             p = time.ticks_diff(t, flip_t)

@@ -8,9 +8,9 @@
 //     key and its certificate chains to Infineon (chipcheck.ts). The factory key proves the chip is real;
 //     it isn't the person's key, so this needs no press. Only that once: Welcome uses the chip too, and a
 //     chip request over USB resets it, so one of Welcome's reads caught in it hung 10 s (2026-10-18);
-//  4. its random and its key slots (empty and unlocked): Welcome checks them itself and its second slide shows green checks
-//     (clawdbotatg/wedgie-welcome read_keys). The page can't read them without full control, so the person
-//     looks at its screen. No press anywhere unless it needs an update.
+//  4. the rest on its own screen: Welcome's second slide checks the chip's wires, its random, its key slots
+//     (empty and unlocked), no saves, and every button as it's pressed (clawdbotatg/wedgie-welcome checks()).
+//     The page can't read those without full control, so the person looks at its screen.
 // 1 or 2 off: one checked install (the green button on its screen), it restarts, and all of it is checked again.
 import * as W from "../serial/wedgies";
 import type { Repl } from "../serial/repl";
@@ -45,7 +45,7 @@ export function prepare(main: HTMLElement) {
   firmwareManifest().then((x) => {
     m = x;
     welcome = x.carts.find((c) => c.mod === "welcome");
-    $("p-fine").textContent = `Ready means: wedgie ${x.version}, Welcome as its app, its Trust M signed and traced to Infineon, then 3 green checks on its own screen (its key slots: empty and unlocked). Out of date: the green button on it updates it.`;
+    $("p-fine").textContent = `Ready means: wedgie ${x.version}, Welcome as its app, its Trust M signed and traced to Infineon, then on its own screen every row green and all 9 buttons pressed. Out of date: the green button on it updates it.`;
     tick();
   });
 
@@ -112,7 +112,7 @@ export function prepare(main: HTMLElement) {
         j.lines = [`wedgie ${w.version} + Welcome, every file checked`];
         trustm(w);
         j.lines.push("Trust M signed, traced to Infineon");
-        j.lines.push("Now look at its screen: 3 green checks");
+        j.lines.push("Now its screen: press every button, every row green");
       });
       if (restarting) { Object.assign(j, { state: "restarting", what: "", at: Date.now() }); W.reidentify(w); }
       else j.state = "ready";
