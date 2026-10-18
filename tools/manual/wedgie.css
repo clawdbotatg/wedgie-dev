@@ -18,9 +18,9 @@ section { break-inside: avoid; margin-bottom: 14px; }
 
 /* cover */
 .cover { margin: 0 0 12px; }
-.cover .kick { text-align: center; }
+.cover .logo img { height: 0.65in; display: block; margin: 0 auto; }
 .kick { font-weight: 900; letter-spacing: .14em; text-transform: uppercase; color: #168c34; font-size: 11pt; }
-.cover h1 { font-size: 34pt; text-align: center; margin: 0.45in 0 0.55in; }
+.cover h1 { font-size: 34pt; text-align: center; margin: 0.2in 0 0.35in; }
 .cover .lede { font-size: 12.5pt; color: #474947; margin: 0 0 10px; }
 .cover .row { display: flex; gap: 16px; align-items: center; }
 .cover .hero img { height: 2.2in; border-radius: 14px; display: block; }
