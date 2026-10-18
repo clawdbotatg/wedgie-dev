@@ -1,7 +1,8 @@
 // /connect's "set it up" card: a board that has no wedgie firmware yet, at the top of the list. What /test
 // does to a new unit, minus the tests: a Pico in BOOTSEL (a blank one boots there; WebUSB, not serial, so the
 // Connect picker never lists it) gets wiped + MicroPython (picoboot.ts), the W build if it has the Pico W's
-// WiFi chip, then the wedgie firmware core. Its app gets picked on its own page after.
+// WiFi chip, then the wedgie firmware core and Welcome (clawdbotatg/wedgie-welcome), which it plays till its
+// app gets picked on its own page after.
 // Three kinds of board show up here:
 //  - boot: a Pico in BOOTSEL this site may use (the test-bench profile, or picked once with "a new Pico");
 //  - other: a serial board with no MicroPython (a maker's demo): the 1200-baud knock reboots it into BOOTSEL;
@@ -9,7 +10,7 @@
 // Nothing starts until Set up is pressed (it wipes the board). Nothing here looks at USB until this browser
 // tapped Connect once (wedgies.ts armed), except "a new Pico", which is a tap.
 import * as W from "../serial/wedgies";
-import { installCore } from "../serial/install";
+import { installCore, useApp, firmwareManifest } from "../serial/install";
 import { usbSupported, bootDevices, isBoot, pickBoot, flashMicroPython, BOOT_PIDS } from "../serial/picoboot";
 import { esc } from "../ui/device";
 
@@ -119,7 +120,10 @@ export function setupCard(el: HTMLElement) {
         r.onLine = (t, v) => { if (t === "board") b = v; };
         await r.exec("board()", 15000);
         if (b?.wifi && !b.wbuild && !job?.wifi) { before = await bootDevices().catch(() => []); reboot = true; await r.write("import machine\nmachine.bootloader()\x04"); return; }
-        await installCore(r, (p, what) => set({ p, detail: `${what}. Don't unplug it.` }), { launcher: false });
+        await installCore(r, (p, what) => set({ p: p * 0.8, detail: `${what}. Don't unplug it.` }), { launcher: false });
+        const m = await firmwareManifest();
+        const welcome = m.carts.find((c) => c.mod === "welcome");
+        if (welcome) await useApp(r, welcome, (p) => set({ p: 0.8 + 0.2 * p, detail: "Welcome. Don't unplug it." }), { launcher: false, manifest: m });
         await r.leave();                         // the one soft reset: it boots into the new firmware
       });
     } catch (e) { return fail(e, "The firmware didn't go on"); }
