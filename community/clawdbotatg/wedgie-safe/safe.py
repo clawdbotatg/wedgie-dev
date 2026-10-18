@@ -32,7 +32,7 @@ import save
 import ui
 from ui import WHITE, INK, MUTED, GREEN_D, RED
 
-FW = "safe-18"
+FW = "safe-19"
 RP_ID = b"wedgie.dev"
 FIELDS = '"origin":"https://wedgie.dev"'
 ASK_MS = 120000
@@ -382,7 +382,7 @@ def _screen(head, lines, yes, k, foot="", safe=None):
     real A, False on Y or no answer."""
     d.fill(WHITE)
     ui.band(d)
-    ui.title(d, head, 42, 1)
+    ui.title(d, head, 42, 1, RED if any(l[1] == RED and len(l) > 2 for l in lines) else INK)   # a big red line: a red page
     y = _draw(lines, 68, 166, sum(_h(l, True) for l in lines) <= 98)    # the big blockie wherever it fits
     if safe:                            # which Safe: its blockie (bigger when there's room), chain, address
         import safe_blockie

@@ -167,12 +167,9 @@ if (hi?.safe_chunk) {     // a transaction over the 6 KB line: its data in safe_
     }
     const { got, secs } = okp ? ask({ ...tx("0x" + "66".repeat(20), "@"), data: "@" }, "A") : { got: null, secs: 0 };
     const r = ram(`a ${size} B tx in pieces`);
-    const unread = got?.type === "error" && /can.t review/.test(got?.error || "");
-    // safe-19 removes blind signing. Keep the old shelf usable until its reviewed pin is updated.
-    const failClosed = Number((hi.app || "").replace(/^safe-/, "")) >= 19;
     const chipStep = got?.type === "safe_sig" || /trustm|ATECC608/.test(got?.error || "");
     if (size > (hi.safe_max || 8000)) { check(!okp && !crash(all.slice(before)), `a ${size} B transaction: refused as too big, no crash`); continue; }
-    check(okp && (failClosed ? unread : chipStep) && !crash(all.slice(before)), `a ${size} B unknown transaction in ${Math.ceil(size * 2 / hi.safe_chunk)} safe_data pieces, ${failClosed ? "refused" : "legacy blind signing"}, ${secs} s: answered ${got ? got.type + (got.error ? " (" + got.error.slice(0, 40) + ")" : "") : "nothing"} · ${r?.ram} B free`);
+    check(okp && chipStep && !crash(all.slice(before)), `a ${size} B transaction in ${Math.ceil(size * 2 / hi.safe_chunk)} safe_data pieces, then signed, ${secs} s: answered ${got ? got.type + (got.error ? " (" + got.error.slice(0, 40) + ")" : "") : "nothing"} · ${r?.ram} B free`);
   }
 }
 { // and a no

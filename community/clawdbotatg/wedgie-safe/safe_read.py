@@ -326,7 +326,8 @@ def describe(tx):
             ([("pay", MUTED), ("%s ETH" % amount(tx["value"], 18), INK, BIG)] if tx["value"] else []) + \
             ([("to this Safe", GREEN_D)] if far == 0 else
              [("to this Safe on", INK), (CHAINS.get(far, "chain %d" % far), INK, BIG)] if far else
-             [("can't tell who gets it", RED)])
+             [("can't tell who gets it", RED)]) + \
+            [("trust " + ROUTERS[to], RED, BIG), ("can't check what you get", RED)]   # it reads who gets paid, not how much
     r = _roles(tx, sel) if sel in ROLES_SELS and to == roles_of(safe) else None
     if r:
         return r[0], out + r[1]
