@@ -3,7 +3,7 @@
 # interrupted; from the REPL they are plain calls:  import wedgie; wedgie.shot(); wedgie.press("A")
 import sys, os, json, machine
 
-VERSION = "0.3.51"
+VERSION = "0.3.52"
 
 # The lock. main.py turns Ctrl-C off before anything else and never ends by itself, so a computer
 # can only send the slot's JSON lines: it can't stop the app, reach the REPL, or make the secure chip
@@ -428,8 +428,40 @@ def take_job():
     return d
 
 
+# ---- the log ------------------------------------------------------------------------------------
+# What happened, for a bug report (the site's "Send a bug report" reads it: slot "get" of LOG / LOG1,
+# allowed while locked). One line per event (power-on, an app's start, a crash with its traceback, an
+# install), never what an app shows or a key. LOG past LOG_MAX becomes LOG1: ~12 KB in all. Written
+# only on events, so it doesn't wear the flash. Never raises.
+LOG, LOG1, LOG_MAX = "log.txt", "log1.txt", 6000
+
+
+def log(*what, e=None):
+    try:
+        import time
+        try:
+            if os.stat(LOG)[6] > LOG_MAX:
+                try:
+                    os.remove(LOG1)
+                except OSError:
+                    pass
+                os.rename(LOG, LOG1)
+        except OSError:
+            pass
+        with open(LOG, "a") as f:
+            f.write(str(time.ticks_ms()))
+            for w in what:
+                f.write(" ")
+                f.write(str(w))
+            f.write("\n")
+            if e is not None:
+                sys.print_exception(e, f)
+    except Exception:
+        pass
+
+
 def failed(mid, e):
-    """A host request broke: tell the host, keep the reason in error.log, free what it left behind."""
+    """A host request broke: tell the host, keep the reason in error.log and the log, free what it left behind."""
     import gc
     sys.print_exception(e)
     try:
@@ -437,6 +469,7 @@ def failed(mid, e):
             sys.print_exception(e, f)
     except Exception:
         pass
+    log("request failed", e=e)
     gc.collect()
     send({"id": mid, "type": "error", "error": "%s: %s" % (type(e).__name__, e)})
 

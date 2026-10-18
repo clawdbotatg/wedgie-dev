@@ -372,6 +372,7 @@ def run(mid, m, ask, show=None):
                     with open("apps.json", "w") as a:
                         a.write(m["apps"])
                 show(title, None, 1)
+                W.log("installed", title, version)
                 W.send({"id": qid, "type": "done", "version": version})
                 write = []
                 time.sleep_ms(100)

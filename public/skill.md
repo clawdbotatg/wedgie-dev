@@ -11,7 +11,7 @@ RP2350), a Waveshare Pico-LCD-1.3 hat (240x240 screen, 5-way joystick, A/B/X/Y),
 wedgie firmware: a boot logo, the one app it boots straight into, saves that outlast apps, and a USB
 protocol. Everything is MIT: https://wedgie.dev
 
-**The current firmware is 0.3.51.** If a wedgie's `hello` says older, update it first
+**The current firmware is 0.3.52.** If a wedgie's `hello` says older, update it first
 (`wedgie.py update`, below): everything here assumes current firmware.
 
 **Three guides cover everything** (this one first):
@@ -103,7 +103,8 @@ while time.time() < end:
 
 **What needs nobody:** `hello`, `shot` (its screen), `press` (a button, as if pressed: it drives an
 app but can never answer a question on the wedgie), `chip` (prove the secure chip works), `ls`, and
-`get` / `rm` inside `/saves/`. **Everything else needs your person to press the green button on the
+`get` / `rm` inside `/saves/`, and `get` of its log (`/log.txt`, older half `/log1.txt`, 0.3.52+: power-ons,
+app starts, crashes with tracebacks, installs). **Everything else needs your person to press the green button on the
 wedgie's own screen** (installs, updates, other files, the REPL, the chip's keys). Tell them what will appear and
 that they should press the green button, before you ask.
 **The case's buttons have no letters on them:** to your person, A is "the green button", Y "the red
@@ -174,7 +175,7 @@ crashes at start or keeps USB from answering. Hold **Y**: no WEDGIE drive this t
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.51","fw":"wedgie-0.3.51","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.52","fw":"wedgie-0.3.52","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":2,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -416,6 +417,8 @@ straight apart, rocking gently end to end, never twisting. Reassemble in reverse
    for full control so a computer can fix it (`wedgie.py debug` shows `error.log`). Black screen: the
    hat isn't fully seated, or there's no firmware (bare MicroPython shows nothing): `wedgie.py update`.
    An app that crashes at start: hold both gray buttons (B and X) while plugging in, then pick another app.
+   What happened lately: `get` `/log1.txt` then `/log.txt` (no yes needed). Your person can send it to us
+   with **Send a bug report** on its page at wedgie.dev/connect.
 3. **Is the chip OK?** `{"type":"chip"}` (or Hardware on its page). Not found, in order of likelihood:
    wires by color instead of plug order; SDA/SCL swapped; a data wire and the power wire swapped (the
    chip powers itself through a data pin, its LED lights, it looks like a short: it isn't, swap them);

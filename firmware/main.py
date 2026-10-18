@@ -19,6 +19,10 @@ def stuck(e):
             sys.print_exception(e, f)
     except Exception:
         pass
+    try:
+        sys.modules["wedgie"].log("broke", e=e)
+    except Exception:
+        pass
     sys.print_exception(e)
     drew = False        # not drawn: the screen may still show the app's page (Safe's "sign"), so green means nothing
     try:

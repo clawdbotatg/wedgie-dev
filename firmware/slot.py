@@ -69,7 +69,8 @@ def _ended(why=None):
 
 def open_app():
     """Import the active app (a Timer app is then running) or get its entry ready to call."""
-    global mod, state
+    global mod, state, _crashed
+    _crashed = False
     save.game = app["mod"]
     gc.collect()
     try:
@@ -80,12 +81,14 @@ def open_app():
         else:
             mod = __import__(app["mod"])
         state = "entry" if app.get("entry") else "running"
+        W.log("app", app["mod"], app.get("v", ""))
         if not _own_usb():
             W.send({"type": "launched", "app": app["mod"]})
     except KeyboardInterrupt:
         raise
     except Exception as e:
         sys.print_exception(e)
+        W.log("app failed to start", app["mod"], e=e)
         state = "error"
         _ended("%s" % e)
 
@@ -98,11 +101,12 @@ _timers = []        # every app Timer, so stop() can end them all
 _kbd = False        # a Ctrl-C landed inside an app tick (or one was let in: hatch.ctrl_c): the main loop raises it
 _started = 0        # ticks_ms when init ran
 _paused = False     # the "let this computer in?" screen is up: no app ticks draw over it
+_crashed = False    # an app tick's crash is in the log (once per start)
 
 
 def _guard(cb, t):
     def tick(_):
-        global _breath, _kbd, _last
+        global _breath, _kbd, _last, _crashed
         if _paused:
             return
         if not _breath and time.ticks_diff(time.ticks_ms(), _last) < GAP:
@@ -113,6 +117,11 @@ def _guard(cb, t):
         except KeyboardInterrupt:
             _kbd = True
             t.deinit()
+        except Exception as e:
+            if not _crashed:            # once: a tick that fails every time would write the log 50 times a second
+                _crashed = True
+                W.log("app crashed", app and app["mod"], e=e)
+            raise
         finally:
             _last = time.ticks_ms()
     return tick
@@ -226,7 +235,7 @@ def _handle(m):
         W.shot(mid)
     elif t == "ls":                     # every file under path: [[path, bytes], ...]; dirs end in /
         W.send({"id": mid, "type": "ls", "files": W.ls(m.get("path") or "/"), "free": W.free()})
-    elif t in ("get", "rm") and not _saves_only(m.get("path")):
+    elif t in ("get", "rm") and not _saves_only(m.get("path"), t):
         W.send({"id": mid, "type": "error", "error": "locked: only /saves/ without a yes on its screen (open)"})
     elif t == "get":
         try:
@@ -278,12 +287,15 @@ def _handle(m):
         W.send({"id": mid, "type": "error", "error": "unknown type"})
 
 
-def _saves_only(p):
-    """get / rm with no yes on the screen: saves only. Anything else could read a key or delete main.py,
-    the file that locks it (the next boot would be an open REPL). Once open (let_in), anything."""
+def _saves_only(p, t="get"):
+    """get / rm with no yes on the screen: saves only, and get of the log (W.log: for a bug report). Anything
+    else could read a key or delete main.py, the file that locks it (the next boot would be an open REPL).
+    Once open (let_in), anything."""
     if not W.SEALED or W.is_open():
         return True
     p = str(p or "")
+    if t == "get" and p.lstrip("/") in (W.LOG, W.LOG1):
+        return True
     return p.startswith("/saves/") and ".." not in p.split("/")
 
 
@@ -525,6 +537,7 @@ def step(board=True):
             raise
         except Exception as e:
             sys.print_exception(e)
+            W.log("app crashed", app["mod"], e=e)
             state = "error"
             _ended("%s" % e)
         if _serve_t:
@@ -535,6 +548,13 @@ def step(board=True):
             open_app()
     else:
         keys.pressed()                  # its own copy of every host press: don't let it pile up
+
+
+def _cause():
+    try:
+        return __import__("machine").reset_cause()
+    except Exception:
+        return "?"
 
 
 def init():
@@ -552,9 +572,11 @@ def init():
         except Exception as e:
             sys.print_exception(e)
     app = W.active()
+    W.log("on", W.VERSION, app and app["mod"], "ram", gc.mem_free(), "cause", _cause())
     if app and keys.pins["B"].value() == 0 and keys.pins["X"].value() == 0:    # both gray buttons held while plugging in:
         app = None                              # start without the app (a way back in when an app won't let USB work)
         print("slot: B+X held, app skipped")
+        W.log("app skipped (B+X held)")
     if not (app and app.get("usb")):      # the Wallet says its own ready
         W.send(W.hello(None, type="ready", running=app and app["mod"]))
     if app:

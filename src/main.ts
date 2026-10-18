@@ -15,6 +15,7 @@ import { debug } from "./pages/debug";
 import { safe } from "./pages/safe";
 import { secret } from "./pages/secret";
 import { order, session } from "./pages/order";
+import "./ui/report";             // from the start: it keeps the page's errors for a bug report
 import { legal } from "./pages/legal";
 
 const path = location.pathname.replace(/\/+$/, "");

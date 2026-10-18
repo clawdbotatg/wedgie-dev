@@ -27,6 +27,7 @@ import { ASK_TEXT } from "../serial/install";
 import * as F from "../ui/facts";
 import { cmpVersion } from "../apps/appjson.mjs";
 import { loadRepo, savedRepos, saveRepo, forgetRepo, withRepos, type Repo } from "../apps/repos";
+import { bugReport, readLog } from "../ui/report";
 
 const APP_SAMPLE = `# A wedgie app: draw with lcd, read the buttons, tick on a Timer so USB stays free.
 # Every button is yours. "Make it its app" puts it on as the one app the wedgie boots into.
@@ -143,12 +144,19 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
             <h4>Console</h4>
             <pre class="recess out log" id="d-log"></pre>
           </details>
+          <p class="fine wd-report">Something wrong? <a href="#" id="d-report">Send a bug report</a>.</p>
         </div>
       </div>
     </div>
   </section>`;
   const $ = <T extends Element = HTMLElement>(s: string) => main.querySelector(s) as T;
   $<HTMLAnchorElement>(".back").onclick = (e) => { e.preventDefault(); go("/connect"); };
+  // The bug report reads its log over live USB while we hold the port; busy or not live: the page's side only.
+  $<HTMLAnchorElement>("#d-report").onclick = (e) => {
+    e.preventDefault();
+    const r = link;
+    bugReport(w || undefined, r && liveFs() && !busy ? () => readLog((p) => FS.get(r, p, true)) : undefined);
+  };
   let m: Manifest | undefined;
   firmwareManifest().then((x) => { m = x; paint(); loadRepos(); }).catch(() => {});
   // Repos this browser added: their apps join the shelf (view()), marked as not reviewed.

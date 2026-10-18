@@ -10,6 +10,7 @@ import { firmwareManifest, type Manifest } from "../serial/install";
 import * as F from "../ui/facts";
 import { wedgiePage } from "./wedgie";
 import { setupCard, needsSetup } from "./setup";
+import { bugReport } from "../ui/report";
 
 let manifest: Manifest | undefined;
 
@@ -99,8 +100,10 @@ function list(main: HTMLElement, go: (path: string) => void) {
     }
     actions.innerHTML = `<button class="btn ${ws.length ? "" : "btn-green"}" id="connect">${ws.length ? "Connect another" : "Connect a wedgie"}</button>` +
       (ws.length ? `<p class="fine unplug-tip">If your wedgie is acting weird, unplug it and plug it back in.</p>` : "") +
-      ("usb" in navigator ? `<p class="fine unplug-tip">A brand-new Pico doesn't show up? <a href="#" id="pick-new">Pick it</a> (it's called RP2 Boot or RP2350 Boot).</p>` : "");
+      ("usb" in navigator ? `<p class="fine unplug-tip">A brand-new Pico doesn't show up? <a href="#" id="pick-new">Pick it</a> (it's called RP2 Boot or RP2350 Boot).</p>` : "") +
+      `<p class="fine unplug-tip">Something wrong? <a href="#" id="report">Send a bug report</a>${ws.length ? " (open your wedgie first: that sends its log too)" : ""}.</p>`;
     document.getElementById("connect")!.onclick = () => W.connectNew().catch(() => {});
+    document.getElementById("report")!.onclick = (e) => { e.preventDefault(); bugReport(); };
     const pn = document.getElementById("pick-new");
     if (pn) pn.onclick = (e) => { e.preventDefault(); setup.pickNew(); };
   }
