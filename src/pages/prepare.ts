@@ -21,7 +21,7 @@ import { cmpVersion } from "../apps/appjson.mjs";
 type Job = { uid: string; key: number; state: "checking" | "installing" | "restarting" | "screen" | "ready" | "fail"; p: number; what: string;
   lines: string[]; error?: string; at: number; tried: string[]; gone?: boolean };
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
-const LABEL: Record<Job["state"], string> = { checking: "Checking", installing: "Updating", restarting: "Restarting", screen: "Check its screen", ready: "Ready to ship", fail: "Not ready" };
+const LABEL: Record<Job["state"], string> = { checking: "Checking", installing: "Updating", restarting: "Restarting", screen: "Now its screen", ready: "Ready to ship", fail: "Not ready" };
 
 export function prepare(main: HTMLElement) {
   main.innerHTML = `
@@ -45,25 +45,24 @@ export function prepare(main: HTMLElement) {
   firmwareManifest().then((x) => {
     m = x;
     welcome = x.carts.find((c) => c.mod === "welcome");
-    $("p-fine").textContent = `Ready means: wedgie ${x.version}, Welcome as its app, its Trust M signed and traced to Infineon, then you tap All green once its own screen shows every row green and all 9 buttons pressed. Out of date: the green button on it updates it.`;
+    $("p-fine").textContent = `Ready means: wedgie ${x.version}, Welcome as its app, its Trust M signed and traced to Infineon, then on its own screen every row green and all 9 buttons pressed. Out of date: the green button on it updates it.`;
     tick();
   });
 
   function paint() {
     const list = [...jobs.values()].sort((a, b) => b.at - a.at);
-    $("p-grid").innerHTML = list.map((j) => `<div class="upd-card ${j.state === "ready" ? "done" : j.state}${j.gone ? " gone" : ""}" data-uid="${esc(j.uid)}">
-        <div class="upd-top"><span class="idtag">${j.uid.startsWith("key") ? "no ID" : esc(j.uid.slice(-6).toUpperCase())}</span><b class="upd-state">${LABEL[j.state]}${j.state === "ready" ? " ✓" : j.state === "fail" ? " ✗" : "…"}</b></div>
+    $("p-grid").innerHTML = list.map((j) => `<div class="upd-card ${j.state === "ready" || j.state === "screen" ? "done" : j.state}${j.gone ? " gone" : ""}" data-uid="${esc(j.uid)}">
+        <div class="upd-top"><span class="idtag">${j.uid.startsWith("key") ? "no ID" : esc(j.uid.slice(-6).toUpperCase())}</span><b class="upd-state">${LABEL[j.state]}${j.state === "ready" || j.state === "screen" ? " ✓" : j.state === "fail" ? " ✗" : "…"}</b></div>
         ${j.state === "fail" ? `<div class="upd-line">${esc(j.error)}</div>` : ""}
         ${j.lines.map((l) => `<div class="upd-line fine">${esc(l)}</div>`).join("")}
         ${j.state === "installing" || j.state === "checking" ? `<div class="upd-line fine">${esc(j.what)}</div>` : ""}
-        ${j.state === "screen" ? `<div class="row"><button class="btn btn-green" data-ok="1" data-uid="${esc(j.uid)}">All green</button><button class="btn" data-ok="0" data-uid="${esc(j.uid)}">Not green</button></div>` : ""}
         <div class="meter"${j.state === "installing" ? "" : " hidden"}><div class="meter-track"><div class="meter-fill" style="width:${8 + 92 * j.p}%"></div></div></div>
       </div>`).join("");
     const busy = list.filter((j) => j.state !== "ready" && j.state !== "fail" && j.state !== "screen").length;
     const look = list.filter((j) => j.state === "screen" && !j.gone).length;
     const ok = list.filter((j) => j.state === "ready").length, bad = list.filter((j) => j.state === "fail" && !j.gone).length;
-    $("p-text").textContent = busy ? `Checking ${busy}…` : look ? "Check its screen" : list.length ? [ok && `${ok} ready`, bad && `${bad} not ready`].filter(Boolean).join(" · ") || "Unplugged" : "Plug in a wedgie";
-    $("p-detail").textContent = busy ? "Don't unplug it yet." : look ? "Press every button on it. Every row and all 9 squares green? Tap All green." : list.length ? "Box the green ones. Plug in the next." : "Latest firmware, Welcome, a working Trust M, no key locked on it.";
+    $("p-text").textContent = busy ? `Checking ${busy}…` : look ? `${look} done here: now ${look > 1 ? "their screens" : "its screen"}` : list.length ? [ok && `${ok} ready`, bad && `${bad} not ready`].filter(Boolean).join(" · ") || "Unplugged" : "Plug in a wedgie";
+    $("p-detail").textContent = busy ? "Don't unplug it yet." : look ? "On the wedgie: press every button. Every row and all 9 squares green? Box it." : list.length ? "Box the green ones. Plug in the next." : "Latest firmware, Welcome, a working Trust M, no key locked on it.";
     $("p-status").className = `test-status ${busy ? "" : bad ? "bad" : list.length ? "good" : ""}`;
   }
 
@@ -120,7 +119,8 @@ export function prepare(main: HTMLElement) {
         trustm(w);
         j.lines.push("Trust M signed, traced to Infineon");
       });
-      // Its key slots, saves and buttons only show on its own screen (Welcome's checks): a person says.
+      // Its key slots, saves and buttons only show on its own screen (Welcome's checks): the person looks
+      // there. Green here means only this page's part passed, so it says "now its screen", not "ready".
       if (restarting) { Object.assign(j, { state: "restarting", what: "", at: Date.now() }); W.reidentify(w); }
       else j.state = "screen";
     } catch (e: any) {
@@ -172,14 +172,6 @@ export function prepare(main: HTMLElement) {
     $("p-detail").textContent = "Open wedgie.dev/prepare in Chrome or Edge on a computer.";
     return;
   }
-  // the person's word on its screen (the grid is repainted wholesale, so one listener on it)
-  $("p-grid").addEventListener("click", (e) => {
-    const b = (e.target as HTMLElement).closest<HTMLElement>("button[data-ok]");
-    const j = b && jobs.get(b.dataset.uid || "");
-    if (!j || j.state !== "screen") return;
-    Object.assign(j, b!.dataset.ok === "1" ? { state: "ready" } : { state: "fail", error: "Its screen wasn't all green" });
-    paint();
-  });
   W.onChange(tick);
   setInterval(tick, 5000);        // the 60 s "didn't come back" check
   W.arm();
