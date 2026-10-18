@@ -4,23 +4,20 @@
 //  1. firmware: every core file's sha256 is the latest release's (not just the version it says), and no
 //     old .py beside a .mpy (MicroPython would run the .py);
 //  2. Welcome is its one app, its files the latest;
-//  3. the Trust M, asked ROUNDS times: each time it signs fresh random bytes with its factory key and its
-//     certificate chains to Infineon (chipcheck.ts); the same certificate every time, no random repeated.
-//     Its random numbers: none repeated, about half the bits 1, none one byte over and over.
-//     The factory key proves the chip is real; it isn't the person's key, so this needs no press;
-//  4. its key slots empty and unlocked: Welcome checks them itself and its first slide shows green checks
+//  3. the Trust M: the check every plug-in gets (wedgies.ts prove) signed fresh random bytes with its factory
+//     key and its certificate chains to Infineon (chipcheck.ts). The factory key proves the chip is real;
+//     it isn't the person's key, so this needs no press. Only that once: Welcome uses the chip too, and a
+//     chip request over USB resets it, so one of Welcome's reads caught in it hung 10 s (2026-10-18);
+//  4. its random and its key slots (empty and unlocked): Welcome checks them itself and its second slide shows green checks
 //     (clawdbotatg/wedgie-welcome read_keys). The page can't read them without full control, so the person
 //     looks at its screen. No press anywhere unless it needs an update.
 // 1 or 2 off: one checked install (the green button on its screen), it restarts, and all of it is checked again.
 import * as W from "../serial/wedgies";
 import type { Repl } from "../serial/repl";
 import { coreWithApp, firmwareManifest, type Manifest, type Cart } from "../serial/install";
-import { checkChip } from "../serial/chipcheck";
 import { benchSetup } from "./format";
 import { cmpVersion } from "../apps/appjson.mjs";
 
-/** Trust M rounds on top of the one every plug-in gets (wedgies.ts prove): ~0.5 s each. */
-const ROUNDS = 5;
 type Job = { uid: string; key: number; state: "checking" | "installing" | "restarting" | "ready" | "fail"; p: number; what: string;
   lines: string[]; error?: string; at: number; installed?: boolean; gone?: boolean };
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -48,7 +45,7 @@ export function prepare(main: HTMLElement) {
   firmwareManifest().then((x) => {
     m = x;
     welcome = x.carts.find((c) => c.mod === "welcome");
-    $("p-fine").textContent = `Ready means: wedgie ${x.version}, Welcome as its app, its Trust M signed ${ROUNDS + 1} times and traced to Infineon, then 3 green checks on its own screen (its key slots: empty and unlocked). Out of date: the green button on it updates it.`;
+    $("p-fine").textContent = `Ready means: wedgie ${x.version}, Welcome as its app, its Trust M signed and traced to Infineon, then 3 green checks on its own screen (its key slots: empty and unlocked). Out of date: the green button on it updates it.`;
     tick();
   });
 
@@ -86,26 +83,10 @@ export function prepare(main: HTMLElement) {
     return off;
   }
 
-  /** The Trust M, ROUNDS more times. Each answer checked on its own; across them, one certificate and no random twice. */
-  async function pound(w: W.Wedgie, r: Repl, j: Job) {
+  /** The Trust M, from the check every plug-in gets. */
+  function trustm(w: W.Wedgie) {
     if (!w.proof?.pass) throw new Error(w.proof?.detail || "the chip wasn't checked");
     if (w.chip?.type !== "OPTIGA Trust M") throw new Error(`its chip is ${w.chip?.type || "unknown"}, not a Trust M`);
-    const certs = new Set<string>(), rand = new Set<string>();
-    for (let i = 1; i <= ROUNDS; i++) {
-      j.what = `Trust M ${i + 1}/${ROUNDS + 1}`; paint();
-      const d = await r.request({ type: "chip" }, 15000);
-      if (d.kind !== "trustm") throw new Error(`Trust M round ${i + 1}: ${d.error || "no answer"}`);
-      const k = await checkChip(d);
-      if (!k.pass) throw new Error(`Trust M round ${i + 1}: ${k.detail}`);
-      certs.add(d.cert);
-      d.random.forEach((x: string) => rand.add(x));
-    }
-    if (certs.size !== 1) throw new Error("Trust M gave different certificates");
-    if (rand.size !== ROUNDS * 2) throw new Error("Trust M repeated a random number");
-    // ~2560 random bits: about half ones (6 standard deviations either way), no number one byte over and over
-    const all = [...rand].join(""), bits = [...all].reduce((t, c) => t + [0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4][parseInt(c, 16)], 0), n = all.length * 4;
-    if (Math.abs(bits - n / 2) > 6 * Math.sqrt(n) / 2) throw new Error(`Trust M random isn't random: ${bits} of ${n} bits are 1`);
-    if ([...rand].some((x) => /^(..)\1+$/.test(x))) throw new Error("Trust M random is one byte repeated");
   }
 
   async function run(w: W.Wedgie, j: Job) {
@@ -129,8 +110,8 @@ export function prepare(main: HTMLElement) {
           return;
         }
         j.lines = [`wedgie ${w.version} + Welcome, every file checked`];
-        await pound(w, r, j);
-        j.lines.push(`Trust M signed ${ROUNDS + 1}×, traced to Infineon; its random numbers look random`);
+        trustm(w);
+        j.lines.push("Trust M signed, traced to Infineon");
         j.lines.push("Now look at its screen: 3 green checks");
       });
       if (restarting) { Object.assign(j, { state: "restarting", what: "", at: Date.now() }); W.reidentify(w); }

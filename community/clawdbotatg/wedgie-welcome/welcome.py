@@ -413,7 +413,7 @@ def s_go():
     small("for apps and updates", 96)
 
 
-SLIDES = ((s_ready, 8000), (s_welcome, 2600), (s_wedgie, 3600), (s_inside, 8000), (s_chip, 6000), (s_safe, 3600),
+SLIDES = ((s_welcome, 2600), (s_ready, 8000), (s_wedgie, 3600), (s_inside, 8000), (s_chip, 6000), (s_safe, 3600),
           (s_games, 3600), (s_make, 3600), (s_go, 6000))
 FLIP = 360                              # ms: the screen turns over between slides
 
@@ -424,6 +424,9 @@ flipped = False
 
 
 def render(i):
+    if not INFO and SLIDES[i][0] is s_ready:
+        read_info()                     # not at start: a page checking the chip over USB does it then (wedgie.chip()
+                                        # resets the chip; a read of ours caught in it waits 10 s)
     S.fill(WHITE)
     SLIDES[i][0]()
     gc.collect()
@@ -587,11 +590,9 @@ def draw(now, wedgie, dx):
 def run():
     global si, slide_end, flip_t, flipped, last_in, next_idea, roll_t
     render(si)
-    draw(time.ticks_ms(), False, 0)     # the stage up first: reading the chip and the logo takes a moment
+    draw(time.ticks_ms(), False, 0)     # the stage up first: reading the logo takes a moment
     lcd.show()
-    read_info()
     read_logo()
-    render(si)                          # its checks, now read
     now = time.ticks_ms()
     slide_end = time.ticks_add(now, SLIDES[si][1])
     last_in = next_idea = now
