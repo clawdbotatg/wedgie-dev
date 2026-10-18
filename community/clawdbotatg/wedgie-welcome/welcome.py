@@ -1,5 +1,6 @@
 # Welcome: what a new wedgie plays until it gets real software. A little guy in his undies stands on a
-# stage; the screen behind him runs a slideshow: what a wedgie is, what's inside this one (its CPU,
+# stage; the screen behind him runs a slideshow: first its checks (a Trust M that answers, random that
+# looks random, key slots empty and unlocked, ready for its person's own key), what a wedgie is, what's inside this one (its CPU,
 # RAM, flash, secure chip and a few random numbers from that chip), and where to get software.
 #
 #   joystick left/right   walk                 up, the green button   jump
@@ -109,12 +110,13 @@ gc.collect()
 # ---- the slides ---------------------------------------------------------------------------------------
 
 
-def big(s, y, c=INK, sc=2):
-    """Text scaled up, centered on S: framebuf's 8x8 font, a fill_rect per run of lit pixels."""
+def big(s, y, c=INK, sc=2, x0=None):
+    """Text scaled up, centered on S (or from x0): framebuf's 8x8 font, a fill_rect per run of lit pixels."""
     w = 8 * len(s)
     _T.fill(0)
     _T.text(s, 0, 0, 1)
-    x0 = (SW - w * sc) // 2
+    if x0 is None:
+        x0 = (SW - w * sc) // 2
     for yy in range(8):
         xx = 0
         while xx < w:
@@ -190,7 +192,49 @@ def _kb(n):
     return "%d KB" % (n // 1024) if n < 1024 * 1024 else "%d.%d MB" % (n // 1048576, n * 10 // 1048576 % 10)
 
 
+def _bits(b):
+    n = 0
+    for x in b:
+        while x:
+            n += x & 1
+            x >>= 1
+    return n
+
+
+def read_keys():
+    """A Trust M's key slots (KEY2-4, DATA[11]): True if all are unlocked and DATA[11] holds no Safe Signer
+    key copy, so its person can make their own key and lock it (Safe Signer locks KEY2 for good, and locks a
+    copy it finds: trustm.md). Reads metadata only. None: no Trust M answered. Runs before W.rand finds the
+    chip (a new Session resets it)."""
+    from machine import Pin
+    for p in (4, 5):                    # no pull-ups: nothing on the bus (don't wait on timeouts)
+        up = Pin(p, Pin.IN, Pin.PULL_DOWN).value()
+        Pin(p, Pin.IN)
+        if not up:
+            return None
+    try:
+        import trustm
+        trustm.bus(4, 5)
+        s = trustm.Session()
+    except Exception:
+        return None
+    try:
+        for oid in (0xE0F1, 0xE0F2, 0xE0F3, 0xF1DB):
+            m, i = s.metadata(oid), 2
+            while i + 2 <= len(m):
+                if (m[i] == 0xC0 and m[i + 2] >= 7) or (m[i] == 0xD0 and m[i + 2:i + 2 + m[i + 1]] == b"\xff"):
+                    return False        # operational (locked for good), or never changeable
+                i += 2 + m[i + 1]
+        try:
+            return s.get(0xF1DB, 0, 6) != b"wsafe1"
+        except OSError:
+            return True                 # nothing in it yet
+    except Exception:
+        return False
+
+
 def read_info():
+    INFO["keys"] = read_keys()
     name, cpu, wifi = W.board()
     INFO["cpu"] = cpu
     INFO["mhz"] = "%d MHz" % (machine.freq() // 1000000)
@@ -218,6 +262,30 @@ def read_info():
         INFO["chip"] = ["OPTIGA", "Trust M"] if "Trust" in src else [src]
         INFO["state"] = "working"
         INFO["from"] = "random from the chip"
+    # its random: two reads differ, neither one byte over and over, about half the bits 1 (6 sigma of 512)
+    a, b = W.rand(32), W.rand(32)
+    INFO["random"] = (not src.startswith("os.urandom") and a != b and a != a[:1] * 32 and b != b[:1] * 32
+                      and abs(_bits(a + b) - 256) <= 68)
+
+
+def s_ready():
+    small("this wedgie", 10)
+    if not INFO:
+        return
+    tm = INFO["chip"] == ["OPTIGA", "Trust M"]
+    rows = (("Trust M" if tm else INFO["chip"][0][:8], tm), ("random", INFO["random"]), ("key slot", INFO["keys"] is True))
+    y = 30
+    for label, ok in rows:
+        big(label, y, INK if ok else RED, 2, 14)
+        if ok:
+            ui.check(S, 150, y + 1, GREEN_D)
+        else:
+            big("X", y, RED, 2, 150)
+        y += 30
+    if all(ok for _, ok in rows):
+        small("ready for your key", 124, GREEN_D)
+    else:
+        small("not ready", 124, RED)
 
 
 def s_welcome():
@@ -345,7 +413,7 @@ def s_go():
     small("for apps and updates", 96)
 
 
-SLIDES = ((s_welcome, 2600), (s_wedgie, 3600), (s_inside, 8000), (s_chip, 6000), (s_safe, 3600),
+SLIDES = ((s_ready, 8000), (s_welcome, 2600), (s_wedgie, 3600), (s_inside, 8000), (s_chip, 6000), (s_safe, 3600),
           (s_games, 3600), (s_make, 3600), (s_go, 6000))
 FLIP = 360                              # ms: the screen turns over between slides
 
@@ -523,6 +591,7 @@ def run():
     lcd.show()
     read_info()
     read_logo()
+    render(si)                          # its checks, now read
     now = time.ticks_ms()
     slide_end = time.ticks_add(now, SLIDES[si][1])
     last_in = next_idea = now

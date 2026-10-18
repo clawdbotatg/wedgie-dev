@@ -8,13 +8,13 @@
 //     certificate chains to Infineon (chipcheck.ts); the same certificate every time, no random repeated.
 //     Its random numbers: none repeated, about half the bits 1, none one byte over and over.
 //     The factory key proves the chip is real; it isn't the person's key, so this needs no press;
-//  4. its key slots empty and open (the one press: reading metadata takes the REPL): KEY2-4 not locked
-//     (lifecycle below operational, change rule not "never") and no Safe Signer key copy in DATA[11]
-//     (Safe Signer would lock a key it finds there, for good: trustm.md, wedgie-safe safe_key.py).
+//  4. its key slots empty and unlocked: Welcome checks them itself and its first slide shows green checks
+//     (clawdbotatg/wedgie-welcome read_keys). The page can't read them without full control, so the person
+//     looks at its screen. No press anywhere unless it needs an update.
 // 1 or 2 off: one checked install (the green button on its screen), it restarts, and all of it is checked again.
 import * as W from "../serial/wedgies";
 import type { Repl } from "../serial/repl";
-import { coreWithApp, takeOver, firmwareManifest, type Manifest, type Cart } from "../serial/install";
+import { coreWithApp, firmwareManifest, type Manifest, type Cart } from "../serial/install";
 import { checkChip } from "../serial/chipcheck";
 import { benchSetup } from "./format";
 import { cmpVersion } from "../apps/appjson.mjs";
@@ -25,21 +25,6 @@ type Job = { uid: string; key: number; state: "checking" | "installing" | "resta
   lines: string[]; error?: string; at: number; installed?: boolean; gone?: boolean };
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 const LABEL: Record<Job["state"], string> = { checking: "Checking", installing: "Updating", restarting: "Restarting", ready: "Ready to ship", fail: "Not ready" };
-
-const SLOTS_PY = `import optiga, json, binascii
-try:
-    c = optiga.Chip()
-    o = {}
-    for n, oid in (("KEY2", optiga.KEY2), ("KEY3", optiga.KEY3), ("KEY4", optiga.KEY4), ("DATA11", optiga.DATA[11])):
-        m = c.metadata(oid)
-        o[n] = {"lc": m.get(0xC0, b"\\x01")[0], "chg": binascii.hexlify(m.get(0xD0, b"")).decode()}
-    try:
-        o["copy"] = c.read(optiga.DATA[11])[:6] == b"wsafe1"
-    except Exception:
-        o["copy"] = False
-except Exception as e:
-    o = {"error": str(e) or type(e).__name__}
-print("@slots", json.dumps(o))`;
 
 export function prepare(main: HTMLElement) {
   main.innerHTML = `
@@ -63,7 +48,7 @@ export function prepare(main: HTMLElement) {
   firmwareManifest().then((x) => {
     m = x;
     welcome = x.carts.find((c) => c.mod === "welcome");
-    $("p-fine").textContent = `Ready means: wedgie ${x.version}, Welcome as its app, its Trust M signed ${ROUNDS + 1} times and traced to Infineon, its key slots empty and unlocked. Press the green button on it once for the key slots (and once more if it needs an update).`;
+    $("p-fine").textContent = `Ready means: wedgie ${x.version}, Welcome as its app, its Trust M signed ${ROUNDS + 1} times and traced to Infineon, then 3 green checks on its own screen (its key slots: empty and unlocked). Out of date: the green button on it updates it.`;
     tick();
   });
 
@@ -123,22 +108,6 @@ export function prepare(main: HTMLElement) {
     if ([...rand].some((x) => /^(..)\1+$/.test(x))) throw new Error("Trust M random is one byte repeated");
   }
 
-  /** KEY2-4 open for the person's own key, no Safe Signer key copy in DATA[11]. Reads only. */
-  async function slots(r: Repl, j: Job) {
-    j.what = "Key slots: press the green button on it"; paint();
-    await takeOver(r, (s) => { if (s) { j.what = "Key slots: press the green button on it"; paint(); } }, "Check its key slots", "Checking key slots");
-    j.what = "Key slots"; paint();
-    let v: any = null;
-    r.onLine = (t, x) => { if (t === "slots") v = x; };
-    try { await r.exec(SLOTS_PY, 15000); }
-    finally { await r.leave({ reset: false }); }      // back to Welcome
-    if (!v) throw new Error("its key slots couldn't be read");
-    if (v.error) throw new Error(`its key slots couldn't be read: ${v.error}`);
-    const shut = ["KEY2", "KEY3", "KEY4", "DATA11"].filter((n) => v[n].lc >= 7 || v[n].chg === "ff");
-    if (shut.length) throw new Error(`LOCKED: ${shut.join(", ")}. Swap the chip`);
-    if (v.copy) throw new Error("A Safe Signer key is already on it. Swap the chip");
-  }
-
   async function run(w: W.Wedgie, j: Job) {
     running.add(w.key);
     Object.assign(j, { state: "checking", key: w.key, p: 0, what: "Firmware", lines: [], error: undefined });
@@ -162,8 +131,7 @@ export function prepare(main: HTMLElement) {
         j.lines = [`wedgie ${w.version} + Welcome, every file checked`];
         await pound(w, r, j);
         j.lines.push(`Trust M signed ${ROUNDS + 1}×, traced to Infineon; its random numbers look random`);
-        await slots(r, j);
-        j.lines.push("Key slots empty and unlocked");
+        j.lines.push("Now look at its screen: 3 green checks");
       });
       if (restarting) { Object.assign(j, { state: "restarting", what: "", at: Date.now() }); W.reidentify(w); }
       else j.state = "ready";
