@@ -6,6 +6,7 @@
 //  2. Welcome is its one app, its files the latest;
 //  3. the Trust M, asked ROUNDS times: each time it signs fresh random bytes with its factory key and its
 //     certificate chains to Infineon (chipcheck.ts); the same certificate every time, no random repeated.
+//     Its random numbers: none repeated, about half the bits 1, none one byte over and over.
 //     The factory key proves the chip is real; it isn't the person's key, so this needs no press;
 //  4. its key slots empty and open (the one press: reading metadata takes the REPL): KEY2-4 not locked
 //     (lifecycle below operational, change rule not "never") and no Safe Signer key copy in DATA[11]
@@ -116,6 +117,10 @@ export function prepare(main: HTMLElement) {
     }
     if (certs.size !== 1) throw new Error("Trust M gave different certificates");
     if (rand.size !== ROUNDS * 2) throw new Error("Trust M repeated a random number");
+    // ~2560 random bits: about half ones (6 standard deviations either way), no number one byte over and over
+    const all = [...rand].join(""), bits = [...all].reduce((t, c) => t + [0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4][parseInt(c, 16)], 0), n = all.length * 4;
+    if (Math.abs(bits - n / 2) > 6 * Math.sqrt(n) / 2) throw new Error(`Trust M random isn't random: ${bits} of ${n} bits are 1`);
+    if ([...rand].some((x) => /^(..)\1+$/.test(x))) throw new Error("Trust M random is one byte repeated");
   }
 
   /** KEY2-4 open for the person's own key, no Safe Signer key copy in DATA[11]. Reads only. */
@@ -156,7 +161,7 @@ export function prepare(main: HTMLElement) {
         }
         j.lines = [`wedgie ${w.version} + Welcome, every file checked`];
         await pound(w, r, j);
-        j.lines.push(`Trust M signed ${ROUNDS + 1}×, traced to Infineon`);
+        j.lines.push(`Trust M signed ${ROUNDS + 1}×, traced to Infineon; its random numbers look random`);
         await slots(r, j);
         j.lines.push("Key slots empty and unlocked");
       });
