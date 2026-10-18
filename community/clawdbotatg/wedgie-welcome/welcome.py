@@ -231,13 +231,17 @@ def _bits(b):
     return n
 
 
-def _locked(m):
-    i = 2
+def _meta(m):
+    """Metadata as (locked, used bytes). locked: operational (locked for good), or never changeable."""
+    i, locked, used = 2, False, 0
     while i + 2 <= len(m):
-        if (m[i] == 0xC0 and m[i + 2] >= 7) or (m[i] == 0xD0 and m[i + 2:i + 2 + m[i + 1]] == b"\xff"):
-            return True                 # operational (locked for good), or never changeable
+        t, v = m[i], m[i + 2:i + 2 + m[i + 1]]
+        if (t == 0xC0 and v[0] >= 7) or (t == 0xD0 and v == b"\xff"):
+            locked = True
+        elif t == 0xC5:                 # used size
+            used = int.from_bytes(v, "big")
         i += 2 + m[i + 1]
-    return False
+    return locked, used
 
 
 def checks():
@@ -265,15 +269,14 @@ def checks():
             except Exception:
                 s = trustm.Session()
                 return f(s)
-        ok = True
+        ok, used = True, 0
         try:
             for oid in (0xE0F1, 0xE0F2, 0xE0F3, 0xF1DB):
-                ok = ok and not _locked(run(lambda c: c.metadata(oid)))
+                locked, used = _meta(run(lambda c: c.metadata(oid)))
+                ok = ok and not locked
                 yield
-            try:
+            if used:                    # DATA[11] holds something: it mustn't be a key copy (a read that fails: not ok)
                 ok = ok and run(lambda c: c.get(0xF1DB, 0, 6)) != b"wsafe1"
-            except OSError:
-                pass                    # nothing in it yet
         except Exception:
             ok = False
         RES["key slot"] = ok
@@ -304,9 +307,16 @@ def checks():
             ok = False
         RES["wires"] = ok
     try:
-        RES["fresh"] = not any(os.listdir("/saves/" + n) for n in os.listdir("/saves"))
+        top = os.listdir("/saves")
     except OSError:
-        RES["fresh"] = True             # no /saves at all
+        top = []                        # no /saves at all
+    fresh = True
+    for n in top:                       # each a game's folder, empty; anything else (a file, unreadable): not fresh
+        try:
+            fresh = fresh and not os.listdir("/saves/" + n)
+        except OSError:
+            fresh = False
+    RES["fresh"] = fresh
     gc.collect()
     yield
     read_chip()                         # last: finding the chip for rand resets it

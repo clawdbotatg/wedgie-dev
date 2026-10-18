@@ -18,10 +18,10 @@ import { coreWithApp, firmwareManifest, type Manifest, type Cart } from "../seri
 import { benchSetup } from "./format";
 import { cmpVersion } from "../apps/appjson.mjs";
 
-type Job = { uid: string; key: number; state: "checking" | "installing" | "restarting" | "ready" | "fail"; p: number; what: string;
+type Job = { uid: string; key: number; state: "checking" | "installing" | "restarting" | "screen" | "ready" | "fail"; p: number; what: string;
   lines: string[]; error?: string; at: number; installed?: boolean; gone?: boolean };
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
-const LABEL: Record<Job["state"], string> = { checking: "Checking", installing: "Updating", restarting: "Restarting", ready: "Ready to ship", fail: "Not ready" };
+const LABEL: Record<Job["state"], string> = { checking: "Checking", installing: "Updating", restarting: "Restarting", screen: "Check its screen", ready: "Ready to ship", fail: "Not ready" };
 
 export function prepare(main: HTMLElement) {
   main.innerHTML = `
@@ -45,7 +45,7 @@ export function prepare(main: HTMLElement) {
   firmwareManifest().then((x) => {
     m = x;
     welcome = x.carts.find((c) => c.mod === "welcome");
-    $("p-fine").textContent = `Ready means: wedgie ${x.version}, Welcome as its app, its Trust M signed and traced to Infineon, then on its own screen every row green and all 9 buttons pressed. Out of date: the green button on it updates it.`;
+    $("p-fine").textContent = `Ready means: wedgie ${x.version}, Welcome as its app, its Trust M signed and traced to Infineon, then you tap All green once its own screen shows every row green and all 9 buttons pressed. Out of date: the green button on it updates it.`;
     tick();
   });
 
@@ -56,12 +56,14 @@ export function prepare(main: HTMLElement) {
         ${j.state === "fail" ? `<div class="upd-line">${esc(j.error)}</div>` : ""}
         ${j.lines.map((l) => `<div class="upd-line fine">${esc(l)}</div>`).join("")}
         ${j.state === "installing" || j.state === "checking" ? `<div class="upd-line fine">${esc(j.what)}</div>` : ""}
+        ${j.state === "screen" ? `<div class="row"><button class="btn btn-green" data-ok="1" data-uid="${esc(j.uid)}">All green</button><button class="btn" data-ok="0" data-uid="${esc(j.uid)}">Not green</button></div>` : ""}
         <div class="meter"${j.state === "installing" ? "" : " hidden"}><div class="meter-track"><div class="meter-fill" style="width:${8 + 92 * j.p}%"></div></div></div>
       </div>`).join("");
-    const busy = list.filter((j) => j.state !== "ready" && j.state !== "fail").length;
+    const busy = list.filter((j) => j.state !== "ready" && j.state !== "fail" && j.state !== "screen").length;
+    const look = list.filter((j) => j.state === "screen" && !j.gone).length;
     const ok = list.filter((j) => j.state === "ready").length, bad = list.filter((j) => j.state === "fail" && !j.gone).length;
-    $("p-text").textContent = busy ? `Checking ${busy}…` : list.length ? [ok && `${ok} ready`, bad && `${bad} not ready`].filter(Boolean).join(" · ") || "Unplugged" : "Plug in a wedgie";
-    $("p-detail").textContent = busy ? "Don't unplug it yet." : list.length ? "Box the green ones. Plug in the next." : "Latest firmware, Welcome, a working Trust M, no key locked on it.";
+    $("p-text").textContent = busy ? `Checking ${busy}…` : look ? "Check its screen" : list.length ? [ok && `${ok} ready`, bad && `${bad} not ready`].filter(Boolean).join(" · ") || "Unplugged" : "Plug in a wedgie";
+    $("p-detail").textContent = busy ? "Don't unplug it yet." : look ? "Press every button on it. Every row and all 9 squares green? Tap All green." : list.length ? "Box the green ones. Plug in the next." : "Latest firmware, Welcome, a working Trust M, no key locked on it.";
     $("p-status").className = `test-status ${busy ? "" : bad ? "bad" : list.length ? "good" : ""}`;
   }
 
@@ -112,10 +114,10 @@ export function prepare(main: HTMLElement) {
         j.lines = [`wedgie ${w.version} + Welcome, every file checked`];
         trustm(w);
         j.lines.push("Trust M signed, traced to Infineon");
-        j.lines.push("Now its screen: press every button, every row green");
       });
+      // Its key slots, saves and buttons only show on its own screen (Welcome's checks): a person says.
       if (restarting) { Object.assign(j, { state: "restarting", what: "", at: Date.now() }); W.reidentify(w); }
-      else j.state = "ready";
+      else j.state = "screen";
     } catch (e: any) {
       j.state = "fail";
       j.error = e?.message || String(e);
@@ -132,7 +134,9 @@ export function prepare(main: HTMLElement) {
     for (const j of jobs.values()) {
       const w = ws.find((x) => (j.uid.startsWith("key") ? "key" + x.key : x.uid) === j.uid);
       j.gone = !w;
-      if (j.state === "restarting" && !w && Date.now() - j.at > 60000)
+      if (j.state === "restarting" && w?.state === "error")
+        Object.assign(j, { state: "fail", error: `after its update: ${w.error}` });
+      else if (j.state === "restarting" && Date.now() - j.at > 60000)
         Object.assign(j, { state: "fail", error: "didn't come back after its update; unplug it and plug it back in" });
     }
     for (const w of ws) {
@@ -146,7 +150,7 @@ export function prepare(main: HTMLElement) {
       if (w.state !== "ready" || !w.uid || running.has(w.key) || w.proof?.detail === "It's installing") continue;
       const j = jobs.get(w.uid);
       const back = j?.state === "restarting" && (w.readyAt || 0) > j.at;          // its own restart after the update
-      const again = j && (j.state === "ready" || j.state === "fail") && j.key !== w.key && (w.readyAt || 0) > j.at + 5000;   // plugged in again
+      const again = j && (j.state === "ready" || j.state === "fail" || j.state === "screen") && j.key !== w.key && (w.readyAt || 0) > j.at + 5000;   // plugged in again
       if (j && !back && !again) continue;
       const nj: Job = j || { uid: w.uid, key: w.key, state: "checking", p: 0, what: "", lines: [], at: 0 };
       if (again) nj.installed = false;
@@ -163,6 +167,14 @@ export function prepare(main: HTMLElement) {
     $("p-detail").textContent = "Open wedgie.dev/prepare in Chrome or Edge on a computer.";
     return;
   }
+  // the person's word on its screen (the grid is repainted wholesale, so one listener on it)
+  $("p-grid").addEventListener("click", (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>("button[data-ok]");
+    const j = b && jobs.get(b.dataset.uid || "");
+    if (!j || j.state !== "screen") return;
+    Object.assign(j, b!.dataset.ok === "1" ? { state: "ready" } : { state: "fail", error: "Its screen wasn't all green" });
+    paint();
+  });
   W.onChange(tick);
   setInterval(tick, 5000);        // the 60 s "didn't come back" check
   W.arm();
