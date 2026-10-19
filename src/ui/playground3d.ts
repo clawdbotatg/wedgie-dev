@@ -35,8 +35,10 @@ const holeXY = (x: number, n: number): V3 => [x, pinY(n), HDR];
 // the manual's cable: white R3, yellow R5, black L6, red L7 (top to bottom in the plug)
 const HOLES = [holeXY(ROW_R, 3), holeXY(ROW_R, 5), holeXY(ROW_L, 6), holeXY(ROW_L, 7)];
 const WIRES = [0xf4f4ef, 0xf2c417, 0x232323, 0xd8262a];
-const CHIP_LAID: V3 = [13.22, 18, -12.4];
-const CHIP_IN: V3 = [13.22, 18, -7.4];
+// wedged: tilted on its long edge between the two socket rows, face toward the Pico. The gap between the
+// rows (inside the tape) and between the boards is about 13 x 12 mm: an 18 mm board only fits on a slant.
+const CHIP_IN: V3 = [13.22, 18, -8.1];
+const WEDGE = 0.76;
 const USB_IN: V3 = [13.22, 48.1, -16.36];
 const USB_OUT: V3 = [13.22, 74, -16.36];
 const PI = Math.PI;
@@ -178,15 +180,16 @@ const STEPS3D: Step3D[] = [
     labels: [{ txt: "4 wires in, taped, holes open", at: [13.2, 40, -12], t: [0.2, 1] }],
     run(s, t) { num(s, "marks", 0.35, E(t, 0.3, 1)); },
   },
-  { // 10 Plug in the chip, lay it on the wires
-    dur: 4.8, view: { at: [0, 24, -6], az: 20, el: 52, d: 190 },
-    labels: [{ txt: "Fits one way", at: [-24, 34, 2], t: [0.35, 0.6] }, { txt: "Face up, over the wires", at: [13.2, 18, -14], t: [0.86, 1] }],
+  { // 10 Plug in the chip, wedge it in between the rows
+    dur: 4.8, view: { at: [10, 22, -8], az: -70, el: 26, d: 115 },
+    labels: [{ txt: "Fits one way", at: [-24, 34, 2], t: [0.35, 0.6] }, { txt: "Tilt it and wedge it in between the rows", at: [13.2, 18, -12], t: [0.74, 1] }],
     run(s, t) {
       go(s, "chip", { v: 1 }, E(t, 0, 0.15));
       num(s, "plugIn", 0.5, E(t, 0.12, 0.42));
       num(s, "plugIn", 1, E(t, 0.44, 0.6));
       go(s, "chip", { p: [-6, 18, -22] }, E(t, 0.62, 0.78));
-      go(s, "chip", { p: CHIP_LAID }, E(t, 0.78, 0.95));
+      go(s, "chip", { p: [13.22, 18, -20], r: [0, PI + WEDGE, 0] }, E(t, 0.72, 0.84));
+      go(s, "chip", { p: CHIP_IN }, E(t, 0.84, 0.97));
     },
   },
   { // 13 Stack the boards
@@ -199,7 +202,6 @@ const STEPS3D: Step3D[] = [
       go(s, "pico", { p: [32, 0, -20] }, E(t, 0.05, 0.3));
       go(s, "pico", { p: [0, 0, -18] }, E(t, 0.3, 0.55));
       go(s, "pico", { p: [0, 0, 0] }, E(t, 0.6, 0.9));
-      go(s, "chip", { p: CHIP_IN, r: [0, PI + 0.85, 0] }, E(t, 0.62, 0.86));
     },
   },
   { // 14 Test the boards
