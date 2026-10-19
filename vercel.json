@@ -3,7 +3,7 @@
   "outputDirectory": "dist",
   "headers": [
     {
-      "source": "/(.*)",
+      "source": "/((?!api/builds).*)",
       "headers": [
         {
           "key": "Cross-Origin-Opener-Policy",
