@@ -3,7 +3,7 @@
 # interrupted; from the REPL they are plain calls:  import wedgie; wedgie.shot(); wedgie.press("A")
 import sys, os, json, machine
 
-VERSION = "0.3.53"
+VERSION = "0.3.54"
 
 # The lock. main.py turns Ctrl-C off before anything else and never ends by itself, so a computer
 # can only send the slot's JSON lines: it can't stop the app, reach the REPL, or make the secure chip
@@ -49,6 +49,26 @@ def release_files(text):
     return lines[1][8:], files
 
 
+SERIAL = "serial"    # the serial of the last signed list a job put on (job.py): an older one never goes on again
+
+
+def release_serial(text):
+    """The signed list's "@serial  N" (0.3.54+; tools/release.mjs): it only goes up, each signing. 0 if none."""
+    lines = text.decode().split("\n") if isinstance(text, bytes) else text.split("\n")
+    for l in lines[2:]:
+        if l.startswith("@serial  "):
+            return int(l[9:])
+    return 0
+
+
+def serial():
+    try:
+        with open(SERIAL) as f:
+            return int(f.read())
+    except (OSError, ValueError):
+        return 0
+
+
 def release_apps(text):
     """{mod: {mod, name, entry, usb, files}} from a signed list's "@app  <json>" lines (0.3.12+:
     a job's apps.json comes from these, never from the host). Firmware before 0.3.12 reads such a line
@@ -66,10 +86,29 @@ def is_open():
     return _open
 
 
+# Flags in watchdog scratch3: they live through a soft reset and machine.reset(), and power-up clears them.
+WAS_OPEN = 1        # a computer was let in and main.py hasn't run since. MicroPython skips main.py (the lock) when
+                    # a soft reset comes from the raw REPL, so boot.py hard resets instead (audit 10-18)
+SAID_NO = 2         # the person said no to FULL CONTROL: no more asking until it's unplugged (slot.let_in)
+
+
+def flag(bit, on=None):
+    """Read (on=None) or set a scratch3 flag. False off a real chip (the emulator)."""
+    try:
+        a = (0x400D8000 if "RP2350" in sys.implementation._machine else 0x40058000) + 0x18
+        v = machine.mem32[a]
+        if on is not None:
+            machine.mem32[a] = (v | bit) if on else (v & ~bit)
+        return bool(v & bit)
+    except Exception:
+        return False
+
+
 def set_open():
     """Let the computer in, until main.py starts again."""
     global _open
     _open = True
+    flag(WAS_OPEN, True)
     try:
         import micropython
         micropython.kbd_intr(3)

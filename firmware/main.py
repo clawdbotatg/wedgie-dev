@@ -73,6 +73,7 @@ try:
     import wedgie
     wedgie.SEALED = True
     wedgie._open = False                # a yes was for one job; this is a fresh start
+    wedgie.flag(wedgie.WAS_OPEN, False) # locked again: boot.py needn't hard reset (wedgie.set_open)
     _j = wedgie.take_job()
     if _j:                              # install mode: a yes to a job, then this restart (slot._job).
         wedgie.lines()                  # Nothing else loads: the same clean heap for every install
@@ -100,8 +101,11 @@ while True:
         import slot
         slot.run()
         e = RuntimeError("the slot ended")
-    except KeyboardInterrupt:       # only once the person let the computer in
-        break
+    except KeyboardInterrupt:       # only once the person let the computer in: any other (an app raising it)
+        if "wedgie" in sys.modules and sys.modules["wedgie"].is_open():   # is a crash, never the REPL (audit 10-18)
+            break
+        e = RuntimeError("an app stopped itself")
+        sys.modules.pop("slot", None)
     except SystemExit:              # machine.soft_reset() is a SystemExit: let the one a job asked for through
         if getattr(sys.modules.get("wedgie"), "restarting", False):   # (0.3.0 caught it: "wedgie broke"
             raise                                                      # after every checked install)

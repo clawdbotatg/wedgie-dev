@@ -123,6 +123,8 @@ def buttons(d, yes="yes", no="no"):
 
 
 drawn = 0       # ticks_ms when the last ask() finished drawing its question (the slot reports it)
+SETTLE = 600    # ms a question is up before a press answers it: one meant for what was there before (a game's A)
+said_no = False # the last ask() was answered with a real no (not a timeout)
 
 
 def check(d, x, y, c=GREEN_D):
@@ -179,10 +181,20 @@ def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None, scary=Fa
     d.show()
     global drawn
     drawn = time.ticks_ms()
+    return wait(k, ms)
+
+
+def wait(k, ms):
+    """The answer to a question just drawn: A True, Y False, nothing in ms False. Presses in its first SETTLE
+    ms are dropped (audit 10-18: a computer could pop a question under a finger already pressing A)."""
+    global said_no
+    said_no = False
+    k.pressed()                             # what went down while it drew doesn't count either
     t0 = time.ticks_ms()
     while time.ticks_diff(time.ticks_ms(), t0) < ms:
         for key in k.pressed():
-            if key in ("A", "Y"):
+            if key in ("A", "Y") and time.ticks_diff(time.ticks_ms(), t0) >= SETTLE:
+                said_no = key == "Y"
                 return key == "A"
         time.sleep_ms(20)
     return False
