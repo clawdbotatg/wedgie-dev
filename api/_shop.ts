@@ -133,6 +133,7 @@ export const late = (o: Pick<Order, "pay" | "created">) =>
   Date.now() > Date.parse(o.created) + (o.pay === "usdc" ? QUOTE + 120_000 : QUOTE);
 export async function expireOld(sql: Awaited<ReturnType<typeof db>>) {
   await sql`update orders set ip = null where ip is not null and created < now() - interval '1 day'`;
+  await sql`update reports set ip = '' where ip <> '' and at < now() - interval '1 day'`.catch(() => {});   // its PER_HOUR needs an hour (no table yet: fine)
   await sql`update orders set status = 'expired' where status = 'new' and pay = 'usdc'
     and created < now() - ${`${(QUOTE + 120_000) / 1000} seconds`}::interval`;
   const cards = await sql`select id, stripe_session from orders where status = 'new' and pay = 'card'

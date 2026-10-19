@@ -3,7 +3,7 @@
 //                                 a plugged-in wedgie's hello + its log). Kept REPORT_DAYS, mailed to the inbox.
 // Spam: PER_HOUR per IP; past MAIL_PER_DAY in a day (many IPs) they're kept but not mailed (`mailed` false);
 // past KEEP_PER_DAY, refused (the table stays small).
-// No IP kept: ipOf (a hash) only for PER_HOUR. Their email, if they gave one, goes in the mail, never the table.
+// No IP kept: ipOf (a hash) only for PER_HOUR, wiped after a day. Their email, if they gave one, goes in the mail, never the table.
 // Never log a body here.
 import { db as shopDb, json, oops, env, ipOf } from "./_shop.js";
 import { send } from "./_mail.js";
@@ -37,6 +37,7 @@ export async function POST(req: Request) {
     sql = await db();
     const ip = await ipOf(req);
     await sql`delete from reports where at < now() - ${`${REPORT_DAYS} days`}::interval`;
+    await sql`update reports set ip = '' where ip <> '' and at < now() - interval '1 day'`;   // the privacy page: a day (also _shop expireOld)
     const [r] = await sql`select count(*) filter (where ip = ${ip} and at > now() - interval '1 hour')::int as hour,
       count(*) filter (where mailed)::int as day, count(*)::int as kept from reports where at > now() - interval '1 day'`;
     if (r.hour >= PER_HOUR || r.kept >= KEEP_PER_DAY) return oops("Too many reports. Wait a bit.", 429);
