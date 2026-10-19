@@ -209,10 +209,11 @@ const STEPS3D: Step3D[] = [
     labels: [{ txt: "Hold BOOTSEL", at: [16.5, 39.7, -18], t: [0.05, 0.5] }, { txt: "USB-C data cable", at: [13.2, 66, -17], t: [0.25, 0.5] },
       { txt: "Board ✓  Firmware ✓  Chip ✓", at: [13.2, 20, -20], t: [0.55, 0.9] }],
     run(s, t) {
-      go(s, "tweezers", { p: [16.5, 39.7, -17.4], r: [-0.5, 0.4, -0.6], v: 1 }, E(t, 0, 0.2));
+      go(s, "tweezers", { p: [16.5, 39.7, -40], r: [PI - 0.6, 0.3, 0], v: 1 }, E(t, 0, 0.12));   // tips down on the button, handle up and away
+      go(s, "tweezers", { p: [16.5, 39.7, -17.6] }, E(t, 0.12, 0.2));
       go(s, "usb", { p: USB_OUT, v: 1 }, E(t, 0.12, 0.25));
       go(s, "usb", { p: USB_IN }, E(t, 0.25, 0.4));
-      go(s, "tweezers", { p: [40, 70, -40], v: 0 }, E(t, 0.5, 0.65));
+      go(s, "tweezers", { p: [16.5, 20, -60], v: 0 }, E(t, 0.5, 0.65));
       num(s, "led", 1, E(t, 0.42, 0.45));
       go(s, "usb", { p: USB_OUT }, E(t, 0.88, 0.96));
       go(s, "usb", { v: 0 }, E(t, 0.95, 1));
@@ -402,7 +403,8 @@ function poker() {
 /** Tweezers: tips at the origin, the arms running up along +z. */
 function tweezers() {
   const g = new THREE.Group(), steel = std(0xc7c9cc, 0.25, 0.9);
-  for (const s of [-1, 1]) { const a = box(0.9, 3.2, 95, steel, s * 1.8, 0, 47); a.rotation.y = -s * 0.035; g.add(a); }
+  // tips together at the origin, the arms spreading to the back
+  for (const s of [-1, 1]) { const a = box(0.9, 3.2, 95, steel, s * 2, 0, 47.5); a.rotation.y = s * 0.0316; g.add(a); }
   return g;
 }
 /** A USB-C plug and its cable: the tip's front at the origin, pointing -y. */
