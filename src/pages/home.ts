@@ -1,5 +1,6 @@
 // The front page: give yourself a wedgie. Get one, or build one; agents at the bottom.
 import { place3D, pageShown } from "../ui/place3d";
+import { world } from "../ui/world";
 import { ITEMS, type Item } from "../shop/catalog";
 import { WHY, STAR, wire } from "../shop/why";
 import { blo } from "blo";
@@ -148,6 +149,17 @@ export function home(main: HTMLElement): Promise<unknown> {
     <a class="btn btn-lg" href="/safe">Safe</a>
   </section>
 
+  <section id="world" class="sec world">
+    <div class="sec-head">
+      <span class="kicker">Wedgies around the world</span>
+      <h2>Put yours on the globe.</h2>
+    </div>
+    <div class="card wide world-card">
+      <div class="globe"></div>
+      <div class="world-side"></div>
+    </div>
+  </section>
+
   <section id="teaser" class="sec teaser">
     <div class="teaser-box">
       <video playsinline preload="none" poster="/video/teaser.jpg" src="/video/teaser.mp4"></video>
@@ -210,6 +222,12 @@ export function home(main: HTMLElement): Promise<unknown> {
     teaser.play();
   };
   assembly(main.querySelector<HTMLElement>("#assembly")!);
+  const globe = world(main.querySelector<HTMLElement>("#world")!);
+  new IntersectionObserver(async (es, o) => {
+    if (!es.some((e) => e.isIntersecting)) return;
+    o.disconnect();
+    try { await pageShown; await globe.mount(); } catch (err) { console.error("globe:", err); }
+  }, { rootMargin: "500px" }).observe(main.querySelector<HTMLElement>("#world .globe")!);
   safeTx(main.querySelector<HTMLElement>(".stx")!);
   library(main.querySelector<HTMLElement>("#lib")!);
   main.querySelectorAll<HTMLElement>(".part-3d").forEach((el, i) => {
