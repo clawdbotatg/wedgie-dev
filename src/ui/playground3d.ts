@@ -126,10 +126,10 @@ const STEPS3D: Step3D[] = [
   },
   { // 6 Tape
     dur: 2.4, view: { at: [6, 40, -10], az: -20, el: 55, d: 110 },
-    labels: [{ txt: "Tape on top of the wires", at: [ROW_R, 40.6, -11], t: [0.5, 1] }],
+    labels: [{ txt: "Tape on top of the wires", at: [ROW_R, 42, -11], t: [0.5, 1] }],
     run(s, t) {
       num(s, "f0", 1, E(t, 0.05, 0.4)); num(s, "f1", 1, E(t, 0.1, 0.45));     // over the top, down the inside of the header
-      go(s, "tape1", { p: [ROW_R, 40.6, HDR], v: 1 }, E(t, 0.3, 0.7));
+      go(s, "tape1", { p: [ROW_R, 42, HDR], v: 1 }, E(t, 0.3, 0.7));
     },
   },
   { // 7 Poke the holes
@@ -558,7 +558,7 @@ export async function mountPlayground(el: HTMLElement): Promise<Playground> {
     return [box(3.8, len, 0.16, tapeM, sx * 0.35, 0, -1.15), box(0.16, len, down + 1.1, tapeM, sx * 2.25, 0, (down - 1.15) / 2 - 0.1),
       box(3.2, len, 0.16, tapeM, sx * 3.8, 0, down - 1.2)];
   };
-  obj("tape1", "stack", tapeWrap(1, 9.6));
+  obj("tape1", "stack", tapeWrap(1, 12.4));
   obj("tape2", "stack", tapeWrap(-1, 7.6));
   // the four sockets the wires use, ringed in their colors; the 4th on the right, struck out
   const marks: THREE.Mesh[] = [];
@@ -597,7 +597,7 @@ export async function mountPlayground(el: HTMLElement): Promise<Playground> {
       lid: o(), A: o(), B: o(), X: o(), Y: o(),
       hat: o([0, 0, -24], [0, 0, 0], 0), film: o(), pico: o([32, 0, -10], [0, 0, 0], 0), tab: o(), g1: o(), g2: o(), g3: o(),
       chip: o([-24, 18, -10], [0, PI, 0], 0), plug: o([13, 72, FLAT - 1.5], [0, 0, PI]), plug2: o([13, -28, FLAT - 1.5]),
-      wires: o(), slugs: o(), tape1: o([ROW_R, 40.6, -26], [0, 0, 0], 0), tape2: o([ROW_L, 36.2, -26], [0, 0, 0], 0),
+      wires: o(), slugs: o(), tape1: o([ROW_R, 42, -26], [0, 0, 0], 0), tape2: o([ROW_L, 36.2, -26], [0, 0, 0], 0),
       marks: o(), holes: o(), joy: o([0, 0, 0], [0, 0, 0], 0), usb: o(USB_OUT, [0, 0, 0], 0),
       cutters: o([-30, 50, FLAT - 2.5], [0, 0, 0], 0), strippers: o([-30, 2, FLAT - 2.5], [0, 0, 0], 0), roll: o([60, 50, FLAT - 6], [0, 0, 0], 0),
       poker: o([48, 12, FLAT - 1.3], [0, PI / 2, 0.3], 0), tweezers: o([48, -20, FLAT - 1.8], [0, PI / 2, 0.1], 0),
