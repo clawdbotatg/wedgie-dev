@@ -149,6 +149,13 @@ export function home(main: HTMLElement): Promise<unknown> {
     <a class="btn btn-lg" href="/safe">Safe</a>
   </section>
 
+  <section id="teaser" class="sec teaser">
+    <div class="teaser-box">
+      <video playsinline preload="none" poster="/video/teaser.jpg" src="/video/teaser.mp4"></video>
+      <button class="teaser-play" aria-label="Play"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg></button>
+    </div>
+  </section>
+
   <section id="world" class="sec world">
     <div class="sec-head">
       <span class="kicker">Wedgies around the world</span>
@@ -157,13 +164,6 @@ export function home(main: HTMLElement): Promise<unknown> {
     <div class="card wide world-card">
       <div class="globe"></div>
       <div class="world-side"></div>
-    </div>
-  </section>
-
-  <section id="teaser" class="sec teaser">
-    <div class="teaser-box">
-      <video playsinline preload="none" poster="/video/teaser.jpg" src="/video/teaser.mp4"></video>
-      <button class="teaser-play" aria-label="Play"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg></button>
     </div>
   </section>
 `;
