@@ -62,10 +62,10 @@ const num = (s: S, name: string, to: number, k: number) => { if (k > 0) s.n[name
 // front; el: degrees up; d: mm away.
 const CAPS = ["A", "B", "X", "Y"];
 const CAP_X: Record<string, number> = { Y: 4.8, X: 10.5, B: 16.1, A: 21.8 };
-const TOOLS = ["cutters", "strippers", "roll", "poker", "tweezers"];
+const TOOLS = ["stripper", "roll", "poker", "tweezers"];
 // Step 1: the tools in tidy rows on the mat, all lying along the cable (case x = down the screen, case y = across)
 const HOME: Record<string, O> = {
-  cutters: { p: [42, 66, FLAT - 2.5], r: [0, 0, -PI / 2], v: 1 }, strippers: { p: [66, 66, FLAT - 2.5], r: [0, 0, -PI / 2], v: 1 },
+  stripper: { p: [50, 72, FLAT - 2.5], r: [0, 0, -PI / 2], v: 1 },
   roll: { p: [-24, 62, FLAT - 6], r: [0, 0, 0], v: 1 }, poker: { p: [-20, -34, FLAT - 1.3], r: [PI / 2, 0, 0], v: 1 },
   tweezers: { p: [90, -14, FLAT - 1.6], r: [-PI / 2, 0, 0], v: 1 },
 };
@@ -77,8 +77,8 @@ const LAID_OUT: Record<string, V3> = {                        // step 17: every 
 const STEPS3D: Step3D[] = [
   { // 1 Cable and tools
     dur: 3, view: { at: [34, 26, 4], az: 0, el: 66, d: 320 },
-    labels: [{ txt: "STEMMA QT / Qwiic cable", at: [13, 50, 3], t: [0.2, 1] }, { txt: "Cutters", at: [42, 30, 2], t: [0.35, 1] },
-      { txt: "Strippers", at: [66, 30, 2], t: [0.45, 1] }, { txt: "Tape", at: [-24, 62, -2], t: [0.55, 1] },
+    labels: [{ txt: "STEMMA QT / Qwiic cable", at: [13, 50, 3], t: [0.2, 1] }, { txt: "Wire stripper: cuts and strips", at: [50, 28, 2], t: [0.35, 1] },
+      { txt: "Tape", at: [-24, 62, -2], t: [0.55, 1] },
       { txt: "Stiff jumper wire", at: [-20, 4, 3], t: [0.65, 1] }, { txt: "Tweezers", at: [90, 34, 3], t: [0.75, 1] }],
     run(s, t) {
       go(s, "root", { r: [0, PI, PI / 2] }, 1);
@@ -87,15 +87,16 @@ const STEPS3D: Step3D[] = [
   },
   { // 2 Cut and strip
     dur: 4.2, view: { at: [13, 38, 4], az: 10, el: 58, d: 230 },
-    labels: [{ txt: "Cut 2 in (5 cm) from the plug", at: [13, 22, 4], t: [0.05, 0.45] }, { txt: "Strip 5 mm", at: [13, 18, 4], t: [0.62, 1] }],
+    labels: [{ txt: "Cut near the pivot, 2 in (5 cm) from the plug", at: [13, 22, 4], t: [0.05, 0.42] }, { txt: "Strip 5 mm in a notch near the tip", at: [13, 18, 4], t: [0.5, 1] }],
     run(s, t) {
-      go(s, "cutters", { p: [19.5, 22, FLAT - 2.5], r: [0, 0, 0] }, E(t, 0, 0.22));
-      go(s, "cutters", HOME.cutters, E(t, 0.3, 0.45));
-      go(s, "plug2", { p: [13, -48, 3.3], v: 0 }, E(t, 0.3, 0.55));
-      go(s, "strippers", { p: [19.5, 25, FLAT - 2.5], r: [0, 0, 0] }, E(t, 0.45, 0.62));
+      // one tool: the cutting edge is near the pivot (5 mm out), the stripping notches near the tip (19 mm out)
+      go(s, "stripper", { p: [13 + 5, 22, FLAT - 2.5], r: [0, 0, 0] }, E(t, 0, 0.22));
+      go(s, "plug2", { p: [13, -48, 3.3], v: 0 }, E(t, 0.28, 0.5));
+      go(s, "stripper", { p: [13 + 19, 26.5, FLAT - 2.5] }, E(t, 0.36, 0.56));
+      go(s, "stripper", { p: [13 + 19, 12, FLAT - 2.5] }, E(t, 0.62, 0.9));
       num(s, "strip", 1, E(t, 0.62, 0.9));
-      go(s, "strippers", HOME.strippers, E(t, 0.85, 1));
-      num(s, "fan", 1, E(t, 0.85, 1));
+      go(s, "stripper", HOME.stripper, E(t, 0.88, 1));
+      num(s, "fan", 1, E(t, 0.88, 1));
     },
   },
   { // 3 Number the wires: plug them into the Trust M, read them 1 to 4 by place, unplug
@@ -359,12 +360,22 @@ function jstPlug() {
   g.add(box(5.8, 4.2, 3, std(0xf1ede2, 0.7)));
   return g;
 }
-/** Pliers-like hand tool: jaws at the origin pointing -x, handles out along +x. */
-function pliers(handle: number) {
-  const g = new THREE.Group(), steel = std(0xb9bcc0, 0.3, 0.9);
-  g.add(box(16, 5, 3, steel, 2, 0, 0));
-  const h1 = box(62, 7, 5, plastic(handle, 0.6), 40, 6, 0); h1.rotation.z = 0.12;
-  const h2 = box(62, 7, 5, plastic(handle, 0.6), 40, -6, 0); h2.rotation.z = -0.12;
+/** A wire stripper: pivot at the origin, jaws out along -x (cutting edge near the pivot, stripping
+ *  notches near the tip), handles along +x. */
+function stripper() {
+  const g = new THREE.Group(), steel = std(0xb9bcc0, 0.3, 0.9), dark = std(0x3a3c40, 0.5, 0.6);
+  const jaw = new THREE.Mesh(new THREE.BoxGeometry(26, 7, 3), steel);
+  jaw.geometry.translate(-13, 0, 0);
+  const pos = jaw.geometry.attributes.position;           // taper toward the tip
+  for (let i = 0; i < pos.count; i++) if (pos.getX(i) < -20) pos.setY(i, pos.getY(i) * 0.55);
+  jaw.geometry.computeVertexNormals();
+  g.add(jaw);
+  g.add(box(9, 0.5, 3.1, dark, -5, 0, 0));                  // the cutting edge, the seam near the pivot
+  [-16, -18.5, -21].forEach((x, i) => { const n = new THREE.Mesh(new THREE.CylinderGeometry(0.45 + i * 0.12, 0.45 + i * 0.12, 3.2, 12), dark); n.rotation.x = PI / 2; n.position.x = x; g.add(n); });
+  const pin = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 3.6, 20), std(0x8d9095, 0.3, 0.9)); pin.rotation.x = PI / 2; g.add(pin);
+  g.add(box(10, 6, 3, steel, 4, 0, 0));
+  const h1 = box(64, 8, 6, plastic(0xd8322c, 0.6), 40, 6.5, 0); h1.rotation.z = 0.13;
+  const h2 = box(64, 8, 6, plastic(0xd8322c, 0.6), 40, -6.5, 0); h2.rotation.z = -0.13;
   g.add(h1, h2);
   return g;
 }
@@ -564,8 +575,7 @@ export async function mountPlayground(el: HTMLElement): Promise<Playground> {
   obj("usb", "stack", usbPlug());
 
   // tools, lying on the mat (board face down: the mat is case z = FLAT)
-  obj("cutters", "root", pliers(0xd8322c));
-  obj("strippers", "root", pliers(0xf2c417));
+  obj("stripper", "root", stripper());
   obj("roll", "root", tapeRoll());
   obj("poker", "stack", poker());
   obj("tweezers", "root", tweezers());
