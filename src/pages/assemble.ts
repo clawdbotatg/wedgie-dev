@@ -5,26 +5,54 @@ import "./assemble.css";
 
 type Step = { t: string; p: string; d?: string; ph: string[]; art?: string; tip?: string; warn?: string; end?: string };
 
+// The 4 wires go by their place in the plug, never by color: cables come in any colors (public/lore.md).
+// Number = place in the plug, top to bottom with the Trust M upright and the plug on the left.
+const WIRES = [
+  { n: 1, job: "GND", to: "right 3rd", hole: "R2" },
+  { n: 2, job: "3V3", to: "right 5th", hole: "R4" },
+  { n: 3, job: "SDA", to: "left 6th", hole: "L5" },
+  { n: 4, job: "SCL", to: "left 7th", hole: "L6" },
+];
+const badge = (x: number, y: number, n: number) =>
+  `<circle class="bd" cx="${x}" cy="${y}" r="11"/><text class="bn" x="${x}" y="${y + 4.5}" text-anchor="middle">${n}</text>`;
+
+// The Trust M board with the plug in, as in the step's photo: each wire's number, job and socket.
+export const PLUG = (() => {
+  let s = "";
+  WIRES.forEach((w, i) => {
+    const y = 74 + i * 26;
+    s += `<path class="wire" d="M268 ${100 + i * 8}C240 ${100 + i * 8} 230 ${y} 200 ${y}H186"/>`;
+    s += badge(174, y, w.n);
+    s += `<text class="wj" x="156" y="${y + 5}" text-anchor="end">${w.job}<tspan class="wt"> → ${w.to}</tspan></text>`;
+  });
+  return `<svg class="wire-art" viewBox="24 36 372 148" role="img" aria-label="The Trust M with the plug on its left. Top to bottom: wire 1 GND goes to the right row's 3rd socket, 2 3V3 right 5th, 3 SDA left 6th, 4 SCL left 7th.">
+    <rect class="board" x="276" y="40" width="116" height="140" rx="14"/>
+    <text class="bt" x="334" y="64" text-anchor="middle">Trust M</text>
+    <rect class="chip" x="316" y="96" width="36" height="36" rx="4"/>
+    <rect class="plug" x="262" y="90" width="26" height="44" rx="3"/>
+    ${s}</svg>`;
+})();
+
 // The screen board's sockets seen from above (board face down, USB end up): the top 8 holes of each
-// row. The four the chip uses are filled with their wire's color; the 4th on the right is struck out.
+// row. The four the chip uses carry their wire's number; the 4th on the right is struck out.
 export const HEADER = (() => {
   const L = ["GP0", "GP1", "GND", "GP2", "GP3", "GP4", "GP5", "GND"];
   const R = ["VBUS", "VSYS", "GND", "3V3_EN", "3V3", "VREF", "GP28", "AGND"];
-  const use: Record<string, [string, string]> = { "L5": ["Black", "black"], "L6": ["Red", "red"], "R2": ["White", "white"], "R4": ["Yellow", "yellow"] };
+  const use = Object.fromEntries(WIRES.map((w) => [w.hole, w]));
   const y = (i: number) => 58 + i * 30;
   let s = "";
   for (let i = 0; i < 8; i++) {
     for (const [side, x, names] of [["L", 150, L], ["R", 250, R]] as const) {
       const u = use[side + i], no = side === "R" && i === 3;
-      s += `<rect class="hole${u ? " w-" + u[1] : ""}${no ? " no" : ""}" x="${x - 11}" y="${y(i) - 11}" width="22" height="22" rx="5"/>`;
+      s += u ? badge(x, y(i), u.n) : `<rect class="hole${no ? " no" : ""}" x="${x - 11}" y="${y(i) - 11}" width="22" height="22" rx="5"/>`;
       if (no) s += `<path class="x" d="M${x - 7} ${y(i) - 7}l14 14m0-14l-14 14"/>`;
       const tx = side === "L" ? x - 22 : x + 22, a = side === "L" ? "end" : "start";
       s += `<text class="pn${u ? " on" : ""}" x="${tx}" y="${y(i) + 4}" text-anchor="${a}">${names[i]}</text>`;
-      if (u) s += `<text class="wl" x="${side === "L" ? 10 : 390}" y="${y(i) + 4}" text-anchor="${side === "L" ? "start" : "end"}">${u[0]}</text>`;
+      if (u) s += `<text class="wl" x="${side === "L" ? 10 : 390}" y="${y(i) + 4}" text-anchor="${side === "L" ? "start" : "end"}">${u.n} ${u.job}</text>`;
     }
     s += `<text class="rn" x="200" y="${y(i) + 4}" text-anchor="middle">${i + 1}</text>`;
   }
-  return `<svg class="header-art" viewBox="0 0 400 300" role="img" aria-label="The screen board's sockets, face down, USB end up. White in the right row's 3rd, yellow right 5th, black left 6th, red left 7th. Never the right 4th.">
+  return `<svg class="wire-art" viewBox="0 0 400 300" role="img" aria-label="The screen board's sockets, face down, USB end up. Wire 1 GND in the right row's 3rd, 2 3V3 right 5th, 3 SDA left 6th, 4 SCL left 7th. Never the right 4th.">
     <rect class="usb" x="170" y="6" width="60" height="22" rx="6"/><text class="usbt" x="200" y="21" text-anchor="middle">USB</text>
     <rect class="strip" x="132" y="38" width="36" height="252" rx="9"/><rect class="strip" x="232" y="38" width="36" height="252" rx="9"/>
     ${s}</svg>`;
@@ -32,17 +60,21 @@ export const HEADER = (() => {
 
 export const STEPS: Step[] = [
   { t: "Cable and tools",
-    p: `A STEMMA QT / Qwiic cable (4-pin JST-SH plug, white, yellow, black, red), wire cutters and strippers, electrical tape, a stiff breadboard jumper wire, and tweezers.`,
+    p: `A STEMMA QT / Qwiic cable (4-pin JST-SH plug), wire cutters and strippers, electrical tape, a stiff breadboard jumper wire, and tweezers.`,
     d: "01", ph: ["01-cable-and-strippers"] },
   { t: "Cut and strip the wires",
     p: `Keep one plug. Cut the wires about <b>2 in (5 cm)</b> from it. Strip off as much as a socket is deep, about <b>5 mm</b> (between 1/8 and 1/4 in), so the bare wire goes all the way down.`,
     d: "03", ph: ["03-cut-and-stripped-a", "03-cut-and-stripped-b"] },
+  { t: "Number the wires",
+    p: `Plug the cable into the Trust M, plug on the left, words up. The wires are <b>1 to 4, top to bottom</b>. Go by place, never by color: cables differ. Unplug it.`,
+    d: "02", ph: ["02-trust-m-plug"], art: PLUG,
+    tip: `In our photos: 1 white, 2 yellow, 3 black, 4 red.` },
   { t: "Lay out the screen board",
     p: `Turn the screen board face down, sockets up, USB mark at the top. Each wire pushes into a socket, no solder. Count sockets from the USB end:`,
     d: "04", ph: ["04-board-and-guide"], art: HEADER,
-    warn: `Never put anything in the 4th socket on the right row. Your own cable? Its colors may differ: go by the wire's place in the plug (step 9), not its color.` },
-  { t: "Push in white and yellow",
-    p: `Twist the strands at each tip tight, so each acts like one solid wire. Push <b>white into the 3rd</b> and <b>yellow into the 5th</b> socket on the right row.`,
+    warn: `Never put anything in the 4th socket on the right row.` },
+  { t: "Push in wires 1 and 2",
+    p: `Twist the strands at each tip tight, so each acts like one solid wire. On the right row: <b>1 (GND) into the 3rd</b>, <b>2 (3V3) into the 5th</b>.`,
     d: "05", ph: ["05-white-yellow-in-header"] },
   { t: "Tape over the wires",
     p: `A small piece of electrical tape over those sockets, right on top of the wires, holds them in.`,
@@ -50,17 +82,14 @@ export const STEPS: Step[] = [
   { t: "Poke the holes open",
     p: `Push the stiff jumper wire through the tape into each covered socket. This opens the holes for the Pico's pins. The tape still holds the wires.`,
     d: "06t", ph: ["08-black-red-taped", "07-poke-holes-through-tape"] },
-  { t: "Black and red, same way",
-    p: `On the left row: <b>black into the 6th</b>, <b>red into the 7th</b>. Tape over them. Poke the holes open.`,
+  { t: "Wires 3 and 4, same way",
+    p: `On the left row: <b>3 (SDA) into the 6th</b>, <b>4 (SCL) into the 7th</b>. Tape over them. Poke the holes open.`,
     d: "08", ph: ["08-black-red-guide", "08-black-red-in-header", "08-black-red-taped"] },
   { t: "Header ready",
     p: `All 4 wires in, taped, holes open. Ready for the Pico.`,
     d: "09h", ph: ["09-header-ready"] },
-  { t: "How the plug fits the chip",
-    p: `The plug goes into the Trust M chip board. Only 4 wires. Top to bottom: <b>white, yellow, black, red</b>.`,
-    d: "02", ph: ["02-trust-m-plug"] },
   { t: "Plug in the chip",
-    p: `Plug the cable into the Trust M. It only fits one way. Lay the Trust M face up on the back of the screen board, over the wires. The Pico goes on top of it next.`,
+    p: `Plug the cable back into the Trust M. It only fits one way. Lay the Trust M face up on the back of the screen board, over the wires. The Pico goes on top of it next.`,
     d: "10p", ph: ["10-chip-laid-down", "10-chip-plugged", "10-chip-plugged-side", "10-ready-for-pico"] },
   { t: "Snap off extra board",
     p: `Some Picos have a little extra board left on the end, away from the USB port. Pinch it with pliers and snap it off. Otherwise it won't fit the case.`,

@@ -39,21 +39,26 @@
 
 /* the header diagram */
 .asm-art { padding: 18px; border-radius: 22px; margin-top: 16px; }
-.header-art { display: block; width: 100%; height: auto; }
-.header-art .strip { fill: #2a2b2c; }
-.header-art .hole { fill: #121313; stroke: #3c3d3f; stroke-width: 1.5; }
-.header-art .hole.w-white { fill: #fdfdfb; stroke: #9a9c99; stroke-width: 2.5; }
-.header-art .hole.w-yellow { fill: #f2c21b; stroke: #a7830a; }
-.header-art .hole.w-black { fill: #000; stroke: #e8e8e4; stroke-width: 2.5; }
-.header-art .hole.w-red { fill: #e3312c; stroke: #9c1d19; }
-.header-art .hole.no { fill: #3a1b1a; stroke: #e3312c; }
-.header-art .x { stroke: #ff6a62; stroke-width: 3; stroke-linecap: round; }
-.header-art .usb { fill: #fff; stroke: #cfcfca; stroke-width: 1.5; }
-.header-art .usbt { font: 800 11px var(--font); fill: var(--muted); letter-spacing: .1em; }
-.header-art .pn { font: 500 10px var(--mono); fill: #9a9c99; }
-.header-art .pn.on { fill: var(--ink); }
-.header-art .rn { font: 800 10px var(--font); fill: #6f7072; }
-.header-art .wl { font: 900 14px var(--font); fill: var(--mint-d); }
+.wire-art { display: block; width: 100%; height: auto; }
+.wire-art .strip { fill: #2a2b2c; }
+.wire-art .hole { fill: #121313; stroke: #3c3d3f; stroke-width: 1.5; }
+.wire-art .hole.no { fill: #3a1b1a; stroke: #e3312c; }
+.wire-art .x { stroke: #ff6a62; stroke-width: 3; stroke-linecap: round; }
+.wire-art .usb { fill: #fff; stroke: #cfcfca; stroke-width: 1.5; }
+.wire-art .usbt { font: 800 11px var(--font); fill: var(--muted); letter-spacing: .1em; }
+.wire-art .pn { font: 500 10px var(--mono); fill: #9a9c99; }
+.wire-art .pn.on { fill: var(--ink); }
+.wire-art .rn { font: 800 10px var(--font); fill: #6f7072; }
+.wire-art .wl { font: 900 14px var(--font); fill: var(--ink); }
+.wire-art .bd { fill: #1bb24a; stroke: #fff; stroke-width: 2; }
+.wire-art .bn { font: 900 13px var(--font); fill: #fff; }
+.wire-art .board { fill: #1c1d1e; }
+.wire-art .bt { font: 800 13px var(--font); fill: #e8e8e4; }
+.wire-art .chip { fill: #2e2f31; stroke: #e8e8e4; stroke-width: 2; }
+.wire-art .plug { fill: #f2f1ec; stroke: #9a9c99; stroke-width: 1.5; }
+.wire-art .wire { fill: none; stroke: #8a8c89; stroke-width: 4; stroke-linecap: round; }
+.wire-art .wj { font: 900 15px var(--font); fill: var(--ink); }
+.wire-art .wt { font-weight: 700; fill: var(--muted); }
 
 .asm-trouble { margin-top: 34px; }
 .asm-trouble dl { margin: 18px 0 0; display: grid; gap: 14px; }
