@@ -522,7 +522,23 @@ export async function mountPlayground(el: HTMLElement): Promise<Playground> {
   screen.position.set(G.cx, G.cy, G.z + 0.05);
   screen.rotation.z = -PI / 2;
   screen.userData.noShadow = true;
-  obj("hat", "stack", [part("hat", std(PART_COLORS.hat, 0.6)), glass, screen], C);
+  // the white "USB" mark printed on the back of the screen board, at the end that goes on the Pico's USB end
+  const usbMark = (() => {
+    const c = document.createElement("canvas"); c.width = 256; c.height = 160;
+    const g = c.getContext("2d")!;
+    g.fillStyle = "#f4f4f0";
+    g.beginPath(); g.roundRect(8, 40, 240, 112, 14); g.fill();
+    g.beginPath(); g.roundRect(78, 6, 100, 44, 8); g.fill();             // the plug-shaped bump on top
+    g.fillStyle = "#3a3b3e"; g.font = "bold 72px system-ui, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillText("USB", 128, 100);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(8, 5), new THREE.MeshStandardMaterial({ map: t, alphaTest: 0.5, roughness: 0.7 }));
+    m.rotation.y = PI;                                                   // faces the back; reads with the USB end up
+    m.position.set(13.22, 49.4, -1.99);
+    m.userData.noShadow = true;
+    return m;
+  })();
+  obj("hat", "stack", [part("hat", std(PART_COLORS.hat, 0.6)), glass, screen, usbMark], C);
   const filmM = new THREE.MeshPhysicalMaterial({ color: 0x9fc4ff, roughness: 0.15, transparent: true, opacity: 0.45, clearcoat: 1 });
   const film = new THREE.Mesh(new THREE.BoxGeometry(G.w + 0.6, G.h + 0.6, 0.12), filmM);
   film.position.set(G.cx, G.cy, G.z + 0.14);
