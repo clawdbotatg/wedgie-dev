@@ -33,7 +33,7 @@ const version = (F.file("wedgie.py").toString().match(/VERSION = "([^"]+)"/) || 
 const { privateKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
 const jwk = createPublicKey(privateKey).export({ format: "jwk" });
 const hx = (b) => Buffer.from(b, "base64url").toString("hex");
-const wedgiePy = Buffer.from(F.file("wedgie.py").toString().replace(/^RELEASE_KEY = .*$/m, `RELEASE_KEY = ("${hx(jwk.x)}", "${hx(jwk.y)}")`));
+const wedgiePy = Buffer.from(F.file("wedgie.py").toString().replace(/^RELEASE_KEYS = [^]*?\)\)\n/m, `RELEASE_KEYS = (("${hx(jwk.x)}", "${hx(jwk.y)}"),)\n`));
 const KD = mkdtempSync(join(tmpdir(), "chipkey-"));
 writeFileSync(join(KD, "wedgie.py"), wedgiePy);
 execFileSync("uv", ["run", "-q", "--with", "mpy-cross==1.29.0.post2", "python3", "-c",
