@@ -8,13 +8,14 @@
 // orders: [{id, token, at}]; the tokens (_mail.ts tokenOf) open each order's page. One link a minute, 5 an hour,
 // per email, and IP_HOUR an hour per IP (a script with a list of addresses would burn the inbox's daily quota). Only
 // hashes are stored (the IP's: _shop.ts ipOf, gone with its link after a day).
-import { db, json, oops, same, env, sha256, randomHex, ipOf } from "./_shop.js";
+import { db, json, oops, same, env, sha256, randomHex, ipOf, crossSite } from "./_shop.js";
 import { EMAIL, emailHash, tokenOf, signinMail, lock, unlock } from "./_mail.js";
 
 const SESSION_DAYS = 30, IP_HOUR = 5;
 type Sql = Awaited<ReturnType<typeof db>>;
 
 export async function POST(req: Request) {
+  if (crossSite(req)) return oops("Not from wedgie.dev.", 403);
   let b: any;
   try { b = await req.json(); } catch { return oops("Bad request."); }
   if (!env("SHOP_DATABASE_URL") || !env("SHOP_MAIL_KEY")) return oops("Sign in isn't open yet.", 503);

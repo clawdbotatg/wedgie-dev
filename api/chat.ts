@@ -5,7 +5,7 @@
 // `from` is what the sender's page says: nothing proves it (the page shows it as such). PER_HOUR posts an
 // hour per IP (_shop.ts ipOf: a hash, never the IP), BOX_MAX waiting in one box. Never log a body here.
 import { neon } from "@neondatabase/serverless";
-import { json, oops, env, sha256, ipOf } from "./_shop.js";
+import { json, oops, env, sha256, ipOf, crossSite } from "./_shop.js";
 
 const DAYS = 7, PER_HOUR = 120, BOX_MAX = 500, BLOB_MAX = 2400;
 const KEY = /^04[0-9a-f]{128}$/, BOX = /^[0-9a-f]{64}$/;
@@ -27,6 +27,7 @@ async function db() {
 }
 
 export async function POST(req: Request) {
+  if (crossSite(req)) return oops("Not from wedgie.dev.", 403);
   let b: any;
   try { b = await req.json(); } catch { return oops("Bad request."); }
   if (!env("SHOP_DATABASE_URL")) return oops("Chat isn't open yet.", 503);

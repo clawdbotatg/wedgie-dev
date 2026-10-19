@@ -15,7 +15,7 @@
 // The place: lat/lon rounded to 0.25° (about 25 km: 0.1° found a house, 1° another town), the person picks where on the globe. Never log a body here.
 // A first look by AI (judge, BANKR_API_KEY): 0-10, how likely we'd approve it, and why. It only advises:
 // the Telegram note shows it with Yes / No buttons, and a person still decides.
-import { db as shopDb, json, oops, env, ipOf, hmac, same, randomHex } from "./_shop.js";
+import { db as shopDb, json, oops, env, ipOf, hmac, same, randomHex, crossSite } from "./_shop.js";
 import { send } from "./_mail.js";
 
 const PER_HOUR = 3, PER_DAY = 8, WAITING_MAX = 300, MAIL_PER_DAY = 30, IMG_MAX = 1_500_000;
@@ -123,6 +123,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  if (crossSite(req)) return oops("Not from wedgie.dev.", 403);
   if ((req.headers.get("content-type") || "").startsWith("application/x-www-form-urlencoded")) return decide(req);
   if (Number(req.headers.get("content-length") || 0) > IMG_MAX * 1.4 + 20_000) return oops("That photo is too big.", 413);
   let b: any;

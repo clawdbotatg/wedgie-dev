@@ -57,6 +57,7 @@ export async function db() {
     await sql`alter table links add column if not exists ip text`;   // ipOf, for login.ts IP_HOUR; gone with the link in a day
     await sql`alter table orders add column if not exists held boolean`;   // unused since 10-15 (dust could lock the stock)
     await sql`alter table orders add column if not exists got bigint`;   // usdc: what its deposit held when last read (settleDeposit); kept past 30 days if > 0
+    await sql`create table if not exists rpc_hits (k text primary key, n int not null, at timestamptz not null default now())`;   // api/rpc.ts: calls per IP hash per minute and per day
     await sql`create table if not exists stock (id int primary key, n int not null, set_at timestamptz not null default now())`;   // stockLeft
     await sql`create table if not exists counts (day date not null, k text not null, n int not null, primary key (day, k))`;   // api/count.ts: checkout steps, no one in them
   })().catch((e) => { ready = null; throw e; });
@@ -165,6 +166,14 @@ export const OPEN_MAX = 2;
 export async function ipOf(req: Request) {
   const ip = req.headers.get("x-real-ip") || (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || "none";
   return (await hmac(env("SHOP_ADMIN_TOKEN") || "wedgie", "ip:" + ip)).slice(0, 32);
+}
+/** A browser POST sent by another site (a form or a no-cors fetch riding the visitor's cookies): refused
+ * everywhere but the Stripe webhook. Scripts (curl, wedgie.py, Stripe) send neither header and pass. */
+export function crossSite(req: Request) {
+  const f = req.headers.get("sec-fetch-site");
+  if (f) return f !== "same-origin" && f !== "none";
+  const o = req.headers.get("origin");
+  try { return !!o && new URL(o).host !== req.headers.get("host"); } catch { return true; }
 }
 export async function tooMany(sql: Awaited<ReturnType<typeof db>>, ip: string) {
   const [r] = await sql`select count(*)::int as n from orders where ip = ${ip} and status = 'new'

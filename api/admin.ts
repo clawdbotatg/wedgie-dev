@@ -9,7 +9,7 @@
 // Each GET also marks paid the USDC orders made in the last 3 days, or with something sent, whose deposit address now
 // holds their price (older empty ones settle when their buyer opens the order page), and deletes what's done with: shipped or canceled orders and
 // unpaid or expired ones with nothing sent, 30 days on. GET ?stock=1: just the stock count.
-import { db, env, json, oops, same, settleDeposit, stockLeft, endCard, type Order } from "./_shop.js";
+import { db, env, json, oops, same, settleDeposit, stockLeft, endCard, type Order, crossSite } from "./_shop.js";
 import { unlock, shippedMail, mailPaid } from "./_mail.js";
 
 const allowed = (req: Request) => {
@@ -46,6 +46,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  if (crossSite(req)) return oops("Not from wedgie.dev.", 403);
   if (!allowed(req)) return oops("no", 401);
   let b: any;
   try { b = await req.json(); } catch { return oops("Bad request."); }

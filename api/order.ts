@@ -9,7 +9,7 @@
 import { PAY_CHAINS, cartOk, cartLines } from "../src/shop/catalog.js";
 import { depositOf } from "../src/shop/deposits.js";
 import { EMAIL, emailHash, lock, tokenOf, mailPaid } from "./_mail.js";
-import { db, env, json, oops, randomHex, sha256, same, publicView, checkout, session, markPaid, endCard, usdcPaid, usdcFind, settleDeposit, extraNow, expireOld, late, rpc, ipOf, tooMany, stockLeft, boxes, soldOut, type Order } from "./_shop.js";
+import { db, env, json, oops, randomHex, sha256, same, publicView, checkout, session, markPaid, endCard, usdcPaid, usdcFind, settleDeposit, extraNow, expireOld, late, rpc, ipOf, tooMany, stockLeft, boxes, soldOut, type Order, crossSite } from "./_shop.js";
 
 const open = () => ({ card: !!env("STRIPE_SECRET_KEY"), usdc: !!env("SHOP_PAY_TO"), chains: Object.keys(PAY_CHAINS).map(Number).filter((c) => env("SHOP_RPC_" + c)) });
 
@@ -21,6 +21,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  if (crossSite(req)) return oops("Not from wedgie.dev.", 403);
   let b: any;
   try { b = await req.json(); } catch { return oops("Bad request."); }
   if (!env("SHOP_DATABASE_URL")) return oops("The shop isn't open yet.", 503);

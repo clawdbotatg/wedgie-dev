@@ -5,7 +5,7 @@
 // past KEEP_PER_DAY, refused (the table stays small).
 // No IP kept: ipOf (a hash) only for PER_HOUR, wiped after a day. Their email, if they gave one, goes in the mail, never the table.
 // Never log a body here.
-import { db as shopDb, json, oops, env, ipOf } from "./_shop.js";
+import { db as shopDb, json, oops, env, ipOf, crossSite } from "./_shop.js";
 import { send } from "./_mail.js";
 
 const REPORT_DAYS = 90, PER_HOUR = 6, MAIL_PER_DAY = 50, KEEP_PER_DAY = 1000, MAX = 60_000, NOTE_MAX = 4000;
@@ -27,6 +27,7 @@ async function db() {
 }
 
 export async function POST(req: Request) {
+  if (crossSite(req)) return oops("Not from wedgie.dev.", 403);
   let b: any;
   try { b = await req.json(); } catch { return oops("Bad request."); }
   const note = String(b?.note || "").slice(0, NOTE_MAX), report = String(b?.report || ""), email = String(b?.email || "").trim();
