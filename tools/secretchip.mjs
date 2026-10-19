@@ -5,8 +5,8 @@
 //     app answers its error there: anything but a crash).
 //  2. No app, the REPL: secret_box.py opens that message on real MicroPython (cryptolib AES, its HMAC),
 //     given the ECDH secret Node works out, and the reader draws it.
-//  3. Chat, in the REPL with the chip's ECDH and the press played: a named sender asks once, their next
-//     message shows with no ask, a nameless one always asks, red closes the chat.
+//  3. Chat, in the REPL with the chip's ECDH and the press played: every message asks (a "from" name is the
+//     computer's word: it never skips the press or shows), a screen shot is refused while one is up, red closes it.
 // A MemoryError, a traceback that isn't the chip's, or no answer fails it. Prints the least free heap seen.
 //   node tools/secretchip.mjs [--app <wedgie-secret checkout>] [--shots <dir>]   (default: the shelf's copy; until it is on the shelf, pass --app)
 // Needs uv (the flash image: littlefs-python).
@@ -149,24 +149,31 @@ b = ${JSON.stringify(blob)}
 gc.collect()
 f0 = gc.mem_free()
 secret.on_open(1, b, "Bob")
-one = (len(asks), secret.chat["from"], len(secret.chat["lines"]))
+one = (len(asks), secret.chat["from"] or "-", len(secret.chat["lines"]))
 secret.draw_chat()
 secret.on_open(2, b, "Bob")
 two = len(asks)
 secret.on_open(3, b, "")
 three = len(asks)
+import wedgie as W
+sent = []
+_send, W.send = W.send, sent.append
+secret.handle({"id": 9, "type": "shot"})
+W.send = _send
+shot = "refused" if sent and sent[0].get("type") == "error" else "SENT"
 secret.chat_key("down")
 pg = secret.chat["at"]
 secret.chat_key("Y")
 gc.collect()
-print("RES", one[0], one[1], one[2], two, three, pg, secret.chat is None, f0 - gc.mem_free(), asks[0])
+print("RES", one[0], one[1], one[2], two, three, pg, secret.chat is None, f0 - gc.mem_free(), shot, asks[0])
 `, 60000);
   const m = r.match(/RES (.*)/);
-  const [a1, from, lines, a2, a3, pg, closed, used, ...q] = m ? m[1].trim().split(" ") : [], q0 = q.join(" ");
+  const [a1, from, lines, a2, a3, pg, closed, used, shot, ...q] = m ? m[1].trim().split(" ") : [], q0 = q.join(" ");
   if (!m) console.log("     it said:", JSON.stringify(r.slice(-600)));
-  check(a1 === "1" && from === "Bob" && Number(lines) > 10, `chat: Bob's first message asks once ("${q0}"), ${lines} lines on screen`);
-  check(a2 === "1", "chat: Bob's next message shows with no ask");
-  check(a3 === "2", "chat: a message with no name always asks");
+  check(a1 === "1" && from === "-" && Number(lines) > 10, `chat: a message asks ("${q0}"), ${lines} lines on screen, no sender name`);
+  check(a2 === "2", "chat: the same \"from\" asks again");
+  check(a3 === "3", "chat: a message with no name asks");
+  check(shot === "refused", "chat: a screen shot is refused while a secret is up");
   check(pg === "1" && closed === "True", `chat: down pages, red closes it (${used} B held after)`);
 }
 console.log(`     least free heap seen with the app running: ${least} bytes (${leastWhere})`);

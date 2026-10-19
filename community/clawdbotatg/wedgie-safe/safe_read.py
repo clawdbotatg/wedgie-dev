@@ -46,6 +46,7 @@ ROLES_SELS = ("957ed2b3", "610b5925", "e009cfde", "0c6c76b8", "0172a43a", "7508d
 K_USDC = "8cf0b93cd9d3e32167f8de799f8e55df33697bb155a46b384f39bd78e75879b5"   # instant-wallet.burner.usdc
 K_ETH = "45cc4838df5ba19e2e80bafaf996e5acf9194b3706f31dfa92fdfb8cc4fd3017"    # instant-wallet.burner.eth
 K_FEE = "e0a4e7171a966a6c2f8a346d61492f1479248405e8f190113096dd36aed44e2b"    # instant-wallet.burner.fee-usdc
+ROLE = "86c37482ef7146c27eb2859f3f7443e45fcbc4e32caa3c89515918953dd30949"     # instant-wallet.burner: the one role
 # what each allowance is: (what it's called, symbol, decimals, what it's for)
 LIMITS = {K_USDC: ("Daily limit", "USDC", 6, "a day with just Face ID"),
           K_ETH: ("Daily limit", "ETH", 18, "a day with just Face ID"),
@@ -152,9 +153,12 @@ def _uniswap(tx):
         to, eth_out = hx(calls[1][4 + 44:4 + 64]), True
     elif len(calls) != 1:
         return None
-    pay = "%s ETH" % amount(tx["value"], 18) if tx["value"] else _amt(tx, a, amt_in)
     get = "%s ETH" % amount(min_out, 18) if eth_out else _amt(tx, z, min_out)
-    return "Swap", [("pay", MUTED), (pay, INK, BIG), ("get at least", MUTED), (get, INK, BIG),
+    if tx["value"] and not (_tok(tx, a)[0] == "WETH" and amt_in == tx["value"]):   # ETH sent, but the swap pays
+        pay = [(_amt(tx, a, amt_in), RED, BIG), ("and sends %s ETH" % amount(tx["value"], 18), RED)]   # something else
+    else:                                                                            # (audit 10-18)
+        pay = [("%s ETH" % amount(tx["value"], 18) if tx["value"] else _amt(tx, a, amt_in), INK, BIG)]
+    return "Swap", [("pay", MUTED)] + pay + [("get at least", MUTED), (get, INK, BIG),
                     ("to this Safe", GREEN_D) if to == safe else ("to " + short(to) + "!", RED)]
 
 
@@ -182,7 +186,10 @@ def _roles(tx, sel):
     """Zodiac Roles (the daily budget): what each setting call does, as (title, lines), or None."""
     data = tx["data"]
     if sel == "957ed2b3" and len(data) >= 4 + 32 * 7:      # assignRoles(module, keys[], memberOf[])
-        o = int.from_bytes(_arg(data, 2), "big")
+        ko, o = int.from_bytes(_arg(data, 1), "big"), int.from_bytes(_arg(data, 2), "big")
+        if int.from_bytes(data[4 + ko:36 + ko], "big") != 1 or int.from_bytes(data[4 + o:36 + o], "big") != 1 or \
+                binascii.hexlify(data[36 + ko:68 + ko]).decode() != ROLE:      # one role, Instant Wallet's (audit 10-18)
+            return "Daily limit", [("roles", MUTED), ("can't read it", RED, BIG)]
         on = data[4 + o + 32 + 31] == 1
         return "Daily limit", [("this key may spend" if on else "this key can't spend", INK if on else RED)] + \
             _addr_lines("", _aarg(data, 0), INK if on else RED)[1:]
@@ -191,6 +198,8 @@ def _roles(tx, sel):
     if sel == "e009cfde" and len(data) == 68:               # disableModule(prev, key)
         return "Daily limit", [("turn it off", RED)] + _addr_lines("", _aarg(data, 1), RED)[1:]
     t = _aarg(data, 1) if len(data) >= 68 else ""
+    if sel in ("0c6c76b8", "0172a43a", "7508dd98") and binascii.hexlify(_arg(data, 0)).decode() != ROLE:
+        return "Daily limit", [("another role", MUTED), ("can't read it", RED, BIG)]     # (audit 10-18)
     what = _tok(tx, t)[0] or ("ETH sends" if t == MULTICALL3 else short(t))
     if sel == "0c6c76b8" and len(data) == 68:               # scopeTarget(role, target)
         ok = _tok(tx, t)[0] == "USDC" or t == MULTICALL3     # what Instant Wallet's limits spend through
@@ -206,6 +215,11 @@ def _roles(tx, sel):
     if sel == "a8ec43ee" and len(data) == 4 + 32 * 6:       # setAllowance(key, balance, max, refill, period, ts)
         k = binascii.hexlify(_arg(data, 0)).decode()
         refill, per = int.from_bytes(_arg(data, 3), "big"), int.from_bytes(_arg(data, 4), "big")
+        bal, most = int.from_bytes(_arg(data, 1), "big"), int.from_bytes(_arg(data, 2), "big")
+        if k in LIMITS and (bal > refill or most != refill):     # spendable now / at most: more than a day's (audit 10-18)
+            name, sym, dec, why = LIMITS[k]
+            return name, [("%s %s" % (amount(max(bal, most), dec), sym), RED, BIG), ("can go at once", RED),
+                          ("then %s %s" % (amount(refill, dec), sym), MUTED)]
         if k in LIMITS:
             name, sym, dec, why = LIMITS[k]
             return name, [("%s %s" % (amount(refill, dec), sym), INK, BIG),
@@ -235,6 +249,9 @@ def _rule(tx, data, target):
     """The rules Instant Wallet sets for the burner's USDC and ETH, in words; None for any other."""
     c = _conds(data)
     sel = binascii.hexlify(data[68:72]).decode()
+    opt = int.from_bytes(_arg(data, 4), "big")      # ExecutionOptions: 0 none, 1 send ETH, 2/3 delegatecall: the key
+    if opt != (1 if target == MULTICALL3 else 0):   # would run any code as the Safe (audit 10-18)
+        return None
     if sel == "a9059cbb" and _tok(tx, target)[0] != "USDC":   # the USDC rules on another token: not what it says
         return None
     if sel == "a9059cbb" and c == [(0, 5, 5, ""), (0, 1, 0, ""), (0, 1, 28, K_USDC)]:
@@ -349,7 +366,7 @@ def batch(tx):
     # multiSend(bytes): the bytes must start right after their offset word, where the wedgie reads them.
     # Solidity follows the offset; a batch pointed elsewhere signed one thing and showed another (audit 10-16).
     n = int.from_bytes(data[36:68], "big")
-    if data[4:36] != word(32) or len(data) < 68 + n:
+    if data[4:36] != word(32) or len(data) < 68 + n or not n:     # empty: nothing to show, nothing signed (audit 10-18)
         raise ValueError("bad batch")
     b = data[68:68 + n]
     out, i = [], 0
@@ -386,11 +403,12 @@ def fold(acts):
         app = pages[-1] if pages and pages[-1][0] == "Allow taking" else None
         if app and head in ("Swap", "Bridge") and app[2] == a["to"] and not any(l[1] == RED for l in app[1]):
             amt = app[1][0][0]
+            fees = [l for l in app[1] if l[0][:2] == "+ "]     # fees folded onto the approval stay (audit 10-18)
             if any(l[0] == amt for l in lines):
-                pages[-1] = (head, lines, None)
+                pages[-1] = (head, lines + fees, None)
                 continue
             if not any(l[0] == "pay" for l in lines):
-                pages[-1] = (head, lines[:1] + [("pay", MUTED), (amt, INK, BIG)] + lines[1:], None)
+                pages[-1] = (head, lines[:1] + [("pay", MUTED), (amt, INK, BIG)] + lines[1:] + fees, None)
                 continue
         mine = head in ("Daily limit", "Fee limit") or head == "Turn on" and lines == [("Daily limit", INK, BIG)]
         if mine and not red and not (a["to"] != a["safe"] and sel in ("957ed2b3", "610b5925")):

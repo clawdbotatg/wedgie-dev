@@ -3,13 +3,20 @@
   "repos": [
     {
       "repo": "clawdbotatg/wedgie-safe",
-      "sha": "7370864db1ec5a84e327366ba7c04844fe8aee3c",
-      "at": "2026-10-18T02:24:21Z",
-      "approved": "2026-10-18",
+      "sha": "3345bd11a448121197c5ad41a14f853c77950145",
+      "at": "2026-10-19T02:17:26Z",
+      "approved": "2026-10-19",
       "v": {
-        "safe": "0abea79b22ca"
+        "safe": "9cdb9528f832"
       },
       "past": [
+        {
+          "sha": "7370864db1ec5a84e327366ba7c04844fe8aee3c",
+          "at": "2026-10-18T02:24:21Z",
+          "v": {
+            "safe": "0abea79b22ca"
+          }
+        },
         {
           "sha": "9c20cdc2765a5e92721fb90cc0ee9c02a31e382b",
           "at": "2026-10-17T03:14:51Z",
@@ -283,13 +290,20 @@
     },
     {
       "repo": "clawdbotatg/wedgie-secret",
-      "sha": "2fa02391a5369aa651cf2bdab690d82d257d46b8",
-      "at": "2026-10-17T03:31:48Z",
-      "approved": "2026-10-17",
+      "sha": "2b80298aba26f2e4057b9491789359c20f1e6039",
+      "at": "2026-10-19T02:20:58Z",
+      "approved": "2026-10-19",
       "v": {
-        "secret": "0634c56b15f5"
+        "secret": "a506f322488b"
       },
       "past": [
+        {
+          "sha": "2fa02391a5369aa651cf2bdab690d82d257d46b8",
+          "at": "2026-10-17T03:31:48Z",
+          "v": {
+            "secret": "0634c56b15f5"
+          }
+        },
         {
           "sha": "58e5cd899cfefcc5bc3117f4ff88e02e47abf0fa",
           "at": "2026-10-15T03:34:05Z",

@@ -10,8 +10,9 @@
 # key that may do ECDH). The public key is saved (/saves/secret/key) because the Trust M hands it out only
 # when it makes the key. The message format: secret_box.py.
 #
-# Chat: a press opens a chat with one sender ("from", a name); while it's open, that sender's next messages
-# show with no press. Red closes it, and so do CHAT_MS with nothing new. Messages only ever go to the screen.
+# Every message asks for a press (secret-3: "from" is the computer's word, so it neither names a sender nor skips
+# the press). Red closes it, and so does CHAT_MS with nothing new. Messages only ever go to the screen: a screen
+# shot is refused while one is up.
 #
 # USB (one JSON line each way; everything else goes to the slot, so hello/shot/jobs still work):
 #   {"id":1,"type":"secret_open","blob":"wedgie1....","from":"Alice"}   (from: optional)
@@ -199,14 +200,13 @@ def on_open(mid, blob, frm):
         return
     blob = None
     gc.collect()
-    frm = frm[:COLS] if isinstance(frm, str) else ""
-    asked = not chat or not frm or chat["from"] != frm      # a message with no name always asks
-    if asked and not ui.ask(d, "Chat with %s?" % frm if frm else "Read a secret?", (), "read", "no", ASK_MS):
+    # Every message asks, and the screen never names a sender: "from" is only what the computer says (a box
+    # carries no sender key), so it can't open a chat or label one (audit 10-18: a host reused a name to skip the press)
+    if not ui.ask(d, "Read a secret?", (), "read", "no", ASK_MS):
         note = "said no"
         W.send({"id": mid, "type": "refused"})
         return
-    if asked:
-        ui.progress("Opening", "in the chip", False)
+    ui.progress("Opening", "in the chip", False)
     try:
         m = B.open_box(ecdh(e), e, binascii.unhexlify(key["pub"]), iv, ct, tag)
     except ValueError as x:
@@ -219,7 +219,7 @@ def on_open(mid, blob, frm):
         gc.collect()
     chat = None
     gc.collect()
-    chat = {"from": frm, "lines": text_lines(m), "at": 0, "t0": time.ticks_ms()}
+    chat = {"from": "", "lines": text_lines(m), "at": 0, "t0": time.ticks_ms()}
     m = None
     note = ""
     W.send({"id": mid, "type": "secret_shown", "chat": True})
@@ -237,6 +237,8 @@ def handle(m):
         dirty = True
     elif t == "hello":
         W.send(W.hello(mid, running="secret", app=FW, secret=key))
+    elif t == "shot" and chat:          # the screen shows a secret: it never goes back to the computer (audit 10-18)
+        W.send({"id": mid, "type": "error", "error": "private: a secret is on the screen"})
     else:                               # hello's cousins, shots, jobs, open: the slot's
         import slot
         slot.handle(m)

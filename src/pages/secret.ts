@@ -2,8 +2,8 @@
 // format is src/secret/box.ts; the mailbox is api/chat.ts (sealed text only, gone after 7 days).
 //   /secret#<key>  someone's share link: add them (or, with no wedgie of your own, write to them once)
 //   /secret        your wedgie's key and link, your chats. What you write is sealed here to their key and
-//                  sent; what they write shows only on your wedgie's screen (one green press opens a chat,
-//                  then their next messages show there with no press, till red). Never on this page.
+//                  sent; what they write shows only on your wedgie's screen (a green press for each one;
+//                  wedgie-secret 3+ never shows the sender's name, which only this page vouches for). Never on this page.
 // The key rides in the # so it never reaches a server. Kept in this browser (localStorage, per key of yours):
 // your chats' names and keys, their sealed messages, and the text you sent (you typed it here anyway).
 import * as W from "../serial/wedgies";

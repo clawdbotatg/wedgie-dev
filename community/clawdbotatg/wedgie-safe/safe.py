@@ -36,6 +36,7 @@ FW = "safe-19"
 RP_ID = b"wedgie.dev"
 FIELDS = '"origin":"https://wedgie.dev"'
 ASK_MS = 120000
+SETTLE = 600        # ms a page is up before a press can answer it
 
 DOMAIN_TYPEHASH = binascii.unhexlify("47e79534a245952e8b16893a336b85a3d9ea9fa8c573f3d803afb92a79469218")
 SAFE_TX_TYPEHASH = binascii.unhexlify("bb8310d486368db6bd6f849402fdd73ad53d316b5a4b2644ad6efe0f941286d8")
@@ -396,8 +397,8 @@ def _screen(head, lines, yes, k, foot="", safe=None):
     k.pressed()                         # a press made before this page was up doesn't answer it
     t0 = time.ticks_ms()
     while time.ticks_diff(time.ticks_ms(), t0) < ASK_MS:
-        for kk in k.pressed():
-            if kk in ("A", "Y"):
+        for kk in k.pressed():          # nor one in its first SETTLE ms: a press meant for what was there (audit 10-18)
+            if kk in ("A", "Y") and time.ticks_diff(time.ticks_ms(), t0) >= SETTLE:
                 return kk == "A"
         time.sleep_ms(20)
     return False
@@ -437,6 +438,8 @@ def confirm(tx):
     # A page that doesn't fit goes on over more pages: every line is seen before the press (wedgie-dev 10-15:
     # an unknown token's recipient fell off the bottom).
     pages = [(head, part) for head, lines in pages for part in _fit(lines)]
+    if not pages:                       # nothing on the screen: never a signature (audit 10-18)
+        raise ValueError("nothing to show")
     n = len(pages)
     for i, (head, lines) in enumerate(pages):
         last = i == n - 1
