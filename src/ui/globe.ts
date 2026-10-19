@@ -50,10 +50,11 @@ async function landTexture(): Promise<HTMLCanvasElement> {
       g.closePath(); g.fill(); g.stroke();
     }
   }
-  // The prime meridian wears green and red, the equator two greys (the buttons).
+  // Green on the Tropic of Cancer, red on Capricorn, two greys on the equator (the buttons).
+  const tropic = (90 - 23.44) / 180 * H;
   g.globalAlpha = .75;
-  g.fillStyle = P.GREEN; g.fillRect(W / 2 - 6, 0, 5, H);
-  g.fillStyle = P.RED; g.fillRect(W / 2 + 1, 0, 5, H);
+  g.fillStyle = P.GREEN; g.fillRect(0, tropic - 2.5, W, 5);
+  g.fillStyle = P.RED; g.fillRect(0, H - tropic - 2.5, W, 5);
   g.fillStyle = P.GREY; g.fillRect(0, H / 2 - 6, W, 4); g.fillRect(0, H / 2 + 2, W, 4);
   g.globalAlpha = 1;
   return c;
