@@ -67,7 +67,9 @@ def install(mod):
     print("%s: wedgie %s, running %s, %s B free" % (mod, h and h.get("version"), h and h.get("running"), h and h.get("ram")))
     names = sorted(set(man["core"] + [n for c in man["carts"] for n in c["files"]]))
     w.req({"type": "sums", "names": [], "exists": names}, 30)
-    others = [n for c in man["carts"] for n in c["files"] if n not in cart["files"] and n not in man["core"]]
+    # 0.3.53+ (job.py check): an install takes off only the app it replaces, and nothing over itself
+    run = h and h.get("running")
+    others = [] if run == mod else [n for c in man["carts"] if c["mod"] == run for n in c["files"] if n not in cart["files"] and n not in man["core"]]
     apps = [{"mod": cart["mod"], "name": cart["name"], "v": cart["v"], **({"entry": cart["entry"]} if cart.get("entry") else {}), **({"usb": True} if cart.get("usb") else {})}]
     print("   press the green button on the wedgie: Install %s?" % cart["name"])
     g = w.req({"type": "job", "job": "Install " + cart["name"], "version": man["version"], "write": cart["files"], "delete": others, "apps": json.dumps(apps)}, 70)
