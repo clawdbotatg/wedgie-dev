@@ -74,7 +74,7 @@ const PRIVACY = `
 <p>Messages sent with /secret are sealed on the wedgie: our server can't read them. It deletes each one after 7 days.</p>
 
 <h2>The globe</h2>
-<p>A wedgie you put on the home page's globe: its photo, the words you typed, and the spot you picked (rounded to about 10 km) are public once we approve them. Your browser shrinks the photo and drops its metadata (location, camera) before sending, and our server strips it again. Until we look at it, nobody else sees it; ones we don't approve are deleted, and waiting ones go after 60 days. To stop spam we keep a one-way hash of your IP with it for a day. To take yours down, email us.</p>
+<p>A wedgie you put on the home page's globe: its photo, the words you typed, and the spot you picked (rounded to about 100 km) are public once we approve them. Your browser shrinks the photo and drops its metadata (location, camera) before sending, and our server strips it again. Until we look at it, nobody else sees it; ones we don't approve are deleted, and waiting ones go after 60 days. To stop spam we keep a one-way hash of your IP with it for a day. To take yours down, email us.</p>
 
 <p>Questions or a request to delete: <a href="mailto:${MAIL}">${MAIL}</a></p>`;
 

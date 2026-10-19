@@ -12,7 +12,7 @@
 // Approving is a POST from that page, never a GET: a mail scanner opening the link approves nothing.
 // Griefing: PER_HOUR / PER_DAY per IP (ipOf, a hash), WAITING_MAX waiting at once, the photo checked as a
 // JPEG and its metadata (GPS, camera) cut out here too, words cut to size, a link only as https or @handle.
-// The place: lat/lon rounded to 0.1° (about 10 km), the person picks where on the globe. Never log a body here.
+// The place: lat/lon rounded to whole degrees (about 100 km; 0.1° found a house), the person picks where on the globe. Never log a body here.
 // A first look by AI (judge, BANKR_API_KEY): 0-10, how likely we'd approve it, and why. It only advises:
 // the Telegram note shows it with Yes / No buttons, and a person still decides.
 import { db as shopDb, json, oops, env, ipOf, hmac, same, randomHex } from "./_shop.js";
@@ -34,6 +34,7 @@ async function db() {
       mailed boolean not null default false,
       at timestamptz not null default now(), live_at timestamptz)`
     .then(() => sql`alter table builds add column if not exists ai_score int, add column if not exists ai_why text not null default ''`)
+    .then(() => sql`update builds set lat = round(lat), lon = round(lon) where lat <> round(lat) or lon <> round(lon)`)   // ones sent at 0.1°
     .catch((e) => { ready = null; throw e; });
   await ready;
   return sql;
@@ -110,7 +111,7 @@ export async function GET(req: Request) {
       : btn("approve", "Approve", "#22c452") + " " + btn("reject", "Reject", "#e3312c");
     return page(r.status === "live" ? "Live on the globe" : "Waiting for review", `${ai}
       <img src="?img=${r.id}&k=${k}" style="max-width:100%;border-radius:14px;display:block">
-      <dl><dt>Name</dt><dd>${esc(r.name)}</dd><dt>Stage</dt><dd>${esc(r.stage)}</dd><dt>Where</dt><dd>${esc(r.place || "—")} (${Number(r.lat).toFixed(1)}, ${Number(r.lon).toFixed(1)})
+      <dl><dt>Name</dt><dd>${esc(r.name)}</dd><dt>Stage</dt><dd>${esc(r.stage)}</dd><dt>Where</dt><dd>${esc(r.place || "—")} (${Number(r.lat)}, ${Number(r.lon)})
         · <a href="https://www.google.com/maps?q=${Number(r.lat)},${Number(r.lon)}" target="_blank" rel="noopener">Google Maps</a></dd>
       <dd style="margin:8px 0 0"><iframe title="where they put it" style="width:100%;max-width:640px;height:300px;border:0;border-radius:14px"
         src="https://www.openstreetmap.org/export/embed.html?bbox=${Number(r.lon) - 1.5},${Number(r.lat) - 0.9},${Number(r.lon) + 1.5},${Number(r.lat) + 0.9}&layer=mapnik&marker=${Number(r.lat)},${Number(r.lon)}"></iframe></dd>
@@ -129,7 +130,7 @@ export async function POST(req: Request) {
   if (b?.website) return json({ ok: true });   // the form's hidden field: only a bot fills it
   const name = clean(b?.name, 40), place = clean(b?.place, 60), note = clean(b?.note, 280, true), stage = String(b?.stage || "");
   const link = linkOf(clean(b?.link, 200));
-  const lat = Math.round(Number(b?.lat) * 10) / 10, lon = Math.round(Number(b?.lon) * 10) / 10;
+  const lat = Math.round(Number(b?.lat)), lon = Math.round(Number(b?.lon));
   if (!name) return oops("Your name, or a nickname.");
   if (!(STAGES as readonly string[]).includes(stage)) return oops("How far along is it?");
   if (link === null) return oops("The link: https://… or an @handle.");

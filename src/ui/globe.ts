@@ -183,7 +183,7 @@ export async function mountGlobe(box: HTMLElement, onPick: (b: Build | null) => 
     if (!hit) return;
     if (!placing) { if (sel) { sel = null; onPick(null); } return; }
     const p = earth.worldToLocal(hit.point.clone()).normalize();
-    const lat = Math.round(Math.asin(p.y) / D * 10) / 10, lon = Math.round(Math.atan2(-p.z, p.x) / D * 10) / 10;
+    const lat = Math.round(Math.asin(p.y) / D), lon = Math.round(Math.atan2(-p.z, p.x) / D);   // whole degrees: about 100 km, never a house
     g.mark(lat, lon);
     placing(lat, lon);
   }
