@@ -109,6 +109,10 @@
       "destination": "/index.html"
     },
     {
+      "source": "/assemble/3d",
+      "destination": "/index.html"
+    },
+    {
       "source": "/format",
       "destination": "/index.html"
     },

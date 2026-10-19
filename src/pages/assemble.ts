@@ -163,12 +163,13 @@ export function assemble(main: HTMLElement) {
       <span class="kicker">Assembly</span>
       <h2>Put a wedgie together.</h2>
       <p>No soldering. ${STEPS.length} steps. Take your time on the wires (3 to 9); the rest just clicks. <a href="/assemble.pdf" download>Print the manual (PDF)</a></p>
+      <p class="row"><a class="btn btn-green" href="/assemble/3d">Every step in 3D →</a></p>
     </div>
     <ol class="asm-steps">
       ${STEPS.map((s, i) => `
       <li class="card asm-step" id="step-${i + 1}">
         <div class="asm-copy">
-          <div class="asm-head"><span class="num">${i + 1}</span><h3>${s.t}</h3></div>
+          <div class="asm-head"><span class="num">${i + 1}</span><h3>${s.t}</h3><a class="asm-3d" href="/assemble/3d#${i + 1}">See it in 3D</a></div>
           <p>${s.p}</p>
           ${s.art ? `<div class="asm-art recess">${s.art}</div>` : ""}
           ${s.tip ? `<p class="note">${s.tip}</p>` : ""}

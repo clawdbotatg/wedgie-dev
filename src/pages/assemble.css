@@ -3,6 +3,7 @@
 .asm-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 22px; }
 .asm-step { display: grid; grid-template-columns: 1.1fr 1fr; gap: 28px; align-items: start; scroll-margin-top: 90px; }
 .asm-head { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
+.asm-3d { margin-left: auto; flex-shrink: 0; font-size: 14px; white-space: nowrap; }
 .asm-head .num { flex-shrink: 0; width: 46px; height: 46px; border-radius: 14px; font-size: 22px; }
 .asm-step:nth-child(3n+2) .num { background: var(--grey-fill); }
 .asm-step:nth-child(3n+3) .num { background: var(--red-fill); }

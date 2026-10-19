@@ -1,0 +1,55 @@
+/* /assemble/3d: the 3D stage left, the step's words and the step list right; stacked on a phone. */
+.pg { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 20px; padding: 20px 0 40px; align-items: start; }
+.pg-stage { position: sticky; top: 84px; height: calc(100vh - 110px); min-height: 460px; border-radius: 30px; overflow: hidden; touch-action: none; }
+.pg-canvas { display: block; outline: none; cursor: grab; }
+.pg-canvas:active { cursor: grabbing; }
+.pg-hint { position: absolute; top: 14px; left: 0; right: 0; text-align: center; margin: 0; font-size: 14px; font-weight: 800; color: #fff;
+  text-shadow: 0 1px 3px rgba(0,0,0,.5); pointer-events: none; z-index: 3; opacity: 0; transition: opacity .4s; }
+.pg-stage.live .pg-hint { opacity: .95; }
+.pg-stage.touched .pg-hint { opacity: 0; }
+.pg-bar { position: absolute; left: 14px; right: 14px; bottom: 14px; z-index: 3; display: flex; align-items: center; gap: 8px; padding: 8px;
+  border-radius: 999px; background: var(--shell); box-shadow: var(--shell-shadow); }
+.pg-bar .btn { flex-shrink: 0; min-width: 46px; }
+#pg-play { min-width: 92px; }
+#pg-scrub { flex: 1; min-width: 40px; accent-color: #22c452; }
+.pg-fail { padding: 40px; text-align: center; }
+
+/* labels in the scene: a pill with a stick down to the spot */
+.pg-label { position: absolute; left: 0; top: 0; pointer-events: none; opacity: 0; z-index: 2; will-change: transform; }
+.pg-label span { position: absolute; bottom: 40px; left: 0; transform: translateX(-50%); white-space: nowrap; font-weight: 900; font-size: 15px; color: #fff;
+  padding: 6px 13px; border-radius: 999px; background: var(--green-fill);
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.3), inset 0 -3px 0 rgba(0,0,0,.2), 0 8px 16px -8px rgba(0,0,0,.6); }
+.pg-label i { position: absolute; left: -1px; bottom: 4px; width: 2px; height: 37px; background: #fff; box-shadow: 0 0 3px rgba(0,0,0,.5); border-radius: 2px; }
+.pg-label i::after { content: ""; position: absolute; left: -3px; bottom: -4px; width: 8px; height: 8px; border-radius: 50%; background: #fff; box-shadow: 0 0 3px rgba(0,0,0,.5); }
+.pg-label.bad span { background: var(--red-fill); }
+
+.pg-side { position: sticky; top: 84px; max-height: calc(100vh - 110px); display: flex; flex-direction: column; padding: 22px; }
+.pg-now { overflow-y: auto; flex-shrink: 1; min-height: 0; }
+.pg-now h2 { font-size: 24px; line-height: 1.2; margin: 0; }
+.pg-now .asm-head .num { width: 46px; height: 46px; border-radius: 14px; font-size: 22px; }
+#pg-copy > p { color: #474947; margin: 0 0 12px; }
+#pg-copy b { font-weight: 900; color: var(--ink); }
+#pg-copy .note { margin: 0 0 12px; }
+#pg-copy .asm-art { margin: 0 0 12px; padding: 12px; }
+.pg-now .photos { justify-content: flex-start; margin: 4px 0 12px; }
+.pg-auto { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 15px; cursor: pointer; margin-bottom: 10px; }
+.pg-auto input { width: 18px; height: 18px; accent-color: #22c452; }
+.pg-list { position: relative; list-style: none; margin: 0; padding: 10px; overflow-y: auto; flex: 0 1 260px; min-height: 120px; border-radius: 18px;
+  background: var(--recess); box-shadow: var(--recess-shadow); }
+.pg-list button { display: flex; gap: 10px; align-items: baseline; width: 100%; text-align: left; border: 0; background: none; font: inherit; font-size: 15px;
+  font-weight: 700; color: #474947; padding: 6px 10px; border-radius: 10px; cursor: pointer; }
+.pg-list button b { font-family: var(--mono); font-weight: 500; font-size: 13px; color: var(--muted); min-width: 20px; }
+.pg-list button:hover { background: rgba(255,255,255,.5); }
+.pg-list button.here { background: var(--shell); color: var(--ink); box-shadow: inset 0 1.5px 0 #fff, 0 3px 8px -4px rgba(0,0,0,.3); }
+.pg-back { margin: 12px 0 0; }
+
+@media (max-width: 900px) {
+  .pg { grid-template-columns: 1fr; padding-top: 10px; gap: 14px; }
+  .pg-stage { position: relative; top: 0; height: 62vh; min-height: 360px; border-radius: 24px; }
+  .pg-side { position: static; max-height: none; padding: 18px; }
+  .pg-list { flex: none; max-height: 300px; }
+  .pg-bar { left: 8px; right: 8px; bottom: 8px; gap: 6px; padding: 6px; }
+  .pg-bar .btn { min-width: 40px; padding-left: 10px; padding-right: 10px; }
+  #pg-play { min-width: 76px; }
+  .pg-label span { font-size: 13px; padding: 5px 10px; }
+}
