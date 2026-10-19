@@ -253,6 +253,11 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
       if (link && wedgie() && live && !busy && !document.hidden) {
         try {
           const s = await link.request({ type: "shot" }, 4000);
+          if (s.type === "error") {             // 0.3.54+ locked: its screen never leaves it without a yes
+            mirrorOn = false; setScreen(home()); paint();
+            $("#d-hint").textContent = "Locked: its screen stays on the wedgie. Give this computer full control to see it here.";
+            throw 0;                            // (the catch below; the loop still sleeps)
+          }
           const raw = atob(s.data);
           for (let i = 0, j = 0; i < raw.length; i += 2, j += 4) {
             const v = (raw.charCodeAt(i) << 8) | raw.charCodeAt(i + 1);

@@ -53,13 +53,7 @@ def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None, scary=Fa
     d.text(no, 128 - 8 * len(no), 56, fg)
     d.show()
     ui.drawn = time.ticks_ms()
-    t0 = time.ticks_ms()
-    while time.ticks_diff(time.ticks_ms(), t0) < ms:
-        for key in k.pressed():
-            if key in ("A", "Y"):
-                return key == "A"
-        time.sleep_ms(20)
-    return False
+    return ui.wait(k, ms)
 
 
 def busy(d, title, what=""):

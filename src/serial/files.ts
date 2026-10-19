@@ -53,7 +53,7 @@ export async function get(r: Repl, path: string, live = true): Promise<Uint8Arra
 
 export async function rm(r: Repl, path: string, live = true) {
   if (live) {
-    const v = await r.request({ type: "rm", path }, 8000);
+    const v = await r.request({ type: "rm", path }, 70000);     // 0.3.54+: the wedgie asks first (a minute to answer)
     if (v.type === "error") throw new Error(v.error);
     return;
   }

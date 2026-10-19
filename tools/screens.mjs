@@ -3,6 +3,7 @@
 // the vite dev server; it can stop at the Safe signer's question), Demon Bunker on the virtual RP2040
 // (tools/rp2040; the browser one can't load its .mpy files), through the slot's shot answer.
 //   node tools/screens.mjs [outdir]        (needs uv, like chipprobe)
+// 0.3.54+: a locked wedgie refuses shot (slot.py), so the Bunker/--shot screens need firmware older than 0.3.54. Open item.
 import { chromium } from "playwright-core";
 import { readdirSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { deflateSync } from "node:zlib";

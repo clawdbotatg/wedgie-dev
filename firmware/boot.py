@@ -5,6 +5,14 @@
 # end boot.py early: every failure is caught, BaseException too.
 import micropython
 micropython.kbd_intr(-1)
+try:                                    # a computer was let in and main.py hasn't run since (wedgie.WAS_OPEN): a soft
+    import machine, sys                 # reset from the raw REPL would skip main.py and leave it in, so start over for real
+    _s3 = (0x400D8000 if "RP2350" in sys.implementation._machine else 0x40058000) + 0x18
+    if machine.mem32[_s3] & 1:
+        machine.mem32[_s3] &= ~1
+        machine.reset()
+except BaseException as e:
+    print("boot:", e)
 try:
     import splash, os, machine, sys
     # A soft reset into an install (wedgie.save_job) keeps the screen: it already shows the install's

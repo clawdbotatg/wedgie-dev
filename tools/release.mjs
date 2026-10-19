@@ -5,6 +5,9 @@
 //   @app  <json>            one per app in firmware/carts.json and per app on the shelf (community.json) (0.3.12+): mod, name, entry, usb, files. A checked job's apps.json is built from these (firmware/job.py check),
 //                           and it may write only the core and its app's files. Older firmware reads the
 //                           line as a file named by the JSON, which nothing ever writes.
+//   @serial  <n>            (0.3.54+) one more at every signing (tools/sign.mjs): a wedgie keeps the highest it
+//                           installed and refuses a list with a lower one, so a same-version re-signing can't be
+//                           rolled back (audit 10-18: 0.3.52 was signed 7 times). releaseText() alone keeps the signed one.
 import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join, dirname } from "node:path";
@@ -17,7 +20,13 @@ export const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 export const published = (name, p) => statSync(p).isFile() && !name.startsWith(".") && /\.(py|bin|json|mpy)$/.test(name) && name !== "carts.json" && name !== "apps.json"
   && !(name.endsWith(".py") && existsSync(p.replace(/\.py$/, ".mpy")));
 
-export function releaseText() {
+/** The "@serial" of the signed list on disk (0: none yet). */
+export function signedSerial() {
+  try { return Number((readFileSync(join(root, "release/firmware.txt"), "utf8").match(/^@serial  (\d+)$/m) || [])[1] || 0); }
+  catch { return 0; }
+}
+
+export function releaseText(serial = signedSerial()) {
   const src = join(root, "firmware");
   const version = (readFileSync(join(src, "wedgie.py"), "utf8").match(/VERSION = "([^"]+)"/) || [])[1] || "0";
   const lines = [];
@@ -31,7 +40,8 @@ export function releaseText() {
     for (const f of files) lines.push(`${createHash("sha256").update(f.buf).digest("hex")}  ${f.name}\n`);
     carts.push(app);
   }
-  return `wedgie-release 1\nversion ${version}\n` + lines.sort((a, b) => (a.slice(66) < b.slice(66) ? -1 : 1)).join("") + appLines(carts);
+  return `wedgie-release 1\nversion ${version}\n` + lines.sort((a, b) => (a.slice(66) < b.slice(66) ? -1 : 1)).join("") + appLines(carts) +
+    (serial ? `@serial  ${serial}\n` : "");
 }
 
 /** The core: published firmware files no firmware cart claims. */

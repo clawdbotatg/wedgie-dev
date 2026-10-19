@@ -10,7 +10,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, chmodSync } from "n
 import { createPrivateKey, createPublicKey, generateKeyPairSync, sign } from "node:crypto";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { releaseText, root } from "./release.mjs";
+import { releaseText, root, signedSerial } from "./release.mjs";
 
 const keyPath = join(homedir(), ".wedgie", "release-key.pem");
 if (!existsSync(keyPath) && !/^RELEASE_KEY = \(""/m.test(readFileSync(join(root, "firmware/wedgie.py"), "utf8"))) {
@@ -46,7 +46,7 @@ if (!w.includes(line)) {
   const g = spawnSync("node", [join(root, "tools/gate.mjs")], { cwd: root, stdio: "inherit" });
   if (g.status !== 0) { console.error("not signed: the gate failed"); process.exit(1); }
 }
-const text = releaseText();
+const text = releaseText(signedSerial() + 1);     // one more every signing: wedgies refuse a lower one (job.py)
 const sig = sign("sha256", Buffer.from(text), { key: priv, dsaEncoding: "ieee-p1363" }).toString("hex");
 writeFileSync(join(root, "release/firmware.txt"), text);
 writeFileSync(join(root, "release/firmware.sig"), sig.slice(0, 64) + " " + sig.slice(64) + "\n");

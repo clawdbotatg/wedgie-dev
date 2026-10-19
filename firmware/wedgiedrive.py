@@ -83,6 +83,7 @@ class Drive(usbdev.Interface):
         self.want = 0
         self._lba = self._left = 0
         self._ok = True
+        self._res = 0
         self._cb_cbw = self._got_cbw
         self._cb_status = self._status_sent
         self._cb_sector = self._sector_sent
@@ -250,17 +251,19 @@ class Drive(usbdev.Interface):
     def _reply(self, data, ok=True):
         """Send data (trimmed or zero-padded to what the host asked for), then the status. Only for the
         rare commands (INQUIRY, sense, capacity): READ(10) and WRITE(10) never come here."""
-        n = self.want
+        n, self._res = self.want, 0
+        if n > 512:                     # the host sets want (up to ~1 GB): never a buffer that size (audit 10-18).
+            self._res, n = n - len(data), len(data)     # A short reply and the rest as residue (BOT: host > device)
         buf = bytearray(n)
         buf[: min(n, len(data))] = data[:n]
         self._ok = ok
         if n:
             self.submit_xfer(self.ep_in, buf, self._cb_reply)
         else:
-            self._status(ok)
+            self._status(ok, self._res)
 
     def _reply_sent(self, ep, result, n):
-        self._status(self._ok)
+        self._status(self._ok, self._res)
 
     def _fail(self, key, asc, ascq=0):
         self.sense = (key, asc, ascq)
@@ -349,7 +352,7 @@ class Drive(usbdev.Interface):
         """RAM is full: forget written data sectors of clusters the FAT now says are free (a deleted
         file's, like a request already read), if written over 2 s ago (a new file's data can come
         before its FAT entry). True if one was freed."""
-        b = self.sector(0, self.base)
+        b = self.img.read(0, self.base)     # the image's geometry, never a boot sector the host wrote (a 0 there divided by zero)
         spc, res, nfats, nroot, _, _, fsz = struct.unpack_from("<BHBHHBH", b, 13)
         data0 = res + nfats * fsz + nroot * 32 // _SECTOR
         now = ticks_ms()

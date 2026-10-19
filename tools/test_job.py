@@ -48,6 +48,7 @@ names = sorted([n for n in os.listdir(FW) if n.endswith((".py", ".mpy", ".bin"))
 
 
 VER = ["9.9.9"]                          # the signed list's version: older than W.VERSION is refused
+SER = [0]                                # its "@serial" (0: none): lower than the one on the flash is refused
 
 
 def release(apps=True):
@@ -59,6 +60,8 @@ def release(apps=True):
                 if c.get(k):
                     a[k] = c[k]
             t += "@app  " + json.dumps(a, separators=(",", ":")) + "\n"
+    if SER[0]:
+        t += "@serial  %d\n" % SER[0]
     r, s = p256.sign(D, hashlib.sha256(t.encode()).digest())
     return t, "%064x %064x" % (r, s)
 
@@ -90,7 +93,7 @@ def puts(name, data, chunk=1024):
             for o in range(0, max(len(data), 1), chunk)]
 
 
-def run(job_msg, msgs, rel_apps=True, app="hello", flash=None):
+def run(job_msg, msgs, rel_apps=True, app="hello", flash=None, version=None):
     """One job on a fresh flash running `app`. (answers, {file: bytes} after)."""
     d = tempfile.mkdtemp()
     old = os.getcwd()
@@ -107,12 +110,14 @@ def run(job_msg, msgs, rel_apps=True, app="hello", flash=None):
         for n, data in (flash or {}).items():
             open(n, "wb").write(data)
         rel, sig = release(rel_apps)
+        if job_msg.get("release") is True:      # embedded: this run's own list
+            job_msg = dict(job_msg, release=rel, sig=sig)
         first = [] if "release" in job_msg else [{"type": "release", "release": rel, "sig": sig}]
         h = Host(first + msgs)
         W.lines = lambda size=6144: h
         W.send = lambda o: h.out.append(o)
         try:
-            job.run(1, dict(job_msg, type="job", version=VER[0]), lambda *a: True)
+            job.run(1, dict(job_msg, type="job", version=version or VER[0]), lambda *a: True)
         except SystemExit:
             h.out.append({"type": "reset"})
         files = {n: open(n, "rb").read() for n in os.listdir(".") if os.path.isfile(n)}
@@ -313,6 +318,29 @@ for embedded in (False, True):
     out, f = run(m, puts("keytest.py", kt) + [second, {"type": "commit"}])
     check("done" not in types_(out) and "keytest.py" not in f and "one signed list" in str(out),
           "a job cannot switch signed lists (embedded=%s)" % embedded)
+
+# The question shows the host's version: an embedded list of another version never goes in (audit 10-18).
+for emb in (False, True):
+    m = {"job": "Update firmware", "write": [], "apps": None}
+    if emb:
+        m["release"] = True
+    out, f = run(m, [{"type": "commit"}], version="9.9.10")
+    check("done" not in types_(out) and "9.9.10" in str(out), "an update shown as another version is refused (embedded=%s): %s" % (emb, types_(out)))
+
+# A same-version list signed before the one on it never goes back on (@serial, audit 10-18).
+try:
+    for ser, on, want in ((4, b"5", False), (0, b"5", False), (5, b"5", True), (6, b"5", True), (1, None, True)):
+        SER[0] = ser
+        out, f = run({"job": "Install Buttons", "write": ["keytest.py"], "delete": ["hello.py"], "apps": json.dumps(buttons)},
+                     puts("keytest.py", kt) + [{"type": "commit"}], flash={"serial": on} if on else None)
+        done = types_(out)[-2:] == ["done", "reset"]
+        check(done == want and (not done or f.get("serial") == str(max(ser, int(on or 0))).encode()),
+              "a list with serial %d on a wedgie at %s: %s (serial after: %s)" % (ser, on and on.decode(), "in" if done else "refused", f.get("serial")))
+    SER[0] = 3
+    out, f = run({"job": "Uninstall the app", "write": [], "delete": ["serial"], "apps": "[]"}, [{"type": "commit"}], flash={"serial": b"2"})
+    check("done" not in types_(out) and f.get("serial") == b"2", "a job can't delete the serial")
+finally:
+    SER[0] = 0
 
 print("all ok" if not fails else "%d FAILED" % fails)
 sys.exit(1 if fails else 0)

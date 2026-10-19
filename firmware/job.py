@@ -22,7 +22,7 @@
 import sys, os, json, time, gc, select, hashlib, binascii
 import wedgie as W
 
-KEEP = ("main.py", "boot.py", "wedgie.py", "slot.py", "lcd.py", "job.py", "p256.py", "loader.py",
+KEEP = ("main.py", "boot.py", "wedgie.py", "slot.py", "lcd.py", "job.py", "p256.py", "loader.py", "serial",
         "wedgie.mpy", "slot.mpy", "lcd.mpy", "job.mpy", "p256.mpy", "loader.mpy")    # 0.3.14+: the core is compiled
 IDLE_MS = 30000
 
@@ -101,6 +101,10 @@ def check(m, sig=True, tick=None):
     version, files = W.release_files(rel)
     if _ver(version) < _ver(W.VERSION):  # an old signed list puts back an old core and its holes (audit 10-16:
         raise ValueError("older than this wedgie: %s" % version)   # 0.3.47's boot.py let a host in, still signed)
+    if W.release_serial(rel) < W.serial():  # the same version is signed again and again (0.3.52: 7 lists): an
+        raise ValueError("an older signed list than the one on it")   # older one puts back old apps (audit 10-18)
+    if m.get("version") and version != m["version"]:    # the question showed the host's version: it must be this one
+        raise ValueError("the signed list is %s, not %s" % (version, m["version"]))
     rules(m)
     signed = W.release_apps(rel)
     required = set(m.get("write") or ())
@@ -238,12 +242,14 @@ def run(mid, m, ask, show=None):
     progress screen (the moment A is pressed, then as files arrive)."""
     show = show or (lambda *a: None)
     late = "release" not in m           # the list comes after the yes (0.3.10+ hosts)
+    sn = 0                              # the signed list's serial: kept at commit (wedgie.SERIAL)
     try:
         if late:
             rules(m)
             version = m.get("version")
         else:
             version, files, required = check(m, sig=False)
+            sn = W.release_serial(m["release"])
     except ValueError as e:
         W.send({"id": mid, "type": "error", "error": str(e)})
         return
@@ -298,8 +304,7 @@ def run(mid, m, ask, show=None):
                 try:
                     m["release"], m["sig"] = q.get("release") or "", q.get("sig") or ""
                     version, files, required = check(m, tick=sig_tick)
-                    if m.get("version") and version != m["version"]:
-                        raise ValueError("the signed list is %s, not %s" % (version, m["version"]))
+                    sn = W.release_serial(m["release"])
                 except ValueError as e:
                     W.send({"id": qid, "type": "error", "error": str(e)})
                     return
@@ -374,11 +379,11 @@ def run(mid, m, ask, show=None):
                     W.send({"id": qid, "type": "error", "error": "not sent: " + " ".join(missing)})
                     return
                 for n in sorted(got, key=lambda n: n == "main.py"):     # main.py last
-                    try:
+                    try:                # one step: littlefs renames over the old file, so a power cut leaves the
+                        os.rename(_tmp(n), n)   # old main.py or the new one, never none (audit 10-18)
+                    except OSError:     # a file system that won't rename over a file
                         os.remove(n)
-                    except OSError:
-                        pass
-                    os.rename(_tmp(n), n)
+                        os.rename(_tmp(n), n)
                 for n in required:
                     if n.endswith(".mpy") and n[:-4] + ".py" not in required:
                         # Remove unsigned shadows even when the signed .mpy was already present.
@@ -394,6 +399,9 @@ def run(mid, m, ask, show=None):
                 if m.get("apps") is not None:
                     with open("apps.json", "w") as a:
                         a.write(m["apps"])
+                if sn > W.serial():
+                    with open(W.SERIAL, "w") as a:
+                        a.write(str(sn))
                 show(title, None, 1)
                 W.log("installed", title, version)
                 W.send({"id": qid, "type": "done", "version": version})

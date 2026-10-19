@@ -225,6 +225,8 @@ def _handle(m):
         W.send(dict(W.chip(), id=mid))
     elif t == "ping":
         W.send({"id": mid, "type": "pong"})
+    elif t in ("press", "shot") and W.SEALED and not W.is_open():    # locked: a computer neither sees the screen
+        W.send({"id": mid, "type": "error", "error": "locked: needs a yes on its screen (open)"})  # nor presses keys (Austin 10-19)
     elif t == "press":
         try:
             L.press(m.get("key"), m.get("ms", 80))
@@ -243,6 +245,11 @@ def _handle(m):
         except OSError as e:
             W.send({"id": mid, "type": "error", "error": "can't read it: %s" % e})
     elif t == "rm":
+        p = [x for x in str(m.get("path") or "").split("/") if x][1:]    # /saves/<app>/<file>: [app, file]
+        if W.SEALED and not W.is_open() and not _asking(lambda: ui.ask(d, "Delete saves", ["/".join(p[1:])[:40]] if p[1:] else (),
+                ms=ASK_MS, big=p[0][:16] if p else "all")):            # locked: the person says so (audit 10-18)
+            W.send({"id": mid, "type": "refused", "asked_ms": W.asked_ms})
+            return
         try:
             W.rm(m.get("path"))
             W.send({"id": mid, "type": "ok", "free": W.free()})
@@ -420,8 +427,13 @@ def let_in(job="", full=False):
     if not W.SEALED or W.is_open():
         W.set_open()
         return True
+    if W.flag(W.SAID_NO):               # a real no to this already: never asked again till unplugged (audit 10-18:
+        print("wedgie: it said no. Unplug it and plug it back in to ask again.")   # ask till they give in)
+        return False
     global _paused
     ok = _asking(lambda: __import__("hatch").ask())
+    if not ok and ui.said_no:
+        W.flag(W.SAID_NO, True)
     if ok:
         W.set_open()
         if full:

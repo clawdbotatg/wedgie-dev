@@ -278,6 +278,11 @@ save.delete("best"); save.names()
 Each app has its own folder (`/saves/<mod>/`); installs, switching apps and firmware updates never
 touch it. Save at checkpoints, never every frame (flash wears).
 
+**Any plugged-in computer can read saves** with no press (and, before 0.3.54, see the screen). Never
+keep a secret in a save. Deleting one asks on the wedgie (0.3.54+). Anything that decides for the person
+(sign, reveal, give away) reads real buttons only: `Keys(physical=True)` or `ui.ask`. Plain `Keys()`
+also takes presses a computer sends over USB.
+
 **Keep progress in a save, and read it at start**, e.g. `save.store("level", {"level": 8, "lives": 3})`.
 In the emulator every save shows up under **Saves**; the person can edit one (`"level": 8`) and it runs
 again from there, so nobody plays through levels 1-7 to test level 8. Tell them which save does what.

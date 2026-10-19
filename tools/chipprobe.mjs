@@ -89,7 +89,7 @@ function job(w, title, write, del, apps, where) {
   const ex = w.req({ type: "sums", names: [], exists: F.all }, 30000);
   if (!ex?.sums) return `sums before the job: ${JSON.stringify(ex)}`;
   w.h.chip.write(JSON.stringify({ type: "job", job: title, version, write, delete: del, apps: apps && JSON.stringify(apps), bytes: write.reduce((t, n) => t + fileOf(n).length, 0), raw: !!bin, id: 900 }) + "\n");
-  w.h.chip.run(800);                // the question is up
+  w.h.chip.run(1600);               // the question is up, past its 0.6 s with no answer (ui.SETTLE)
   w.press("A");
   let g = null;
   w.h.until((b) => { const m = b.match(/\{[^\n]*"id": 900[,}][^\n]*\n/); if (m) g = JSON.parse(m[0]); return !!m; }, 20000);
