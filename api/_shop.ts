@@ -170,6 +170,7 @@ export async function ipOf(req: Request) {
 /** A browser POST sent by another site (a form or a no-cors fetch riding the visitor's cookies): refused
  * everywhere but the Stripe webhook. Scripts (curl, wedgie.py, Stripe) send neither header and pass. */
 export function crossSite(req: Request) {
+  if ((req.headers.get("host") || "").startsWith("emu.")) return true;   // /code's own site (index.html): apps nobody reviewed
   const f = req.headers.get("sec-fetch-site");
   if (f) return f !== "same-origin" && f !== "none";
   const o = req.headers.get("origin");

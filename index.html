@@ -2,6 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<script>
+// /code runs apps nobody reviewed (a repo link, a folder): on its own site, emu.wedgie.dev, so their code can
+// never act as wedgie.dev (its storage, its API: api/_shop.ts crossSite). Each host serves only its own pages.
+(function () {
+  var h = location.hostname, p = location.pathname.replace(/\/+$/, ""), rest = location.search + location.hash;
+  if ((h === "wedgie.dev" || h === "www.wedgie.dev") && p === "/code") location.replace("https://emu.wedgie.dev/code" + rest);
+  else if (h === "emu.wedgie.dev" && p !== "/code") location.replace("https://wedgie.dev" + location.pathname + rest);
+})();
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>wedgie.dev</title>
 <meta name="description" content="Give yourself a wedgie: a pocket computer from three off-the-shelf parts. Order one, build one, plug it in and put software on it. MIT everything.">
