@@ -41,6 +41,8 @@ _poll = None
 key = None              # {"pub": "04..", "chip": "ATECC608" | "OPTIGA Trust M", "id": "a1b2 c3d4"} or None
 note = ""
 dirty = True
+shown = False           # a secret is in the framebuffer: from draw_chat until draw_home paints over it. Screen shots
+                        # wait on this, not on chat (red cleared chat a loop before the redraw: codex 10-18)
 chat = None             # the open chat: {"from": name, "lines": [...], "at": page, "t0": ticks of the last message}
 
 
@@ -124,6 +126,8 @@ def ecdh(e):
 # ---- screens ----------------------------------------------------------------------------------
 
 def draw_home():
+    global shown
+    shown = False
     d.fill(WHITE)
     ui.band(d)
     ui.title(d, "Secrets", 42, 1)
@@ -159,6 +163,8 @@ def text_lines(m):
 
 def draw_chat():
     """The newest message, a screen at a time: down for the next, up back."""
+    global shown
+    shown = True
     lines, at = chat["lines"], chat["at"]
     n = max(1, (len(lines) + ROWS - 1) // ROWS)
     d.fill(WHITE)
@@ -237,7 +243,7 @@ def handle(m):
         dirty = True
     elif t == "hello":
         W.send(W.hello(mid, running="secret", app=FW, secret=key))
-    elif t == "shot" and chat:          # the screen shows a secret: it never goes back to the computer (audit 10-18)
+    elif t == "shot" and shown:          # the screen shows a secret: it never goes back to the computer (audit 10-18)
         W.send({"id": mid, "type": "error", "error": "private: a secret is on the screen"})
     else:                               # hello's cousins, shots, jobs, open: the slot's
         import slot

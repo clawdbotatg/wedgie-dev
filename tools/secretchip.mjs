@@ -164,16 +164,34 @@ shot = "refused" if sent and sent[0].get("type") == "error" else "SENT"
 secret.chat_key("down")
 pg = secret.chat["at"]
 secret.chat_key("Y")
+import sys
+_slot = sys.modules.get("slot")
+passed = []
+sys.modules["slot"] = type("S", (), {"handle": staticmethod(passed.append)})
+sent.clear()
+W.send = sent.append
+secret.handle({"id": 10, "type": "shot"})
+after_red = "refused" if sent and not passed else "SENT"
+secret.draw_home()
+secret.handle({"id": 11, "type": "shot"})
+home = "passed" if passed else "BLOCKED"
+W.send = _send
+if _slot:
+    sys.modules["slot"] = _slot
+else:
+    del sys.modules["slot"]
 gc.collect()
-print("RES", one[0], one[1], one[2], two, three, pg, secret.chat is None, f0 - gc.mem_free(), shot, asks[0])
+print("RES", one[0], one[1], one[2], two, three, pg, secret.chat is None, f0 - gc.mem_free(), shot, after_red, home, asks[0])
 `, 60000);
   const m = r.match(/RES (.*)/);
-  const [a1, from, lines, a2, a3, pg, closed, used, shot, ...q] = m ? m[1].trim().split(" ") : [], q0 = q.join(" ");
+  const [a1, from, lines, a2, a3, pg, closed, used, shot, afterRed, home, ...q] = m ? m[1].trim().split(" ") : [], q0 = q.join(" ");
   if (!m) console.log("     it said:", JSON.stringify(r.slice(-600)));
   check(a1 === "1" && from === "-" && Number(lines) > 10, `chat: a message asks ("${q0}"), ${lines} lines on screen, no sender name`);
   check(a2 === "2", "chat: the same \"from\" asks again");
   check(a3 === "3", "chat: a message with no name asks");
   check(shot === "refused", "chat: a screen shot is refused while a secret is up");
+  check(afterRed === "refused", "chat: red closes it, and a shot before the redraw is still refused (codex 10-18)");
+  check(home === "passed", "chat: once the home screen is drawn, a shot goes through");
   check(pg === "1" && closed === "True", `chat: down pages, red closes it (${used} B held after)`);
 }
 console.log(`     least free heap seen with the app running: ${least} bytes (${leastWhere})`);
