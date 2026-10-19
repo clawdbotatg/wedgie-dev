@@ -445,7 +445,10 @@ def folder_app(path, pick, m):
         stem = n.rsplit(".", 1)[0]
         if n in core or stem.rsplit(".", 1)[0] in {c.rsplit(".", 1)[0] for c in core} or not (stem == mod or stem.startswith(mod + "_")):
             sys.exit("%s: every file is named %s.py or %s_something (it lands in the flash's root), and no firmware file" % (n, mod, mod))
-        files[n] = open(os.path.join(path, p), "rb").read()
+        src, top = os.path.realpath(os.path.join(path, p)), os.path.realpath(path)
+        if os.path.isabs(p) or os.path.commonpath([src, top]) != top:    # ../, /etc, a link out: never off this folder
+            sys.exit("%s: not inside %s" % (p, path))
+        files[n] = open(src, "rb").read()
     if mod + ".py" not in files and mod + ".mpy" not in files:
         sys.exit("wedgie.json: %s needs %s.py in its files" % (mod, mod))
     entry = {"mod": mod, "name": str(a.get("name") or mod)[:14], "about": a.get("about", ""), "repo": "local", "files": sorted(files),
