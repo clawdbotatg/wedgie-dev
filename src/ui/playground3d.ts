@@ -35,7 +35,7 @@ const holeXY = (x: number, n: number): V3 => [x, pinY(n), HDR];
 // the manual's cable: white R3, yellow R5, black L6, red L7 (top to bottom in the plug)
 const HOLES = [holeXY(ROW_R, 3), holeXY(ROW_R, 5), holeXY(ROW_L, 6), holeXY(ROW_L, 7)];
 const WIRES = [0xf4f4ef, 0xf2c417, 0x232323, 0xd8262a];
-const CHIP_LAID: V3 = [13.22, 18, -11.5];
+const CHIP_LAID: V3 = [13.22, 18, -12.4];
 const CHIP_IN: V3 = [13.22, 18, -7.4];
 const USB_IN: V3 = [13.22, 48.1, -16.36];
 const USB_OUT: V3 = [13.22, 74, -16.36];
@@ -112,7 +112,7 @@ const STEPS3D: Step3D[] = [
       go(s, "chip", { v: 0 }, E(t, 0, 0.2));
       go(s, "chip", { p: [-24, 18, FLAT - 0.8], r: [0, PI, 0] }, E(t, 0.2, 0.25));
       go(s, "hat", { p: [0, 0, 0], v: 1 }, E(t, 0.1, 0.55));
-      go(s, "plug", { p: [13.22, 16, -12.3], r: [0, 0, 0] }, E(t, 0.25, 0.7));
+      go(s, "plug", { p: [13.22, 20, -3.6], r: [0, 0, 0] }, E(t, 0.25, 0.7));
       num(s, "marks", 1, E(t, 0.6, 0.85));
     },
   },
@@ -127,7 +127,10 @@ const STEPS3D: Step3D[] = [
   { // 6 Tape
     dur: 2.4, view: { at: [6, 40, -10], az: -20, el: 55, d: 110 },
     labels: [{ txt: "Tape on top of the wires", at: [ROW_R, 40.6, -11], t: [0.5, 1] }],
-    run(s, t) { go(s, "tape1", { p: [ROW_R, 40.6, HDR - 0.1], v: 1 }, E(t, 0.05, 0.6)); },
+    run(s, t) {
+      num(s, "f0", 1, E(t, 0.05, 0.4)); num(s, "f1", 1, E(t, 0.1, 0.45));     // over the top, down the inside of the header
+      go(s, "tape1", { p: [ROW_R, 40.6, HDR], v: 1 }, E(t, 0.3, 0.7));
+    },
   },
   { // 7 Poke the holes
     dur: 3.4, view: { at: [6, 40, -14], az: -40, el: 38, d: 120 },
@@ -148,7 +151,8 @@ const STEPS3D: Step3D[] = [
     run(s, t) {
       num(s, "w2", 1, E(t, 0.04, 0.28));
       num(s, "w3", 1, E(t, 0.26, 0.5));
-      go(s, "tape2", { p: [ROW_L, 36.2, HDR - 0.1], v: 1 }, E(t, 0.5, 0.64));
+      num(s, "f2", 1, E(t, 0.48, 0.58)); num(s, "f3", 1, E(t, 0.5, 0.6));
+      go(s, "tape2", { p: [ROW_L, 36.2, HDR], v: 1 }, E(t, 0.56, 0.66));
       const [x, y6] = HOLES[2], y7 = HOLES[3][1];
       go(s, "poker", { p: [x, y6, -30], v: 1 }, E(t, 0.62, 0.7));
       go(s, "poker", { p: [x, y6, HDR + 4] }, E(t, 0.7, 0.77));
@@ -547,8 +551,15 @@ export async function mountPlayground(el: HTMLElement): Promise<Playground> {
   obj("wires", "stack", [...ins, ...cu]);
   obj("slugs", "stack", slugs);
   const tapeM = new THREE.MeshStandardMaterial({ color: 0x141414, roughness: 0.35, transparent: true, opacity: 0.9 });
-  obj("tape1", "stack", box(6.4, 9.6, 0.16, tapeM));
-  obj("tape2", "stack", box(6.4, 7.6, 0.16, tapeM));
+  // tape over a row: across the top of the sockets, down the inside of the header, a foot on the board
+  // (origin: the row, at the sockets' open end; sx: toward the middle of the board)
+  const tapeWrap = (sx: number, len: number) => {
+    const down = -1.97 - HDR;
+    return [box(3.8, len, 0.16, tapeM, sx * 0.35, 0, -1.15), box(0.16, len, down + 1.1, tapeM, sx * 2.25, 0, (down - 1.15) / 2 - 0.1),
+      box(3.2, len, 0.16, tapeM, sx * 3.8, 0, down - 1.2)];
+  };
+  obj("tape1", "stack", tapeWrap(1, 9.6));
+  obj("tape2", "stack", tapeWrap(-1, 7.6));
   // the four sockets the wires use, ringed in their colors; the 4th on the right, struck out
   const marks: THREE.Mesh[] = [];
   HOLES.forEach(([x, y], i) => {
@@ -561,7 +572,7 @@ export async function mountPlayground(el: HTMLElement): Promise<Playground> {
   }
   obj("marks", "stack", marks);
   // holes poked open: a dark dot through the tape
-  const opened = HOLES.map(([x, y]) => { const d = new THREE.Mesh(new THREE.CircleGeometry(0.55, 16), new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide, transparent: true })); d.position.set(x, y, HDR - 0.2); d.userData.noShadow = true; return d; });
+  const opened = HOLES.map(([x, y]) => { const d = new THREE.Mesh(new THREE.CircleGeometry(0.55, 16), new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide, transparent: true })); d.position.set(x, y, HDR - 1.25); d.userData.noShadow = true; return d; });
   obj("holes", "stack", opened);
   obj("joy", "stack", part("joystick", plastic(COLORS.joystick, 0.8)), STICK);
   obj("usb", "stack", usbPlug());
@@ -592,7 +603,7 @@ export async function mountPlayground(el: HTMLElement): Promise<Playground> {
       poker: o([48, 12, FLAT - 1.3], [0, PI / 2, 0.3], 0), tweezers: o([48, -20, FLAT - 1.8], [0, PI / 2, 0.1], 0),
       box: o([0, 0, 0], [0, 0, 0], 0), boxlid: o([0, 0, 0], [0, 2.2, 0]),
     },
-    n: { strip: 0, fan: 0, w0: 0, w1: 0, w2: 0, w3: 0, plugIn: 0, marks: 0, open0: 0, open1: 0, open2: 0, open3: 0, led: 0, scr: 0, scrK: 0 },
+    n: { strip: 0, fan: 0, w0: 0, w1: 0, w2: 0, w3: 0, f0: 0, f1: 0, f2: 0, f3: 0, plugIn: 0, marks: 0, open0: 0, open1: 0, open2: 0, open3: 0, led: 0, scr: 0, scrK: 0 },
   };
   const clone = (s: S): S => ({ o: Object.fromEntries(Object.entries(s.o).map(([k, v]) => [k, { p: [...v.p] as V3, r: [...v.r] as V3, v: v.v }])), n: { ...s.n } });
   const ends: S[] = [];
@@ -662,9 +673,19 @@ export async function mountPlayground(el: HTMLElement): Promise<Playground> {
       else { end.copy(hover).lerp(H, ease((w - 0.6) / 0.4)); dir.copy(into); }
       end.addScaledVector(dir, -0.2);
       const a = start.clone().addScaledVector(d0, 6), b = end.clone().addScaledVector(dir, -7);
-      const mid = a.clone().lerp(b, 0.5);
+      let curve = new THREE.CatmullRomCurve3([start, a, a.clone().lerp(b, 0.5), b, end], false, "centripetal");
+      const f = s.n["f" + i];
+      if (f > 0) {
+        // taped: out of the socket, over the top, down the inside of the header, out along the board
+        const [x, y] = HOLES[i], sx = x < C[0] ? 1 : -1, low = -2.5;
+        const e5 = new THREE.Vector3(x + sx * 6.5, y, low);
+        const folded = new THREE.CatmullRomCurve3([start, a, a.clone().lerp(e5, 0.5), e5, new THREE.Vector3(x + sx * 1.6, y, low),
+          new THREE.Vector3(x + sx * 1.6, y, HDR + 1.2), new THREE.Vector3(x + sx * 1.1, y, HDR - 0.55), new THREE.Vector3(x, y, HDR - 0.55), end], false, "centripetal");
+        const pa = curve.getSpacedPoints(60), pb = folded.getSpacedPoints(60);
+        curve = new THREE.CatmullRomCurve3(pa.map((p, j) => p.lerp(pb[j], ease(f))), false, "centripetal");
+      }
       ins[i].geometry.dispose();
-      ins[i].geometry = new THREE.TubeGeometry(new THREE.CatmullRomCurve3([start, a, mid, b, end]), 48, 0.5, 8, false);
+      ins[i].geometry = new THREE.TubeGeometry(curve, 80, 0.5, 8, false);
       cu[i].visible = cuLen > 0.05;
       cu[i].scale.set(1, cuLen || 0.001, 1);
       cu[i].position.copy(end).addScaledVector(dir, cuLen / 2);
