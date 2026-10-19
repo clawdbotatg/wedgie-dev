@@ -6,7 +6,8 @@ import "./assemble.css";
 type Step = { t: string; p: string; d?: string; ph: string[]; art?: string; tip?: string; warn?: string; end?: string };
 
 // The 4 wires go by their place in the plug, never by color: cables come in any colors (public/lore.md).
-// Number = place in the plug, top to bottom with the Trust M upright and the plug on the left.
+// Number = place in the plug, top to bottom: Trust M chip side up, words readable, plug in the left socket.
+// The right socket is turned around, so there the order reads backwards. Both sockets are wired the same.
 const WIRES = [
   { n: 1, job: "GND", to: "right 3rd", hole: "R2" },
   { n: 2, job: "3V3", to: "right 5th", hole: "R4" },
@@ -30,6 +31,7 @@ export const PLUG = (() => {
     <text class="bt" x="334" y="64" text-anchor="middle">Trust M</text>
     <rect class="chip" x="316" y="96" width="36" height="36" rx="4"/>
     <rect class="plug" x="262" y="90" width="26" height="44" rx="3"/>
+    <rect class="sock" x="370" y="92" width="14" height="40" rx="2"/>
     ${s}</svg>`;
 })();
 
@@ -66,9 +68,10 @@ export const STEPS: Step[] = [
     p: `Keep one plug. Cut the wires about <b>2 in (5 cm)</b> from it. Strip off as much as a socket is deep, about <b>5 mm</b> (between 1/8 and 1/4 in), so the bare wire goes all the way down.`,
     d: "03", ph: ["03-cut-and-stripped-a", "03-cut-and-stripped-b"] },
   { t: "Number the wires",
-    p: `Plug the cable into the Trust M, plug on the left, words up. The wires are <b>1 to 4, top to bottom</b>. Go by place, never by color: cables differ. Unplug it.`,
+    p: `Lay the Trust M <b>chip side up</b>, words readable. Plug the cable into the <b>left</b> socket. The wires are <b>1 to 4, top to bottom</b>. Mark them with a pen. Go by place, never by color: cables differ. Unplug it.`,
     d: "02", ph: ["02-trust-m-plug"], art: PLUG,
-    tip: `In our photos: 1 white, 2 yellow, 3 black, 4 red.` },
+    tip: `In our photos: 1 white, 2 yellow, 3 black, 4 red.`,
+    warn: `Count only this way. Chip side down or in the right socket, the order reads backwards.` },
   { t: "Lay out the screen board",
     p: `Turn the screen board face down, sockets up, USB mark at the top. Each wire pushes into a socket, no solder. Count sockets from the USB end:`,
     d: "04", ph: ["04-board-and-guide"], art: HEADER,
@@ -89,7 +92,7 @@ export const STEPS: Step[] = [
     p: `All 4 wires in, taped, holes open. Ready for the Pico.`,
     d: "09h", ph: ["09-header-ready"] },
   { t: "Plug in the chip",
-    p: `Plug the cable back into the Trust M. It only fits one way. Lay the Trust M face up on the back of the screen board, over the wires. The Pico goes on top of it next.`,
+    p: `Plug the cable back into the Trust M, either socket: both work. It only fits one way. Lay the Trust M face up on the back of the screen board, over the wires. The Pico goes on top of it next.`,
     d: "10p", ph: ["10-chip-laid-down", "10-chip-plugged", "10-chip-plugged-side", "10-ready-for-pico"] },
   { t: "Snap off extra board",
     p: `Some Picos have a little extra board left on the end, away from the USB port. Pinch it with pliers and snap it off. Otherwise it won't fit the case.`,

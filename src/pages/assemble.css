@@ -57,6 +57,7 @@
 .wire-art .bt { font: 800 13px var(--font); fill: #e8e8e4; }
 .wire-art .chip { fill: #2e2f31; stroke: #e8e8e4; stroke-width: 2; }
 .wire-art .plug { fill: #f2f1ec; stroke: #9a9c99; stroke-width: 1.5; }
+.wire-art .sock { fill: #2e2f31; stroke: #6f7072; stroke-width: 1.5; }
 .wire-art .wire { fill: none; stroke: #8a8c89; stroke-width: 4; stroke-linecap: round; }
 .wire-art .wj { font: 900 15px var(--font); fill: var(--ink); }
 .wire-art .wt { font-weight: 700; fill: var(--muted); }
