@@ -63,6 +63,12 @@ const num = (s: S, name: string, to: number, k: number) => { if (k > 0) s.n[name
 const CAPS = ["A", "B", "X", "Y"];
 const CAP_X: Record<string, number> = { Y: 4.8, X: 10.5, B: 16.1, A: 21.8 };
 const TOOLS = ["cutters", "strippers", "roll", "poker", "tweezers"];
+// Step 1: the tools in tidy rows on the mat, all lying along the cable (case x = down the screen, case y = across)
+const HOME: Record<string, O> = {
+  cutters: { p: [42, 66, FLAT - 2.5], r: [0, 0, -PI / 2], v: 1 }, strippers: { p: [66, 66, FLAT - 2.5], r: [0, 0, -PI / 2], v: 1 },
+  roll: { p: [-24, 62, FLAT - 6], r: [0, 0, 0], v: 1 }, poker: { p: [-20, -34, FLAT - 1.3], r: [PI / 2, 0, 0], v: 1 },
+  tweezers: { p: [90, -14, FLAT - 1.6], r: [-PI / 2, 0, 0], v: 1 },
+};
 const LAID_OUT: Record<string, V3> = {                        // step 17: every case part on the mat
   lid: [0, -38, FLAT_UP + 12.36], base: [0, 38, 0],
   ...Object.fromEntries(CAPS.map((k, i) => [k, [-22 - CAP_X[k], 10 + i * 11 - 4, FLAT_UP - 2.61]])),
@@ -70,10 +76,10 @@ const LAID_OUT: Record<string, V3> = {                        // step 17: every 
 
 const STEPS3D: Step3D[] = [
   { // 1 Cable and tools
-    dur: 3, view: { at: [8, 22, 4], az: 0, el: 62, d: 330 },
-    labels: [{ txt: "STEMMA QT / Qwiic cable", at: [13, 72, 3], t: [0.2, 1] }, { txt: "Cutters", at: [-28, 50, 3], t: [0.35, 1] },
-      { txt: "Strippers", at: [-28, 2, 3], t: [0.45, 1] }, { txt: "Tape", at: [56, 52, 0], t: [0.55, 1] },
-      { txt: "Stiff jumper wire", at: [52, 12, 3], t: [0.65, 1] }, { txt: "Tweezers", at: [56, -16, 3], t: [0.75, 1] }],
+    dur: 3, view: { at: [34, 26, 4], az: 0, el: 66, d: 320 },
+    labels: [{ txt: "STEMMA QT / Qwiic cable", at: [13, 50, 3], t: [0.2, 1] }, { txt: "Cutters", at: [42, 30, 2], t: [0.35, 1] },
+      { txt: "Strippers", at: [66, 30, 2], t: [0.45, 1] }, { txt: "Tape", at: [-24, 62, -2], t: [0.55, 1] },
+      { txt: "Stiff jumper wire", at: [-20, 4, 3], t: [0.65, 1] }, { txt: "Tweezers", at: [90, 34, 3], t: [0.75, 1] }],
     run(s, t) {
       go(s, "root", { r: [0, PI, PI / 2] }, 1);
       TOOLS.forEach((k, i) => go(s, k, { v: 1 }, E(t, 0.1 + i * 0.1, 0.4 + i * 0.1)));
@@ -83,12 +89,12 @@ const STEPS3D: Step3D[] = [
     dur: 4.2, view: { at: [13, 38, 4], az: 10, el: 58, d: 230 },
     labels: [{ txt: "Cut 2 in (5 cm) from the plug", at: [13, 22, 4], t: [0.05, 0.45] }, { txt: "Strip 5 mm", at: [13, 18, 4], t: [0.62, 1] }],
     run(s, t) {
-      go(s, "cutters", { p: [19.5, 22, FLAT - 2.5] }, E(t, 0, 0.22));
-      go(s, "cutters", { p: [-30, 50, FLAT - 2.5] }, E(t, 0.3, 0.45));
+      go(s, "cutters", { p: [19.5, 22, FLAT - 2.5], r: [0, 0, 0] }, E(t, 0, 0.22));
+      go(s, "cutters", HOME.cutters, E(t, 0.3, 0.45));
       go(s, "plug2", { p: [13, -48, 3.3], v: 0 }, E(t, 0.3, 0.55));
-      go(s, "strippers", { p: [19.5, 25, FLAT - 2.5] }, E(t, 0.45, 0.62));
+      go(s, "strippers", { p: [19.5, 25, FLAT - 2.5], r: [0, 0, 0] }, E(t, 0.45, 0.62));
       num(s, "strip", 1, E(t, 0.62, 0.9));
-      go(s, "strippers", { p: [-30, 2, FLAT - 2.5] }, E(t, 0.85, 1));
+      go(s, "strippers", HOME.strippers, E(t, 0.85, 1));
       num(s, "fan", 1, E(t, 0.85, 1));
     },
   },
@@ -579,8 +585,7 @@ export async function mountPlayground(el: HTMLElement): Promise<Playground> {
       chip: o([-24, 18, -10], [0, PI, 0], 0), plug: o([13, 72, FLAT - 1.5], [0, 0, PI]), plug2: o([13, -28, FLAT - 1.5]),
       wires: o(), slugs: o(), tape1: o([ROW_R, pinY(4), -26], [0, 0, 0], 0), tape2: o([ROW_L, 36.2, -26], [0, 0, 0], 0),
       marks: o(), holes: o(), joy: o([0, 0, 0], [0, 0, 0], 0), usb: o(USB_OUT, [0, 0, 0], 0),
-      cutters: o([-30, 50, FLAT - 2.5], [0, 0, 0], 0), strippers: o([-30, 2, FLAT - 2.5], [0, 0, 0], 0), roll: o([60, 50, FLAT - 6], [0, 0, 0], 0),
-      poker: o([48, 12, FLAT - 1.3], [0, PI / 2, 0.3], 0), tweezers: o([48, -20, FLAT - 1.8], [0, PI / 2, 0.1], 0),
+      ...Object.fromEntries(TOOLS.map((k) => [k, o([...HOME[k].p], [...HOME[k].r], 0)])),
       box: o([0, 0, 0], [0, 0, 0], 0), boxlid: o([0, 0, 0], [0, 2.2, 0]),
     },
     n: { strip: 0, fan: 0, w0: 0, w1: 0, w2: 0, w3: 0, f0: 0, f1: 0, f2: 0, f3: 0, plugIn: 0, marks: 0, open0: 0, open1: 0, open2: 0, open3: 0, open4: 0, led: 0, scr: 0, scrK: 0 },
