@@ -50,8 +50,11 @@ async function landTexture(): Promise<HTMLCanvasElement> {
       g.closePath(); g.fill(); g.stroke();
     }
   }
-  // The equator wears the waistband.
-  [[P.GREEN, -7], [P.GREY, -2], [P.RED, 2]].forEach(([col, dy]) => { g.fillStyle = col as string; g.globalAlpha = .75; g.fillRect(0, H / 2 + (dy as number), W, dy === -2 ? 4 : 5); });
+  // The prime meridian wears green and red, the equator two greys (the buttons).
+  g.globalAlpha = .75;
+  g.fillStyle = P.GREEN; g.fillRect(W / 2 - 6, 0, 5, H);
+  g.fillStyle = P.RED; g.fillRect(W / 2 + 1, 0, 5, H);
+  g.fillStyle = P.GREY; g.fillRect(0, H / 2 - 6, W, 4); g.fillRect(0, H / 2 + 2, W, 4);
   g.globalAlpha = 1;
   return c;
 }
