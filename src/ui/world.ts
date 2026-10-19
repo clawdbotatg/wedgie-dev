@@ -91,7 +91,7 @@ export function world(sec: HTMLElement) {
       <textarea class="recess about" rows="2" maxlength="280" placeholder="Anything about it (optional)"></textarea>
       <input class="recess link" maxlength="200" placeholder="@handle or https:// link (optional)" autocomplete="url">
       <input class="website" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
-      <p class="fine">Everyone will see the photo, these words, and the spot on the globe (rounded to about 100 km). We check each one first.</p>
+      <p class="fine">Everyone will see the photo, these words, and the spot on the globe (rounded to about 25 km). We check each one first.</p>
       <p class="fine said" hidden></p>
       <div class="row"><button class="btn btn-green send">Send</button><button type="button" class="btn cancel">Cancel</button></div>
     </form>`;
@@ -121,7 +121,7 @@ export function world(sec: HTMLElement) {
       side.querySelectorAll<HTMLButtonElement>(".world-seg button").forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-checked", String(x === b)); });
     }));
     $(".here").onclick = () => navigator.geolocation?.getCurrentPosition(
-      (p) => { const a = Math.round(p.coords.latitude), o = Math.round(p.coords.longitude); globe?.mark(a, o); where(a, o); },
+      (p) => { const a = Math.round(p.coords.latitude * 4) / 4, o = Math.round(p.coords.longitude * 4) / 4; globe?.mark(a, o); where(a, o); },
       () => said("Couldn't get your location. Tap the globe instead."), { maximumAge: 600_000, timeout: 15_000 });
     $<HTMLFormElement>("form").onsubmit = async (e) => {
       e.preventDefault();
