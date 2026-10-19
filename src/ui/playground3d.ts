@@ -540,7 +540,14 @@ export async function mountPlayground(el: HTMLElement): Promise<Playground> {
     m.userData.noShadow = true;
     return m;
   })();
-  obj("hat", "stack", [part("hat", std(PART_COLORS.hat, 0.6)), glass, screen, usbMark], C);
+  // The joystick's square base on the board model stands 0.65 mm taller than the cap's rim: lower it so the
+  // pressed-on cap covers it, as on the real board.
+  const hat = part("hat", std(PART_COLORS.hat, 0.6));
+  hat.geometry = hat.geometry.clone();
+  const hp = hat.geometry.attributes.position;
+  for (let i = 0; i < hp.count; i++) if (Math.abs(hp.getZ(i) - 3) < 0.01 && hp.getY(i) > 39) hp.setZ(i, 2.2);
+  hp.needsUpdate = true;
+  obj("hat", "stack", [hat, glass, screen, usbMark], C);
   const filmM = new THREE.MeshPhysicalMaterial({ color: 0x9fc4ff, roughness: 0.15, transparent: true, opacity: 0.45, clearcoat: 1 });
   const film = new THREE.Mesh(new THREE.BoxGeometry(G.w + 0.6, G.h + 0.6, 0.12), filmM);
   film.position.set(G.cx, G.cy, G.z + 0.14);
