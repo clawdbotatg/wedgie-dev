@@ -3,10 +3,12 @@
 // arrows: it plays once and holds. Drag to look around, scroll or pinch to zoom. #7 opens step 7.
 import "./assemble.css";
 import "./assemble3d.css";
-import { STEPS } from "./assemble";
+import { STEPS, NO_3D } from "./assemble";
 import type { Playground } from "../ui/playground3d";
 
 const IMG = "/img/assemble/";
+// The manual's steps that have a 3D animation (step numbers stay the manual's).
+const IDS = STEPS.map((_, i) => i).filter((i) => !NO_3D.includes(STEPS[i].t));
 
 export function assemble3d(main: HTMLElement) {
   main.innerHTML = `
@@ -30,7 +32,7 @@ export function assemble3d(main: HTMLElement) {
         <label class="pg-auto"><input type="checkbox" id="pg-all"> Play all steps</label>
       </div>
       <ol class="pg-list" id="pg-list">
-        ${STEPS.map((s, i) => `<li><button type="button" data-i="${i}"><b>${i + 1}</b>${s.t}</button></li>`).join("")}
+        ${IDS.map((i) => `<li><button type="button" data-i="${i}"><b>${i + 1}</b>${STEPS[i].t}</button></li>`).join("")}
       </ol>
       <p class="fine pg-back"><a href="/assemble">The step-by-step page with photos</a> · <a href="/assemble.pdf" download>Print (PDF)</a></p>
     </aside>
@@ -44,7 +46,8 @@ export function assemble3d(main: HTMLElement) {
   big.addEventListener("click", () => big.close());
 
   let pg: Playground | null = null;
-  let step = Math.max(0, Math.min(STEPS.length - 1, (parseInt(location.hash.slice(1)) || 1) - 1));
+  const near = (n: number) => IDS.find((i) => i >= n) ?? IDS[IDS.length - 1];   // a step without 3D: the next one
+  let step = near((parseInt(location.hash.slice(1)) || 1) - 1);
   let t = 0, playing = false, last = 0, hold = 0;
 
   function paint() {
@@ -56,7 +59,7 @@ export function assemble3d(main: HTMLElement) {
     $("pg-title").textContent = s.t;
     $("pg-copy").innerHTML = `<p>${s.p}</p>${s.art ? `<div class="asm-art recess">${s.art}</div>` : ""}${s.tip ? `<p class="note">${s.tip}</p>` : ""}${s.warn ? `<p class="note bad">${s.warn}</p>` : ""}`;
     $("pg-photos").innerHTML = s.ph.map((f) => `<button type="button" data-ph="${f}" aria-label="Photo"><img src="${IMG}t/${f}.webp" alt="" loading="lazy"></button>`).join("");
-    list.querySelectorAll("button").forEach((b, i) => b.classList.toggle("here", i === step));
+    list.querySelectorAll<HTMLElement>("button").forEach((b) => b.classList.toggle("here", +b.dataset.i! === step));
     const li = list.querySelector<HTMLElement>(`[data-i="${step}"]`)!.parentElement!;   // scroll the list only, never the page
     if (li.offsetTop < list.scrollTop) list.scrollTop = li.offsetTop - 8;
     else if (li.offsetTop + li.offsetHeight > list.scrollTop + list.clientHeight) list.scrollTop = li.offsetTop + li.offsetHeight - list.clientHeight + 8;
@@ -67,8 +70,10 @@ export function assemble3d(main: HTMLElement) {
     if (b) { bigImg.src = `${IMG}p/${b.dataset.ph}.webp`; big.showModal(); }
   });
 
+  const at = () => IDS.indexOf(step);
+  const next = () => IDS[(at() + 1) % IDS.length], prev = () => IDS[(at() - 1 + IDS.length) % IDS.length];
   function go(i: number) {
-    step = (i + STEPS.length) % STEPS.length;
+    step = i;
     t = 0; hold = 0;
     paint();
     setPlaying(true);
@@ -78,20 +83,20 @@ export function assemble3d(main: HTMLElement) {
     play.textContent = on ? "Pause" : t >= 1 ? "Replay" : "Play";
   }
   play.addEventListener("click", () => { if (!playing && t >= 1) t = 0; setPlaying(!playing); });
-  $("pg-prev").addEventListener("click", () => go(step - 1));
-  $("pg-next").addEventListener("click", () => go(step + 1));
+  $("pg-prev").addEventListener("click", () => go(prev()));
+  $("pg-next").addEventListener("click", () => go(next()));
   $("pg-view").addEventListener("click", () => pg?.resetView());
   scrub.addEventListener("input", () => { setPlaying(false); t = +scrub.value / 1000; play.textContent = t >= 1 ? "Replay" : "Play"; });
   list.addEventListener("click", (e) => { const b = (e.target as HTMLElement).closest<HTMLElement>("[data-i]"); if (b) go(+b.dataset.i!); });
-  all.addEventListener("change", () => { if (all.checked && !playing) { if (t >= 1) go(step + 1); else setPlaying(true); } });
+  all.addEventListener("change", () => { if (all.checked && !playing) { if (t >= 1) go(next()); else setPlaying(true); } });
   const onKey = (e: KeyboardEvent) => {
     if ((e.target as HTMLElement).closest("input, textarea") && e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-    if (e.key === "ArrowRight") { e.preventDefault(); go(step + 1); }
-    else if (e.key === "ArrowLeft") { e.preventDefault(); go(step - 1); }
+    if (e.key === "ArrowRight") { e.preventDefault(); go(next()); }
+    else if (e.key === "ArrowLeft") { e.preventDefault(); go(prev()); }
     else if (e.key === " " && !(e.target as HTMLElement).closest("button")) { e.preventDefault(); play.click(); }
   };
   addEventListener("keydown", onKey);
-  addEventListener("hashchange", () => { const n = parseInt(location.hash.slice(1)) - 1; if (n >= 0 && n < STEPS.length && n !== step) go(n); });
+  addEventListener("hashchange", () => { const n = parseInt(location.hash.slice(1)) - 1; if (n >= 0 && n < STEPS.length && near(n) !== step) go(near(n)); });
 
   paint();
   // Drop the hint once they've touched it.
@@ -99,7 +104,7 @@ export function assemble3d(main: HTMLElement) {
 
   import("../ui/playground3d").then(async ({ mountPlayground }) => {
     pg = await mountPlayground(stage);
-    if (pg.steps !== STEPS.length) console.warn("playground: steps out of step", pg.steps, STEPS.length);
+    if (pg.steps !== IDS.length) console.warn("playground: steps out of step", pg.steps, IDS.length);
     stage.classList.add("live");
     setPlaying(true);
     const tick = () => {
@@ -108,14 +113,14 @@ export function assemble3d(main: HTMLElement) {
       const now = performance.now(), dt = (now - last) / 1000;
       last = now;
       if (playing) {
-        t = Math.min(1, t + dt / pg!.durations[step]);
+        t = Math.min(1, t + dt / pg!.durations[IDS.indexOf(step)]);
         if (t >= 1) {
-          if (all.checked && step < STEPS.length - 1) { hold += dt; if (hold > 1.4) go(step + 1); }
+          if (all.checked && step !== IDS[IDS.length - 1]) { hold += dt; if (hold > 1.4) go(next()); }
           else setPlaying(false);
         }
       }
       scrub.value = String(Math.round(t * 1000));
-      pg!.show(step, t);
+      pg!.show(IDS.indexOf(step), t);
     };
     tick();
   }).catch((err) => {

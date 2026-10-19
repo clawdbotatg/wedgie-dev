@@ -15,8 +15,8 @@ const errs = []; p.on("pageerror", (e) => errs.push(e.message)); p.on("console",
 mkdirSync("shots", { recursive: true });
 await p.goto(url); await p.waitForFunction(() => !document.getElementById("wl"));
 await p.waitForSelector(".pg-stage.live", { timeout: 30000 });
-const n = await p.$$eval("#pg-list button", (b) => b.length);
-for (let i = 1; i <= n; i++) {
+const ids = await p.$$eval("#pg-list button", (b) => b.map((x) => +x.dataset.i + 1));   // manual step numbers
+for (const i of ids) {
   if (only && !only.includes(i)) continue;
   await p.click(`#pg-list button[data-i="${i - 1}"]`);
   await p.evaluate((v) => { const s = document.getElementById("pg-scrub"); s.value = String(v); s.dispatchEvent(new Event("input")); }, mid ? 500 : 1000);

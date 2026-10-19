@@ -1,6 +1,6 @@
 // /assemble/3d: every assembly step, in 3D, on a cutting mat. Drag to turn, wheel or pinch to zoom,
 // right-drag to move. show(step, t) poses the whole scene for step `step` (0-based, same order as STEPS
-// in pages/assemble.ts) at t 0..1 of its animation. Each step starts where the one before it ended:
+// in pages/assemble.ts, less NO_3D there) at t 0..1 of its animation. Each step starts where the one before it ended:
 // a step only says what it changes (run(S, t)), and the end of step k is steps 0..k run at t = 1.
 // Frame: case mm (LCD PCB bottom-left origin, +y toward the joystick and USB, +z out of the screen),
 // the same as wedgie3d / assembly3d. The boards and case parts are the real models (public/3d/).
@@ -189,20 +189,6 @@ const STEPS3D: Step3D[] = [
       go(s, "pico", { p: [32, 0, FLAT + 6.86], v: 1 }, E(t, 0, 0.3));
       go(s, "tab", { r: [0.55, 0, 0] }, E(t, 0.5, 0.68));
       go(s, "tab", { p: [0, -16, -10], r: [1.2, 0, 0.3], v: 0 }, E(t, 0.7, 1));
-    },
-  },
-  { // 12 Cut off plastic guards (Pico 2 W only)
-    dur: 4.4, view: { at: [45, 26, -2], az: -20, el: 58, d: 150 },
-    labels: [{ txt: "Pico 2 W only", at: [45.2, 52, -8], t: [0.15, 0.4] },
-      { txt: "Cut", at: [13.22, 27, -11.6], on: "pico", t: [0.4, 0.6] }, { txt: "Cut", at: [13.22, 48, -11.6], on: "pico", t: [0.58, 0.78] },
-      { txt: "Keep this one", at: [13.22, 5, -11.6], on: "pico", t: [0.78, 1] }],
-    run(s, t) {
-      go(s, "pico", { p: [32, 0, 2.9], r: [0, PI, 0] }, E(t, 0, 0.3));
-      go(s, "cutters", { p: [58.5, 27, -1], v: 1 }, E(t, 0.3, 0.45));
-      go(s, "g2", { p: [0, 0, 16], v: 0 }, E(t, 0.45, 0.62));
-      go(s, "cutters", { p: [58.5, 48, -1] }, E(t, 0.5, 0.62));
-      go(s, "g3", { p: [0, 4, 16], v: 0 }, E(t, 0.64, 0.8));
-      go(s, "cutters", { p: [80, 50, -10], v: 0 }, E(t, 0.75, 0.95));
     },
   },
   { // 13 Stack the boards
@@ -531,14 +517,12 @@ export async function mountPlayground(el: HTMLElement): Promise<Playground> {
   const filmTab = box(6, 5, 0.14, std(0x2f6fd6, 0.5), -2.2, 34, G.z + 0.14);
   obj("film", "hat", [film, filmTab], [25.7, 26.1, G.z + 0.14]);
 
-  // the Pico: its pins, the extra board on its end, the 3 plastic guards of a Pico 2 W
+  // the Pico: its pins, the extra board on its end
   const picoMesh = part("pico", std(PART_COLORS.pico, 0.55));
   const led = box(1.4, 1, 0.5, new THREE.MeshBasicMaterial({ color: 0x3a3a3a }), 7.2, 49, -15.8);
   const port = [box(8.9, 7.3, 3.1, std(0xc9ccd0, 0.25, 0.95), 13.22, 50.6, -16.36), box(7, 0.1, 1.5, std(0x111111, 0.8), 13.22, 54.26, -16.36)];
   obj("pico", "stack", [picoMesh, picoPins(), led, ...port], C);
   obj("tab", "pico", box(20.8, 2.9, 1.23, std(PART_COLORS.pico, 0.55), 13.22, -0.72, -14.88), [13.22, 0.73, -14.26]);
-  const guard = (y: number) => box(ROW_L - ROW_R - 2.5, 2, 2.5, std(0x151515, 0.7), 13.22, y, -13.01);
-  obj("g1", "pico", guard(5), C); obj("g2", "pico", guard(27), C); obj("g3", "pico", guard(48), C);
 
   // the chip and the cable
   obj("chip", "stack", chipBoard());
@@ -599,7 +583,7 @@ export async function mountPlayground(el: HTMLElement): Promise<Playground> {
       root: o([-C[0], -C[1], -9.2], [0, PI, PI / 2]), core: o(), stack: o(), shell: o([0, 0, 0], [0, 0, 0], 0),
       base: o([0, 0, 0], [0, 0, 0], 0), baseR: o([38, 0, 0], [0, 0, 0], 0), baseG: o([-38, 0, 0], [0, 0, 0], 0),
       lid: o(), A: o(), B: o(), X: o(), Y: o(),
-      hat: o([0, 0, -24], [0, 0, 0], 0), film: o(), pico: o([32, 0, -10], [0, 0, 0], 0), tab: o(), g1: o(), g2: o(), g3: o(),
+      hat: o([0, 0, -24], [0, 0, 0], 0), film: o(), pico: o([32, 0, -10], [0, 0, 0], 0), tab: o(),
       chip: o([-24, 18, -10], [0, PI, 0], 0), plug: o([13, 72, FLAT - 1.5], [0, 0, PI]), plug2: o([13, -28, FLAT - 1.5]),
       wires: o(), slugs: o(), tape1: o([ROW_R, pinY(4), -26], [0, 0, 0], 0), tape2: o([ROW_L, 36.2, -26], [0, 0, 0], 0),
       marks: o(), holes: o(), joy: o([0, 0, 0], [0, 0, 0], 0), usb: o(USB_OUT, [0, 0, 0], 0),
