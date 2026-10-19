@@ -9,6 +9,7 @@ Push to main = deploy (Vercel).
   After editing them, run `tools/drive.py`. `tools/test_docs.py` checks them.
 - App rules: `src/apps/appjson.mjs`, `folder_app` in `public/wedgie.py`, `public/code.md`. Keep in step.
 - Style: `docs/STYLE.md`, enforced by `tools/test_style.py`. Apps: `docs/APPS.md`. Memory: `docs/PLAN-MEMORY.md`.
+- Clear signing groundwork (ERC-7730 wire format, not used yet) and its next steps: `wire/README.md`.
 
 ## Accounts
 
