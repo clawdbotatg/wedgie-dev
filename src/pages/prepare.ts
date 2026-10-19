@@ -172,11 +172,15 @@ export function prepare(main: HTMLElement) {
     $("p-detail").textContent = "Open wedgie.dev/prepare in Chrome or Edge on a computer.";
     return;
   }
-  W.onChange(tick);
-  setInterval(tick, 5000);        // the 60 s "didn't come back" check
-  W.arm();
-  W.start();
-  $("p-actions").innerHTML = `<p class="fine">Plugged in and nothing happens? No profile yet: <a href="#" id="p-pick">pick it</a></p>`;
-  $("p-pick").onclick = (e) => { e.preventDefault(); W.connectNew().catch(() => {}); };
-  tick();
+  // Nothing touches a wedgie until this tap (CLAUDE.md: the page never drives a wedgie by default)
+  $("p-actions").innerHTML = `<button class="btn btn-green" id="p-go">Start checking</button>`;
+  $("p-go").onclick = () => {
+    W.onChange(tick);
+    setInterval(tick, 5000);      // the 60 s "didn't come back" check
+    W.arm();                      // the bench is for people with boards in hand
+    W.start();
+    $("p-actions").innerHTML = `<p class="fine">Plugged in and nothing happens? No profile yet: <a href="#" id="p-pick">pick it</a></p>`;
+    $("p-pick").onclick = (e) => { e.preventDefault(); W.connectNew().catch(() => {}); };
+    tick();
+  };
 }

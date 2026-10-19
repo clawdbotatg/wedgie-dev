@@ -20,10 +20,26 @@ export function askScreen(job: string, checked = false, version = "") {
   const c = document.createElement("canvas");
   c.width = c.height = 240;
   const g = c.getContext("2d")!;
+  g.textAlign = "center"; g.textBaseline = "top";
+  if (!checked) {                                 // an "open" is always hatch.ask's red question, whatever the job says
+    g.fillStyle = P.RED; g.fillRect(0, 0, 240, 240);
+    g.fillStyle = P.WHITE; g.font = "16px Silkscreen, monospace";
+    g.fillText("! WARNING !", 120, 14);
+    g.fillText("FULL CONTROL?", 120, 48);
+    g.font = "8px Silkscreen, monospace";
+    wrap("This computer could run any code and make the chip sign anything: send your money.", 28).concat(wrap("Didn't ask? Press no", 28))
+      .forEach((s, i) => g.fillText(s, 120, 108 + i * 14));
+    g.fillStyle = P.GREEN; g.fillRect(0, 184, 240, 26);
+    g.fillStyle = P.RED; g.fillRect(0, 214, 240, 26);
+    g.fillStyle = P.WHITE; g.fillRect(0, 212, 240, 2);
+    g.font = "16px Silkscreen, monospace";
+    g.fillText("full control", 120, 189); g.fillText("no", 120, 219);
+    return c;
+  }
   g.fillStyle = P.WHITE; g.fillRect(0, 0, 240, 240);
   [[P.GREEN, 10], [P.GREY, 19], [P.RED, 28]].forEach(([col, y]) => { g.fillStyle = col as string; g.fillRect(0, y as number, 240, 5); });
-  g.textAlign = "center"; g.textBaseline = "top"; g.fillStyle = P.INK;
-  if (checked) {                                  // as slot.ask: the question, then what it's about big, a small check
+  g.fillStyle = P.INK;
+  {                                  // as slot.ask: the question, then what it's about big, a small check
     const head = (job || "Install").split(" to ")[0];
     const [q, big] = head.startsWith("Update") ? [head, version || job.split(" to ")[1] || "?"]
       : head.startsWith("Install ") ? ["Install", head.slice(8)] : [head + "?", ""];
@@ -42,10 +58,6 @@ export function askScreen(job: string, checked = false, version = "") {
       g.font = "16px Silkscreen, monospace";
       wrap(q, 15).slice(0, 2).forEach((s, i) => g.fillText(s, 120, 48 + i * 24));
     }
-  } else {
-    const title = job ? wrap(job + "?", 15).slice(0, 2) : ["LET THIS", "COMPUTER IN?"];
-    g.font = "16px Silkscreen, monospace";
-    title.forEach((s, i) => g.fillText(s, 120, 48 + i * 24));
   }
   g.fillStyle = P.GREEN; g.fillRect(0, 184, 240, 26);
   g.fillStyle = P.RED; g.fillRect(0, 214, 240, 26);

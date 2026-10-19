@@ -29,6 +29,7 @@ const errs = [];
 page.on("pageerror", (e) => errs.push(e.message));
 const card = (id) => page.evaluate((id) => { const c = [...document.querySelectorAll(".upd-card")].find((c) => c.querySelector(".idtag").textContent === id); return c ? c.className + " | " + c.textContent.replace(/\s+/g, " ").trim() : "(no card)"; }, id);
 await page.goto(base + "/prepare");
+await page.click("#p-go");
 await page.waitForFunction(() => document.querySelectorAll(".upd-card").length === 3 && ![...document.querySelectorAll(".upd-card")].some((c) => /checking|installing|restarting/.test(c.className)), null, { timeout: 120000 }).catch(() => {});
 const a = await card("3D9F01"), b = await card("no ID");
 console.log("·", a); console.log("·", b);

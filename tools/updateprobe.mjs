@@ -36,6 +36,7 @@ const card = (id) => page.evaluate((id) => { const c = [...document.querySelecto
 const wait = (fn, arg, ms, what) => page.waitForFunction(fn, arg, { timeout: ms }).then(() => true, async () => { console.log("STUCK:", what, "|", (await page.textContent("main")).replace(/\s+/g, " ").slice(0, 600)); bad++; return false; });
 
 await page.goto(base + "/update");
+await page.click("#u-go");
 await page.waitForFunction(() => !document.getElementById("wl"));
 const settled = () => [...document.querySelectorAll(".upd-card")].length === 4 && ![...document.querySelectorAll(".upd-card")].some((c) => /updating|restarting|waiting/.test(c.className));
 await wait(settled, null, 180000, "four cards, all settled");

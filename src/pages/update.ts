@@ -138,11 +138,15 @@ export function update(main: HTMLElement) {
     $("u-detail").textContent = "Open wedgie.dev/update in Chrome or Edge on a computer.";
     return;
   }
-  W.onChange(tick);
-  setInterval(tick, 5000);        // the 60 s "didn't come back" check
-  W.arm();                        // the bench is for people with boards in hand
-  W.start();
-  $("u-actions").innerHTML = `<p class="fine">Plugged in and nothing happens? No profile yet: <a href="#" id="u-pick">pick it</a></p>`;
-  $("u-pick").onclick = (e) => { e.preventDefault(); W.connectNew().catch(() => {}); };
-  tick();
+  // Nothing touches a wedgie until this tap (CLAUDE.md: the page never drives a wedgie by default)
+  $("u-actions").innerHTML = `<button class="btn btn-green" id="u-go">Start updating</button>`;
+  $("u-go").onclick = () => {
+    W.onChange(tick);
+    setInterval(tick, 5000);      // the 60 s "didn't come back" check
+    W.arm();                      // the bench is for people with boards in hand
+    W.start();
+    $("u-actions").innerHTML = `<p class="fine">Plugged in and nothing happens? No profile yet: <a href="#" id="u-pick">pick it</a></p>`;
+    $("u-pick").onclick = (e) => { e.preventDefault(); W.connectNew().catch(() => {}); };
+    tick();
+  };
 }
