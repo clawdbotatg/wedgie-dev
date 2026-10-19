@@ -20,9 +20,7 @@ export function place3D(el: HTMLElement, opts: Wedgie3DOptions & { fallback?: Sc
   // demo: a clickable pretend wedgie (a few apps, hard-coded) instead of a still screen
   const demo = opts.demo !== undefined ? import("./demo").then((m) => m.createDemo(opts.demo, { boot: opts.boot })) : null;
   return new Promise((resolve) => {
-    const io = new IntersectionObserver(async (es) => {
-      if (!es.some((e) => e.isIntersecting)) return;
-      io.disconnect();
+    const go = async () => {
       try {
         if (!opts.eager) await pageShown;          // eager: the hero, built while the loader is up
         const { mountWedgie3D } = await import("./wedgie3d");
@@ -38,7 +36,10 @@ export function place3D(el: HTMLElement, opts: Wedgie3DOptions & { fallback?: Sc
         el.innerHTML = deviceSvg(opts.fallback || { kind: "off" });
         resolve(null);
       }
-    }, { rootMargin: "400px" });
+    };
+    // eager: the hero, built at once, seen or not: the loader waits for it (a reload scrolled down never sees it)
+    if (opts.eager) return void go();
+    const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { io.disconnect(); go(); } }, { rootMargin: "400px" });
     io.observe(el);
   });
 }

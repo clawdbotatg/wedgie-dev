@@ -227,7 +227,7 @@ export function home(main: HTMLElement): Promise<unknown> {
     if (!es.some((e) => e.isIntersecting)) return;
     o.disconnect();
     try { await pageShown; await globe.mount(); } catch (err) { console.error("globe:", err); }
-  }, { rootMargin: "500px" }).observe(main.querySelector<HTMLElement>("#world .globe")!);
+  }, { rootMargin: "1500px" }).observe(main.querySelector<HTMLElement>("#world .globe")!);
   safeTx(main.querySelector<HTMLElement>(".stx")!);
   library(main.querySelector<HTMLElement>("#lib")!);
   main.querySelectorAll<HTMLElement>(".part-3d").forEach((el, i) => {

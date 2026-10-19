@@ -135,6 +135,15 @@ export async function mountGlobe(box: HTMLElement, onPick: (b: Build | null) => 
   };
   const kick = () => { if (!raf && shown) { last = 0; raf = requestAnimationFrame(frame); } };
   new IntersectionObserver((es) => { shown = es.some((e) => e.isIntersecting); kick(); }).observe(box);
+  // Scrolling the page turns it a little, as if it rolled along.
+  let lastY = scrollY;
+  addEventListener("scroll", () => {
+    const dy = scrollY - lastY;
+    lastY = scrollY;
+    if (!shown || still || drag || goal) return;
+    yaw += dy * 0.0025;
+    kick();
+  }, { passive: true });
 
   // Dragging: sideways turns it, up and down tilts it (a mouse; a finger's up and down scrolls the page).
   let drag: { x: number; y: number; id: number; moved: boolean; t: number } | null = null;
