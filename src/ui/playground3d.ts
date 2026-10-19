@@ -182,21 +182,14 @@ const STEPS3D: Step3D[] = [
       go(s, "chip", { p: CHIP_LAID }, E(t, 0.78, 0.95));
     },
   },
-  { // 11 Snap off extra board
-    dur: 3.4, view: { at: [40, 8, 2], az: -30, el: 50, d: 140 },
-    labels: [{ txt: "Extra board, away from the USB-C", at: [45.2, -0.7, -16], t: [0.25, 0.65] }, { txt: "Snap", at: [45.2, -2, -18], t: [0.65, 1] }],
-    run(s, t) {
-      go(s, "pico", { p: [32, 0, FLAT + 6.86], v: 1 }, E(t, 0, 0.3));
-      go(s, "tab", { r: [0.55, 0, 0] }, E(t, 0.5, 0.68));
-      go(s, "tab", { p: [0, -16, -10], r: [1.2, 0, 0.3], v: 0 }, E(t, 0.7, 1));
-    },
-  },
   { // 13 Stack the boards
     dur: 4.6, view: { at: [13, 26, -10], az: -55, el: 22, d: 165 },
     labels: [{ txt: "USB-C at the USB end", at: [13.2, 54, -17], on: "pico", t: [0.25, 0.65] }, { txt: "Push till flush", at: [13.2, 26, -18], on: "pico", t: [0.75, 1] },
       { txt: "Trust M wedged in", at: [13.2, 30, -8], t: [0.82, 1] }],
     run(s, t) {
-      go(s, "pico", { p: [32, 0, -20], r: [0, 0, 0] }, E(t, 0, 0.3));
+      go(s, "pico", { p: [32, 0, FLAT + 6.86] }, 1);
+      go(s, "pico", { v: 1 }, E(t, 0, 0.12));
+      go(s, "pico", { p: [32, 0, -20] }, E(t, 0.05, 0.3));
       go(s, "pico", { p: [0, 0, -18] }, E(t, 0.3, 0.55));
       go(s, "pico", { p: [0, 0, 0] }, E(t, 0.6, 0.9));
       go(s, "chip", { p: CHIP_IN, r: [0, PI + 0.85, 0] }, E(t, 0.62, 0.86));
@@ -517,12 +510,11 @@ export async function mountPlayground(el: HTMLElement): Promise<Playground> {
   const filmTab = box(6, 5, 0.14, std(0x2f6fd6, 0.5), -2.2, 34, G.z + 0.14);
   obj("film", "hat", [film, filmTab], [25.7, 26.1, G.z + 0.14]);
 
-  // the Pico: its pins, the extra board on its end
+  // the Pico and its pins
   const picoMesh = part("pico", std(PART_COLORS.pico, 0.55));
   const led = box(1.4, 1, 0.5, new THREE.MeshBasicMaterial({ color: 0x3a3a3a }), 7.2, 49, -15.8);
   const port = [box(8.9, 7.3, 3.1, std(0xc9ccd0, 0.25, 0.95), 13.22, 50.6, -16.36), box(7, 0.1, 1.5, std(0x111111, 0.8), 13.22, 54.26, -16.36)];
   obj("pico", "stack", [picoMesh, picoPins(), led, ...port], C);
-  obj("tab", "pico", box(20.8, 2.9, 1.23, std(PART_COLORS.pico, 0.55), 13.22, -0.72, -14.88), [13.22, 0.73, -14.26]);
 
   // the chip and the cable
   obj("chip", "stack", chipBoard());
@@ -583,7 +575,7 @@ export async function mountPlayground(el: HTMLElement): Promise<Playground> {
       root: o([-C[0], -C[1], -9.2], [0, PI, PI / 2]), core: o(), stack: o(), shell: o([0, 0, 0], [0, 0, 0], 0),
       base: o([0, 0, 0], [0, 0, 0], 0), baseR: o([38, 0, 0], [0, 0, 0], 0), baseG: o([-38, 0, 0], [0, 0, 0], 0),
       lid: o(), A: o(), B: o(), X: o(), Y: o(),
-      hat: o([0, 0, -24], [0, 0, 0], 0), film: o(), pico: o([32, 0, -10], [0, 0, 0], 0), tab: o(),
+      hat: o([0, 0, -24], [0, 0, 0], 0), film: o(), pico: o([32, 0, -10], [0, 0, 0], 0),
       chip: o([-24, 18, -10], [0, PI, 0], 0), plug: o([13, 72, FLAT - 1.5], [0, 0, PI]), plug2: o([13, -28, FLAT - 1.5]),
       wires: o(), slugs: o(), tape1: o([ROW_R, pinY(4), -26], [0, 0, 0], 0), tape2: o([ROW_L, 36.2, -26], [0, 0, 0], 0),
       marks: o(), holes: o(), joy: o([0, 0, 0], [0, 0, 0], 0), usb: o(USB_OUT, [0, 0, 0], 0),

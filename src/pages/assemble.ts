@@ -61,7 +61,7 @@ export const HEADER = (() => {
 })();
 
 // Steps /assemble/3d leaves out: most Picos don't need them (Austin, 10-19).
-export const NO_3D = ["Cut off plastic guards"];
+export const NO_3D = ["Snap off extra board", "Cut off plastic guards"];
 
 export const STEPS: Step[] = [
   { t: "Cable and tools",
