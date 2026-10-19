@@ -7,7 +7,7 @@ Everything picked lives in the URL (`src/pages/build.ts`, guarded by `tools/buil
 
 - **Hat:** Waveshare Pico-LCD-1.3 only.
 - **Case:** the current clawd-pico-case (made for the pink USB-C RP2040 clone).
-- **Board:** only Pico boards that fit that case: same 51 x 21 mm outline, same pins, USB-C in the same spot.
+- **Board:** only Pico boards that fit that case: same 51 x 21 mm outline, same pins, USB (USB-C or micro USB) in the same spot.
   The pink NULLLAB board is fit-tested; the DIGISHUO pink and the green USB-C copies should fit (not tested).
 - **Chips:** up to two I2C boards no bigger than the ATECC608 breakout (25.4 x 17.8 mm, about 5 mm tall).
   Two boards can't share an I2C address. An app that needs a chip locks it in.
@@ -35,7 +35,6 @@ Everything picked lives in the URL (`src/pages/build.ts`, guarded by `tools/buil
 Boards that don't fit today's case, and why (researched 2026-09-28):
 - Waveshare RP2040-Plus / RP2350-Plus (battery socket): the port sticks out 1.1 mm less and the BOOT and
   RESET buttons miss the base hole. One is on the bench: test it.
-- Official Pico / Pico W / Pico 2 / Pico 2 W: micro-USB, fit unknown.
 - Pimoroni Pico Plus 2 (W), Pico LiPo: connectors about 4.5 mm tall where the case has about 3.5 mm.
 - The black 16 MB "YD-RP2040" boards, WeAct: about 2 mm bigger, or a different pinout.
 

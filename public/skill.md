@@ -376,8 +376,7 @@ breakout's second STEMMA QT port and share the bus; no new wires.
 ### The case
 A snap-together printed shell, no screws: https://github.com/clawdbotatg/clawd-pico-case (STLs in
 `stl/current/`: lid, base, joystick cap, 4 button caps). PETG, 0.16 mm layers, 4 walls, no supports;
-lid face down, base floor down, caps flange down. **Fit-tested only with the USB-C RP2040 clone and the
-hat**; an official Pico, Pico W or Pico 2 W (micro-USB) may not fit. Check the wedged chip lies flat
+lid face down, base floor down, caps flange down. **USB-C and micro USB Picos both fit the same case.** Check the wedged chip lies flat
 before closing. To assemble: seat the Pico's USB connector into the base's port first, then lower the
 joined boards in (don't force them straight down); put the four button caps and the joystick cap on;
 press the lid on until the hidden catches click. To open: the pry notch on one side. There's a hole in
