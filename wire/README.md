@@ -34,11 +34,15 @@ Not yet run on a real wedgie.
 
 ## Next steps
 
-1. **Ask Bacca** (Austin):
-   - real example messages to test against
-   - an array step with no element size (`[1, null]`) is allowed by the spec: what does it mean? We refuse it.
+1. **Ask Bacca** (Austin; btchip on Telegram, group "7730 Wire Format - Clear Signing Side Quest"):
+   - real example messages to test against. As of 2026-10-19 none are published: the spec branch's last
+     commit is 09-29, `ethereum/ethereum-app` has no 7730 code yet, and on 10-09 he said he's testing his own
+     parsers before Devcon.
+   - the CDDL says an array step `[1, null]` means "iterate the whole array", but gives no element size.
+     Weight 1? We refuse it until he says.
    - a wedgie signs only Safe transactions (its chips can't do Ethereum's usual curve). Does that fit the
      universal signer?
+   - On 10-17 he said he has to compare the wedgie with Leek, which does something very similar.
 2. **Check signatures.** The spec's signatures are secp256k1 or Ed25519. We only have P-256 (`firmware/p256.py`).
    secp256k1 in pure Python is ~2 s per check.
 3. **Trusted sources.** Which keys the wedgie accepts and how many must agree, changed only with an A press.
