@@ -7,6 +7,7 @@
 // A MemoryError, a traceback, "wedgie broke" or no answer fails it. Prints the least free heap seen.
 //   node tools/safechip.mjs [--app <wedgie-safe checkout>] [--shot <file.png>]   (default: the shelf's copy
 //   in community/; --shot: its home screen)
+// 0.3.54+: a locked wedgie refuses shot (slot.py), so the Bunker/--shot screens need firmware older than 0.3.54. Open item.
 // Needs uv (the flash image: littlefs-python).
 import { readFileSync, existsSync, writeFileSync } from "node:fs";
 import { deflateSync } from "node:zlib";

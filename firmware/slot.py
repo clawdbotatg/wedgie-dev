@@ -225,6 +225,8 @@ def _handle(m):
         W.send(dict(W.chip(), id=mid))
     elif t == "ping":
         W.send({"id": mid, "type": "pong"})
+    elif t in ("press", "shot") and W.SEALED and not W.is_open():    # locked: a computer neither sees the screen
+        W.send({"id": mid, "type": "error", "error": "locked: needs a yes on its screen (open)"})  # nor presses keys (Austin 10-19)
     elif t == "press":
         try:
             L.press(m.get("key"), m.get("ms", 80))

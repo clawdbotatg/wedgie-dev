@@ -278,7 +278,7 @@ save.delete("best"); save.names()
 Each app has its own folder (`/saves/<mod>/`); installs, switching apps and firmware updates never
 touch it. Save at checkpoints, never every frame (flash wears).
 
-**Any plugged-in computer can read saves, and see the screen** (a screen shot), with no press. Never
+**Any plugged-in computer can read saves** with no press (and, before 0.3.54, see the screen). Never
 keep a secret in a save. Deleting one asks on the wedgie (0.3.54+). Anything that decides for the person
 (sign, reveal, give away) reads real buttons only: `Keys(physical=True)` or `ui.ask`. Plain `Keys()`
 also takes presses a computer sends over USB.

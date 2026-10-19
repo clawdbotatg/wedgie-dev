@@ -36,8 +36,8 @@ A new wedgie says "no software" until an app is picked. That's normal.
 ## Is it safe?
 
 - **Plugging it in gives a computer nothing.** It's locked: no computer can reach its code, its files
-  (except reading `/saves/`, and a picture of its screen) or its secure chip without a press of the
-  green button on the wedgie itself.
+  (except reading `/saves/`) or its secure chip without a press of the green button on the wedgie itself.
+  0.3.54+: it can't see the screen or press a button either.
 - **It signs nothing without that press.** No USB message, website or app on your computer can press it.
 - **Firmware and shelf apps are signed by wedgie.dev.** The wedgie checks the signature before it installs.
 - **Keys are made inside the secure chip and never leave it.** Not to the computer, not to wedgie.dev.
@@ -186,7 +186,8 @@ crashes at start or keeps USB from answering. Hold **Y**: no WEDGIE drive this t
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":2,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
-    {"id":3,"type":"press","key":"A","ms":80} -> {"type":"ok"}
+                                            0.3.54+: only after a yes (open); locked, an error
+    {"id":3,"type":"press","key":"A","ms":80} -> {"type":"ok"}   (0.3.54+: only after a yes, as shot)
     {"id":4,"type":"chip"}               -> proof the chip works: an ATECC608 hashes random bytes, a Trust M
                                             signs them with its factory key (check it yourself).
                                             0.3.53+: {"busy":1} while its app is using the chip: ask again

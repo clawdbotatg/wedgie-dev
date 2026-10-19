@@ -671,6 +671,8 @@ def main():
         elif c == "shot":
             need_firmware(wg)
             v = wg.request({"type": "shot"}, 10)
+            if v.get("type") == "error":    # 0.3.54+: locked, its screen stays on it
+                sys.exit("the wedgie said: %s. Run wedgie.py unlock first (a yes on its screen)." % v.get("error"))
             out = args.rest[0] if args.rest else "wedgie-shot.png"
             png(out, base64.b64decode(v["data"]))
             print(out)
