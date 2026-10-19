@@ -126,23 +126,27 @@ const STEPS3D: Step3D[] = [
   },
   { // 6 Tape
     dur: 2.4, view: { at: [6, 40, -10], az: -20, el: 55, d: 110 },
-    labels: [{ txt: "Tape on top of the wires", at: [ROW_R, 42, -11], t: [0.5, 1] }],
+    labels: [{ txt: "Tape on top of the wires", at: [ROW_R, pinY(4), -11], t: [0.5, 1] }],
     run(s, t) {
       num(s, "f0", 1, E(t, 0.05, 0.4)); num(s, "f1", 1, E(t, 0.1, 0.45));     // over the top, down the inside of the header
-      go(s, "tape1", { p: [ROW_R, 42, HDR], v: 1 }, E(t, 0.3, 0.7));
+      go(s, "tape1", { p: [ROW_R, pinY(4), HDR], v: 1 }, E(t, 0.3, 0.7));
     },
   },
   { // 7 Poke the holes
-    dur: 3.4, view: { at: [6, 40, -14], az: -40, el: 38, d: 120 },
-    labels: [{ txt: "Poke through the tape", at: [ROW_R, pinY(3), -16], t: [0.15, 0.85] }],
+    dur: 4.2, view: { at: [6, 40, -14], az: -40, el: 38, d: 120 },
+    labels: [{ txt: "Poke every taped hole: 3rd, 4th, 5th", at: [ROW_R, pinY(4), -16], t: [0.1, 0.9] }],
     run(s, t) {
-      const [x, y3] = HOLES[0], y5 = HOLES[1][1];
-      go(s, "poker", { p: [x, y3, -30], r: [0, 0, 0], v: 1 }, E(t, 0, 0.15));
-      go(s, "poker", { p: [x, y3, HDR + 4] }, E(t, 0.15, 0.3));
-      go(s, "poker", { p: [x, y5, -24] }, E(t, 0.32, 0.48));
-      go(s, "poker", { p: [x, y5, HDR + 4] }, E(t, 0.5, 0.65));
-      go(s, "poker", { p: [x - 20, y5, -40], v: 0 }, E(t, 0.7, 1));
-      num(s, "open0", 1, E(t, 0.25, 0.3)); num(s, "open1", 1, E(t, 0.6, 0.65));
+      // every socket under the tape, the empty 4th too, so the Pico's pins slide straight in
+      const x = ROW_R;
+      go(s, "poker", { p: [x, pinY(3), -30], r: [0, 0, 0], v: 1 }, E(t, 0, 0.12));
+      [3, 4, 5].forEach((n, k) => {
+        const a = 0.12 + k * 0.24;
+        if (k) go(s, "poker", { p: [x, pinY(n), -24] }, E(t, a - 0.08, a));
+        go(s, "poker", { p: [x, pinY(n), HDR + 4] }, E(t, a, a + 0.1));
+        go(s, "poker", { p: [x, pinY(n), -24] }, E(t, a + 0.1, a + 0.16));
+        num(s, ["open0", "open4", "open1"][k], 1, E(t, a + 0.08, a + 0.1));
+      });
+      go(s, "poker", { p: [x - 20, pinY(5), -40], v: 0 }, E(t, 0.82, 1));
     },
   },
   { // 8 Wires 3 and 4
@@ -558,8 +562,8 @@ export async function mountPlayground(el: HTMLElement): Promise<Playground> {
     return [box(3.8, len, 0.16, tapeM, sx * 0.35, 0, -1.15), box(0.16, len, down + 1.1, tapeM, sx * 2.25, 0, (down - 1.15) / 2 - 0.1),
       box(3.2, len, 0.16, tapeM, sx * 3.8, 0, down - 1.2)];
   };
-  obj("tape1", "stack", tapeWrap(1, 12.4));
-  obj("tape2", "stack", tapeWrap(-1, 7.6));
+  obj("tape1", "stack", tapeWrap(1, 9));
+  obj("tape2", "stack", tapeWrap(-1, 6.6));
   // the four sockets the wires use, ringed in their colors; the 4th on the right, struck out
   const marks: THREE.Mesh[] = [];
   HOLES.forEach(([x, y], i) => {
@@ -572,7 +576,7 @@ export async function mountPlayground(el: HTMLElement): Promise<Playground> {
   }
   obj("marks", "stack", marks);
   // holes poked open: a dark dot through the tape
-  const opened = HOLES.map(([x, y]) => { const d = new THREE.Mesh(new THREE.CircleGeometry(0.55, 16), new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide, transparent: true })); d.position.set(x, y, HDR - 1.25); d.userData.noShadow = true; return d; });
+  const opened = [...HOLES, holeXY(ROW_R, 4)].map(([x, y]) => { const d = new THREE.Mesh(new THREE.CircleGeometry(0.55, 16), new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide, transparent: true })); d.position.set(x, y, HDR - 1.25); d.userData.noShadow = true; return d; });
   obj("holes", "stack", opened);
   obj("joy", "stack", part("joystick", plastic(COLORS.joystick, 0.8)), STICK);
   obj("usb", "stack", usbPlug());
@@ -597,13 +601,13 @@ export async function mountPlayground(el: HTMLElement): Promise<Playground> {
       lid: o(), A: o(), B: o(), X: o(), Y: o(),
       hat: o([0, 0, -24], [0, 0, 0], 0), film: o(), pico: o([32, 0, -10], [0, 0, 0], 0), tab: o(), g1: o(), g2: o(), g3: o(),
       chip: o([-24, 18, -10], [0, PI, 0], 0), plug: o([13, 72, FLAT - 1.5], [0, 0, PI]), plug2: o([13, -28, FLAT - 1.5]),
-      wires: o(), slugs: o(), tape1: o([ROW_R, 42, -26], [0, 0, 0], 0), tape2: o([ROW_L, 36.2, -26], [0, 0, 0], 0),
+      wires: o(), slugs: o(), tape1: o([ROW_R, pinY(4), -26], [0, 0, 0], 0), tape2: o([ROW_L, 36.2, -26], [0, 0, 0], 0),
       marks: o(), holes: o(), joy: o([0, 0, 0], [0, 0, 0], 0), usb: o(USB_OUT, [0, 0, 0], 0),
       cutters: o([-30, 50, FLAT - 2.5], [0, 0, 0], 0), strippers: o([-30, 2, FLAT - 2.5], [0, 0, 0], 0), roll: o([60, 50, FLAT - 6], [0, 0, 0], 0),
       poker: o([48, 12, FLAT - 1.3], [0, PI / 2, 0.3], 0), tweezers: o([48, -20, FLAT - 1.8], [0, PI / 2, 0.1], 0),
       box: o([0, 0, 0], [0, 0, 0], 0), boxlid: o([0, 0, 0], [0, 2.2, 0]),
     },
-    n: { strip: 0, fan: 0, w0: 0, w1: 0, w2: 0, w3: 0, f0: 0, f1: 0, f2: 0, f3: 0, plugIn: 0, marks: 0, open0: 0, open1: 0, open2: 0, open3: 0, led: 0, scr: 0, scrK: 0 },
+    n: { strip: 0, fan: 0, w0: 0, w1: 0, w2: 0, w3: 0, f0: 0, f1: 0, f2: 0, f3: 0, plugIn: 0, marks: 0, open0: 0, open1: 0, open2: 0, open3: 0, open4: 0, led: 0, scr: 0, scrK: 0 },
   };
   const clone = (s: S): S => ({ o: Object.fromEntries(Object.entries(s.o).map(([k, v]) => [k, { p: [...v.p] as V3, r: [...v.r] as V3, v: v.v }])), n: { ...s.n } });
   const ends: S[] = [];
