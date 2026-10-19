@@ -317,8 +317,9 @@ Be exact when someone builds or rebuilds one: **a wire in the wrong hole is the 
 A 3D step-by-step is on https://wedgie.dev ("Put it together"); parts are below.
 
 ### Parts
-- **A Pico**: Raspberry Pi Pico 2 W (RP2350, WiFi), Pico W (RP2040, WiFi), or a USB-C RP2040 Pico clone
-  (often pink, no WiFi). Same 40-pin layout on all of them. It needs its two 20-pin male headers
+- **A Pico**: Raspberry Pi Pico 2 W (RP2350, WiFi), Pico W (RP2040, WiFi), or an RP2040 Pico clone
+  (often pink, no WiFi). The USB port is USB-C or micro USB depending on the model (official Picos are
+  micro USB; most clones are USB-C), so check which cable fits. Same 40-pin layout on all of them. It needs its two 20-pin male headers
   (buy "pre-soldered headers"). Telling them apart: the chip on the board says RP2040 or RP2350; a W
   has a silver WiFi can next to it; `hello`'s `board` says which.
 - **Waveshare Pico-LCD-1.3**: 1.3" 240x240 IPS (ST7789, SPI), a 5-way joystick, four buttons A B X Y,

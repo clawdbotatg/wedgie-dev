@@ -3,7 +3,7 @@
 // is $16-30, over the $10 we'll eat; wedgie-shipping README).
 export const ITEMS = {
   wedgie: { name: "wedgie", what: "Assembled: pico, screen, chip, and case. Plug it in and go.", cents: 6700 },
-  kit: { name: "wedgie kit", what: "Every part and the case, with assembly instructions. You need wire cutters, tape, tweezers, and a USB-C data cable.", cents: 5700 },
+  kit: { name: "wedgie kit", what: "Every part and the case, with assembly instructions. You need wire cutters, tape, tweezers, and a USB data cable that fits your Pico (USB-C or micro USB, depending on the model).", cents: 5700 },
 } as const;
 export type Item = keyof typeof ITEMS;
 export type Cart = Record<Item, number>;
