@@ -341,7 +341,7 @@ export async function build(main: HTMLElement) {
         <div class="buy">${[["lid.stl", `Lid · ${cname("lid")}`], ["base.stl", `Base · ${cname("base")}`], ["joystick.stl", `Joystick · ${cname("stick")}`], ["button.stl", "Button ×4"]]
           .map(([f, t]) => `<a class="btn btn-xs" href="${CASE}${f}" download>${t}</a>`).join("")}</div></li>
       <li><b>Put it together</b> <span>${picked.length ? `Wedge the wires in, then the ${picked.length > 1 ? "boards" : "board"}, then the case.` : "Plug the Pico into the hat, then snap the case on. Skip the chip steps."}</span>
-        <div class="buy"><a class="btn btn-xs" href="/assemble">Assembly guide</a></div></li>
+        <div class="buy"><a class="btn btn-xs" href="/assemble">Assembly guide</a><a class="btn btn-xs" href="/assemble/3d">In 3D</a></div></li>
       <li><b>Put ${esc(cart?.name || b.app)} on it</b> <span>Plug it in, tap Connect at the top, open your wedgie, and tap ${esc(cart?.name || b.app)}. It gets the latest firmware too.</span>
         <div class="buy"><a class="btn btn-xs" href="/connect">Connect</a></div></li>`;
     paintDevice();

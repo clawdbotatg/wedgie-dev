@@ -51,7 +51,7 @@ export function home(main: HTMLElement): Promise<unknown> {
             <li class="step" data-n="3"><b>Snap the case on.</b> <span>Boards into the base, USB first. Caps on, lid down until it clicks.</span></li>
             <li class="step" data-n="4"><b>Plug it in.</b> <span>A USB cable (USB-C or micro USB, whichever your Pico has), then press <b>Allow wedgie connection</b> at the top and pick it. It boots to the underwear.</span></li>
           </ol>
-          <p class="fine" style="margin-top:16px"><a href="/assemble">Detailed assembly guide →</a></p>
+          <p class="fine" style="margin-top:16px"><a href="/assemble">Detailed assembly guide →</a> · <a href="/assemble/3d">Every step in 3D →</a></p>
         </div>
         <div class="assembly-stage" id="assembly-stage"></div>
       </div>
@@ -207,7 +207,7 @@ export function home(main: HTMLElement): Promise<unknown> {
     main.querySelectorAll<HTMLButtonElement>(".seg button").forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-checked", String(x === b)); });
     const kit = b.dataset.for === "kit";
     main.querySelector("#order-what")!.innerHTML = kit
-      ? `Every part and the case in the mail, with <a href="/assemble">assembly instructions</a>. You need wire cutters, tape, tweezers, and a USB data cable that fits your Pico (USB-C or micro USB, depending on the model).`
+      ? `Every part and the case in the mail, with <a href="/assemble">assembly instructions</a> (also <a href="/assemble/3d">in 3D</a>). You need wire cutters, tape, tweezers, and a USB data cable that fits your Pico (USB-C or micro USB, depending on the model).`
       : "One wedgie: pico, screen, chip, and case.";
     item = kit ? "kit" : "wedgie";
     showPrice();

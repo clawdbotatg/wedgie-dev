@@ -175,7 +175,7 @@ export function assemble(main: HTMLElement) {
       ${STEPS.map((s, i) => `
       <li class="card asm-step" id="step-${i + 1}">
         <div class="asm-copy">
-          <div class="asm-head"><span class="num">${i + 1}</span><h3>${s.t}</h3>${NO_3D.includes(s.t) ? "" : `<a class="asm-3d" href="/assemble/3d#${i + 1}">See it in 3D</a>`}</div>
+          <div class="asm-head"><span class="num">${i + 1}</span><h3>${s.t}</h3>${NO_3D.includes(s.t) ? "" : `<a class="asm-3d" href="/assemble/3d#${i + 1}">See it in 3D →</a>`}</div>
           <p>${s.p}</p>
           ${s.art ? `<div class="asm-art recess">${s.art}</div>` : ""}
           ${s.tip ? `<p class="note">${s.tip}</p>` : ""}
