@@ -28,7 +28,7 @@ async function db() {
       name text not null, place text not null default '', stage text not null, note text not null default '', link text not null default '',
       lat real not null, lon real not null,
       img text not null,                    -- base64 JPEG, metadata cut
-      ip text not null,                     -- ipOf, for PER_HOUR / PER_DAY
+      ip text not null,                     -- ipOf, for PER_HOUR / PER_DAY; wiped after a day
       mailed boolean not null default false,
       at timestamptz not null default now(), live_at timestamptz)`
     .catch((e) => { ready = null; throw e; });
@@ -129,6 +129,7 @@ export async function POST(req: Request) {
   const sql = await db();
   const ip = await ipOf(req);
   await sql`delete from builds where status = 'new' and at < now() - interval '60 days'`;
+  await sql`update builds set ip = '' where ip <> '' and at < now() - interval '1 day'`;   // the IP hash goes after a day (privacy page)
   const [c] = await sql`select count(*) filter (where ip = ${ip} and at > now() - interval '1 hour')::int as hour,
     count(*) filter (where ip = ${ip} and at > now() - interval '1 day')::int as day,
     count(*) filter (where status = 'new')::int as waiting,
