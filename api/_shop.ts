@@ -35,6 +35,7 @@ export async function db() {
       tx text, payer text,
       tracking text,
       created timestamptz not null default now(), paid_at timestamptz, shipped_at timestamptz)`;
+    await sql`drop table if exists builds`;   // the old globe: names, photos and places of owners, pulled 10-19
     await sql`drop index if exists orders_open_usdc`;   // the old exact-amount orders: amounts needn't be unique now
     await sql`create unique index if not exists orders_tx on orders (chain, tx) where tx is not null`;
     await sql`alter table orders add column if not exists lines jsonb`;   // the prices it was made at
