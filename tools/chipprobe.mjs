@@ -178,7 +178,7 @@ for (const [a, b] of pairs) {
   check(r === true && !BAD.test(w.all), `firmware update (${want} core files sent, booted on them) while ${a.mod} runs: ${r === true ? "done, " + w.put : r} ${BAD.test(w.all) ? "| " + bad(w) : ""}`);
 }
 // The question's check, the other ways it goes (0.3.56+): a list signed by another key gets the warning sign,
-// and a yes then changes nothing; a press while it checks answers at once.
+// and a yes then changes nothing; while it checks a yes does nothing (yes is grey) and a no answers at once.
 if (!args.includes("--late") && !from) {
   const a = carts[0], b = carts[1];
   const send = (w, sig) => {
@@ -210,8 +210,11 @@ if (!args.includes("--late") && !from) {
   ok = ask(w);
   w.h.chip.run(800);                // past ui.SETTLE, the list not sent yet: it's still waiting for it
   w.press("A");
+  w.h.chip.run(1500);
+  const early = /"id": 901[,}][^\n]*"type": "(go|error|refused)"/.test(w.h.out);
+  w.press("Y");
   const g2 = answer(w);
-  check(ok && g2?.type === "go" && !w.h.out.includes("slot: signed True"), `a yes while it checks: answered at once, no mark (${JSON.stringify(g2)})`);
+  check(ok && !early && g2?.type === "refused" && !w.h.out.includes("slot: signed True"), `while it checks: a yes does nothing, a no answers at once (${early ? "the yes answered" : JSON.stringify(g2)})`);
 }
 console.log(`     least free heap seen: ${leastFree} bytes (${leastWhere})`);
 console.log(failed ? `${failed} FAILED` : "all checks passed");
