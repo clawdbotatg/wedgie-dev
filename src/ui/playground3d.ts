@@ -101,23 +101,11 @@ const STEPS3D: Step3D[] = [
       num(s, "fan", 1, E(t, 0.88, 1));
     },
   },
-  { // 3 Number the wires: plug them into the Trust M, read them 1 to 4 by place, unplug
-    dur: 4.6, view: { at: [13, 56, 4], az: 0, el: 64, d: 160 },
-    labels: [{ txt: "Trust M", at: [13, 90, 2], t: [0.12, 0.42] }, { txt: "1 GND", at: [-3.13, 9.3, 0], on: "plug", t: [0.42, 0.84] }, { txt: "2 3V3", at: [-1.87, 21.3, 0], on: "plug", t: [0.47, 0.84] }, { txt: "3 SDA", at: [2.70, 33.3, 0], on: "plug", t: [0.52, 0.84] }, { txt: "4 SCL", at: [10.56, 45.3, 0], on: "plug", t: [0.57, 0.84] }],
-    run(s, t) {
-      TOOLS.forEach((k) => go(s, k, { v: 0 }, E(t, 0, 0.15)));
-      go(s, "chip", { p: [13, 106, FLAT - 0.8], r: [0, PI, PI] }, 1);
-      go(s, "chip", { v: 1 }, E(t, 0, 0.12));
-      go(s, "chip", { p: [13, 86, FLAT - 0.8] }, E(t, 0.12, 0.38));
-      num(s, "plugIn", 1, E(t, 0.12, 0.4));
-      num(s, "plugIn", 0, E(t, 0.86, 1));
-      go(s, "chip", { p: [13, 106, FLAT - 0.8] }, E(t, 0.86, 1));
-    },
-  },
-  { // 4 Lay out the screen board
+  { // 3 Lay out the screen board
     dur: 3.4, view: { at: [13, 34, -10], az: 0, el: 62, d: 170 },
     labels: [{ txt: "USB end", at: [13.2, 52, -11], t: [0.6, 1] }, { txt: "Never the 4th", at: holeXY(ROW_R, 4), t: [0.75, 1], bad: true }],
     run(s, t) {
+      TOOLS.forEach((k) => go(s, k, { v: 0 }, E(t, 0, 0.15)));
       go(s, "chip", { v: 0 }, E(t, 0, 0.2));
       go(s, "chip", { p: [-24, 18, FLAT - 0.8], r: [0, PI, 0] }, E(t, 0.2, 0.25));
       go(s, "hat", { p: [0, 0, 0], v: 1 }, E(t, 0.1, 0.55));
@@ -125,15 +113,15 @@ const STEPS3D: Step3D[] = [
       num(s, "marks", 1, E(t, 0.6, 0.85));
     },
   },
-  { // 5 Wires 1 and 2
+  { // 4 White and yellow
     dur: 3.6, view: { at: [8, 38, -10], az: -25, el: 52, d: 120 },
-    labels: [{ txt: "1 GND: 3rd", at: HOLES[0], t: [0.08, 0.47] }, { txt: "2 3V3: 5th", at: HOLES[1], t: [0.47, 1] }],
+    labels: [{ txt: "White: 3rd", at: HOLES[0], t: [0.08, 0.47] }, { txt: "Yellow: 5th", at: HOLES[1], t: [0.47, 1] }],
     run(s, t) {
       num(s, "w0", 1, E(t, 0.08, 0.5));
       num(s, "w1", 1, E(t, 0.45, 0.9));
     },
   },
-  { // 6 Tape
+  { // 5 Tape
     dur: 2.4, view: { at: [6, 40, -10], az: -20, el: 55, d: 110 },
     labels: [{ txt: "Tape on top of the wires", at: [ROW_R, pinY(4), -11], t: [0.5, 1] }],
     run(s, t) {
@@ -141,7 +129,7 @@ const STEPS3D: Step3D[] = [
       go(s, "tape1", { p: [ROW_R, pinY(4), HDR], v: 1 }, E(t, 0.3, 0.7));
     },
   },
-  { // 7 Poke the holes
+  { // 6 Poke the holes
     dur: 4.2, view: { at: [6, 40, -14], az: -40, el: 38, d: 120 },
     labels: [{ txt: "Poke every taped hole: 3rd, 4th, 5th", at: [ROW_R, pinY(4), -16], t: [0.1, 0.9] }],
     run(s, t) {
@@ -158,9 +146,9 @@ const STEPS3D: Step3D[] = [
       go(s, "poker", { p: [x - 20, pinY(5), -40], v: 0 }, E(t, 0.82, 1));
     },
   },
-  { // 8 Wires 3 and 4
+  { // 7 Black and red
     dur: 5.4, view: { at: [20, 37, -10], az: 25, el: 52, d: 125 },
-    labels: [{ txt: "3 SDA: 6th", at: HOLES[2], t: [0.03, 0.27] }, { txt: "4 SCL: 7th", at: HOLES[3], t: [0.27, 0.55] }, { txt: "Tape, then poke", at: [ROW_L, 36.2, -11], t: [0.6, 1] }],
+    labels: [{ txt: "Black: 6th", at: HOLES[2], t: [0.03, 0.27] }, { txt: "Red: 7th", at: HOLES[3], t: [0.27, 0.55] }, { txt: "Tape, then poke", at: [ROW_L, 36.2, -11], t: [0.6, 1] }],
     run(s, t) {
       num(s, "w2", 1, E(t, 0.04, 0.28));
       num(s, "w3", 1, E(t, 0.26, 0.5));
@@ -175,12 +163,12 @@ const STEPS3D: Step3D[] = [
       num(s, "open2", 1, E(t, 0.75, 0.77)); num(s, "open3", 1, E(t, 0.9, 0.91));
     },
   },
-  { // 9 Header ready
+  { // 8 Header ready
     dur: 2.6, view: { at: [13, 36, -10], az: 35, el: 40, d: 150 },
     labels: [{ txt: "4 wires in, taped, holes open", at: [13.2, 40, -12], t: [0.2, 1] }],
     run(s, t) { num(s, "marks", 0.35, E(t, 0.3, 1)); },
   },
-  { // 10 Plug in the chip, wedge it in between the rows
+  { // 9 Plug in the chip, wedge it in between the rows
     dur: 4.8, view: { at: [10, 22, -8], az: -70, el: 26, d: 115 },
     labels: [{ txt: "Fits one way", at: [-24, 34, 2], t: [0.35, 0.6] }, { txt: "Tilt it and wedge it in between the rows", at: [13.2, 18, -12], t: [0.74, 1] }],
     run(s, t) {
@@ -192,7 +180,7 @@ const STEPS3D: Step3D[] = [
       go(s, "chip", { p: CHIP_IN }, E(t, 0.84, 0.97));
     },
   },
-  { // 12 Stack the boards
+  { // 11 Stack the boards
     dur: 4.6, view: { at: [13, 26, -10], az: -55, el: 22, d: 165 },
     labels: [{ txt: "USB-C at the USB end", at: [13.2, 54, -17], on: "pico", t: [0.25, 0.65] }, { txt: "Push till flush", at: [13.2, 26, -18], on: "pico", t: [0.75, 1] },
       { txt: "Trust M wedged in", at: [13.2, 30, -8], t: [0.82, 1] }],
@@ -204,7 +192,7 @@ const STEPS3D: Step3D[] = [
       go(s, "pico", { p: [0, 0, 0] }, E(t, 0.6, 0.9));
     },
   },
-  { // 13 Peel the screen protector
+  { // 12 Peel the screen protector
     dur: 3, view: { at: [13, 26, -8], az: 15, el: 50, d: 150 },
     labels: [{ txt: "Pull the blue tab", at: [-3, 34, 2.2], on: "hat", t: [0.15, 0.6] }],
     run(s, t) {
@@ -215,7 +203,7 @@ const STEPS3D: Step3D[] = [
       go(s, "film", { p: [10, 0, 30], v: 0 }, E(t, 0.7, 1));
     },
   },
-  { // 14 Case parts
+  { // 13 Case parts
     dur: 3, view: { at: [8, 26, -14], az: 0, el: 64, d: 330 },
     labels: [{ txt: "Lid", at: [13, -12, -6], t: [0.5, 1] }, { txt: "Base", at: [13, 64, -6], t: [0.5, 1] },
       { txt: "Joystick cap", at: [-18, 52, -18], t: [0.6, 1] }, { txt: "Green, gray, gray, red", at: [-18, 22, -18], t: [0.6, 1] }],
@@ -227,7 +215,7 @@ const STEPS3D: Step3D[] = [
       go(s, "joy", { p: [-42 - 31, 6 - 0, -20.4], v: 1 }, 1);
     },
   },
-  { // 15 Joystick cap
+  { // 14 Joystick cap
     dur: 3.2, view: { at: [13, 40, -4], az: -20, el: 40, d: 150 },
     labels: [{ txt: "Square hole on the joystick", at: [13.17, 46.13, 8], t: [0.15, 0.55] }, { txt: "Press hard till it snaps", at: [13.17, 46.13, 8], t: [0.65, 1] }],
     run(s, t) {
@@ -238,7 +226,7 @@ const STEPS3D: Step3D[] = [
       go(s, "joy", { p: [0, 0, 0] }, E(t, 0.72, 0.8));
     },
   },
-  { // 16 Buttons into the lid
+  { // 15 Buttons into the lid
     dur: 4.4, view: { at: [13, 26, -14], az: 0, el: 56, d: 170 },
     labels: [{ txt: "Lid face down", at: [13, 26, -4], on: "shell", t: [0.05, 0.3] }, { txt: "Green", at: [CAP_X.A, 4, -6], on: "shell", t: [0.3, 1] },
       { txt: "Red", at: [CAP_X.Y, 4, -6], on: "shell", t: [0.75, 1] }],
@@ -252,7 +240,7 @@ const STEPS3D: Step3D[] = [
       });
     },
   },
-  { // 17 Boards into the base
+  { // 16 Boards into the base
     dur: 4.2, view: { at: [13, 30, -10], az: -55, el: 32, d: 180 },
     labels: [{ txt: "USB-C end first", at: [13.2, 56, -16], on: "stack", t: [0.25, 0.75] }],
     run(s, t) {
@@ -263,12 +251,12 @@ const STEPS3D: Step3D[] = [
       go(s, "stack", { p: [0, 0, 0], r: [0, 0, 0] }, E(t, 0.68, 0.92));
     },
   },
-  { // 18 Check the USB-C fit
+  { // 17 Check the USB-C fit
     dur: 2.4, view: { at: [13.2, 55, -14], az: -88, el: 18, d: 125 },
     labels: [{ txt: "Port right in the middle of the hole", at: [13.22, 54.6, -16.4], t: [0.2, 1] }],
     run() {},
   },
-  { // 19 Close the case
+  { // 18 Close the case
     dur: 4.2, view: { at: [13, -20, -10], az: -25, el: 30, d: 230 },
     labels: [{ txt: "Flip it over", at: [13, 26, 0], on: "core", t: [0.1, 0.4] }, { txt: "Press hard till it snaps", at: [13, -44, 0], t: [0.75, 1] }],
     run(s, t) {
@@ -279,7 +267,7 @@ const STEPS3D: Step3D[] = [
       go(s, "core", { p: [0, -70, 0] }, E(t, 0.86, 0.92));
     },
   },
-  { // 20 Check the feel
+  { // 19 Check the feel
     dur: 4.6, view: { at: [13, 26, -6], az: -15, el: 42, d: 150 },
     labels: [{ txt: "Every button clicks", at: [13, 4, 7], t: [0.3, 0.65] }, { txt: "Joystick, every way and in", at: [13.17, 46.13, 8], t: [0.65, 1] }],
     run(s, t) {
@@ -291,7 +279,7 @@ const STEPS3D: Step3D[] = [
       j.p[2] -= 0.6 * bump(t, 0.93, 1);
     },
   },
-  { // 21 Install the firmware
+  { // 20 Install the firmware
     dur: 3.6, view: { at: [13, 30, -6], az: -30, el: 45, d: 190 },
     labels: [{ txt: "Hold BOOTSEL, plug it in", at: [13.2, 66, 4], t: [0.15, 0.5] }, { txt: "wedgie.dev/reset", at: [13, 26, 8], t: [0.6, 1] }],
     run(s, t) {
@@ -300,7 +288,7 @@ const STEPS3D: Step3D[] = [
       num(s, "scr", 1, t > 0.37 ? 1 : 0); num(s, "scrK", 1, E(t, 0.37, 0.6));
     },
   },
-  { // 22 Install the software
+  { // 21 Install the software
     dur: 2.4, view: { at: [13, 30, -6], az: -10, el: 50, d: 170 },
     labels: [{ txt: "wedgie.dev/connect", at: [13, 26, 8], t: [0.2, 1] }],
     run() {},

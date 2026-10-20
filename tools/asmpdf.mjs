@@ -18,7 +18,7 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><style>${css()}</
 <section class="cover">
   <div class="top">
     <div><div class="kick">wedgie.dev</div><h1>Put a wedgie together.</h1>
-      <p class="lede">No soldering. ${STEPS.length} steps. Take your time on the wires (3 to 9); the rest just clicks.</p></div>
+      <p class="lede">No soldering. ${STEPS.length} steps. Take your time on the wires (2 to 8); the rest just clicks.</p></div>
     <div class="qr">${qr}<p>Latest version, with photos:<br><span class="url">wedgie.dev/assemble</span><br>Every step in 3D:<br><a class="url" href="https://wedgie.dev/assemble/3d">wedgie.dev/assemble/3d</a></p></div>
   </div>
   <div class="need"><h2>In your kit</h2><ul>
@@ -27,7 +27,7 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><style>${css()}</
   </ul></div>
   <div class="need"><h2>You need</h2><ul>
     <li>Wire stripper</li><li>Electrical tape</li><li>A stiff breadboard jumper wire</li><li>Tweezers</li>
-    <li>Pliers (step 11, if needed)</li><li>USB data cable that fits your Pico</li><li>A computer with Chrome</li>
+    <li>Pliers (step 10, if needed)</li><li>USB data cable that fits your Pico</li><li>A computer with Chrome</li>
   </ul></div>
 </section>
 <div class="steps">
@@ -47,7 +47,7 @@ ${STEPS.map((s, i) => `<section class="step${s.art ? " wide" : ""}">
 </section>
 <section class="reach">
   <h2>Stuck? Ask us.</h2>
-  <p>Email <b>wedgie@buidlguidl.com</b> · Telegram <b>@austingriffith</b> · X <b>@austingriffith</b></p>
+  <p>Email <b>wedgie@buidlguidl.com</b> · Telegram <b>@austingriffith</b></p>
 </section>
 </div></body></html>`;
 

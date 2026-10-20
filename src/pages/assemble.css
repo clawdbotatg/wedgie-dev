@@ -52,7 +52,7 @@
 .wire-art .pn.on { fill: var(--ink); }
 .wire-art .rn { font: 800 10px var(--font); fill: #6f7072; }
 .wire-art .wl { font: 900 14px var(--font); fill: var(--ink); }
-.wire-art .bd { fill: #1bb24a; stroke: #fff; stroke-width: 2; }
+.wire-art .bd { stroke: #2a2b2a; stroke-width: 1.5; }
 .wire-art .bn { font: 900 13px var(--font); fill: #fff; }
 .wire-art .board { fill: #1c1d1e; }
 .wire-art .bt { font: 800 13px var(--font); fill: #e8e8e4; }
