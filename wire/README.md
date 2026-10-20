@@ -51,27 +51,23 @@ Not yet run on a real wedgie.
 
 Done: test messages from the real registry (`from7730.py`).
 
-1. **Ask Bacca** (Austin; btchip on Telegram, group "7730 Wire Format - Clear Signing Side Quest"):
-   - real example messages to test against. As of 2026-10-19 none are published: the spec branch's last
-     commit is 09-29, `ethereum/ethereum-app` has no 7730 code yet, and on 10-09 he said he's testing his own
-     parsers before Devcon.
-   - the CDDL says an array step `[1, null]` means "iterate the whole array", but gives no element size.
-     Weight 1? We refuse it until he says.
-   - a wedgie signs only Safe transactions (its chips can't do Ethereum's usual curve). Does that fit the
-     universal signer?
-   - what the registry turned up (checked 10-19 against the spec, his GitHub, the registry's issues and
-     the Telegram group; none of it is raised anywhere yet):
-     - **likely new:** functions with nothing to show (`pause()`) need an empty field list; the CDDL says
-       `[+ field]`. We send `[]`.
-     - **likely new:** 1inch calldata has extra bytes after the ABI part, so it isn't whole slots. The spec
-       doesn't say if that's allowed. We allow it.
-     - **he knows, worth a mention:** constants are capped at 32 bytes (Ledger's limit, in the spec), but
-       Celo's descriptors use longer fixed sentences. Skipped.
-     - **he knows, by design:** `addressName` sources are "vendor specific" uints in the wire format,
-       strings in ERC-7730. Ledger has a list (0 local address book, 2 ENS, ...). We send `[]` (any).
+1. **Bacca's answers** (Telegram DM, 10-20):
+   - **Empty field list** (`pause()`): signers should accept it; `[+ field]` should allow empty. We send `[]`.
+   - **Extra bytes after the ABI part** (1inch): fine if a neutral tracker or note (the descriptor should
+     ideally flag it), not fine if it changes the tx (then the descriptor needs fixing). A signer can't tell
+     which, so `path()` still reads and `extra_bytes()` says how many: not 0 = warn on screen, A still signs.
+     A trailer of whole slots can't be seen (the wire format has no parameter types).
+   - **Signed data from the internet** (the price demo): "absolutely not a non starter". Commercial wallets
+     use a server that signs it. A middle step: the device runs the TLS connection, the host only passes bytes.
+   - **His code:** decoding and screen text will live in `ethereum/ethereum-app/common-eth-signer` (Rust).
+     He suggested it "if that's not redundant"; he hadn't read ours. A wedgie can't run Rust.
+   - **Asked 10-20, waiting:** would he add P-256 as an allowed signature type? It's all a wedgie can check
+     fast (step 2).
+   - Not asked, low value: his example messages (none published; we have 8,774 of our own), the `[1, null]`
+     array step (we refuse it), Safe-only signing.
    - On 10-17 he said he has to compare the wedgie with Leek, which does something very similar.
 2. **Check signatures.** The spec's signatures are secp256k1 or Ed25519. We only have P-256 (`firmware/p256.py`).
-   secp256k1 in pure Python is ~2 s per check.
+   secp256k1 in pure Python is ~2 s per check. Asked Bacca to allow P-256 (10-20).
 3. **Trusted sources.** Which keys the wedgie accepts and how many must agree, changed only with an A press.
    Local mode: only your own node, and the screen says "local mode". Same plan as the signed price demo
    (`api/price.ts`, `clawdbotatg/wedgie-price`).

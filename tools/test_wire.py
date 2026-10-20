@@ -176,6 +176,7 @@ check(len(wire.path(c, [[T, 0], [REF], [ARR, [1, 0, 16]], [LEAF, STATIC]])) == 1
 c = cd(["address", "uint256"], [A[0], 1])
 refuses(lambda: wire.path(c, [[T, 2], [LEAF, STATIC]]), "path: refuses a slot past the calldata")
 check(wire.path(c + b"\x00", [[T, 0], [LEAF, STATIC]]) == [addr(A[0])], "path: extra bytes after the ABI part are fine (1inch)")
+check(wire.extra_bytes(c) == 0 and wire.extra_bytes(c + b"\x00" * 5) == 5, "extra_bytes: counts bytes past the last slot")
 refuses(lambda: wire.path(c[:40], [[T, 1], [LEAF, STATIC]]), "path: refuses a slot cut short")
 refuses(lambda: wire.path(c, [[T, 1], [REF], [LEAF, STATIC]]), "path: refuses an offset that isn't a multiple of 32")
 evil = word(2**255) + word(0)

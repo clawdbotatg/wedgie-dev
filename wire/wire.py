@@ -7,6 +7,7 @@
 #   signed_message(b)     a signed structure's bytes -> (the bytes its signature covers, its envelope)
 #   path(calldata, p)     a slot program (the spec's DATA_PATH) on calldata without its selector -> [bytes]
 #   value(v, calldata, tx)  a value ([type-family, type-size, source]) -> [bytes]
+#   extra_bytes(calldata) bytes past the last whole slot (1inch-style trailers): the screen must warn
 # Limits are the spec's minimums or more; past one it raises ValueError, never shows half an answer.
 # Tests: tools/test_wire.py (CPython), tools/wirechip.mjs (a virtual RP2040).
 
@@ -270,10 +271,18 @@ def path(cd, p):
     if not 0 < len(p) <= MAX_PATH:
         raise ValueError("path: length")
     # Calldata needn't be a whole number of slots (1inch appends bytes after the ABI part): only the slots
-    # read must be inside it.
+    # read must be inside it. Whether such bytes are harmless is the caller's call (extra_bytes).
     out = []
     _walk(cd, p, 0, 0, 0, 0, out)
     return out
+
+
+def extra_bytes(cd):
+    """How many bytes of calldata (no selector) sit past the last whole slot. Bacca (10-20): a neutral
+    tracker or note is fine, anything that changes the tx is not, and a signer can't tell which. So not 0
+    = warn on screen (A still signs). A trailer that is itself whole slots can't be seen: the wire format
+    has no parameter types, so it doesn't know where the ABI part ends."""
+    return len(cd) % 32
 
 
 def _walk(cd, p, k, offset, ref, arrays, out):
