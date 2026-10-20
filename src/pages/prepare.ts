@@ -111,10 +111,7 @@ export function prepare(main: HTMLElement) {
           const prog = (p: number, what: string) => { j.p = p; if (what) j.what = what; paint(); };
           // the firmware first (its own question), then Welcome (its own), each with a restart
           const res = core.length ? await installCore(r, prog) : await useApp(r, welcome!, prog);
-          if (!res.restarted) {     // before 0.3.55 (old release key): updated through full access, in its REPL
-            if ("untouched" in res && res.untouched) throw new Error("It can't take a checked install: run it through /test");
-            await r.leave();        // the soft reset boots the new core
-          }
+          if (!res.restarted) throw new Error("It can't take a checked install: run it through /test");
           restarting = true;
           return;
         }
