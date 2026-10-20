@@ -14,9 +14,9 @@ h1, h2, h3 { font-weight: 900; letter-spacing: -.02em; line-height: 1.05; margin
 .cover .kick { font-weight: 900; letter-spacing: .14em; text-transform: uppercase; color: #168c34; font-size: 9pt; }
 .cover h1 { font-size: 28pt; margin: 2px 0 6px; }
 .cover .lede { font-size: 11pt; color: #474947; margin: 0; }
-.cover .qr { display: flex; gap: 10px; align-items: center; padding: 8px; border: 2px solid #e2e2dd; border-radius: 12px; flex-shrink: 0; }
+.cover .qr { display: flex; gap: 10px; align-items: center; padding: 8px 14px 8px 8px; border: 2px solid #e2e2dd; border-radius: 12px; flex-shrink: 0; }
 .cover .qr svg { width: 0.95in; height: 0.95in; flex-shrink: 0; }
-.cover .qr p { margin: 0; font-size: 9pt; width: 1.4in; }
+.cover .qr p { margin: 0; font-size: 9pt; width: 1.6in; }
 .need { margin-top: 8px; display: flex; gap: 14px; align-items: baseline; }
 .need h2 { font-size: 11pt; flex-shrink: 0; width: 82px; }
 .need ul { margin: 0; padding-left: 14px; columns: 4; column-gap: 18px; font-size: 8.4pt; }
