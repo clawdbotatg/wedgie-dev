@@ -56,4 +56,4 @@ e20d454f74229b3aaa09a15829cbb6b85aa50c6b3bf229287b9cdbff73bee90d  wedgiedrive.mp
 @app  {"mod":"safe","name":"Safe Signer","entry":"run","usb":true,"files":["safe.py","safe_read.py","safe_keccak.py","safe_addr.py","safe_blockie.py","safe_key.py"]}
 @app  {"mod":"secret","name":"Secrets","entry":"run","usb":true,"files":["secret.py","secret_box.py"]}
 @app  {"mod":"welcome","name":"Welcome","entry":"run","files":["welcome.py"]}
-@serial  4
+@serial  5
