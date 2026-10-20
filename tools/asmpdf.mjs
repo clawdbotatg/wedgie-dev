@@ -18,7 +18,7 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><style>${css()}</
 <section class="cover">
   <div class="top">
     <div><div class="kick">wedgie.dev</div><h1>Put a wedgie together.</h1>
-      <p class="lede">No soldering. ${STEPS.length} steps. Take your time on the wires (2 to 8); the rest just clicks.</p></div>
+      <p class="lede">No soldering. ${STEPS.length} steps. Take your time on the wires (2 to 8);<br>the rest just clicks.</p></div>
     <div class="qr">${qr}<p>Latest version, with photos:<br><span class="url">wedgie.dev/assemble</span><br>Every step in 3D:<br><a class="url" href="https://wedgie.dev/assemble/3d">wedgie.dev/assemble/3d</a></p></div>
   </div>
   <div class="need"><h2>In your kit</h2><ul>
