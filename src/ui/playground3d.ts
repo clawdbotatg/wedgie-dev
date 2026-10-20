@@ -220,7 +220,7 @@ const STEPS3D: Step3D[] = [
       num(s, "led", 0, E(t, 0.88, 0.9));
     },
   },
-  { // 15 Pick the base
+  { // 15 The black base
     dur: 3.6, view: { at: [13, 26, -14], az: 0, el: 58, d: 300 },
     labels: [{ txt: "Red: Pico W + battery", at: [51, 26, -1], t: [0.55, 1] }, { txt: "Black: Trust M", at: [13, 26, -1], t: [0.55, 1] },
       { txt: "Gray: ATECC608", at: [-25, 26, -1], t: [0.55, 1] }],
@@ -336,9 +336,9 @@ const STEPS3D: Step3D[] = [
       if (t > 0.84) s.n.scr = 5;
     },
   },
-  { // 25 Box it
+  { // 25 Done
     dur: 4, view: { at: [13, 26, -8], az: -10, el: 55, d: 220 },
-    labels: [{ txt: "Done. Build the next one", at: [13, 26, 12], t: [0.8, 1] }],
+    labels: [{ txt: "Done", at: [13, 26, 12], t: [0.8, 1] }],
     run(s, t) {
       go(s, "usb", { p: USB_OUT }, E(t, 0, 0.12)); go(s, "usb", { v: 0 }, E(t, 0.1, 0.18));
       num(s, "scr", 0, t > 0.15 ? 1 : 0);

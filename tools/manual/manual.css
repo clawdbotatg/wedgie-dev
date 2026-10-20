@@ -18,7 +18,7 @@ h1, h2, h3 { font-weight: 900; letter-spacing: -.02em; line-height: 1.05; margin
 .cover .qr svg { width: 0.95in; height: 0.95in; flex-shrink: 0; }
 .cover .qr p { margin: 0; font-size: 9pt; width: 1.4in; }
 .need { margin-top: 8px; display: flex; gap: 14px; align-items: baseline; }
-.need h2 { font-size: 11pt; flex-shrink: 0; }
+.need h2 { font-size: 11pt; flex-shrink: 0; width: 82px; }
 .need ul { margin: 0; padding-left: 14px; columns: 4; column-gap: 18px; font-size: 8.4pt; }
 .need li { break-inside: avoid; }
 

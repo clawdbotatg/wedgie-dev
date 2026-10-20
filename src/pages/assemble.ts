@@ -65,7 +65,7 @@ export const NO_3D = ["Snap off extra board", "Cut off plastic guards (Pico 2 W 
 
 export const STEPS: Step[] = [
   { t: "Cable and tools",
-    p: `A STEMMA QT / Qwiic cable (4-pin JST-SH plug), a wire stripper (it cuts near the hinge and strips near the tip), electrical tape, a stiff breadboard jumper wire, and tweezers.`,
+    p: `In your kit: the STEMMA QT / Qwiic cable (4-pin JST-SH plug). You need: a wire stripper (it cuts near the hinge and strips near the tip), electrical tape, a stiff breadboard jumper wire, and tweezers.`,
     d: "01", ph: ["01-cable-and-strippers"] },
   { t: "Cut and strip the wires",
     p: `Keep one plug. Cut the wires about <b>2 in (5 cm)</b> from it, near the stripper's hinge. Strip with the notches near its tip. Strip off as much as a socket is deep, about <b>5 mm</b> (between 1/8 and 1/4 in), so the bare wire goes all the way down.`,
@@ -113,8 +113,8 @@ export const STEPS: Step[] = [
     d: "11", ph: ["11-bootsel", "11-test-page", "11-test-wiping", "11-test-firmware"],
     tip: `First time on this computer? The test page has a one-time setup so Chrome stops asking about every new Pico.`,
     warn: `Chip fails? A wire is in the wrong socket, a wire came out, or the Trust M touches a Pico pin. Take it apart and check.` },
-  { t: "Pick the base",
-    p: `The base color says what's inside: <b>red</b> is a Pico W with a battery, <b>black</b> is the Trust M chip, <b>gray</b> is the ATECC608. This build is Trust M, so black.`,
+  { t: "The black base",
+    p: `Your kit has a <b>black</b> base. Black means a Trust M chip is inside. (Red is a Pico W with a battery, gray is the ATECC608.)`,
     d: "12", ph: ["13-bases"] },
   { t: "Peel the screen protector",
     p: `Pull the blue tab off the screen.`,
@@ -147,8 +147,8 @@ export const STEPS: Step[] = [
     p: `Plug it in: it shows <b>wedgie.dev</b> and the underwear. On <a href="/test">wedgie.dev/test</a> click <b>Test only</b>. The wedgie shows a red FULL CONTROL warning: press green on the wedgie. Then the chip check, then <b>shake</b> it (tap, squeeze, light drops on each side) until the counter stops, press each button it asks for, and check each color for scratches or dead pixels. <b>PASS</b> on the wedgie and the page: done.`,
     d: "20", ph: ["20-no-software", "20-test-only", "20-full-control", "20-press-green", "20-shake", "20-buttons", "20-colors", "20-pass", "20-pass-page"],
     tip: `Need to wipe it after the case is closed? Press BOOTSEL through the small hole in the base with a paperclip while you plug it in.` },
-  { t: "Box it",
-    p: `Put it in the box. Build the next one.`,
+  { t: "Done",
+    p: `It's ready. Go to <a href="/connect">wedgie.dev/connect</a> to set it up.`,
     d: "21", ph: ["21-box"], end: `<div class="row"><a class="btn btn-green" href="/connect">Go to Connect</a></div>` },
 ];
 
