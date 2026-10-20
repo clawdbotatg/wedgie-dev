@@ -164,7 +164,8 @@ Release gate for any firmware change:
 5. The Wallet's line limit is now 6 KB (rule 1).
 6. Austin's board now has hand-copied 0.3.12 files and a hand-compiled Wallet (.mpy). It should get a
    proper signed update once the release is out.
-7. Signing: the release key exists only on Austin's Mac (`~/.wedgie/release-key.pem`). `tools/sign.mjs`
+7. Signing (0.3.55+): two keys that can't be copied, the Mac's Secure Enclave and a YubiKey (`docs/PLAN-TRUST.md`).
+   Before that: one plain file (`~/.wedgie/release-key.pem`). `tools/sign.mjs`
    used to make a new key silently when it was missing, which would have locked every wedgie out of
    checked installs. It now refuses when wedgie.py already has a key.
 8. Frozen modules (core bytecode built into a custom UF2, run from flash, 0 bytes of heap) would free

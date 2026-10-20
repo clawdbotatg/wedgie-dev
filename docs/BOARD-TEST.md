@@ -4,7 +4,7 @@ Use a test wedgie, not the one with your wallet on it. Each step: press A on the
 
 ## Setup (once)
 
-1. On the Mac (it has the release key): `node tools/sign.mjs`, commit `release/`, push the branch.
+1. On the Mac (Touch ID, or `--yubikey`): `node tools/sign.mjs`, commit `release/`, push the branch.
 2. On omen: `git pull`, then `npm run build && npx vite preview --port 4173 --host`.
 3. Plug the test wedgie into omen. It shows up as `/dev/ttyACM0`.
 4. Put 0.3.11 on it first (from wedgie.dev), then update to 0.3.12 from the preview:

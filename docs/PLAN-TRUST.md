@@ -5,8 +5,11 @@ know we trust. And what if someone flashes the firmware with their own version?"
 
 ## What we have today
 
-- **Release key.** One P-256 key, `~/.wedgie/release-key.pem` on Austin's Mac, a plain file.
-  Its public half is `RELEASE_KEY` in `firmware/wedgie.py`. `tools/sign.mjs` runs the gate, then
+- **Release keys** (0.3.55+). Two P-256 keys that can't be copied; either one signs:
+  key 0 in Austin's Mac Secure Enclave (Touch ID, `~/.wedgie/sekey` + `release-se.key`, `tools/sekey.swift`),
+  key 1 on his YubiKey (PIV 9c, PIN + touch, `tools/yksign.py`). Public halves: `RELEASE_KEYS` in
+  `firmware/wedgie.py`; the sig says which key (`r s` or `r s 1`). Firmware 0.3.54 and older trusted
+  only the old plain-file key; 0.3.55 refuses it. `tools/sign.mjs [--yubikey]` runs the gate, then
   signs `release/firmware.txt`: the sha256 of every firmware file plus the shelf apps (`@app` lines).
 - **The wedgie checks it.** A checked install (`firmware/job.py`) verifies the signature with
   `p256.py` and hashes every file it's sent. A computer can't swap in other files or rename an app.
@@ -22,7 +25,7 @@ know we trust. And what if someone flashes the firmware with their own version?"
    the way real firmware would. On an RP2040 no check can prove the firmware is ours: any check our
    firmware can pass, a copy of it can pass too. We can only limit the damage (phase 3) or change
    the chip (phase 4).
-2. **The release key is one plain file on a machine where agents run.** Any Claude session here can
+2. **(Fixed in 0.3.55.) The release key was one plain file on a machine where agents run.** Any Claude session here can
    sign firmware every wedgie accepts. If it leaks, an attacker can too. If it's lost, no wedgie can
    ever be updated again: the firmware trusts that one key and there's no way to swap it.
 3. **No rollback guard.** `job.py` checks the list is the version the host claims, not that it's
@@ -37,6 +40,8 @@ know we trust. And what if someone flashes the firmware with their own version?"
 ## The plan
 
 ### Phase 1: the release key (no firmware change)
+
+Done 2026-10-19, differently: a Mac Secure Enclave key + one YubiKey, in 0.3.55.
 
 - Move it into hardware where it can't be copied: **two YubiKeys** (PIV slot, P-256, touch to
   sign). One on Austin's keychain, one in a safe. `sign.mjs` signs through the YubiKey.
@@ -106,7 +111,7 @@ site and `wedgie.py` check there too, so a stolen key can't quietly ship a relea
 
 ## Decisions for Austin
 
-1. Release key: two YubiKeys (recommended), or a passphrase-locked file, or a dedicated wedgie.
+1. Release key: done, Mac Secure Enclave + YubiKey (0.3.55). A wedgie as a third key: maybe later.
 2. Firmware signing needs your touch every release, agents can't sign (recommended: yes).
 3. Money wedgies move to RP2350: open to any firmware, money key only for ours (recommended: yes, after phases 1-2).
 4. Rollback: refuse older than current in a checked install, full access can still (recommended).

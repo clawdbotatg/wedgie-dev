@@ -12,7 +12,7 @@ history before commit 020765c.
 - `tools/community.mjs` copies that commit's app files into `community/<owner>/<repo>/`, so a review
   is a normal `git diff`, and the site never fetches from GitHub at build time.
 - `tools/release.mjs shelf()` adds those apps to the signed list (a hash of each file, plus an `@app`
-  line: mod, name, entry, usb, files). One release key signs the firmware and the apps together.
+  line: mod, name, entry, usb, files). The release keys sign the firmware and the apps together.
 - `tools/fw.mjs` publishes them to `/fw/` beside the core, first in the manifest, so they're first on
   the site. A wedgie installs them with a checked install (`firmware/job.py`): every file must match
   the signed hash, and the person presses A.
