@@ -11,7 +11,7 @@ RP2350), a Waveshare Pico-LCD-1.3 hat (240x240 screen, 5-way joystick, A/B/X/Y),
 wedgie firmware: a boot logo, the one app it boots straight into, saves that outlast apps, and a USB
 protocol. Everything is MIT: https://wedgie.dev
 
-**The current firmware is 0.3.54.** If a wedgie's `hello` says older, update it first
+**The current firmware is 0.3.55.** If a wedgie's `hello` says older, update it first
 (`wedgie.py update`, below): everything here assumes current firmware.
 
 **Three guides cover everything** (this one first):
@@ -156,6 +156,9 @@ wedgie's own screen answered by a **real press** (a `press` request can't answer
   (its app stays as it is); "Install Buttons" writes only Buttons and takes off only the app it
   replaces (the question says which); an uninstall takes off only its app. Anything more is refused.
   0.3.54+: a signed list older than the last one it installed is refused (`@serial`), even of the same version.
+  0.3.55+: signed by one of two new keys, which can't be copied (a Mac's Secure Enclave, a YubiKey); lists
+  signed by the old key are refused. A wedgie on 0.3.54 or older can't take a 0.3.55+ list: update it at
+  wedgie.dev/test (it reflashes), or with `wedgie.py update` (asks FULL CONTROL).
 - **A no to FULL CONTROL holds until it's unplugged** (0.3.54+): every `open` after it is `refused` without
   asking, so a computer can't ask until the person gives in. A question takes no press in its first 0.6 s.
 - **A no restarts the wedgie.** The question is drawn straight over the app's screen without saving it
@@ -182,7 +185,7 @@ crashes at start or keeps USB from answering. Hold **Y**: no WEDGIE drive this t
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.54","fw":"wedgie-0.3.54","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.55","fw":"wedgie-0.3.55","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":2,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n

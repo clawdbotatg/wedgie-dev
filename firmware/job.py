@@ -96,7 +96,7 @@ def check(m, sig=True, tick=None):
     job that doesn't change the app (an update, taking it off) keeps the one it runs. It writes only the
     core and that app's files, and deletes nothing of the core."""
     rel = m.get("release") or ""
-    if sig and (not W.RELEASE_KEY[0] or not W.release_ok(rel.encode(), m.get("sig") or "", tick)):
+    if sig and (not W.RELEASE_KEYS or not W.release_ok(rel.encode(), m.get("sig") or "", tick)):
         raise ValueError("not signed by wedgie.dev")
     version, files = W.release_files(rel)
     if _ver(version) < _ver(W.VERSION):  # an old signed list puts back an old core and its holes (audit 10-16:

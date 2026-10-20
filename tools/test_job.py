@@ -35,7 +35,7 @@ import job           # noqa: E402
 
 D = 0x1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDE
 QX, QY = p256.pubkey(D)
-W.RELEASE_KEY = ("%064x" % QX, "%064x" % QY)
+W.RELEASE_KEYS = (("%064x" % QX, "%064x" % QY),)
 # Three small apps of the test's own (the real ones live in their own repos now): the cases need an app
 # that runs, one to install, and a third whose files the install mustn't touch.
 APPS = {"hello.py": b"print('hello')\n", "keytest.py": b"def run():\n    pass\n", "battery.py": b"print('battery')\n"}

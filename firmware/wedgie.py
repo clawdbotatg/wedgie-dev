@@ -3,7 +3,7 @@
 # interrupted; from the REPL they are plain calls:  import wedgie; wedgie.shot(); wedgie.press("A")
 import sys, os, json, machine
 
-VERSION = "0.3.54"
+VERSION = "0.3.55"
 
 # The lock. main.py turns Ctrl-C off before anything else and never ends by itself, so a computer
 # can only send the slot's JSON lines: it can't stop the app, reach the REPL, or make the secure chip
@@ -16,19 +16,24 @@ VERSION = "0.3.54"
 SEALED = sys.platform == "rp2"
 _open = False
 
-# The release key (tools/sign.mjs writes it here): a file list signed with it is ours. A checked install
-# hashes every file it's sent against that list (release_ok), so the computer can't swap in others.
-RELEASE_KEY = ("75467e0970a70909082a39594e9c29e8c6e42cf3663ab9ae31dbbb8babc522f3", "dc7b3ed1006e9273a185c4a6f754cd5c1fd15f0d0a8464f78a9c65ac938eb8d3")
+# The release keys: a file list signed with one of them is ours. A checked install hashes every file it's
+# sent against that list (release_ok), so the computer can't swap in others. Neither key can be copied
+# (Austin, 10-19): 0 is in a Mac's Secure Enclave (Touch ID, tools/sekey.swift), 1 on a YubiKey (PIN and a
+# touch); either signs, each the other's backup. 0.3.55 dropped the old key, a file: nothing it signed installs.
+RELEASE_KEYS = (("4c65afa37faa35c84301f2ba183b21563a7c6e6c9e8a6a5fb3b074495c5c56a6", "287026553d26f0d87dc9afc19a513db73dc67bfe4b2c861b481213b4091052b1"),
+                ("80446783d76526b3b21dc199f19bd889535506fd82b5b2c9cd48d8a3a0c6f43e", "166fe21369bcdcbec9c0797f9dc188b40923c771b85b35a50d6b321b44c22cfa"))
 
 
 def release_ok(text, sig, tick=None):
-    """text: the signed list (tools/release.mjs), sig: "r s" in hex. True if our key signed it.
-    Pure-Python P-256 (p256.py): 2.2 s on an RP2040, once per job; tick(0..1) moves a bar meanwhile."""
+    """text: the signed list (tools/release.mjs), sig: "r s" in hex, then which key ("1"; none: 0). True if
+    that key signed it. Pure-Python P-256 (p256.py): 2.2 s on an RP2040, once per job; tick(0..1) moves a bar."""
     import gc
     try:
         import p256, hashlib
-        r, s = (int(x, 16) for x in sig.split())
-        return p256.verify(int(RELEASE_KEY[0], 16), int(RELEASE_KEY[1], 16), hashlib.sha256(text).digest(), r, s, tick)
+        f = sig.split()
+        r, s = int(f[0], 16), int(f[1], 16)
+        x, y = RELEASE_KEYS[int(f[2]) if len(f) == 3 else 0 if len(f) == 2 else 9]
+        return p256.verify(int(x, 16), int(y, 16), hashlib.sha256(text).digest(), r, s, tick)
     except Exception:
         return False
     finally:
