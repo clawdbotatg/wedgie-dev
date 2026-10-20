@@ -25,7 +25,7 @@ export function reset(main: HTMLElement) {
     <p class="fine">Its apps and saves get wiped. Nothing shows up? Try another cable (some only charge) and hold the button again.</p>
   </section>`;
   const $ = (id: string) => document.getElementById(id)!;
-  import("../ui/bootsel3d").then((m) => m.mountBootsel3D($("r-3d"))).catch(() => {});
+  import("../ui/bootsel3d").then((m) => m.mountBootsel3D($("r-3d"), { install: true })).catch(() => {});
   if (!W.supported() || !usbSupported()) {
     $("r-actions").innerHTML = `<p class="fine">Can't see USB here. Open wedgie.dev/reset in Chrome or Edge on a computer.</p>`;
     return;
