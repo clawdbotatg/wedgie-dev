@@ -22,7 +22,7 @@
 import sys, os, json, time, gc, select, hashlib, binascii
 import wedgie as W
 
-KEEP = ("main.py", "boot.py", "wedgie.py", "slot.py", "lcd.py", "job.py", "p256.py", "loader.py", "serial",
+KEEP = ("main.py", "boot.py", "wedgie.py", "slot.py", "lcd.py", "job.py", "p256.py", "loader.py", "serial", "modified",
         "wedgie.mpy", "slot.mpy", "lcd.mpy", "job.mpy", "p256.mpy", "loader.mpy")    # 0.3.14+: the core is compiled
 IDLE_MS = 30000
 
@@ -148,6 +148,10 @@ def check(m, sig=True, tick=None):
             raise ValueError("not a job this wedgie knows: %r" % title)
         if title.startswith("Install "):
             required.update(may_write)  # the whole app, as signed
+        after = json.loads(m["apps"]) if m.get("apps") is not None else ([now] if now else [])
+        s = after and signed.get(after[0].get("mod"))
+        if not after or s:              # all the core and the app it runs after this, as signed: it clears the mark
+            m["clean"] = core + list(s and s.get("files") or ())
         for n in m.get("write") or []:
             if n not in may_write:
                 raise ValueError("%s isn't part of this job" % n)
@@ -418,6 +422,13 @@ def run(mid, m, ask, show=None):
                 if sn > W.serial():
                     with open(W.SERIAL, "w") as a:
                         a.write(str(sn))
+                c = m.get("clean")      # full control left the red border (wedgie.MARK): gone once every file it
+                if c and sums((), [W.MARK])[W.MARK] and all(v == files.get(n) for n, v in sums(c).items()) and not any(
+                        sums((), [n[:-4] + ".py" for n in c if n.endswith(".mpy")]).values()):    # runs is as signed again
+                    try:
+                        os.remove(W.MARK)
+                    except OSError:
+                        pass
                 show(title, None, 1)
                 W.log("installed", title, version)
                 W.send({"id": qid, "type": "done", "version": version})

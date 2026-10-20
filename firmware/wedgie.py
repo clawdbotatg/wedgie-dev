@@ -112,11 +112,22 @@ def flag(bit, on=None):
         return False
 
 
+MARK = "modified"   # a computer had full control since the files were last all as signed: a thin red border on
+                    # every screen (lcd.py) till a signed job leaves them so (job.py). Honest firmware shows it; a fake can't be made to
+
+
 def set_open():
     """Let the computer in, until main.py starts again."""
     global _open
     _open = True
     flag(WAS_OPEN, True)
+    if SEALED:
+        try:
+            open(MARK, "w").close()
+        except OSError:
+            pass
+        if "lcd" in sys.modules:
+            sys.modules["lcd"]._mark = True
     try:
         import micropython
         micropython.kbd_intr(3)
