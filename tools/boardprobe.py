@@ -53,11 +53,26 @@ class W:
                     r = json.loads(t)
                 except ValueError:
                     continue
+                if r.get("id") == self.id and r.get("type") == "list":    # 0.3.56+: its question checks the list
+                    self.send_list()
+                    continue
                 if r.get("id") == self.id:
                     return r
                 if r.get("type") == "ready":
                     print("     | ready (ram %s)" % r.get("ram"))
         return None
+
+    def send_list(self):
+        """The signed list in pieces of whole lines, ~512 bytes each, then the signature (as install.ts)."""
+        o = 0
+        while o < len(rel):
+            e = rel.rfind("\n", o, o + 513)
+            if e < o:
+                e = rel.find("\n", o)
+            e = len(rel) if e < 0 else e + 1
+            self.s.write((json.dumps({"type": "rel", "t": rel[o:e]}) + "\n").encode())
+            o = e
+        self.s.write((json.dumps({"type": "rel", "sig": sig}) + "\n").encode())
 
 
 def install(mod):
@@ -72,7 +87,7 @@ def install(mod):
     others = [] if run == mod else [n for c in man["carts"] if c["mod"] == run for n in c["files"] if n not in cart["files"] and n not in man["core"]]
     apps = [{"mod": cart["mod"], "name": cart["name"], "v": cart["v"], **({"entry": cart["entry"]} if cart.get("entry") else {}), **({"usb": True} if cart.get("usb") else {})}]
     print("   press the green button on the wedgie: Install %s?" % cart["name"])
-    g = w.req({"type": "job", "job": "Install " + cart["name"], "version": man["version"], "write": cart["files"], "delete": others, "apps": json.dumps(apps)}, 70)
+    g = w.req({"type": "job", "job": "Install " + cart["name"], "version": man["version"], "write": cart["files"], "delete": others, "apps": json.dumps(apps), **({"list": 1} if h and h.get("jobs", 0) >= 3 else {})}, 70)
     if g and g.get("type") == "lost":
         # 0.3.12: the yes restarts it into install mode, and the first restart since a plug-in drops the
         # port (the WEDGIE drive goes). Open it again and ask the job (hello says job), as the site does.
