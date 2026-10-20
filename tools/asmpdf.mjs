@@ -45,6 +45,10 @@ ${STEPS.map((s, i) => `<section class="step${s.art ? " wide" : ""}">
   <h2>If something's off</h2>
   <dl>${TROUBLE.map(([q, a]) => `<dt>${q}</dt><dd>${a}</dd>`).join("")}</dl>
 </section>
+<section class="reach">
+  <h2>Stuck? Ask us.</h2>
+  <p>Email <b>wedgie@buidlguidl.com</b> · Telegram <b>@austingriffith</b> · X <b>@austingriffith</b></p>
+</section>
 </div></body></html>`;
 
 await pdf(html, "public/assemble.pdf", "Put a wedgie together · latest version: wedgie.dev/assemble");

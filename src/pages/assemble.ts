@@ -61,7 +61,7 @@ export const HEADER = (() => {
 })();
 
 // Steps /assemble/3d leaves out: most Picos don't need them (Austin, 10-19).
-export const NO_3D = ["Snap off extra board", "Cut off plastic guards (Pico 2 W only)"];
+export const NO_3D = ["Snap off extra board"];
 
 export const STEPS: Step[] = [
   { t: "Cable and tools",
@@ -100,22 +100,10 @@ export const STEPS: Step[] = [
   { t: "Snap off extra board",
     p: `Some Picos have a little extra board left on the end, away from the USB port. Pinch it with pliers and snap it off. Otherwise it won't fit the case.`,
     d: "11p", ph: ["11-snap-off-tab", "11-picos-with-tabs"] },
-  { t: "Cut off plastic guards (Pico 2 W only)",
-    p: `We don't recommend a Pico 2 W: a hardware wallet shouldn't have WiFi. Got one anyway? Flip it over. It probably has 3 black plastic guards across the back. Cut off the middle one and one of the end ones with clippers. Keep the plastic along the pins.`,
-    d: "11g", ph: ["11-guards", "11-guards-end", "11-guards-cut", "11-guards-cut-parts"],
-    warn: `On a Pico 2 W you have to. With the guards on, the Trust M can't wedge in.` },
   { t: "Stack the boards",
     p: `Push the Pico into the sockets, <b>USB port at the same end as the screen board's USB mark</b>, the Pico's chips and BOOTSEL button facing out. Push straight, all the way in, until it's flush. The Trust M ends up wedged between the two boards.`,
     d: "10", ph: ["11-pico-going-on", "10-stacked-top", "10-chip-wedged", "10-headers-flush", "11-stacked-usb"],
     warn: `No pin, wire or chip sticking out. If anything does, do it again: it won't fit the case.` },
-  { t: "Test the boards",
-    p: `Hold the Pico's <b>BOOTSEL</b> button (tweezers help) and plug in a USB data cable (USB-C or micro USB, whichever your Pico has). Always hold it: many Picos come with software on them and won't show up without it. Open <a href="/test">wedgie.dev/test</a> in Chrome and click <b>Test it</b>. Don't unplug while it runs. Wait for <b>Board, Firmware, Chip</b> to go green, then unplug. Shake, Buttons and Colors come after the case is on.`,
-    d: "11", ph: ["11-bootsel", "11-test-page", "11-test-wiping", "11-test-firmware"],
-    tip: `First time on this computer? The test page has a one-time setup so Chrome stops asking about every new Pico.`,
-    warn: `Chip fails? A wire is in the wrong socket, a wire came out, or the Trust M touches a Pico pin. Take it apart and check.` },
-  { t: "The black base",
-    p: `Your kit has a <b>black</b> base. Black means a Trust M chip is inside. (Red is a Pico W with a battery, gray is the ATECC608.)`,
-    d: "12", ph: ["13-bases"] },
   { t: "Peel the screen protector",
     p: `Pull the blue tab off the screen.`,
     d: "13", ph: ["13-screen-protector"] },
@@ -143,13 +131,15 @@ export const STEPS: Step[] = [
   { t: "Check the feel",
     p: `Press every button. Push the joystick every way and straight in. Each should click. Look for anything off: a tilted joystick, a stuck button.`,
     d: "19", ph: ["18-closed"] },
-  { t: "Full test",
-    p: `Plug it in: it shows <b>wedgie.dev</b> and the underwear. On <a href="/test">wedgie.dev/test</a> click <b>Test only</b>. The wedgie shows a red FULL CONTROL warning: press green on the wedgie. Then the chip check, then <b>shake</b> it (tap, squeeze, light drops on each side) until the counter stops, press each button it asks for, and check each color for scratches or dead pixels. <b>PASS</b> on the wedgie and the page: done.`,
-    d: "20", ph: ["20-no-software", "20-test-only", "20-full-control", "20-press-green", "20-shake", "20-buttons", "20-colors", "20-pass", "20-pass-page"],
-    tip: `Need to wipe it after the case is closed? Press BOOTSEL through the small hole in the base with a paperclip while you plug it in.` },
-  { t: "Done",
-    p: `It's ready. Go to <a href="/connect">wedgie.dev/connect</a> to set it up.`,
-    d: "21", ph: ["21-box"], end: `<div class="row"><a class="btn btn-green" href="/connect">Go to Connect</a></div>` },
+  { t: "Install the firmware",
+    p: `Unplug it. Hold the <b>BOOTSEL</b> button through the small hole in the base with a paperclip, and plug in a USB data cable (USB-C or micro USB, whichever your Pico has). Let go once it's in. Open <a href="/reset">wedgie.dev/reset</a> in Chrome, click <b>Find it</b>, and follow the page. Don't unplug while it runs.`,
+    ph: ["18-closed-usb"],
+    warn: `Screen stays dark or shows an error? A wire is in the wrong socket, a wire came out, or the Trust M touches a Pico pin. Open the case and check.`,
+    end: `<div class="row"><a class="btn btn-green" href="/reset">Go to Reset</a></div>` },
+  { t: "Install the software",
+    p: `Leave it plugged in. Open <a href="/connect">wedgie.dev/connect</a> in Chrome and follow the page.`,
+    d: "19", ph: [],
+    end: `<div class="row"><a class="btn btn-green" href="/connect">Go to Connect</a></div>` },
 ];
 
 // "If something's off", on the page and in the printed manual.

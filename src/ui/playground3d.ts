@@ -192,7 +192,7 @@ const STEPS3D: Step3D[] = [
       go(s, "chip", { p: CHIP_IN }, E(t, 0.84, 0.97));
     },
   },
-  { // 13 Stack the boards
+  { // 12 Stack the boards
     dur: 4.6, view: { at: [13, 26, -10], az: -55, el: 22, d: 165 },
     labels: [{ txt: "USB-C at the USB end", at: [13.2, 54, -17], on: "pico", t: [0.25, 0.65] }, { txt: "Push till flush", at: [13.2, 26, -18], on: "pico", t: [0.75, 1] },
       { txt: "Trust M wedged in", at: [13.2, 30, -8], t: [0.82, 1] }],
@@ -204,47 +204,18 @@ const STEPS3D: Step3D[] = [
       go(s, "pico", { p: [0, 0, 0] }, E(t, 0.6, 0.9));
     },
   },
-  { // 14 Test the boards
-    dur: 5, view: { at: [13, 40, -14], az: -60, el: 38, d: 170 },
-    labels: [{ txt: "Hold BOOTSEL", at: [16.5, 39.7, -18], t: [0.05, 0.5] }, { txt: "USB-C data cable", at: [13.2, 66, -17], t: [0.25, 0.5] },
-      { txt: "Board ✓  Firmware ✓  Chip ✓", at: [13.2, 20, -20], t: [0.55, 0.9] }],
-    run(s, t) {
-      go(s, "tweezers", { p: [16.5, 39.7, -40], r: [PI - 0.6, 0.3, 0], v: 1 }, E(t, 0, 0.12));   // tips down on the button, handle up and away
-      go(s, "tweezers", { p: [16.5, 39.7, -17.6] }, E(t, 0.12, 0.2));
-      go(s, "usb", { p: USB_OUT, v: 1 }, E(t, 0.12, 0.25));
-      go(s, "usb", { p: USB_IN }, E(t, 0.25, 0.4));
-      go(s, "tweezers", { p: [16.5, 20, -60], v: 0 }, E(t, 0.5, 0.65));
-      num(s, "led", 1, E(t, 0.42, 0.45));
-      go(s, "usb", { p: USB_OUT }, E(t, 0.88, 0.96));
-      go(s, "usb", { v: 0 }, E(t, 0.95, 1));
-      num(s, "led", 0, E(t, 0.88, 0.9));
-    },
-  },
-  { // 15 The black base
-    dur: 3.6, view: { at: [13, 26, -14], az: 0, el: 58, d: 300 },
-    labels: [{ txt: "Red: Pico W + battery", at: [51, 26, -1], t: [0.55, 1] }, { txt: "Black: Trust M", at: [13, 26, -1], t: [0.55, 1] },
-      { txt: "Gray: ATECC608", at: [-25, 26, -1], t: [0.55, 1] }],
-    run(s, t) {
-      go(s, "stack", { v: 0 }, E(t, 0, 0.25));
-      go(s, "root", { r: [0, 0, PI / 2] }, E(t, 0.15, 0.45));
-      go(s, "base", { v: 1 }, E(t, 0.4, 0.6));
-      go(s, "baseR", { v: 1 }, E(t, 0.45, 0.65));
-      go(s, "baseG", { v: 1 }, E(t, 0.5, 0.7));
-      go(s, "baseR", { v: 0.3 }, E(t, 0.8, 1)); go(s, "baseG", { v: 0.3 }, E(t, 0.8, 1));
-      go(s, "base", { p: [0, 0, 4] }, E(t, 0.8, 1));
-    },
-  },
-  { // 16 Peel the screen protector
+  { // 13 Peel the screen protector
     dur: 3, view: { at: [13, 26, -8], az: 15, el: 50, d: 150 },
     labels: [{ txt: "Pull the blue tab", at: [-3, 34, 2.2], on: "hat", t: [0.15, 0.6] }],
     run(s, t) {
-      go(s, "baseR", { v: 0 }, E(t, 0, 0.2)); go(s, "baseG", { v: 0 }, E(t, 0, 0.2)); go(s, "base", { v: 0, p: [0, 0, 0] }, E(t, 0, 0.2));
+      go(s, "tweezers", { v: 0 }, E(t, 0, 0.2));
+      go(s, "root", { r: [0, 0, PI / 2] }, E(t, 0, 0.3));
       go(s, "stack", { p: [0, 0, -2.9], v: 1 }, E(t, 0.1, 0.3));
       go(s, "film", { r: [0, 1.4, 0] }, E(t, 0.4, 0.7));
       go(s, "film", { p: [10, 0, 30], v: 0 }, E(t, 0.7, 1));
     },
   },
-  { // 17 Case parts
+  { // 14 Case parts
     dur: 3, view: { at: [8, 26, -14], az: 0, el: 64, d: 330 },
     labels: [{ txt: "Lid", at: [13, -12, -6], t: [0.5, 1] }, { txt: "Base", at: [13, 64, -6], t: [0.5, 1] },
       { txt: "Joystick cap", at: [-18, 52, -18], t: [0.6, 1] }, { txt: "Green, gray, gray, red", at: [-18, 22, -18], t: [0.6, 1] }],
@@ -256,7 +227,7 @@ const STEPS3D: Step3D[] = [
       go(s, "joy", { p: [-42 - 31, 6 - 0, -20.4], v: 1 }, 1);
     },
   },
-  { // 18 Joystick cap
+  { // 15 Joystick cap
     dur: 3.2, view: { at: [13, 40, -4], az: -20, el: 40, d: 150 },
     labels: [{ txt: "Square hole on the joystick", at: [13.17, 46.13, 8], t: [0.15, 0.55] }, { txt: "Press hard till it snaps", at: [13.17, 46.13, 8], t: [0.65, 1] }],
     run(s, t) {
@@ -267,7 +238,7 @@ const STEPS3D: Step3D[] = [
       go(s, "joy", { p: [0, 0, 0] }, E(t, 0.72, 0.8));
     },
   },
-  { // 19 Buttons into the lid
+  { // 16 Buttons into the lid
     dur: 4.4, view: { at: [13, 26, -14], az: 0, el: 56, d: 170 },
     labels: [{ txt: "Lid face down", at: [13, 26, -4], on: "shell", t: [0.05, 0.3] }, { txt: "Green", at: [CAP_X.A, 4, -6], on: "shell", t: [0.3, 1] },
       { txt: "Red", at: [CAP_X.Y, 4, -6], on: "shell", t: [0.75, 1] }],
@@ -281,7 +252,7 @@ const STEPS3D: Step3D[] = [
       });
     },
   },
-  { // 20 Boards into the base
+  { // 17 Boards into the base
     dur: 4.2, view: { at: [13, 30, -10], az: -55, el: 32, d: 180 },
     labels: [{ txt: "USB-C end first", at: [13.2, 56, -16], on: "stack", t: [0.25, 0.75] }],
     run(s, t) {
@@ -292,12 +263,12 @@ const STEPS3D: Step3D[] = [
       go(s, "stack", { p: [0, 0, 0], r: [0, 0, 0] }, E(t, 0.68, 0.92));
     },
   },
-  { // 21 Check the USB-C fit
+  { // 18 Check the USB-C fit
     dur: 2.4, view: { at: [13.2, 55, -14], az: -88, el: 18, d: 125 },
     labels: [{ txt: "Port right in the middle of the hole", at: [13.22, 54.6, -16.4], t: [0.2, 1] }],
     run() {},
   },
-  { // 22 Close the case
+  { // 19 Close the case
     dur: 4.2, view: { at: [13, -20, -10], az: -25, el: 30, d: 230 },
     labels: [{ txt: "Flip it over", at: [13, 26, 0], on: "core", t: [0.1, 0.4] }, { txt: "Press hard till it snaps", at: [13, -44, 0], t: [0.75, 1] }],
     run(s, t) {
@@ -308,7 +279,7 @@ const STEPS3D: Step3D[] = [
       go(s, "core", { p: [0, -70, 0] }, E(t, 0.86, 0.92));
     },
   },
-  { // 23 Check the feel
+  { // 20 Check the feel
     dur: 4.6, view: { at: [13, 26, -6], az: -15, el: 42, d: 150 },
     labels: [{ txt: "Every button clicks", at: [13, 4, 7], t: [0.3, 0.65] }, { txt: "Joystick, every way and in", at: [13.17, 46.13, 8], t: [0.65, 1] }],
     run(s, t) {
@@ -320,33 +291,19 @@ const STEPS3D: Step3D[] = [
       j.p[2] -= 0.6 * bump(t, 0.93, 1);
     },
   },
-  { // 24 Full test
-    dur: 7, view: { at: [13, 30, -6], az: -30, el: 45, d: 190 },
-    labels: [{ txt: "Press green", at: [CAP_X.A, 4, 7], t: [0.4, 0.55] }, { txt: "Shake it", at: [13, 26, 10], t: [0.56, 0.78] }, { txt: "PASS", at: [13, 26, 8], t: [0.85, 1] }],
+  { // 21 Install the firmware
+    dur: 3.6, view: { at: [13, 30, -6], az: -30, el: 45, d: 190 },
+    labels: [{ txt: "Hold BOOTSEL, plug it in", at: [13.2, 66, 4], t: [0.15, 0.5] }, { txt: "wedgie.dev/reset", at: [13, 26, 8], t: [0.6, 1] }],
     run(s, t) {
-      go(s, "usb", { p: USB_OUT, v: 1 }, E(t, 0, 0.08));
-      go(s, "usb", { p: USB_IN }, E(t, 0.08, 0.16));
-      num(s, "scr", 1, t > 0.17 ? 1 : 0); num(s, "scrK", 1, E(t, 0.17, 0.32));
-      if (t > 0.32) s.n.scr = 2;
-      if (t > 0.4) s.n.scr = 3;
-      s.o.A.p[2] -= 1 * bump(t, 0.5, 0.55);
-      if (t > 0.56) s.n.scr = 4;
-      const sh = bump(t, 0.58, 0.8) * Math.sin(t * 160);
-      s.o.root.r[0] += sh * 0.05; s.o.root.p[2] += Math.abs(sh) * 4;
-      if (t > 0.84) s.n.scr = 5;
+      go(s, "usb", { p: USB_OUT, v: 1 }, E(t, 0, 0.15));
+      go(s, "usb", { p: USB_IN }, E(t, 0.15, 0.35));
+      num(s, "scr", 1, t > 0.37 ? 1 : 0); num(s, "scrK", 1, E(t, 0.37, 0.6));
     },
   },
-  { // 25 Done
-    dur: 4, view: { at: [13, 26, -8], az: -10, el: 55, d: 220 },
-    labels: [{ txt: "Done", at: [13, 26, 12], t: [0.8, 1] }],
-    run(s, t) {
-      go(s, "usb", { p: USB_OUT }, E(t, 0, 0.12)); go(s, "usb", { v: 0 }, E(t, 0.1, 0.18));
-      num(s, "scr", 0, t > 0.15 ? 1 : 0);
-      for (const k of ["core", "shell"]) go(s, k, { p: [0, 0, 44] }, E(t, 0.1, 0.35));
-      go(s, "box", { v: 1 }, E(t, 0.2, 0.4));
-      for (const k of ["core", "shell"]) go(s, k, { p: [0, 0, 0] }, E(t, 0.4, 0.65));
-      go(s, "boxlid", { r: [0, 0, 0] }, E(t, 0.68, 0.95));
-    },
+  { // 22 Install the software
+    dur: 2.4, view: { at: [13, 30, -6], az: -10, el: 50, d: 170 },
+    labels: [{ txt: "wedgie.dev/connect", at: [13, 26, 8], t: [0.2, 1] }],
+    run() {},
   },
 ];
 
