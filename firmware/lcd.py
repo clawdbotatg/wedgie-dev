@@ -301,8 +301,8 @@ class LCD(framebuf.FrameBuffer):
         if _on_frame:
             _on_frame(self, x0, y0, x1, y1)
         if _mark:
-            self.rect(0, 0, 240, 240, RED)
-            self.rect(1, 1, 238, 238, RED)
+            for i in range(4):
+                self.rect(i, i, 240 - 2 * i, 240 - 2 * i, RED)
         self._cmd(0x2A, [0x00, x0, 0x00, x1 - 1])
         self._cmd(0x2B, [0x00, y0, 0x00, y1 - 1])
         self._cmd(0x2C)
