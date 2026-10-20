@@ -74,7 +74,7 @@ export const STEPS: Step[] = [
     p: `Lay the Trust M <b>chip side up</b>, words readable. Plug the cable into the <b>left</b> socket. The wires are <b>1 to 4, top to bottom</b>. Mark them with a pen. Go by place, never by color: cables differ. Unplug it.`,
     d: "02", ph: ["02-trust-m-plug"], art: PLUG,
     tip: `In our photos: 1 white, 2 yellow, 3 black, 4 red.`,
-    warn: `Count only this way. Chip side down or in the right socket, the order reads backwards.` },
+    warn: `Chip up, left socket, or your numbers will be backwards.` },
   { t: "Lay out the screen board",
     p: `Turn the screen board face down, sockets up, USB mark at the top. Each wire pushes into a socket, no solder. Count sockets from the USB end:`,
     d: "04", ph: ["04-board-and-guide"], art: HEADER,
