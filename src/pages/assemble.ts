@@ -61,7 +61,7 @@ export const HEADER = (() => {
 })();
 
 // Steps /assemble/3d leaves out: most Picos don't need them (Austin, 10-19).
-export const NO_3D = ["Snap off extra board", "Cut off plastic guards"];
+export const NO_3D = ["Snap off extra board", "Cut off plastic guards (Pico 2 W only)"];
 
 export const STEPS: Step[] = [
   { t: "Cable and tools",
@@ -100,10 +100,10 @@ export const STEPS: Step[] = [
   { t: "Snap off extra board",
     p: `Some Picos have a little extra board left on the end, away from the USB port. Pinch it with pliers and snap it off. Otherwise it won't fit the case.`,
     d: "11p", ph: ["11-snap-off-tab", "11-picos-with-tabs"] },
-  { t: "Cut off plastic guards",
+  { t: "Cut off plastic guards (Pico 2 W only)",
     p: `We don't recommend a Pico 2 W: a hardware wallet shouldn't have WiFi. Got one anyway? Flip it over. It probably has 3 black plastic guards across the back. Cut off the middle one and one of the end ones with clippers. Keep the plastic along the pins.`,
     d: "11g", ph: ["11-guards", "11-guards-end", "11-guards-cut", "11-guards-cut-parts"],
-    warn: `You have to. With the guards on, the Trust M can't wedge in.` },
+    warn: `On a Pico 2 W you have to. With the guards on, the Trust M can't wedge in.` },
   { t: "Stack the boards",
     p: `Push the Pico into the sockets, <b>USB port at the same end as the screen board's USB mark</b>, the Pico's chips and BOOTSEL button facing out. Push straight, all the way in, until it's flush. The Trust M ends up wedged between the two boards.`,
     d: "10", ph: ["11-pico-going-on", "10-stacked-top", "10-chip-wedged", "10-headers-flush", "11-stacked-usb"],
