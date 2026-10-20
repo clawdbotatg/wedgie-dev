@@ -52,3 +52,10 @@ dd { margin: 1px 0 0; color: #474947; }
 .contact { display: flex; gap: 22px; align-items: center; padding: 18px; border-radius: 18px; background: #f4f4f1; }
 .contact { padding: 12px; gap: 12px; } .contact svg { width: 0.85in; height: 0.85in; flex-shrink: 0; }
 .contact p { margin: 2px 0; }
+
+/* fold marks: short gray ticks out on both edges, 1/3 and 2/3 down the sheet, so it folds in thirds.
+   The left/right margin boxes run from the top margin (0.55in) to the bottom one (0.65in down from 11in). */
+@page {
+  @left-middle { content: ""; height: 9.8in; width: 0.65in; background: linear-gradient(#b9bab6, #b9bab6) 0 calc(11in / 3 - 0.55in) / 0.35in 1px no-repeat, linear-gradient(#b9bab6, #b9bab6) 0 calc(22in / 3 - 0.55in) / 0.35in 1px no-repeat; }
+  @right-middle { content: ""; height: 9.8in; width: 0.65in; background: linear-gradient(#b9bab6, #b9bab6) 0.3in calc(11in / 3 - 0.55in) / 0.35in 1px no-repeat, linear-gradient(#b9bab6, #b9bab6) 0.3in calc(22in / 3 - 0.55in) / 0.35in 1px no-repeat; }
+}
