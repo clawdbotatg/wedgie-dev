@@ -269,8 +269,8 @@ def path(cd, p):
     bytes, one per value (arrays iterate). Semantics: the spec's DATA_PATH (Ledger's generic parser)."""
     if not 0 < len(p) <= MAX_PATH:
         raise ValueError("path: length")
-    if len(cd) % 32:
-        raise ValueError("path: calldata not in slots")
+    # Calldata needn't be a whole number of slots (1inch appends bytes after the ABI part): only the slots
+    # read must be inside it.
     out = []
     _walk(cd, p, 0, 0, 0, 0, out)
     return out
