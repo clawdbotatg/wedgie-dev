@@ -44,7 +44,7 @@ ca324e0a4598275f90d016e04322efea2c4c9b47a8602a143ce6524fc57adb95  secret.py
 8891352abecddf9de45f4e7aa87afad8c9dd30964d5b99a9853a3758878d7f36  usbdev.mpy
 e601d3cfeadf4af722718e124308a22ac91656cc8bf20cf94d3857ba3a07ee10  wedgie.mpy
 e20d454f74229b3aaa09a15829cbb6b85aa50c6b3bf229287b9cdbff73bee90d  wedgiedrive.mpy
-7d7a3b128ac87f5ed49f997d6dd185c0393b7a9e9b8733d66e338d1ed9a6d5f6  welcome.py
+5178bde1e2c81e1c14f11630911499f7cfd202306e880588de6d6c23bfed0280  welcome.py
 @app  {"mod":"blackjack","name":"Blackjack","entry":"run","files":["blackjack.py"]}
 @app  {"mod":"blocks","name":"Blocks","entry":"run","files":["blocks.py"]}
 @app  {"mod":"bunker","name":"Demon Bunker","entry":"run","files":["bunker.py","bunker_draw.py","bunker_art.mpy","bunker_game.mpy"]}
@@ -56,4 +56,4 @@ e20d454f74229b3aaa09a15829cbb6b85aa50c6b3bf229287b9cdbff73bee90d  wedgiedrive.mp
 @app  {"mod":"safe","name":"Safe Signer","entry":"run","usb":true,"files":["safe.py","safe_read.py","safe_keccak.py","safe_addr.py","safe_blockie.py","safe_key.py"]}
 @app  {"mod":"secret","name":"Secrets","entry":"run","usb":true,"files":["secret.py","secret_box.py"]}
 @app  {"mod":"welcome","name":"Welcome","entry":"run","files":["welcome.py"]}
-@serial  2
+@serial  3

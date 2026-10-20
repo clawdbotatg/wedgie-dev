@@ -394,6 +394,7 @@ def s_welcome():
     big("Welcome", 34, INK, 3)
     big("to", 70, INK, 3)
     ui.say(S, "{g} jump  {r} wave", 118, MUTED)
+    small("firmware " + W.VERSION, 142)
 
 
 # The boot logo (logo.bin, on every wedgie): kept in 16 colors in S, and shown over that in full color
