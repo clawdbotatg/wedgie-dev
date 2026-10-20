@@ -445,6 +445,8 @@ straight apart, rocking gently end to end, never twisting. Reassemble in reverse
    Pico (BOOTSEL), puts MicroPython on (the W build if it has WiFi), then the firmware, puts the saves
    back, and tests the board, the screen, every button and the chip. Nothing starts until its Test it
    button is pressed. It uses the secure chip but never changes it: safe to run again and again.
+   Just the latest firmware, no tests (old firmware, or it won't start): https://wedgie.dev/reset. It
+   shows how to hold BOOTSEL, then wipes it and puts on MicroPython, the firmware and Welcome. Saves go.
 
 **A dead or locked secure chip:** it's its own little board, so swap in a new breakout. Keys made inside
 the old chip are gone with it: anything they guarded (a wallet whose key lived on that chip) can only
