@@ -398,6 +398,8 @@ body.test-mode .top, body.test-mode .foot { display: none; }
 .boot-hint p { margin: 0 0 6px; }
 .boot-hint-3d { height: 230px; min-width: 0; overflow: hidden; }
 .boot-hint-3d canvas { display: block; max-width: 100%; }
+.boot-hint-3d:has(.boot-hint-cap) { position: relative; height: 260px; }
+.boot-hint-cap { position: absolute; left: 0; right: 0; bottom: 0; text-align: center; font-weight: 800; font-size: 16px; }
 @media (max-width: 560px) { .boot-hint { grid-template-columns: minmax(0, 1fr); padding: 16px; } .boot-hint h3 { text-align: center; } }
 .test-setup { width: min(100%, 780px); text-align: left; display: grid; gap: 10px; margin-top: 24px; }
 .test-cmd { font-family: var(--mono); font-size: 14px; padding: 12px 16px; margin: 0; overflow-x: auto; white-space: pre; user-select: all; }
