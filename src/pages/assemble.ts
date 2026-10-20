@@ -65,10 +65,10 @@ export const NO_3D = ["Snap off extra board", "Cut off plastic guards (Pico 2 W 
 
 export const STEPS: Step[] = [
   { t: "Cable and tools",
-    p: `A STEMMA QT / Qwiic cable (4-pin JST-SH plug), wire cutters and strippers, electrical tape, a stiff breadboard jumper wire, and tweezers.`,
+    p: `A STEMMA QT / Qwiic cable (4-pin JST-SH plug), a wire stripper (it cuts near the hinge and strips near the tip), electrical tape, a stiff breadboard jumper wire, and tweezers.`,
     d: "01", ph: ["01-cable-and-strippers"] },
   { t: "Cut and strip the wires",
-    p: `Keep one plug. Cut the wires about <b>2 in (5 cm)</b> from it. Strip off as much as a socket is deep, about <b>5 mm</b> (between 1/8 and 1/4 in), so the bare wire goes all the way down.`,
+    p: `Keep one plug. Cut the wires about <b>2 in (5 cm)</b> from it, near the stripper's hinge. Strip with the notches near its tip. Strip off as much as a socket is deep, about <b>5 mm</b> (between 1/8 and 1/4 in), so the bare wire goes all the way down.`,
     d: "03", ph: ["03-cut-and-stripped-a", "03-cut-and-stripped-b"] },
   { t: "Number the wires",
     p: `Lay the Trust M <b>chip side up</b>, words readable. Plug the cable into the <b>left</b> socket. The wires are <b>1 to 4, top to bottom</b>. Mark them with a pen. Go by place, never by color: cables differ. Unplug it.`,
@@ -95,7 +95,7 @@ export const STEPS: Step[] = [
     p: `All 4 wires in, taped, holes open. Ready for the Pico.`,
     d: "09h", ph: ["09-header-ready"] },
   { t: "Plug in the chip",
-    p: `Plug the cable back into the Trust M, either socket: both work. It only fits one way. Lay the Trust M face up on the back of the screen board, over the wires. The Pico goes on top of it next.`,
+    p: `Plug the cable back into the Trust M, either socket: both work. It only fits one way. Tilt the Trust M on its side and wedge it between the two rows of sockets, over the wires. It should be a snug fit: the Pico goes on top of it next.`,
     d: "10p", ph: ["10-chip-laid-down", "10-chip-plugged", "10-chip-plugged-side", "10-ready-for-pico"] },
   { t: "Snap off extra board",
     p: `Some Picos have a little extra board left on the end, away from the USB port. Pinch it with pliers and snap it off. Otherwise it won't fit the case.`,
