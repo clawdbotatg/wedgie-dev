@@ -51,7 +51,7 @@ h1, h2, h3 { font-weight: 900; letter-spacing: -.02em; line-height: 1.05; margin
 .wire-art .pn.on { fill: #1a1b1a; }
 .wire-art .rn { font: 800 10px "Nunito"; fill: #6f7072; }
 .wire-art .wl { font: 900 14px "Nunito"; fill: #1a1b1a; }
-.wire-art .bd { stroke: #2a2b2a; stroke-width: 1.5; }
+.wire-art .bd { stroke: #b9bbb9; stroke-width: 2.5; }
 .wire-art .bn { font: 900 13px "Nunito"; fill: #fff; }
 .wire-art .board { fill: #1c1d1e; }
 .wire-art .bt { font: 800 13px "Nunito"; fill: #e8e8e4; }
