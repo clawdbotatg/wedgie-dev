@@ -1,7 +1,7 @@
 # Waveshare Pico-LCD-1.3: 240x240 ST7789 over SPI1, plus joystick and A/B/X/Y keys.
 # Pins from waveshare.com/wiki/Pico-LCD-1.3.
 from machine import Pin, SPI, PWM
-import framebuf, time, sys, machine, micropython
+import framebuf, time, sys, os, machine, micropython
 import splash as _s     # pins and panel setup; boot.py already used it to put the logo up
 from splash import DC, CS, SCK, MOSI, RST, BL
 KEYS = {"A": 15, "B": 17, "X": 19, "Y": 21, "up": 2, "down": 18, "left": 16, "right": 20, "press": 3}
@@ -41,6 +41,11 @@ _on_frame = None    # power.py: (lcd, x0, y0, x1, y1) before a box goes out, to 
 _busy = False       # a box is going out to the panel (power.py waits for the next tick)
 _art = None         # (x, y, w, h, file, offset): a full-color picture on flash shown over that box (art())
 _artrow = None      # one of its rows, read from the file
+try:                # a computer had full control (wedgie.MARK): a thin red border over every frame
+    os.stat("modified")
+    _mark = True
+except OSError:
+    _mark = False
 
 
 def art(x, y, w, h, path, offset):
@@ -295,6 +300,9 @@ class LCD(framebuf.FrameBuffer):
     def _push(self, x0, y0, x1, y1):
         if _on_frame:
             _on_frame(self, x0, y0, x1, y1)
+        if _mark:
+            self.rect(0, 0, 240, 240, RED)
+            self.rect(1, 1, 238, 238, RED)
         self._cmd(0x2A, [0x00, x0, 0x00, x1 - 1])
         self._cmd(0x2B, [0x00, y0, 0x00, y1 - 1])
         self._cmd(0x2C)

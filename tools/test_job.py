@@ -342,5 +342,30 @@ try:
 finally:
     SER[0] = 0
 
+# full control's red border (wedgie.MARK): only a signed job that leaves every file it runs as signed takes it off
+M = {"modified": b""}
+upd = lambda: puts("slot.mpy", read("slot.mpy")) + [{"type": "commit"}]
+out, f = run({"job": "Update firmware", "write": ["slot.mpy"], "delete": [], "apps": json.dumps([{"mod": "hello"}])}, upd(), flash=M)
+check("done" in types_(out) and "modified" not in f, "a signed update, all as signed: the border goes (%s)" % types_(out))
+out, f = run({"job": "Update firmware", "write": ["slot.mpy"], "delete": [], "apps": json.dumps([{"mod": "hello"}])}, upd(),
+             flash=dict(M, **{"hello.py": b"print('changed')\n"}))
+check("done" in types_(out) and "modified" in f, "the app it runs was changed: the border stays")
+out, f = run({"job": "Install Buttons", "write": ["keytest.py"], "delete": ["hello.py"], "apps": json.dumps(buttons)},
+             puts("keytest.py", kt) + [{"type": "commit"}], flash=dict(M, **{"ui.py": b"x = 1\n"}))
+check("done" in types_(out) and "modified" in f, "an install, a .py over a signed .mpy: the border stays")
+out, f = run({"job": "Install Buttons", "write": ["keytest.py"], "delete": ["hello.py"], "apps": json.dumps(buttons)},
+             puts("keytest.py", kt) + [{"type": "commit"}], flash=M)
+check("done" in types_(out) and "modified" not in f, "a signed install, all as signed: the border goes")
+out, f = run({"job": "Uninstall the app", "write": [], "delete": ["modified"], "apps": "[]"}, [{"type": "commit"}],
+             flash=dict(M, **{"ui.py": b"x = 1\n"}))
+check("done" not in types_(out) and "modified" in f, "a job can't delete the border's file")
+W.SEALED = True
+d = tempfile.mkdtemp(); o = os.getcwd(); os.chdir(d)
+try:
+    W.set_open()
+    check(os.path.exists("modified"), "full control leaves the border's file")
+finally:
+    os.chdir(o); shutil.rmtree(d); W.SEALED = False; W._open = False
+
 print("all ok" if not fails else "%d FAILED" % fails)
 sys.exit(1 if fails else 0)
