@@ -28,7 +28,8 @@ const other = (w: W.Wedgie) => w.state === "error" && /No MicroPython/.test(w.er
 /** Boards the card owns: /connect leaves them out of its rows. */
 export const needsSetup = (w: W.Wedgie) => other(w);
 
-export function setupCard(el: HTMLElement) {
+/** reset: /reset's copy (a wedgie someone put in boot mode to start over), not /connect's. */
+export function setupCard(el: HTMLElement, opts: { reset?: boolean } = {}) {
   let job: Job | null = null;
   let boots: USBDevice[] = [];
   let alive = true;
@@ -48,14 +49,14 @@ export function setupCard(el: HTMLElement) {
       return;
     }
     const items = [
-      ...boots.map((d, i) => ({ id: `b${i}`, what: `A new Pico (${BOOT_PIDS[d.productId]}, in boot mode)`, go: () => flash(d) })),
+      ...boots.map((d, i) => ({ id: `b${i}`, what: opts.reset ? `Found it: a wedgie in boot mode (${BOOT_PIDS[d.productId]})` : `A new Pico (${BOOT_PIDS[d.productId]}, in boot mode)`, go: () => flash(d) })),
       ...W.wedgies().filter(other).map((w) => ({ id: `o${w.key}`, what: "A board with something else on it (not MicroPython)", go: () => knock(w) })),
       ...W.wedgies().filter(bare).map((w) => ({ id: `m${w.key}`, what: `${w.short} · ${w.board}: MicroPython, no wedgie firmware`, go: () => install(w) })),
     ];
     if (!items.length) { el.innerHTML = ""; return; }
-    el.innerHTML = `<div class="setup card"><h3>Not set up yet</h3>
-      ${items.map((x) => `<div class="setup-item"><span>${esc(x.what)}</span><button class="btn btn-green setup-go" data-id="${x.id}">Set up</button></div>`).join("")}
-      <p class="fine">Set up wipes it, then puts on MicroPython and the wedgie firmware. Pick its app after.</p></div>`;
+    el.innerHTML = `<div class="setup card"><h3>${opts.reset ? "Ready to reset" : "Not set up yet"}</h3>
+      ${items.map((x) => `<div class="setup-item"><span>${esc(x.what)}</span><button class="btn btn-green setup-go" data-id="${x.id}">${opts.reset ? "Reset it" : "Set up"}</button></div>`).join("")}
+      <p class="fine">${opts.reset ? "Wipes its apps and saves, then puts on MicroPython and the latest wedgie firmware. The chip and its keys stay." : "Set up wipes it, then puts on MicroPython and the wedgie firmware. Pick its app after."}</p></div>`;
     for (const x of items) el.querySelector<HTMLElement>(`[data-id="${x.id}"]`)!.onclick = () => void x.go();
   };
   const set = (j: Partial<Job>) => { job = { ...(job || { stage: "boot", text: "", detail: "", p: null, since: Date.now(), wifi: false }), ...j }; paint(); };
@@ -129,7 +130,7 @@ export function setupCard(el: HTMLElement) {
     } catch (e) { return fail(e, "The firmware didn't go on"); }
     if (reboot) { set({ stage: "boot", wifi: true, text: "It has WiFi: restarting into boot mode…", detail: "For the WiFi build of MicroPython.", p: null, since: Date.now(), before, serial: w.uid }); look(); return needPick("boot", "boot"); }   // it may be in boot mode already
     W.reidentify(w);
-    set({ stage: "done", text: `${w.short} is set up`, detail: "It's restarting on the wedgie firmware. Tap it below to pick its app.", p: null });
+    set({ stage: "done", text: `${w.short} is set up`, detail: opts.reset ? "It's restarting on the latest firmware. Pick its app at wedgie.dev/connect." : "It's restarting on the wedgie firmware. Tap it below to pick its app.", p: null });
   }
 
   const onUsb = (e: Event) => { if (isBoot((e as USBConnectionEvent).device)) setTimeout(look, 300); };

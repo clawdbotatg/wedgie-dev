@@ -129,6 +129,10 @@
       "destination": "/index.html"
     },
     {
+      "source": "/reset",
+      "destination": "/index.html"
+    },
+    {
       "source": "/build",
       "destination": "/index.html"
     },
