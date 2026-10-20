@@ -224,6 +224,9 @@ async function checkedHave(r: Repl, m: Manifest, hash?: string[], late: boolean 
   // installs ran out of memory on real boards (0.3.6, 0.3.11). They get there once through full access
   // (Austin, 2026-10-02: one "full access" question is fine); 0.3.12+ installs on a clean heap.
   if (!h.version || cmpVersion(h.version, "0.3.12") < 0) return null;
+  // Before 0.3.55 it knows only the old release key, so it can't check this list: its job would ask, then
+  // stop at the signature and restart with nothing said on its screen. Full access instead (Austin, 10-19).
+  if (cmpVersion(h.version, NEW_KEYS) < 0) return null;
   if (h.jobs >= 2 && (late === true || (late === "update" && h.version !== m.version))) {
     const v = await r.request({ type: "sums", names: [], exists: allNames(m) }, 30000).catch(() => null);
     if (v?.sums) return { hashes: v.sums, files: Object.keys(v.sums).filter((n) => v.sums[n]), apps: v.apps || [], late: true };
@@ -242,6 +245,7 @@ async function checkedHave(r: Repl, m: Manifest, hash?: string[], late: boolean 
  *  uninstall takes off only its app. Older firmware gets the jobs it knows (an update brings its app's
  *  files along and clears other apps' leftovers). EXPECTATIONS.md: the person knows what they say yes to. */
 const ONE_THING = "0.3.53";
+const NEW_KEYS = "0.3.55";     // the release keys changed: older wedgies can't check a list signed now
 const oneThing = new WeakMap<Repl, boolean>();
 /** The files of the app it runs (its twins too), on the flash: all a 0.3.53+ job may take off. */
 function mineOf(m: Manifest, have: Have) {

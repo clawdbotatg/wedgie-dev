@@ -1,8 +1,8 @@
 // /prepare with fake wedgies (tools/fakewedgies.mjs). Their chip is an ATECC608, so the last step fails
 // ("not a Trust M"): this checks the software half. 0: wedgie 0.3.20 with Buttons: its firmware update
 // (the old kind: its app comes along), then "Install Welcome", back on the latest with Welcome only.
-// 1: no MicroPython: told to use /test. 2: 0.3.53 with old firmware files and Buttons: "Update firmware"
-// (only the firmware), then "Install Welcome" (replaces Buttons): two questions.
+// 1: no MicroPython: told to use /test. 2: 0.3.53 with old firmware files and Buttons: the firmware through
+// full access (before 0.3.55 it knows only the old release key), then "Install Welcome" (replaces Buttons).
 // Every job sent is written to shots/sitejobs-prepare.json for tools/test_sitejobs.py (the real rules).
 // Serve dist first (npx vite preview), then: node tools/prepareprobe.mjs [url]
 import { chromium } from "playwright-core";
@@ -43,8 +43,8 @@ console.log("·", c);
 const g = await page.evaluate(() => { const s = window.__ports[2]._st; return { asks: s.asks, apps: JSON.parse(new TextDecoder().decode(s.files.get("apps.json"))).map((x) => x.mod), buttons: s.files.has("buttons.py"), welcome: s.files.has("welcome.py"),
   jobs: s.jobLog.map((j) => j.msg.job + " w" + j.msg.write.length + " d" + j.msg.delete.length) }; });
 console.log("·", JSON.stringify(g));
-check(g.asks === 2 && JSON.stringify(g.jobs) === JSON.stringify([g.jobs[0], g.jobs[1]]) && /^Update firmware w\d+ d0$/.test(g.jobs[0]) && /^Install Welcome w1 d1$/.test(g.jobs[1]) && g.welcome && !g.buttons && JSON.stringify(g.apps) === '["welcome"]',
-  "0.3.53: two questions, the firmware alone (nothing taken off), then Welcome (Buttons off)");
+check(g.asks === 2 && JSON.stringify(g.jobs) === '["Install Welcome w1 d1"]' && g.welcome && !g.buttons && JSON.stringify(g.apps) === '["welcome"]',
+  "0.3.53: two questions, the firmware through full access (it can't check the new release keys), then Welcome (Buttons off)");
 check(/ fail/.test(c) && /not a Trust M/.test(c), "0.3.53: then the chip step (an ATECC608 here)");
 writeFileSync(new URL("../shots/sitejobs-prepare.json", import.meta.url), JSON.stringify(await page.evaluate(() => window.__ports.flatMap((p) => p._st.jobLog || []))));
 check(!errs.length, errs.length ? "page errors: " + errs.join(" | ") : "no page errors");
