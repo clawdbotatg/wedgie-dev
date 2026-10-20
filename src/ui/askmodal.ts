@@ -39,7 +39,7 @@ export function askScreen(job: string, checked = false, version = "") {
   g.fillStyle = P.WHITE; g.fillRect(0, 0, 240, 240);
   [[P.GREEN, 10], [P.GREY, 19], [P.RED, 28]].forEach(([col, y]) => { g.fillStyle = col as string; g.fillRect(0, y as number, 240, 5); });
   g.fillStyle = P.INK;
-  {                                  // as slot.ask: the question, then what it's about big, a small check
+  {                                  // as slot.ask: the question, then what it's about big, its check's dot
     const head = (job || "Install").split(" to ")[0];
     const [q, big] = head.startsWith("Update") ? [head, version || job.split(" to ")[1] || "?"]
       : head.startsWith("Install ") ? ["Install", head.slice(8)] : [head + "?", ""];
@@ -50,9 +50,9 @@ export function askScreen(job: string, checked = false, version = "") {
       g.font = "16px Silkscreen, monospace"; g.fillText(q.slice(0, 15), 120, y); y += 36;
       g.textAlign = "left"; g.font = `${8 * sc}px Silkscreen, monospace`;
       t.forEach((s, i) => { w = 8 * sc * s.length; x = (240 - w - (i === t.length - 1 ? 24 : 0)) / 2; g.fillText(s, x, y); y += h; });
+      // where the wedgie's check goes: its pulsing grey dot (ui.mark). Only the wedgie knows how its check came out.
       const cx = x + w + 8, cy = y - h + (8 * sc - 13) / 2;
-      g.strokeStyle = P.GREEN_D; g.lineWidth = 3; g.lineCap = "square";
-      g.beginPath(); g.moveTo(cx + 1, cy + 6); g.lineTo(cx + 5, cy + 10); g.lineTo(cx + 15, cy + 1); g.stroke();
+      g.fillStyle = P.GREY; g.beginPath(); g.arc(cx + 8, cy + 6, 6, 0, 7); g.fill(); g.fillStyle = P.INK;
       g.textAlign = "center";
     } else {
       g.font = "16px Silkscreen, monospace";

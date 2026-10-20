@@ -219,6 +219,7 @@ async function checkedHave(r: Repl, m: Manifest, hash?: string[], late: boolean 
   if (!h?.jobs) return null;
   if (h.uid) uidOf.set(r, h.uid);
   if (h.bin) binOf.set(r, h.bin);
+  listOf.set(r, h.jobs >= 3);
   oneThing.set(r, !!h.version && cmpVersion(h.version, ONE_THING) >= 0);
   // Before 0.3.12 a job ran on the app's chopped-up heap and job.py grew each USB line a char at a time:
   // installs ran out of memory on real boards (0.3.6, 0.3.11). They get there once through full access
@@ -252,6 +253,7 @@ function mineOf(m: Manifest, have: Have) {
 }
 const uidOf = new WeakMap<Repl, string>();     // its board ID, to find it again if a job's restart drops the port
 const binOf = new WeakMap<Repl, number>();      // 0.3.16+: the most raw bytes one put takes (hello "bin")
+const listOf = new WeakMap<Repl, boolean>();    // 0.3.56+ (hello "jobs" 3): checks the signed list while its question is up
 let release: Promise<{ text: string; sig: string }> | null = null;
 const signedList = () => release ||= Promise.all(["release.txt", "release.sig"].map((n) => fetch("/fw/" + n, { cache: "no-cache" }).then((x) => x.text())))
   .then(([text, sig]) => ({ text, sig: sig.trim() }));
@@ -266,6 +268,8 @@ async function job(r: Repl, m: Manifest, title: string, write: string[], del: st
   // jobs). Not in delete: 0.3.12-0.3.13 refuse to delete their core names (wedgie.py, slot.py, ...).
   const relP = signedList();
   relP.catch(() => {});
+  const list = !!listOf.get(r);
+  late ||= list;                        // its check gets the list in pieces (slot._sig); the job carries none
   const listed = late ? new Set(m.files.map((f) => f.name)) : new Set((await relP).text.split("\n").slice(2).map((l) => l.split("  ")[1]).filter(Boolean));
   if (!write.every((n) => listed.has(n) && !m.files.find((f) => f.name === n)?.url)) return false;
   const fetched = Promise.all(write.map(async (n) => {      // downloads while the wedgie asks
@@ -281,7 +285,18 @@ async function job(r: Repl, m: Manifest, title: string, write: string[], del: st
   const site = performance.now() - (askStart || performance.now()), sent = Date.now();
   const asked = r.request({ type: "job", job: title, ...(rel ? { release: rel.text, sig: rel.sig } : { version: m.version }), write, delete: del, apps: apps && JSON.stringify(apps),
     bytes: write.reduce((t, n) => t + (m.files.find((f) => f.name === n)?.size || 0), 0),    // the wedgie's bar weighs the file part by it
-    ...(binOf.get(r) ? { raw: true } : {}) }, 120000);
+    ...(binOf.get(r) ? { raw: true } : {}), ...(list ? { list: 1 } : {}) }, 120000,
+    // its question asks for the signed list: whole lines, ~512 bytes a piece (it hashes each and drops it), then the signature
+    list ? () => relP.then(async ({ text, sig }) => {
+      for (let o = 0; o < text.length;) {
+        let e = text.lastIndexOf("\n", o + 512);
+        if (e < o) e = text.indexOf("\n", o);
+        e = e < 0 ? text.length : e + 1;
+        await r.write(JSON.stringify({ type: "rel", t: text.slice(o, e) }) + "\n");
+        o = e;
+      }
+      await r.write(JSON.stringify({ type: "rel", sig }) + "\n");
+    }).catch(() => {}) : undefined);
   asked.catch(() => {});
   const close = (await import("../ui/askmodal")).askModal(title, true, m.version);
   let v: any;

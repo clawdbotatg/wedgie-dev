@@ -111,14 +111,15 @@ export class Repl {
   }
 
   private nextId = 100;
-  private pending = new Map<number, { parts: any[]; res: (v: any) => void; rej: (e: Error) => void; t: number }>();
+  private pending = new Map<number, { parts: any[]; res: (v: any) => void; rej: (e: Error) => void; t: number; list?: () => void }>();
 
-  /** One JSON request to the wedgie firmware (slot.py). Shots and files arrive in parts; they're joined. */
-  request(msg: Record<string, unknown>, ms = 5000): Promise<any> {
+  /** One JSON request to the wedgie firmware (slot.py). Shots and files arrive in parts; they're joined.
+   *  list: a job's question asking for its signed list ({"type": "list"}, 0.3.56+); the answer comes after. */
+  request(msg: Record<string, unknown>, ms = 5000, list?: () => void): Promise<any> {
     const id = this.nextId++;
     return new Promise((res, rej) => {
       const t = window.setTimeout(() => { this.pending.delete(id); rej(new Error("wedgie did not answer")); }, ms);
-      this.pending.set(id, { parts: [], res, rej, t });
+      this.pending.set(id, { parts: [], res, rej, t, list });
       this.write(JSON.stringify({ ...msg, id }) + "\n").catch(rej);
     });
   }
@@ -136,6 +137,7 @@ export class Repl {
   private json(v: any) {
     const p = v && typeof v.id === "number" ? this.pending.get(v.id) : undefined;
     if (!p) { this.onJson?.(v); return; }
+    if (v.type === "list" && p.list) { p.list(); return; }
     if (v.type === "shot" || v.type === "file") {
       p.parts[v.i] = v.type === "file" ? atob(v.data) : v.data;
       clearTimeout(p.t);                 // a big file takes a while: each part buys it time

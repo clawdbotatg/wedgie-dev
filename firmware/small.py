@@ -37,14 +37,33 @@ def page(d, head, lines=(), hint="", show=True):
         d.show()
 
 
-def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None, scary=False, big=None):
+def _mark(d, x, y, s):
+    """ui.mark in one color, 8 x 8: a check, a "!" in a box (not signed), nothing, or a dot that blinks."""
+    d.fill_rect(x, y, 8, 8, WHITE)
+    if s is True:
+        for i in range(3):
+            d.fill_rect(x + i, y + 4 + i, 2, 2, INK)
+        for i in range(5):
+            d.fill_rect(x + 3 + i, y + 5 - i, 2, 2, INK)
+    elif s is False:
+        d.fill_rect(x, y, 8, 8, INK)
+        d.fill_rect(x + 3, y + 1, 2, 4, WHITE)
+        d.fill_rect(x + 3, y + 6, 2, 1, WHITE)
+    elif s is not None:
+        d.ellipse(x + 3, y + 4, 3, 3, INK, s // 3 % 2 == 0)
+    d.show_rect(x, y, 8, 8)
+
+
+def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None, scary=False, big=None, sig=None):
     k = keys or L.Keys(physical=True)
     k.pressed()
     bg, fg = (INK, WHITE) if scary else (WHITE, INK)
     d.fill(bg)
     y = _head(d, question, fg)
+    at = None
     if big:
         d.text(big[:11], 0, y, fg)
+        at = (8 * len(big[:11]) + 2, y)
         y += 10
     _lines(d, lines, y, fg, cols=11)
     no, yes = no[:5], yes[:5]
@@ -53,7 +72,7 @@ def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None, scary=Fa
     d.text(no, 128 - 8 * len(no), 56, fg)
     d.show()
     ui.drawn = time.ticks_ms()
-    return ui.wait(k, ms)
+    return ui.wait(k, ms, sig, at and (lambda s: _mark(d, at[0], at[1], s)))
 
 
 def busy(d, title, what=""):

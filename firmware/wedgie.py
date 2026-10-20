@@ -3,7 +3,7 @@
 # interrupted; from the REPL they are plain calls:  import wedgie; wedgie.shot(); wedgie.press("A")
 import sys, os, json, machine
 
-VERSION = "0.3.55"
+VERSION = "0.3.56"
 
 # The lock. main.py turns Ctrl-C off before anything else and never ends by itself, so a computer
 # can only send the slot's JSON lines: it can't stop the app, reach the REPL, or make the secure chip
@@ -24,16 +24,19 @@ RELEASE_KEYS = (("4c65afa37faa35c84301f2ba183b21563a7c6e6c9e8a6a5fb3b074495c5c56
                 ("80446783d76526b3b21dc199f19bd889535506fd82b5b2c9cd48d8a3a0c6f43e", "166fe21369bcdcbec9c0797f9dc188b40923c771b85b35a50d6b321b44c22cfa"))
 
 
-def release_ok(text, sig, tick=None):
+def release_ok(text, sig, tick=None, digest=None):
     """text: the signed list (tools/release.mjs), sig: "r s" in hex, then which key ("1"; none: 0). True if
-    that key signed it. Pure-Python P-256 (p256.py): 2.2 s on an RP2040, once per job; tick(0..1) moves a bar."""
+    that key signed it. Pure-Python P-256 (p256.py): 2.2 s on an RP2040, once per job; tick(0..1) moves a bar.
+    digest: the list's sha256 instead of text (slot._sig hashes it as it arrives, in pieces)."""
     import gc
     try:
         import p256, hashlib
         f = sig.split()
         r, s = int(f[0], 16), int(f[1], 16)
         x, y = RELEASE_KEYS[int(f[2]) if len(f) == 3 else 0 if len(f) == 2 else 9]
-        return p256.verify(int(x, 16), int(y, 16), hashlib.sha256(text).digest(), r, s, tick)
+        return p256.verify(int(x, 16), int(y, 16), digest or hashlib.sha256(text).digest(), r, s, tick)
+    except MemoryError:                     # not "unsigned": it couldn't tell (slot._sig: no mark; a job: its error)
+        raise
     except Exception:
         return False
     finally:
@@ -197,7 +200,7 @@ def hello(mid=None, **extra):
          "short": short(), "board": name, "cpu": cpu, "wifi": wifi, "machine": sys.implementation._machine,
          "micropython": os.uname().release, "apps": [x["mod"] for x in a],
          "carts": [{"mod": x["mod"], "v": x.get("v")} for x in a], "free": free(), "chip": _chip, "slot": 1,
-         "sealed": SEALED, "open": is_open(), "jobs": 2, "ram": _ram()}
+         "sealed": SEALED, "open": is_open(), "jobs": 3, "ram": _ram()}
     if SEALED:              # a job takes raw puts of up to this many bytes (0.3.16+; job.py RAW). Not in the
         d["bin"] = 4096     # emulator: its job runs in place and its stdin is the page's
     if mid is not None:

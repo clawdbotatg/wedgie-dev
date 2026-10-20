@@ -164,6 +164,22 @@ def check(m, sig=True, tick=None):
     return version, files, required
 
 
+def _nope(mid, e):
+    """A check failed after the yes: tell the host, and the person on its screen for a few seconds (0.3.55
+    and before only restarted, saying nothing: Austin, 10-19). Nothing was written."""
+    W.send({"id": mid, "type": "error", "error": str(e)})
+    try:
+        import lcd, ui
+        d = lcd.LCD()
+        ui.page(d, "Not installed", [(str(e)[:56], ui.RED)], show=False)
+        if d.width >= 240:
+            ui.warn(d, 112, 52)
+        d.show()
+        ui.wait(lcd.Keys(physical=True), 5000)
+    except Exception as x:
+        print("job: screen:", x)
+
+
 _prog = None     # [title, the boot bar, the line under it] while the job runs
 
 
@@ -270,7 +286,7 @@ def run(mid, m, ask, show=None):
         try:
             version, files, required = check(m, tick=sig_tick)
         except ValueError as e:
-            W.send({"id": mid, "type": "error", "error": str(e)})
+            _nope(mid, e)
             return
         show(title, "starting", plan.at("sums"))
     W.send({"id": mid, "type": "go", "asked_ms": W.asked_ms})
@@ -306,7 +322,7 @@ def run(mid, m, ask, show=None):
                     version, files, required = check(m, tick=sig_tick)
                     sn = W.release_serial(m["release"])
                 except ValueError as e:
-                    W.send({"id": qid, "type": "error", "error": str(e)})
+                    _nope(qid, e)
                     return
                 m.pop("release", None)      # the 2.6 KB list: files has what's needed from it
                 gc.collect()

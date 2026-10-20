@@ -309,13 +309,14 @@ def _saves_only(p, t="get"):
 ASK_MS = 60000      # no answer to "let this computer in?" in a minute is a no
 
 
-def ask(job="", checked=False, v=""):
+def ask(job="", checked=False, v="", sig=None):
     """Let the computer do `job` (what it says it wants, e.g. "Install Safe signer", "Update firmware to
     0.3.30")? ui.ask: only a real press answers, green yes, red no. Nothing comes off USB meanwhile, so the
     computer waits. Only for a checked job (job.py: only files signed by wedgie.dev go on, so the green
     check): anything that gives the computer the REPL asks the red question (hatch.ask, let_in), never
     this calm one with the computer's own title on it. Few words, big (Austin, 2026-10-09): the job,
-    the version it puts on when it's an update (v: the one job.py holds the signed list to), the check."""
+    the version it puts on when it's an update (v: the one job.py holds the signed list to), and after
+    it the signature check (sig: _sig; ui.ask turns its dot into a check or a warning sign)."""
     if not checked:
         return False
     W.asked_ms = None
@@ -325,12 +326,12 @@ def ask(job="", checked=False, v=""):
     # Everything the job can do is on this screen (job.check holds it to exactly that, 0.3.53): an
     # update writes only the firmware; an install puts on that app and takes off the one it replaces.
     if head.startswith("Update"):
-        ok = ui.ask(d, head, ms=ASK_MS, big=str(v or "?")[:12])
+        ok = ui.ask(d, head, ms=ASK_MS, big=str(v or "?")[:12], sig=sig)
     elif head.startswith("Install "):                  # "Install" over the app's name, big
         new = head[8:]
-        ok = ui.ask(d, "Install", ["replaces " + name] if name and name != new else (), ms=ASK_MS, big=new)
+        ok = ui.ask(d, "Install", ["replaces " + name] if name and name != new else (), ms=ASK_MS, big=new, sig=sig)
     elif head in ("Uninstall the app", "Take its app off"):
-        ok = ui.ask(d, "Uninstall", ms=ASK_MS, big=name or "its app")
+        ok = ui.ask(d, "Uninstall", ms=ASK_MS, big=name or "its app", sig=sig)
     else:
         ok = ui.ask(d, head + "?", ms=ASK_MS)
     W.asked_ms = time.ticks_diff(ui.drawn, _rx)
@@ -343,6 +344,67 @@ def _older(v):
         return tuple(int(x) for x in str(v).split(".")) < tuple(int(x) for x in W.VERSION.split("."))
     except ValueError:
         return True
+
+
+SIG_RAM = 16000     # free heap the check needs beside an app (p256 and its numbers, one piece of the list)
+SIG_WAIT = 8000     # ms with nothing from the host: it stopped sending the list
+
+
+def _sig(mid, m, v):
+    """The check the question runs while it's up (ui.ask sig), for a host that sends the list (its job says
+    "list": 1; it saw hello "jobs" 3, 0.3.56+). It asks for the job's signed list ({"type": "list"}); the host sends it in pieces of
+    whole lines, {"type": "rel", "t": <text>}, then {"type": "rel", "sig": <sig>}. Each piece is hashed and
+    dropped: the whole list (4.5 KB) in one line ran out of memory beside Crystal Grove (chipprobe, 10-19).
+    True: a release key signed it, for the version or the app the question names. False: it didn't.
+    None: no list came, or too little memory beside the app; job.py checks it after the yes either way,
+    on a clean heap, before anything is written."""
+    title = str(m.get("job") or "")
+    app = title[8:] if title.startswith("Install ") else None
+
+    def check(tick):
+        import gc, hashlib
+        gc.collect()
+        if gc.mem_free() < SIG_RAM:
+            print("slot: signed None %d low" % gc.mem_free())
+            return None
+        W.send({"id": mid, "type": "list"})
+        h, n, named, sg, ok = hashlib.sha256(), 0, app is None, None, None
+        R, t0 = W.lines(), time.ticks_ms()
+        try:
+            while sg is None:
+                tick()
+                line = R.pump(_poll, 20)
+                if line is None:
+                    if time.ticks_diff(time.ticks_ms(), t0) > SIG_WAIT:
+                        raise StopIteration
+                    continue
+                t0 = time.ticks_ms()
+                q = json.loads(line) if line else {}
+                line = None
+                if q.get("type") != "rel":
+                    raise StopIteration
+                t = q.get("t") or ""
+                if t and t[-1] != "\n":
+                    raise ValueError("a piece ends in a whole line")
+                h.update(t)
+                for l in t.split("\n")[:-1]:
+                    if n == 0 and l != "wedgie-release 1" or n == 1 and l != "version %s" % v:
+                        raise ValueError("not this release")
+                    if app and l.startswith("@app  ") and json.loads(l[6:]).get("name") == app:
+                        named = True
+                    n += 1
+                sg = q.get("sig")
+            ok = n > 1 and named and W.release_ok(None, sg, tick, h.digest())
+        except StopIteration:
+            ok = None
+        except MemoryError:
+            ok = None
+        except ValueError:
+            ok = False
+        gc.collect()
+        print("slot: signed %s %d" % (ok, gc.mem_free()))    # tools/chipprobe.mjs reads it
+        return ok
+    return check
 
 
 def _job(mid, m):
@@ -358,8 +420,11 @@ def _job(mid, m):
     if _older(v):                       # never asked: an old signed list puts back an old core and its holes
         W.send({"id": mid, "type": "error", "error": "older than this wedgie: %s" % v})   # (job.check holds the signed one too)
         return False
-    if not ask(title, True, v):
+    if not ask(title, True, v, _sig(mid, m, v) if m.get("list") else None):
         W.send({"id": mid, "type": "refused", "asked_ms": W.asked_ms})
+        return False
+    if ui.signed is False:              # the warning sign was up: a yes changes nothing
+        W.send({"id": mid, "type": "error", "error": "not signed by wedgie.dev"})
         return False
     if not W.SEALED:                    # the emulator: its flash is new at every restart, so no install
         import job                      # mode there; the job runs in place (its heap is big anyway)

@@ -8,7 +8,8 @@
 // seen (hello's ram, asked mid-job). The release list is signed with a throwaway key put in the test
 // image's wedgie.py, so the real P-256 check (and its memory) runs too. The browser emulator can't do
 // this: its heap starts at 128 MB and grows on demand.
-//   node tools/chipprobe.mjs [--fw <firmware dir>] [--from <app>] [--to <app>] [--no-update] [--all] [--b64] [--log <file>]
+// 0.3.56+: the question asks for the signed list in pieces and checks it while it is up (--late: no check there).
+//   node tools/chipprobe.mjs [--fw <firmware dir>] [--from <app>] [--to <app>] [--no-update] [--all] [--b64] [--late] [--log <file>]
 //   (needs uv: the flash image is made with littlefs-python)
 import { generateKeyPairSync, createPublicKey, sign, createHash } from "node:crypto";
 import { appendFileSync, writeFileSync, readFileSync, mkdtempSync, existsSync } from "node:fs";
@@ -88,14 +89,30 @@ function job(w, title, write, del, apps, where) {
   const bin = args.includes("--b64") ? 0 : h.bin || 0;      // 0.3.16+: raw 4 KB puts, as the site sends them
   const ex = w.req({ type: "sums", names: [], exists: F.all }, 30000);
   if (!ex?.sums) return `sums before the job: ${JSON.stringify(ex)}`;
-  w.h.chip.write(JSON.stringify({ type: "job", job: title, version, write, delete: del, apps: apps && JSON.stringify(apps), bytes: write.reduce((t, n) => t + fileOf(n).length, 0), raw: !!bin, id: 900 }) + "\n");
-  w.h.chip.run(1600);               // the question is up, past its 0.6 s with no answer (ui.SETTLE)
+  // 0.3.56+ (jobs 3): its question asks for the signed list and checks it, in pieces, on the app's heap
+  const first = h.jobs >= 3 && !args.includes("--late");
+  w.h.chip.write(JSON.stringify({ type: "job", job: title, version, write, delete: del, apps: apps && JSON.stringify(apps), bytes: write.reduce((t, n) => t + fileOf(n).length, 0), raw: !!bin, id: 900, ...(first ? { list: 1 } : {}) }) + "\n");
+  if (first) {                      // as install.ts: whole lines, ~512 bytes a piece, then the signature
+    if (!w.h.until((b) => /"type": "list"/.test(b), 20000, 20)) return `its question didn't ask for the list: ${JSON.stringify(w.h.out.slice(-300))}`;
+    for (let o = 0; o < relText.length;) {
+      let e = relText.lastIndexOf("\n", o + 512);
+      if (e < o) e = relText.indexOf("\n", o);
+      e = e < 0 ? relText.length : e + 1;
+      w.h.chip.write(JSON.stringify({ type: "rel", t: relText.slice(o, e) }) + "\n");
+      o = e;
+    }
+    w.h.chip.write(JSON.stringify({ type: "rel", sig: relSig }) + "\n");
+    if (!w.h.until((b) => /slot: signed \S+ \d+/.test(b), 60000, 20)) return `no check while the question was up: ${JSON.stringify(w.h.out.slice(-300))}`;
+    const m = w.all.match(/slot: signed (\S+) (\d+)/);
+    if (!m || m[1] !== "True") return `its check said ${m ? m[1] : "?"} (${m?.[2]} B free)`;
+    if (+m[2] < leastFree) { leastFree = +m[2]; leastWhere = where + ", after the check on the question"; }
+  } else w.h.chip.run(1600);        // the question is up, past its 0.6 s with no answer (ui.SETTLE)
   w.press("A");
   let g = null;
-  w.h.until((b) => { const m = b.match(/\{[^\n]*"id": 900[,}][^\n]*\n/); if (m) g = JSON.parse(m[0]); return !!m; }, 20000);
+  w.h.until((b) => { const m = [...b.matchAll(/\{[^\n]*"id": 900[,}][^\n]*\n/g)].map((x) => JSON.parse(x[0])).find((x) => x.type !== "list"); if (m) g = m; return !!m; }, 20000);
   if (g?.type !== "go") return `job: ${JSON.stringify(g)}`;
   w.ram(where + ", after the yes");
-  const a = w.req({ type: "release", release: relText, sig: relSig }, 240000);
+  const a = w.req({ type: "release", release: relText, sig: relSig }, 240000);    // checked again, on install mode's clean heap
   if (a?.type !== "ok") return `release: ${JSON.stringify(a)}`;
   w.ram(where + ", after the signature");
   const s = w.req({ type: "sums", names: write }, 60000);
@@ -159,6 +176,42 @@ for (const [a, b] of pairs) {
     else if (left.length) r = `the old .py is still there (it would run instead): ${left.join(" ")}`;
   }
   check(r === true && !BAD.test(w.all), `firmware update (${want} core files sent, booted on them) while ${a.mod} runs: ${r === true ? "done, " + w.put : r} ${BAD.test(w.all) ? "| " + bad(w) : ""}`);
+}
+// The question's check, the other ways it goes (0.3.56+): a list signed by another key gets the warning sign,
+// and a yes then changes nothing; a press while it checks answers at once.
+if (!args.includes("--late") && !from) {
+  const a = carts[0], b = carts[1];
+  const send = (w, sig) => {
+    for (let o = 0; o < relText.length;) {
+      let e = relText.lastIndexOf("\n", o + 512);
+      if (e < o) e = relText.indexOf("\n", o);
+      e = e < 0 ? relText.length : e + 1;
+      w.h.chip.write(JSON.stringify({ type: "rel", t: relText.slice(o, e) }) + "\n");
+      o = e;
+    }
+    w.h.chip.write(JSON.stringify({ type: "rel", sig }) + "\n");
+  };
+  const ask = (w) => {
+    w.h.take();
+    w.h.chip.write(JSON.stringify({ type: "job", job: `Install ${b.name}`, version, write: b.files, delete: [], apps: JSON.stringify([appEntry(F, b)]), id: 901, list: 1 }) + "\n");
+    return w.h.until((x) => /"type": "list"/.test(x), 20000, 20);
+  };
+  const answer = (w) => { let g = null; w.h.until((x) => { const m = [...x.matchAll(/\{[^\n]*"id": 901[,}][^\n]*\n/g)].map((y) => JSON.parse(y[0])).find((y) => y.type !== "list"); if (m) g = m; return !!m; }, 20000); return g; };
+  let w = wedgie(a.mod);
+  const other = generateKeyPairSync("ec", { namedCurve: "P-256" }).privateKey;
+  const bad = sign("sha256", Buffer.from(relText), { key: other, dsaEncoding: "ieee-p1363" }).toString("hex");
+  let ok = ask(w);
+  if (ok) { send(w, bad.slice(0, 64) + " " + bad.slice(64)); ok = w.h.until((x) => /slot: signed \S+ \d+/.test(x), 60000, 20); }
+  const said = (w.h.out.match(/slot: signed (\S+)/) || [])[1];
+  w.press("A");
+  const g = answer(w);
+  check(said === "False" && g?.type === "error" && /not signed/.test(g.error) && !BAD.test(w.all), `another key's list: the warning sign, and a yes changes nothing (${said}, ${JSON.stringify(g)})`);
+  w = wedgie(a.mod);
+  ok = ask(w);
+  w.h.chip.run(800);                // past ui.SETTLE, the list not sent yet: it's still waiting for it
+  w.press("A");
+  const g2 = answer(w);
+  check(ok && g2?.type === "go" && !w.h.out.includes("slot: signed True"), `a yes while it checks: answered at once, no mark (${JSON.stringify(g2)})`);
 }
 console.log(`     least free heap seen: ${leastFree} bytes (${leastWhere})`);
 console.log(failed ? `${failed} FAILED` : "all checks passed");

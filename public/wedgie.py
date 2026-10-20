@@ -104,7 +104,8 @@ class Wedgie:
         raise TimeoutError("the wedgie did not answer")
 
     # JSON lines to the launcher --------------------------------------------------------------
-    def request(self, msg, timeout=5.0):
+    def request(self, msg, timeout=5.0, on_list=None):
+        """on_list(): a job's question asking for its signed list ({"type": "list"}, 0.3.56+); the answer comes after."""
         mid = self.id
         self.id += 1
         msg = dict(msg, id=mid)
@@ -120,6 +121,9 @@ class Wedgie:
             except ValueError:
                 continue
             if v.get("id") != mid:
+                continue
+            if v.get("type") == "list" and on_list:
+                on_list()
                 continue
             if v.get("type") == "shot":
                 parts[v["i"]] = v["data"]
@@ -543,9 +547,26 @@ def job(wg, title, write, delete, apps):
     h0 = wg.hello(1.5) or {}
     bin_ = h0.get("bin") or 0           # 0.3.16+: raw bytes, 4 KB a put (base64 lines cost it ~1 s a KB)
     sys.stderr.write("press the green button on the wedgie: %s?\n" % title)
+    # 0.3.56+ (hello jobs 3): its question asks for the signed list and checks it while it's up (its check
+    # mark): whole lines, ~512 bytes a piece (it hashes each and drops it), then the signature. After the
+    # yes the list goes again, whole, to install mode (its clean heap). Older: the list rides with the job.
+    late = (h0.get("jobs") or 0) >= 3
+
+    def send_list():
+        o = 0
+        while o < len(rel):
+            e = rel.rfind("\n", o, o + 513)
+            e = (rel.find("\n", o) if e < o else e)
+            e = len(rel) if e < 0 else e + 1
+            wg.s.write((json.dumps({"type": "rel", "t": rel[o:e]}) + "\n").encode())
+            o = e
+        wg.s.write((json.dumps({"type": "rel", "sig": sig}) + "\n").encode())
+
     try:
-        v = wg.request({"type": "job", "job": title, "release": rel, "sig": sig, "write": write, "delete": delete,
-                        "apps": None if apps is None else json.dumps(apps), "raw": bool(bin_)}, 120)
+        v = wg.request(dict({"type": "job", "job": title, "write": write, "delete": delete,
+                             "apps": None if apps is None else json.dumps(apps), "raw": bool(bin_)},
+                            **({"version": rel.split("\n")[1][8:], "list": 1} if late else {"release": rel, "sig": sig})),
+                       120, send_list if late else None)
     except (serial.SerialException, OSError):
         # 0.3.12+: a yes restarts it into install mode, and the first restart since it was plugged in drops
         # the port. Find it again; in install mode its hello says job (the go went out on the old port).
@@ -564,6 +585,10 @@ def job(wg, title, write, delete, apps):
         sys.exit("the wedgie said no (Y on its screen)")
     if v.get("type") != "go":
         sys.exit("the wedgie said: %s" % (v.get("error") or v))
+    if late:
+        r = wg.request({"type": "release", "release": rel, "sig": sig}, 60)
+        if r.get("type") != "ok":
+            sys.exit("the wedgie stopped: %s" % (r.get("error") or r))
     for i, n in enumerate(write):
         data = urllib.request.urlopen(SITE + "/fw/" + n).read()
         print("[%d/%d] %s" % (i + 1, len(write), n))

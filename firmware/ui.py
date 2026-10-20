@@ -125,6 +125,7 @@ def buttons(d, yes="yes", no="no"):
 drawn = 0       # ticks_ms when the last ask() finished drawing its question (the slot reports it)
 SETTLE = 600    # ms a question is up before a press answers it: one meant for what was there before (a game's A)
 said_no = False # the last ask() was answered with a real no (not a timeout)
+signed = None   # the last ask()'s signature check: True, False (not signed), None (none, or not finished)
 
 
 def check(d, x, y, c=GREEN_D):
@@ -135,15 +136,43 @@ def check(d, x, y, c=GREEN_D):
         d.fill_rect(x + 4 + i, y + 9 - i, 3, 3, c)
 
 
-def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None, scary=False, big=None):
+def warn(d, x, y):
+    """A small red warning sign, 16 x 14, its top left at (x, y-1): "not signed"."""
+    for i in range(14):
+        d.fill_rect(x + 7 - i // 2, y - 1 + i, 2 + i // 2 * 2, 1, RED)
+    d.fill_rect(x + 7, y + 3, 2, 6, WHITE)
+    d.fill_rect(x + 7, y + 10, 2, 2, WHITE)
+
+
+# The dot that pulses where the check will go while a signature is checked: grey, lighter, darker.
+PULSE = tuple(L.color(v, v, v) for v in (236, 216, 195, 169, 148, 120, 148, 169, 195, 216))
+
+
+def mark(d, x, y, s):
+    """Where a question's check goes (x, y: the check's top left): s True a check, False a warning sign,
+    None nothing, a number the pulsing dot (PULSE[s])."""
+    d.fill_rect(x, y - 1, 16, 15, WHITE)
+    if s is True:
+        check(d, x, y)
+    elif s is False:
+        warn(d, x, y)
+    elif s is not None:
+        d.ellipse(x + 8, y + 6, 6, 6, PULSE[s % len(PULSE)], True)
+    d.show_rect(x, y - 1, 16, 15)
+
+
+def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None, scary=False, big=None, sig=None):
     """A yes/no question: green yes, red no, no answer in `ms` is a no. Only real presses count (a press
     sent over USB can't answer). True for yes. scary: white on red, for a yes that hands over
     everything (full control: slot.let_in). big: what it's about, drawn huge under a one-line question
-    (scale 3, a word a line, or scale 2 for long words) with a small green check after its last line:
-    a signed update's version, a signed app's name."""
+    (scale 3, a word a line, or scale 2 for long words): an update's version, an app's name.
+    sig(tick): a signed job's check (slot._sig), run once the question is up, a dot pulsing after big
+    meanwhile; it turns into a green check (True), a red warning sign (False) or nothing (None: it
+    couldn't check; job.py does after the yes). A press answers at any time, checked or not. Without
+    sig there's never a check: it means only "this wedgie checked the signature" (Austin, 10-19)."""
     if d.width < 240:
         import small
-        return small.ask(d, question, lines, yes, no, ms, keys, scary, big)
+        return small.ask(d, question, lines, yes, no, ms, keys, scary, big, sig)
     k = keys or L.Keys(physical=True)
     k.pressed()                             # a key already down doesn't count
     bg, fg = (RED, WHITE) if scary else (WHITE, INK)
@@ -165,9 +194,10 @@ def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None, scary=Fa
             x = (240 - w - (24 if i == len(t) - 1 else 0)) // 2
             d.big_text(s, x, y, fg, sc)
             y += h
-        check(d, x + w + 8, y - h + (8 * sc - 13) // 2)
+        at = (x + w + 8, y - h + (8 * sc - 13) // 2)
         y = 168
     else:
+        at = None
         y = max(title(d, question, 48, 2, fg) + 12, 108)
     for s in lines:
         for x in wrap(s):
@@ -181,16 +211,42 @@ def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None, scary=Fa
     d.show()
     global drawn
     drawn = time.ticks_ms()
-    return wait(k, ms)
+    return wait(k, ms, sig, at and (lambda s: mark(d, at[0], at[1], s)))
 
 
-def wait(k, ms):
+class _Answered(BaseException):     # a press during the check: not an Exception, so release_ok can't eat it
+    pass
+
+
+def wait(k, ms, sig=None, show=None):
     """The answer to a question just drawn: A True, Y False, nothing in ms False. Presses in its first SETTLE
-    ms are dropped (audit 10-18: a computer could pop a question under a finger already pressing A)."""
-    global said_no
+    ms are dropped (audit 10-18: a computer could pop a question under a finger already pressing A).
+    sig, show: ask's check, and what draws its mark (show(s), s as ui.mark). signed: what it found."""
+    global said_no, signed
     said_no = False
+    signed = None
     k.pressed()                             # what went down while it drew doesn't count either
     t0 = time.ticks_ms()
+    if sig:
+        got, n = [], [0]
+
+        def tick(_=None):                   # ~30 times a check (p256.verify): the keys, then the dot
+            for key in k.pressed():
+                if key in ("A", "Y") and time.ticks_diff(time.ticks_ms(), t0) >= SETTLE:
+                    got.append(key)
+                    raise _Answered
+            n[0] += 1
+            show and show(n[0])
+
+        show and show(0)
+        try:
+            signed = sig(tick)
+        except _Answered:
+            pass
+        if got:
+            said_no = got[0] == "Y"
+            return got[0] == "A"
+        show and show(signed)
     while time.ticks_diff(time.ticks_ms(), t0) < ms:
         for key in k.pressed():
             if key in ("A", "Y") and time.ticks_diff(time.ticks_ms(), t0) >= SETTLE:
