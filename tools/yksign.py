@@ -15,9 +15,10 @@ devs = list_all_devices()
 if not devs:
     sys.exit("yksign: no YubiKey plugged in")
 try:
-    pin = getpass.getpass("YubiKey PIN: ", open("/dev/tty", "w+"))
+    open("/dev/tty").close()                 # a terminal to ask in? (stdin is the text being signed)
 except OSError:
     sys.exit("yksign: needs a terminal to ask the PIN in (run node tools/sign.mjs --yubikey in Terminal)")
+pin = getpass.getpass("YubiKey PIN: ")       # reads /dev/tty itself; open(.., "w+") on a tty never worked (not seekable)
 if not pin:
     sys.exit("yksign: no PIN")
 with devs[0][0].open_connection(SmartCardConnection) as c:
