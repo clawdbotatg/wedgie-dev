@@ -33,7 +33,8 @@ python3 wire/from7730.py <registry>/registry <out dir>     # one .cbor per (chai
 
 Registry 7ced22e (2026-10-19): 8,774 messages from 543 files, the biggest 1,144 bytes. 3 files skipped (see
 below). Its 1,543 test transactions all find their message, the signature checks, every value reads out of
-the real calldata in place, and the labels a wallet must show are all there in order.
+the real calldata in place, and the labels a wallet must show are all there in order. Not yet checked:
+that the values are the right ones. That comes with step 2, against the registry's expected screens.
 
 ## Tests
 
@@ -58,13 +59,16 @@ Done: test messages from the real registry (`from7730.py`).
      Weight 1? We refuse it until he says.
    - a wedgie signs only Safe transactions (its chips can't do Ethereum's usual curve). Does that fit the
      universal signer?
-   - spec gaps the registry turned up:
-     - functions with nothing to show (`pause()`) need an empty field list; the CDDL says `[+ field]`.
-       We send `[]`.
-     - text constants over 32 bytes (Celo's governance descriptors) don't fit `src-constant`. Skipped.
-     - `addressName` sources are strings in ERC-7730 ("ens", "local") but uints in the wire format.
-       We send `[]` (any).
-     - 1inch calldata has extra bytes after the ABI part, so it isn't whole slots. We allow it.
+   - what the registry turned up (checked 10-19 against the spec, his GitHub, the registry's issues and
+     the Telegram group; none of it is raised anywhere yet):
+     - **likely new:** functions with nothing to show (`pause()`) need an empty field list; the CDDL says
+       `[+ field]`. We send `[]`.
+     - **likely new:** 1inch calldata has extra bytes after the ABI part, so it isn't whole slots. The spec
+       doesn't say if that's allowed. We allow it.
+     - **he knows, worth a mention:** constants are capped at 32 bytes (Ledger's limit, in the spec), but
+       Celo's descriptors use longer fixed sentences. Skipped.
+     - **he knows, by design:** `addressName` sources are "vendor specific" uints in the wire format,
+       strings in ERC-7730. Ledger has a list (0 local address book, 2 ENS, ...). We send `[]` (any).
    - On 10-17 he said he has to compare the wedgie with Leek, which does something very similar.
 2. **Check signatures.** The spec's signatures are secp256k1 or Ed25519. We only have P-256 (`firmware/p256.py`).
    secp256k1 in pure Python is ~2 s per check.
