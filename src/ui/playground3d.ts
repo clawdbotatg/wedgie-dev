@@ -81,7 +81,7 @@ const STEPS3D: Step3D[] = [
     dur: 3, view: { at: [34, 26, 4], az: 0, el: 66, d: 320 },
     labels: [{ txt: "STEMMA QT / Qwiic cable", at: [13, 50, 3], t: [0.2, 1] }, { txt: "Wire stripper: cuts and strips", at: [50, 28, 2], t: [0.35, 1] },
       { txt: "Tape", at: [-24, 62, -2], t: [0.55, 1] },
-      { txt: "Stiff jumper wire", at: [-20, 4, 3], t: [0.65, 1] }, { txt: "Tweezers", at: [90, 34, 3], t: [0.75, 1] }],
+      { txt: "Stiff wire or pin", at: [-20, 4, 3], t: [0.65, 1] }, { txt: "Tweezers", at: [90, 34, 3], t: [0.75, 1] }],
     run(s, t) {
       go(s, "root", { r: [0, PI, PI / 2] }, 1);
       TOOLS.forEach((k, i) => go(s, k, { v: 1 }, E(t, 0.1 + i * 0.1, 0.4 + i * 0.1)));

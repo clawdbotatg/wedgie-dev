@@ -45,7 +45,7 @@ export const NO_3D = ["Snap off extra board"];
 
 export const STEPS: Step[] = [
   { t: "Cable and tools",
-    p: `In your kit: the STEMMA QT / Qwiic cable (4-pin JST-SH plug). You need: a wire stripper (it cuts near the hinge and strips near the tip), electrical tape, a stiff breadboard jumper wire, and tweezers.`,
+    p: `In your kit: the STEMMA QT / Qwiic cable (4-pin JST-SH plug). You need: a wire stripper (it cuts near the hinge and strips near the tip), electrical tape, a stiff wire or pin, and tweezers.`,
     d: "01", ph: ["01-cable-and-strippers"] },
   { t: "Cut and strip the wires",
     p: `Keep one plug. Cut the wires about <b>2 in (5 cm)</b> from it, near the stripper's hinge. Strip with the notches near its tip. Strip off as much as a socket is deep, about <b>5 mm</b> (between 1/8 and 1/4 in), so the bare wire goes all the way down.`,
@@ -62,7 +62,7 @@ export const STEPS: Step[] = [
     p: `A small piece of electrical tape over those sockets, right on top of the wires, holds them in.`,
     d: "06", ph: ["06-tape-over-wires"] },
   { t: "Poke the holes open",
-    p: `Push the stiff jumper wire through the tape into each covered socket. This opens the holes for the Pico's pins. The tape still holds the wires.`,
+    p: `Push the stiff wire or pin through the tape into each covered socket. This opens the holes for the Pico's pins. The tape still holds the wires.`,
     d: "06t", ph: ["08-black-red-taped", "07-poke-holes-through-tape"] },
   { t: "Black and red, same way",
     p: `On the left row: <b>black into the 6th</b>, <b>red into the 7th</b>. Tape over them. Poke the holes open.`,

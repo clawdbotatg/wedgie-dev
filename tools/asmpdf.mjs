@@ -26,7 +26,7 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><style>${css()}</
     <li>Case: black base, white lid, joystick cap, 4 buttons</li>
   </ul></div>
   <div class="need"><h2>You need</h2><ul>
-    <li>Wire stripper</li><li>Electrical tape</li><li>A stiff breadboard jumper wire</li><li>Tweezers</li>
+    <li>Wire stripper</li><li>Electrical tape</li><li>A stiff wire or pin</li><li>Tweezers</li>
     <li>Pliers (step 10, if needed)</li><li>USB data cable that fits your Pico</li><li>A computer with Chrome</li>
   </ul></div>
 </section>
