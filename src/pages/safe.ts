@@ -289,11 +289,15 @@ export function safe(main: HTMLElement) {
       : new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: s > 3e7 ? "numeric" : undefined });
   };
   const tokenBadge = (sym: string, logo?: string | null) => {
-    if (logo) return `<img class="sx-tok sx-tok-img" src="${esc(logo)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'sx-tok',textContent:${esc(JSON.stringify(sym.slice(0, 1).toUpperCase()))}}))">`;
+    if (logo) return `<img class="sx-tok sx-tok-img" src="${esc(logo)}" alt="" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'sx-tok',textContent:${esc(JSON.stringify(sym.slice(0, 1).toUpperCase()))}}))">`;
     let h = 0; for (const ch of sym) h = (h * 31 + ch.charCodeAt(0)) % 360;
     return `<span class="sx-tok" style="--h:${h}">${esc(sym.slice(0, 1).toUpperCase())}</span>`;
   };
   const can = () => wedgieOwns() || isOwner(account);    // someone here can sign for this Safe
+  /** A token as a row: its logo, symbol and name, its dollars and amount (Assets, and Send's picker). */
+  const assetInner = (a: Asset) => `${tokenBadge(a.symbol, a.logo)}
+      <span class="sx-asset-name"><b>${esc(a.symbol)}</b><span class="fine">${esc(a.name)}</span></span>
+      <span class="sx-asset-amt">${a.usd !== null ? `<b>${esc(usd(a.usd))}</b><span class="fine">${esc(E.fmt(a.balance, a.decimals, 4))} ${esc(a.symbol)}</span>` : `<b>${esc(E.fmt(a.balance, a.decimals, 4))}</b>`}</span>`;
 
   // Safes made or opened in this browser, per wedgie: Safe's API lists a new one only seconds later
   const memKey = () => `wedgie.safes.${signer.toLowerCase()}`;
@@ -1106,9 +1110,7 @@ export function safe(main: HTMLElement) {
     box.hidden = !(safeAddr && info && sub === "home" && (assets || assetsErr));
     if (box.hidden) return;
     const list = assets || [{ token: null, ...CHAINS[chain].native, decimals: 18, balance: info!.balance, usd: null, price: null } as Asset];
-    const row = (a: Asset) => `<li><button class="sx-asset" type="button" data-tok="${a.token || ""}"${can() ? "" : " disabled"}>${tokenBadge(a.symbol, a.logo)}
-      <span class="sx-asset-name"><b>${esc(a.symbol)}</b><span class="fine">${esc(a.name)}</span></span>
-      <span class="sx-asset-amt">${a.usd !== null ? `<b>${esc(usd(a.usd))}</b><span class="fine">${esc(E.fmt(a.balance, a.decimals, 4))} ${esc(a.symbol)}</span>` : `<b>${esc(E.fmt(a.balance, a.decimals, 4))}</b>`}</span></button></li>`;
+    const row = (a: Asset) => `<li><button class="sx-asset" type="button" data-tok="${a.token || ""}"${can() ? "" : " disabled"}>${assetInner(a)}</button></li>`;
     const priced = list.filter((a) => a.token === null || a.price !== null), other = list.filter((a) => a.token !== null && a.price === null);
     const open = !!document.querySelector("#s-other[open]");
     box.innerHTML = `<h3>Assets</h3><ul class="sx-assets">${priced.map(row).join("")}</ul>
@@ -1261,7 +1263,8 @@ export function safe(main: HTMLElement) {
     if (box.hidden) return;
     if (!document.getElementById("n-to")) {      // built once per open: keep what's typed across repaints
       box.innerHTML = `<h2>Send</h2>
-        <div class="sx-amount"><input id="n-amt" placeholder="0" inputmode="decimal" autocomplete="off"><select id="n-tok"></select></div>
+        <div class="sx-amount"><input id="n-amt" placeholder="0" inputmode="decimal" autocomplete="off"><button class="sx-tokbtn" id="n-tokbtn" type="button" aria-haspopup="listbox"></button><select id="n-tok" hidden></select>
+          <ul class="sx-assets sx-toklist" id="n-toklist" role="listbox" hidden></ul></div>
         <p class="sx-row sx-under"><span class="fine" id="n-usd"></span><span class="sx-end"><span class="fine" id="n-has"></span> <button class="btn btn-sm" id="n-max" type="button">Max</button></span></p>
         <p class="sx-label">To</p><p>${addressInput("n-to", "0x… or ENS name")}</p>
         <details class="sx-more"><summary>Contract call data</summary><p><input id="n-data" class="sx-mono" placeholder="0x…" spellcheck="false" autocomplete="off"></p><p class="fine">Only with ${esc(nat(chain))}. Leave it empty to just send.</p></details>
@@ -1272,15 +1275,31 @@ export function safe(main: HTMLElement) {
       for (const id of ["n-amt", "n-tok", "n-data"]) $(id).addEventListener("input", review);
       $("n-to").addEventListener("input", review);
       box.addEventListener("address", review);
+      // the token picker: a list like Assets (logo, name, dollars), over the form; the hidden select keeps the choice
+      const list = $("n-toklist");
+      $("n-tokbtn").onclick = (e) => { e.stopPropagation(); list.hidden = !list.hidden; };
+      list.onclick = (e) => {
+        const b = (e.target as HTMLElement).closest<HTMLElement>("[data-pick]");
+        if (!b) return;
+        const sel = $("n-tok") as HTMLSelectElement;
+        sel.value = b.dataset.pick!; list.hidden = true; paintTok(); review();
+      };
+      box.addEventListener("click", (e) => { if (!(e.target as HTMLElement).closest("#n-toklist")) list.hidden = true; });
       requestAnimationFrame(() => ($("n-amt") as HTMLInputElement).focus());
     }
     const sel = $("n-tok") as HTMLSelectElement, keep = sendToken !== null ? sendToken : sel.value;
     sendToken = null;
     sel.innerHTML = sendList().map((a) => `<option value="${a.token || ""}"${(a.token || "") === keep ? " selected" : ""}>${esc(a.symbol)}</option>`).join("");
+    paintTok();
     $("n-btns").innerHTML = `${wedgieOwns() ? `<button class="btn btn-green" id="n-wedgie"${dis(!key)}>Sign with wedgie</button> ` : ""}${isOwner(account) ? `<button class="btn" id="n-wallet"${dis()}>Sign with wallet</button>` : ""}`;
     $("n-wedgie")?.addEventListener("click", () => job(() => newTx("wedgie")));
     $("n-wallet")?.addEventListener("click", () => job(() => newTx("wallet")));
     review();
+  }
+  function paintTok() {
+    const a = picked(), list = sendList().filter((x) => x.token === null || x.price !== null || x.token === a.token);   // no spam in the picker
+    $("n-tokbtn").innerHTML = `${tokenBadge(a.symbol, a.logo)}<b>${esc(a.symbol)}</b><span class="sx-caret">▾</span>`;
+    $("n-toklist").innerHTML = list.map((x) => `<li><button class="sx-asset${x === a ? " sx-picked" : ""}" type="button" role="option" data-pick="${x.token || ""}">${assetInner(x)}</button></li>`).join("");
   }
   /** What the inputs make, or why they don't make one yet. */
   function draft(): { t: E.SafeTx; what: string } {

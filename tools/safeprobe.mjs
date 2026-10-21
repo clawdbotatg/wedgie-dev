@@ -278,6 +278,11 @@ const asked = await asks();
 await page.click("#a-send");
 await page.fill("#n-to", to);
 await page.fill("#n-amt", "0.001");
+await page.click("#n-tokbtn");      // the token picker: rows like Assets, ETH picked
+check(await page.$eval("#n-toklist", (l) => !l.hidden && /ETH/.test(l.querySelector(".sx-picked")?.textContent || "") && !!l.querySelector("img.sx-tok")), "Send's token picker: a list with logos, ETH picked");
+if (out) await page.screenshot({ path: `${out}/safe-3a-pick.png` });
+await page.click("#n-toklist .sx-picked");
+check(await page.$eval("#n-toklist", (l) => l.hidden), "picking a token closes the list");
 if (out) await page.screenshot({ path: `${out}/safe-3a-send.png` });
 await page.click("#n-wedgie");
 await says(/In the queue with the wedgie's signature/, "queued");
