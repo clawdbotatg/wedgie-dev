@@ -14,30 +14,45 @@ const FLASH = 0x10000000;
 
 /** A booted chip: write(bytes|str) to its USB serial, every byte it sends goes to onData. */
 export function boot({ uf2 = join(root, "public/mp/RPI_PICO.uf2"), flash = null, fs = null, onData = () => {}, log = false, drive = false } = {}) {
-  const sim = new Simulator();
-  const mcu = sim.rp2040, clock = sim.clock;
   const rom = readFileSync(join(here, "bootrom-b1.bin"));
-  mcu.loadBootrom(new Uint32Array(rom.buffer, rom.byteOffset, rom.length / 4));
-  mcu.logger = new ConsoleLogger(log ? LogLevel.Warn : LogLevel.Error);
-  if (flash) mcu.flash.set(flash);
-  else {
-    const f = readFileSync(uf2);
-    for (let o = 0; o + 512 <= f.length; o += 512) {
-      const v = new DataView(f.buffer, f.byteOffset + o, 512);
-      const addr = v.getUint32(12, true), size = v.getUint32(16, true);
-      mcu.flash.set(f.subarray(o + 32, o + 32 + size), addr - FLASH);
-    }
-  }
-  if (fs) mcu.flash.set(fs, 0xa0000);     // the littlefs image (mkfs.py): where a Pico's filesystem starts
-  const hook = flashWrites(mcu, rom);
-  let cdc, connected = false, msc = null;
+  let sim, mcu, clock, hook, cdc, connected = false, msc = null, base = 0, rebooting = false;
   const pending = [];
+  // machine.reset() (a watchdog reboot): rp2040js only flags it. A real chip starts over with every
+  // peripheral fresh and only its flash, the watchdog's scratch registers and its reason kept, so this
+  // builds a new chip from those (job.restart's hard reset after an install, 0.3.57; slot._cold).
+  const make = (bytes, wd) => {
+    const pins = mcu ? mcu.gpio.map((g) => g.inputValue) : null;
+    if (clock) base += clock.nanos / 1e6;
+    sim = new Simulator();
+    mcu = sim.rp2040; clock = sim.clock;
+    mcu.loadBootrom(new Uint32Array(rom.buffer, rom.byteOffset, rom.length / 4));
+    mcu.logger = new ConsoleLogger(log ? LogLevel.Warn : LogLevel.Error);
+    mcu.flash.set(bytes);
+    const w = mcu.peripherals[0x40058];     // WATCHDOG
+    if (wd) { w.scratchData.set(wd.scratch); w.reason = wd.reason; }
+    w.onWatchdogTrigger = () => { rebooting = true; };
+    if (pins) pins.forEach((v, i) => mcu.gpio[i].setInputValue(v));
+    hook = flashWrites(mcu, rom);
+    connected = false;
+    attach();
+    // A re-enumeration with the controller already on (MicroPython's runtime USB after a soft reset: the WEDGIE drive
+    // back after an install, 0.3.47) only drops and raises the D+ pull-up, which rp2040js ignores: it reconnects its
+    // host only when MAIN_CTRL turns the controller on. A real host sees a replug, so a rising pull-up is one here too.
+    const sie = mcu.usbCtrl.handleSieCtrlWrite.bind(mcu.usbCtrl);
+    let pullup = false;
+    mcu.usbCtrl.handleSieCtrlWrite = (v) => {
+      sie(v);
+      const up = !!(mcu.usbCtrl.sieCtrl & (1 << 16));       // SIE_CTRL_PULLUP_EN
+      if (up && !pullup && mcu.usbCtrl.mainCtrl & 1 && !mcu.usbCtrl.hostMode) mcu.usbCtrl.onUSBEnabled?.();
+      pullup = up;
+    };
+    mcu.core.PC = 0x10000000;
+    return w;
+  };
   const attach = () => {
     // a fresh host each time the device (re)enables USB: boot.py re-enumerates to add the WEDGIE drive
     cdc = new USBCDC(mcu.usbCtrl);
-    const enabled = mcu.usbCtrl.onUSBEnabled;
     mcu.usbCtrl.onUSBEnabled = () => { connected = false; attach(); mcu.usbCtrl.resetDevice(); };
-    void enabled;
     cdc.onDeviceConnected = () => { connected = true; feed(); if (drive) msc = mscHost(cdc, mcu, msc); };
     cdc.onSerialData = (b) => onData(b);
     if (drive) {        // the drive's OUT endpoint asks for data before the drive host is set up: remember it
@@ -54,21 +69,28 @@ export function boot({ uf2 = join(root, "public/mp/RPI_PICO.uf2"), flash = null,
     while (head < pending.length && !cdc.txFIFO.full) cdc.sendSerialByte(pending[head++]);
     if (head === pending.length) { pending.length = 0; head = 0; }
   };
-  attach();
-  // A re-enumeration with the controller already on (MicroPython's runtime USB after a soft reset: the WEDGIE drive
-  // back after an install, 0.3.47) only drops and raises the D+ pull-up, which rp2040js ignores: it reconnects its
-  // host only when MAIN_CTRL turns the controller on. A real host sees a replug, so a rising pull-up is one here too.
-  const sie = mcu.usbCtrl.handleSieCtrlWrite.bind(mcu.usbCtrl);
-  let pullup = false;
-  mcu.usbCtrl.handleSieCtrlWrite = (v) => {
-    sie(v);
-    const up = !!(mcu.usbCtrl.sieCtrl & (1 << 16));       // SIE_CTRL_PULLUP_EN
-    if (up && !pullup && mcu.usbCtrl.mainCtrl & 1 && !mcu.usbCtrl.hostMode) mcu.usbCtrl.onUSBEnabled?.();
-    pullup = up;
+  {
+    const img = new Uint8Array(16 * 1024 * 1024).fill(0xff);
+    if (flash) img.set(flash);
+    else {
+      const f = readFileSync(uf2);
+      for (let o = 0; o + 512 <= f.length; o += 512) {
+        const v = new DataView(f.buffer, f.byteOffset + o, 512);
+        const addr = v.getUint32(12, true), size = v.getUint32(16, true);
+        img.set(f.subarray(o + 32, o + 32 + size), addr - FLASH);
+      }
+    }
+    if (fs) img.set(fs, 0xa0000);     // the littlefs image (mkfs.py): where a Pico's filesystem starts
+    make(img);
+  }
+  const reboot = () => {
+    rebooting = false;
+    const w = mcu.peripherals[0x40058];
+    pending.length = 0; head = 0;     // a real host's writes to the gone port fail
+    make(new Uint8Array(mcu.flash), { scratch: new Uint32Array(w.scratchData), reason: w.reason });
   };
-  mcu.core.PC = 0x10000000;
   return {
-    mcu,
+    get mcu() { return mcu; },
     get connected() { return connected; },
     get cdc() { return cdc; },
     /** drive: true: what the Mac's reads of the WEDGIE drive did (mscHost), or null */
@@ -78,16 +100,17 @@ export function boot({ uf2 = join(root, "public/mp/RPI_PICO.uf2"), flash = null,
       for (const c of b) pending.push(c);
       feed();
     },
-    /** chip time in ms */
-    get ms() { return clock.nanos / 1e6; },
+    /** chip time in ms (across reboots) */
+    get ms() { return base + clock.nanos / 1e6; },
     /** Run the chip for ms of its own time (the Simulator's loop, without its setTimeout pacing). */
     run(ms) {
-      const until = clock.nanos + ms * 1e6, cyc = 8;   // 1e9 / 125 MHz
+      const until = this.ms + ms, cyc = 8;   // 1e9 / 125 MHz
       let n = 0;
-      while (clock.nanos < until) {
+      while (this.ms < until) {
+        if (rebooting) { reboot(); continue; }
         if ((++n & 255) === 0) { if (pending.length) feed(); msc?.tick?.(clock.nanos / 1e6); }
         if (hook()) continue;
-        if (mcu.core.waiting) clock.tick(Math.min(clock.nanosToNextAlarm, until - clock.nanos) || 1000);
+        if (mcu.core.waiting) clock.tick(Math.min(clock.nanosToNextAlarm, (until - this.ms) * 1e6) || 1000);
         else clock.tick(mcu.core.executeInstruction() * cyc);
       }
     },

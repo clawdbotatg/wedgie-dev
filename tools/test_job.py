@@ -21,6 +21,7 @@ time.sleep_ms = lambda ms: None
 machine = types.ModuleType("machine")
 machine.unique_id = lambda: b"\x01" * 8
 machine.soft_reset = lambda: (_ for _ in ()).throw(SystemExit("soft reset"))
+machine.reset = lambda: (_ for _ in ()).throw(SystemExit("reset"))    # job.restart (0.3.57+: a hard reset after an install)
 machine.mem32 = {}
 sys.modules["machine"] = machine
 sel = types.ModuleType("select")

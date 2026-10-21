@@ -245,15 +245,19 @@ def resume(j):
 
 
 def restart():
-    """The install's last restart. A soft reset takes the WEDGIE drive off USB (MicroPython drops a runtime USB
-    device) and boot.py only adds it at power-up, so this asks boot.py for it (scratch2 0xD21E): without it the
-    drive stayed gone after an update until a replug (Austin, 10-13)."""
+    """The install's last restart: a hard reset, so the app starts as it does at a plug-in (fresh USB, SPI,
+    timers). It was a soft reset (scratch2 0xD21E: main.py added the drive back) and that hung now and then:
+    the app's bar full and green, USB gone, no "on" in the log until a replug (0.3.55-0.3.57; Austin 10-20,
+    twice in a row on a real board). scratch0 cleared: boot.py adds the WEDGIE drive as at power-up;
+    scratch1 0xC01D: it sets the panel up again (slot._cold)."""
     import machine, sys
     try:
-        machine.mem32[(0x400D8000 if "RP2350" in sys.implementation._machine else 0x40058000) + 0x14] = 0xD21E
+        b = (0x400D8000 if "RP2350" in sys.implementation._machine else 0x40058000) + 0x0C
+        machine.mem32[b] = 0
+        machine.mem32[b + 4] = 0xC01D
     except Exception:
         pass                                # (the emulator: no mem32)
-    machine.soft_reset()
+    machine.reset()
 
 
 def run(mid, m, ask, show=None):
