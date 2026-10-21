@@ -158,6 +158,8 @@ export function safe(main: HTMLElement) {
   main.innerHTML = `
   <section class="test-page safe-page">
     <div class="safe-ids" id="s-ids"><div class="safe-id" id="s-me" hidden></div><div class="safe-id safe-id-wallet" id="s-wallet" hidden></div></div>
+    <div class="sx-spin" id="s-spin" hidden aria-label="Loading"></div>
+    <div class="sx-first" id="s-first" hidden><div class="sx-spin sx-spin-big"></div></div>
     <div class="sx-banner" id="s-wedgie" hidden></div>
     <div class="sx-view" id="s-list" hidden></div>
     <div class="sx-hero" id="s-safe" hidden></div>
@@ -313,6 +315,14 @@ export function safe(main: HTMLElement) {
       rows = l.rows.filter((r: any) => CHAINS[r.chain]).map((r: any) => ({ ...r, info: { ...r.info, balance: BigInt(r.info.balance), usdc: r.info.usdc === null ? null : BigInt(r.info.usdc) } }));
     } catch { rows = []; }
   };
+  // which chains a Safe is on, saved: its chain buttons show at once on the next visit (then checked again)
+  const SEEN = "wedgie.safe.chains";
+  const seenOn = (a: string): Record<number, boolean> => {
+    try { const ids: number[] = JSON.parse(localStorage.getItem(SEEN) || "{}")[a.toLowerCase()] || []; return Object.fromEntries(ids.filter((t) => CHAINS[t]).map((t) => [t, true])); } catch { return {}; }
+  };
+  const saveSeen = (a: string, on: Record<number, boolean | undefined>) => {
+    try { const all = JSON.parse(localStorage.getItem(SEEN) || "{}"); all[a.toLowerCase()] = IDS.filter((t) => on[t]); localStorage.setItem(SEEN, JSON.stringify(all)); } catch {}
+  };
   let lastFind = 0, findAgain = false;      // when the list was last checked: back from a Safe within a minute, no new check
   // a Safe this browser made or opened that the list doesn't have yet
   const unlisted = () => remembered().some((k) => { const [c, x] = k.split(":"); return !rows.some((r) => r.chain === KEYS[c] && eqA(r.addr, x)); });
@@ -339,8 +349,8 @@ export function safe(main: HTMLElement) {
       if (same) { paintAll(); window.scrollTo(0, 0); return; }     // Settings and back: the same Safe, already read
       const was = chain, sameAddr = eqA(m[2], safeAddr);    // another chain of this Safe: keep what's known of the others
       chain = KEYS[m[1]]; safeAddr = E.checksum(m[2]); info = null; queue = []; recipe = null;
-      if (sameAddr) copies[was] = true; else { copies = {}; worths = {}; looked = false; }
-      assets = null; activity = null; activityErr = "";
+      if (sameAddr) copies[was] = true; else { copies = seenOn(m[2]); worths = {}; looked = false; }
+      assets = null; assetsErr = false; activity = null; activityErr = "";
       $("s-new").innerHTML = ""; $("s-owner").innerHTML = ""; $("s-wc").innerHTML = "";
       paintAll();
       checkDeployed();
@@ -363,32 +373,44 @@ export function safe(main: HTMLElement) {
   });
 
   // ---- the wedgie ----
+  // The spinner, top left: something is still loading (the wedgie, the list, this Safe). Never moves the page.
+  // The first time (nothing known yet) it's big, in the middle. waited: a few seconds for a wedgie to show up.
+  let wedgieWait = false, waited = false, opening = false, assetsErr = false;
+  setTimeout(() => { waited = true; paintWedgie(); paintSpin(); }, 4000);
+  function paintSpin() {
+    const on = wedgieWait || listing || opening || (!!safeAddr && !!info && !assets && !assetsErr);
+    const big = on && !safeAddr && !signer && !rows.length;
+    const el = $("s-spin");
+    el.hidden = !on || big;
+    $("s-first").hidden = !big;
+  }
   // No wedgie here: the way back to get one (same as /connect without one).
   const HOME = `<a class="btn btn-green" href="/">Back to wedgie.dev</a>`;
   function paintWedgie() {
     const ws = Drive.inApp() ? (driveState === "here" ? [DRIVE] : []) : W.wedgies().filter((w) => w.state === "ready");
     const app = ws.filter((w) => w.running === "safe");
+    // Only what needs a hand from you shows here. Connecting, reading the key: just the spinner (paintSpin), and
+    // with a saved list nothing at all: the list is already there (Austin, 10-21: no boxes that push the page down).
+    const known = !!signer, all = Drive.inApp() ? [] : W.wedgies().filter((w) => w.state !== "gone");
+    const bad = all.find((w) => w.state === "error");
+    const gone = `<p class="sx-row">${HOME}<a class="btn" href="/connect">Connect a wedgie</a></p>`;
     let h = "";
     if (Drive.inApp() && !ws.length) h += driveState === "unpicked"
       ? `<p>Plug in your wedgie, then <button class="btn btn-sm btn-green" id="s-drive">Find it</button></p>`
       : driveState === "readonly" ? `<p><button class="btn btn-sm btn-green" id="s-drive">Allow phone txns</button> then press green on your wedgie.</p>`
-      : `<p class="fine">Plug in your wedgie. <button class="btn btn-sm" id="s-drive">Help</button></p>`;
-    else if (!Drive.inApp() && !W.supported()) h += `<p class="fine">This browser can't talk to a wedgie over USB. Use Chrome, Edge or Brave on a computer.</p>${HOME}`;
-    else if (!Drive.inApp() && !W.armed()) h += `<p class="row">${HOME}<a class="btn" href="/connect">Connect a wedgie</a></p>`;
-    else if (!ws.length) {
-      // plugged in but not ready: say why (another tab has it open, …) or that it's still connecting, never "plug it in"
-      const all = Drive.inApp() ? [] : W.wedgies().filter((w) => w.state !== "gone"), bad = all.find((w) => w.state === "error");
-      h += bad ? `<p><b>${esc(bad.error || "The wedgie didn't answer.")}</b></p>`
-        : all.length ? `<p class="fine">Connecting to the wedgie.</p>`
-        : `<p class="fine">Plug it in. Not showing? <a href="/connect">Connect</a> it first.</p>${HOME}`;
-    }
-    else if (!app.length) h += `<p class="fine">It isn't running the Safe Signer yet. <a class="btn btn-sm btn-green" href="/connect/${esc(ws[0].short)}">Install Safe Signer</a> (on its page, Software).</p>`;
+      : known || !driveState ? "" : `<p>Plug in your wedgie. <button class="btn btn-sm" id="s-drive">Help</button></p>`;
+    else if (!Drive.inApp() && !W.supported()) h += `<p>This browser can't talk to a wedgie. Use Chrome, Edge or Brave on a computer.</p>${HOME}`;
+    else if (!Drive.inApp() && !W.armed()) h += known || safeAddr ? "" : gone;
+    else if (!ws.length) h += bad ? `<p><b>${esc(bad.error || "The wedgie didn't answer.")}</b></p>` : all.length || known || safeAddr || !waited ? "" : gone;
+    else if (!app.length) h += `<p>It isn't running Safe Signer. <a class="btn btn-sm btn-green" href="/connect/${esc(ws[0].short)}">Install it</a></p>`;
     else if (!key) h += noKey === "swap" ? `<p><b>This wedgie's chip is locked with a key that isn't Safe Signer's.</b> It never signs with it. Swap the chip.</p>`
       : noKey === "lock" ? `<p><b>Its key is from before keys were locked.</b> On the wedgie: green locks it for good (only if you made it), red makes your own.</p>`
-      : noKey ? `<p><b>Press the green button on the wedgie to make its key.</b> The chip makes it, locks it for good, and never lets it out.</p>` : `<p class="fine">Reading its key.</p>`;
-    else if (safeAddr && info && wedgieOwns() && deployed[chain] === false)    // all good: say nothing
+      : noKey ? `<p><b>Press green on the wedgie to make its key.</b></p>` : "";
+    else if (safeAddr && info && wedgieOwns() && deployed[chain] === false)
       h += `<p><b>Set up your wedgie on ${esc(CHAINS[chain].name)}</b> before it signs here. <button class="btn btn-sm btn-green" id="s-deploy"${dis()}>Set it up</button></p>
         <p class="fine">Once per chain. Your wallet pays a little gas.</p>`;
+    wedgieWait = !h && (Drive.inApp() ? driveState !== "here" && !known : W.armed() && (!ws.length ? !bad && (all.length > 0 || !waited) : !!app.length && !key && !noKey));
+    paintSpin();
     $("s-wedgie").innerHTML = h;
     $("s-wedgie").hidden = !h || sub === "settings";
     // up top, under Connected: the wedgie's Safe owner address (what you'd add to another Safe), a tap copies it
@@ -553,6 +575,7 @@ export function safe(main: HTMLElement) {
   };
 
   function paintList() {
+    paintSpin();
     const box = $("s-list");
     box.hidden = !!safeAddr || !signer;
     if (box.hidden) return;
@@ -578,14 +601,14 @@ export function safe(main: HTMLElement) {
     const all = groups(rows), mine = all.filter((g) => g.some((r) => r.wedgie)), theirs = all.filter((g) => !g.some((r) => r.wedgie));
     let h = `<div class="sx-head"><h1>Your wedgie's Safes</h1><button class="btn btn-green" id="l-new"${dis()}>＋ New Safe</button></div>`;
     h += mine.length ? `<ul class="sx-safes">${mine.map(card).join("")}</ul>`
-      : listing ? `<div class="sx-card"><div class="meter"><div class="meter-track"><div class="meter-fill" id="l-fill" style="width:${listPct}%"></div></div><p class="fine">Looking on every chain.</p></div></div>`
+      : listing ? ``
       : `<div class="sx-card sx-empty"><p><b>No Safes yet.</b></p><p class="fine">Make one, or add your wedgie to a Safe you have.</p></div>`;
     if (theirs.length) h += `<p class="sx-fold"><button class="btn btn-sm" id="l-wallet">${showWallet ? "Hide your wallet's Safes" : `Your wallet's Safes (${theirs.length})`}</button></p>`
       + (showWallet ? `<ul class="sx-safes">${theirs.map(card).join("")}</ul>` : "");
     const typed = (document.getElementById("l-addr") as HTMLInputElement | null)?.value || "", open = !!document.querySelector("#l-more[open]");
     h += `<details class="sx-more" id="l-more"${open ? " open" : ""}><summary>Open another Safe</summary>
       <p class="sx-row">${addressInput("l-addr", "0x… or ENS name of a Safe")} <select id="l-chain">${chainOpts(newChain)}</select> <button class="btn btn-sm" id="l-open">Open</button></p></details>
-      <p class="sx-foot"><button class="btn btn-sm" id="l-refresh"${dis(listing)}>${listing ? "Checking every chain…" : "Refresh"}</button></p>`;
+      <p class="sx-foot"><button class="btn btn-sm" id="l-refresh"${dis(listing)}>Refresh</button></p>`;
     box.innerHTML = h;
     if (typed) { const el = $("l-addr") as HTMLInputElement; el.value = typed; el.dispatchEvent(new Event("input")); }
     $("l-new").onclick = () => openSheet("create");
@@ -674,12 +697,14 @@ export function safe(main: HTMLElement) {
 
   // ---- /safe/<chain>:<address>: one Safe. The top: its name, its worth, three buttons ----
   function paintSafe() {
+    paintSpin();
     const box = $("s-safe");
     box.hidden = !safeAddr;
     if (box.hidden) return;
     const c = CHAINS[chain], i = info, home = route(chain, safeAddr), $t = total(), g = grand();
     const on = IDS.filter((t) => t === chain || copies[t]);   // fixed order: a tap only recolors
-    const worthOf = !i ? "" : $t !== null ? usd($t) : `${E.fmt(i.balance, 18, 4)} ${nat(chain)}`;
+    // no number till the dollars are known (a coin amount first, then dollars, is a jump); no price at all: the coin
+    const worthOf = !i || (!assets && !assetsErr) ? "" : $t !== null ? usd($t) : `${E.fmt(i.balance, 18, 4)} ${nat(chain)}`;
     const who = !i ? "" : `${i.threshold} of ${plural(i.owners.length, "owner")}`
       + (signer ? wedgieOwns() ? " · your wedgie is one" : " · your wedgie isn't one" : "");
     let h = `<div class="sx-hero-top">${sub === "settings" ? `<a class="sx-back" data-nav href="${home}">← Back</a>` : `<a class="sx-back" data-nav href="/safe">← Safes</a>`}
@@ -689,7 +714,7 @@ export function safe(main: HTMLElement) {
         : `<a class="sx-pill" data-nav href="${route(t, safeAddr)}${sub === "settings" ? "/settings" : ""}">${chainLogo(t)}${esc(CHAINS[t].name)}</a>`).join("")}</div>`;
     if (sub === "settings") h += `<div class="sx-total sx-total-sm">Settings</div><div class="sx-sub">${esc(who)}</div>`;
     else {
-      h += `<div class="sx-total">${i ? esc(worthOf) : "&nbsp;"}</div><div class="sx-sub">${i ? esc(who) : "Opening the Safe"}</div>`;
+      h += `<div class="sx-total">${worthOf ? esc(worthOf) : "&nbsp;"}</div><div class="sx-sub">${i ? esc(who) : "Opening the Safe"}</div>`;
       if (i) h += `<div class="sx-actions">
         ${can() ? `<button class="sx-act" id="a-send"${dis()}><span>↑</span>Send</button>` : ""}
         <button class="sx-act" id="a-receive"><span>↓</span>Receive</button>
@@ -738,6 +763,7 @@ export function safe(main: HTMLElement) {
   async function load(quiet = false) {
     if (!quiet) say("Opening the Safe.");
     const c = chain, a = safeAddr;
+    opening = true; paintSpin();
     try {
       let i: Info;
       for (let t = 0; ; t++) {       // just made: an RPC can lag a few seconds behind, so watch before saying it isn't there
@@ -747,18 +773,19 @@ export function safe(main: HTMLElement) {
           await sleep(2000);
         }
       }
+      opening = false;
       if (c !== chain || a !== safeAddr) return;
       info = i;
       if (signer) { if (wedgieOwns()) { remember(c, a); tellWedgie(c, a); } else forget(c, a); }
       if (!quiet) say("");
       paintAll();             // the Safe from the chain now; its queue, tokens and history as the sources answer
       if (!quiet) checkCopies(c, a);
-      loadAssets(c, a, i);
+      loadAssets(c, a, i).catch(() => { if (c === chain && a === safeAddr) { assetsErr = true; paintSpin(); } });
       loadActivity(c, a);
       const q = await readQueue(c, a, i.nonce);
       if (c !== chain || a !== safeAddr) return;
       queue = q;
-    } catch (e) { if (c === chain && a === safeAddr) { info = null; queue = []; if (!quiet) fail(e); } }
+    } catch (e) { opening = false; paintSpin(); if (c === chain && a === safeAddr) { info = null; queue = []; if (!quiet) fail(e); } }
     paintAll();
   }
 
@@ -767,6 +794,7 @@ export function safe(main: HTMLElement) {
     const got = await readAssets(c, a, CHAINS[c].native, i.balance, CHAINS[c].usdc ? { address: CHAINS[c].usdc!, balance: i.usdc } : null, (m, p) => rpc(c, m, p));
     if (c === chain && a === safeAddr) { assets = got; paintSafe(); paintAssets(); paintNew(); }
   }
+
 
   /** What happened: Safe's API (its executed transactions, and money that came in). */
   async function loadActivity(c: number, a: string) {
@@ -804,7 +832,7 @@ export function safe(main: HTMLElement) {
         if (has) { worths[t] = await worthOn(t, a); paintSafe(); }
       } catch {}
     }));
-    if (c === chain && a === safeAddr) { looked = true; paintSafe(); paintChains(); }
+    if (c === chain && a === safeAddr) { looked = true; copies[c] = true; saveSeen(a, copies); paintSafe(); paintChains(); }
     try { const r = await recipeOf(c, a); if (c === chain && a === safeAddr) { recipe = r; paintChains(); } } catch {}
   }
 
@@ -1028,8 +1056,9 @@ export function safe(main: HTMLElement) {
 
   // ---- Assets: every token, biggest first; ones with no price folded away ----
   function paintAssets() {
+    paintSpin();
     const box = $("s-assets");
-    box.hidden = !(safeAddr && info && sub === "home");
+    box.hidden = !(safeAddr && info && sub === "home" && (assets || assetsErr));
     if (box.hidden) return;
     const list = assets || [{ token: null, ...CHAINS[chain].native, decimals: 18, balance: info!.balance, usd: null, price: null } as Asset];
     const row = (a: Asset) => `<li><button class="sx-asset" type="button" data-tok="${a.token || ""}"${can() ? "" : " disabled"}>${tokenBadge(a.symbol, a.logo)}

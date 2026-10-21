@@ -379,8 +379,11 @@ const t0 = Date.now();
 await page.reload({ waitUntil: "domcontentloaded" });
 await wait((a) => [...document.querySelectorAll("#s-list .safe-row")].filter((r) => a.some((x) => r.getAttribute("href").endsWith(x))).length === 2, [mine, made], 3000, "the saved list, at once");
 check(true, `a reload shows the saved list at once (${Date.now() - t0} ms), before the wedgie or any chain answers`);
+const top0 = await page.evaluate(() => document.querySelector("#s-list .safe-row").getBoundingClientRect().top);
 await wait(() => document.querySelector("#s-me .addr"), null, 30000, "reloaded");
 await page.waitForTimeout(1500);
+const top1 = await page.evaluate(() => document.querySelector("#s-list .safe-row").getBoundingClientRect().top);
+check(top0 === top1 && (await page.$eval("#s-wedgie", (e) => e.hidden)), `nothing moves while the wedgie connects: the list stays put (${top0}px), no box above it`);
 check(!!(await page.$("#w-go")), "Disconnect sticks after a reload (Connect wallet shows, no address)");
 if (out) await page.screenshot({ path: `${out}/safe-5-list.png`, fullPage: true });
 
