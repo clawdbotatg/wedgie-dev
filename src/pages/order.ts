@@ -13,6 +13,7 @@ import { WHY, STAR, wire } from "../shop/why";
 import { seal, SEAL_KEY } from "../shop/seal";
 import { transferData } from "../safe/eth";
 import { count, errKey } from "../shop/count";
+import { STEPS, sprite } from "../shop/steps";
 
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 const usd = (cents: number) => "$" + (cents / 100).toFixed(cents % 100 ? 2 : 0);
@@ -140,7 +141,7 @@ async function list(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
     const row = box.querySelector<HTMLElement>(`[data-id="${i}"]`)!;
     const items = v.lines ? v.lines.map((l) => `${l.qty} × ${ITEMS[l.item].name}`).join(", ") : "";
     row.querySelector(".o-what")!.textContent = `${items} · ${usd(v.cents)}${o.at ? " · " + new Date(o.at).toLocaleDateString() : ""}`;
-    row.querySelector(".o-st")!.textContent = STATUS[v.status] || v.status;
+    row.querySelector(".o-st")!.textContent = v.delivered_at ? "Delivered" : v.moving_at ? "On the way" : STATUS[v.status] || v.status;
     row.classList.add("st-" + v.status);
   }, (e) => { box.querySelector(`[data-id="${i}"] .o-st`)!.textContent = msgOf(e); }));
 }
@@ -260,7 +261,17 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
 // ---- one order ----
 const WHYNOT = [["price", "Price"], ["time", "Ran out of time"], ["pay", "Couldn't pay"], ["looking", "Just looking"]];
 type View = { id: string; cart: Cart; lines: { item: Item; qty: number; cents: number }[] | null; cents: number; pay: string; status: string; chain: number | null; usdc: string | null; payTo?: string;
-  tracking: string | null; url?: string; why?: string; left?: number; got?: string; checking?: boolean };
+  tracking: string | null; url?: string; why?: string; left?: number; got?: string; checking?: boolean;
+  created: string; paid_at: string | null; shipped_at: string | null; moving_at?: string | null; delivered_at?: string | null };
+
+// Ordered → Paid → Shipped → On the way → Delivered: a sprite and a date each; the newest one bounces till it's delivered.
+function steps(v: View) {
+  const at = [v.created, v.paid_at, v.shipped_at, v.moving_at, v.delivered_at];
+  let now = 0;
+  at.forEach((t, i) => { if (t) now = i; });
+  return `<ol class="o-steps">${STEPS.map((s, i) => `<li class="${at[i] ? "done" : ""}${i === now && i < 4 ? " now" : ""}">${sprite(s.px)}
+    <b>${s.name}</b><span class="fine">${at[i] ? new Date(at[i]!).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "&nbsp;"}</span></li>`).join("")}</ol>`;
+}
 
 function status(id: string, box: HTMLElement, say: (s: string, bad?: boolean) => void) {
   const fromLink = location.hash.slice(1);
@@ -315,8 +326,9 @@ function status(id: string, box: HTMLElement, say: (s: string, bad?: boolean) =>
       <p><button class="btn btn-green" id="o-renew"${busy ? " disabled" : ""}>Refresh price</button> <a class="btn" href="/order">Start over</a></p>
       <p class="fine o-why">${asked ? "Thanks." : `Didn't buy? Why: ${WHYNOT.map(([k, t]) => `<button class="btn btn-sm" data-why="${k}">${t}</button>`).join(" ")}`}</p>`;
     }
+    if (v.status === "paid" || v.status === "shipped") h += steps(v);
     if (v.status === "paid") h += `<p class="good"><b>Paid, thank you.</b></p><p>${esc(SHIPS)} The tracking number shows up here when it does.</p>`;
-    if (v.status === "shipped") h += `<p class="good"><b>Shipped.</b> Your address is deleted.</p>
+    if (v.status === "shipped") h += `<p class="good"><b>${v.delivered_at ? "Delivered." : "Shipped."}</b> Your address is deleted.</p>
       <p>USPS tracking: <a href="https://tools.usps.com/go/TrackConfirmAction?tLabels=${encodeURIComponent(v.tracking || "")}" target="_blank" rel="noopener">${esc(v.tracking)}</a></p>`;
     if (v.status === "canceled") h += `<p>Canceled.</p>`;
     h += `</div><div class="safe-box recess"><h2>Keep this link</h2><p class="fine">It's how you check on this order from anywhere. Anyone with it can see the order's status (never your address).</p>

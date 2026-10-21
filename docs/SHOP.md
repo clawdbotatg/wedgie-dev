@@ -21,6 +21,12 @@ a card quote holds its box until its Stripe checkout can't be paid (31 min). Shi
 deleted after 30 days come off the count, so their boxes aren't sold twice. A late USDC payment can still land on a
 sold-out shop: `orders.py list` then says OVERSOLD. `api/_shop.ts` `stockLeft`; test: `node tools/stocktest.mjs`.
 
+## Tracking
+
+The order page shows Ordered, Paid, Shipped, On the way, Delivered, each a pixel sprite (`src/shop/steps.ts`).
+The site never asks USPS: omen does (`orders.py track`, wedgie-shipping) and posts just the step and time to
+`/api/admin` (`moving_at`, `delivered_at`). No USPS key on Vercel, and no place ever reaches the site.
+
 ## Card
 
 Stripe Checkout (`api/_shop.ts`). Stripe never gets a shipping address.

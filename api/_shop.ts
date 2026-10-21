@@ -61,6 +61,8 @@ export async function db() {
     await sql`create table if not exists rpc_hits (k text primary key, n int not null, at timestamptz not null default now())`;   // api/rpc.ts: calls per IP hash per minute and per day
     await sql`create table if not exists stock (id int primary key, n int not null, set_at timestamptz not null default now())`;   // stockLeft
     await sql`create table if not exists counts (day date not null, k text not null, n int not null, primary key (day, k))`;   // api/count.ts: checkout steps, no one in them
+    await sql`alter table orders add column if not exists moving_at timestamptz`;      // shipped: USPS has it moving (omen, admin.ts step); never a place
+    await sql`alter table orders add column if not exists delivered_at timestamptz`;   // shipped: USPS delivered it
   })().catch((e) => { ready = null; throw e; });
   await ready;
   return sql;
@@ -85,7 +87,7 @@ export function same(a: string, b: string) {   // constant time
 export type Order = {
   id: string; token_hash: string; cart: Cart; lines: Line[] | null; cents: number; pay: "card" | "usdc"; status: string; sealed: string | null;
   chain: number | null; usdc: string | null; from_block: string | null; stripe_session: string | null; tx: string | null; payer: string | null; deposit: string | null;
-  tracking: string | null; created: string; paid_at: string | null; shipped_at: string | null; held?: boolean | null; got?: string | null;
+  tracking: string | null; created: string; paid_at: string | null; shipped_at: string | null; moving_at?: string | null; delivered_at?: string | null; held?: boolean | null; got?: string | null;
 };
 
 /** What the buyer's own order page may see: never the sealed address, the payer or the session. */
@@ -95,7 +97,7 @@ export const publicView = (o: Order, got?: bigint, checking?: boolean) => ({
   got: got?.toString(),     // usdc sent to its deposit so far
   checking: checking || undefined,   // a chain couldn't be read: got may be short
   left: o.status === "new" ? Math.max(0, Date.parse(o.created) + QUOTE - Date.now()) : undefined,
-  tracking: o.tracking, created: o.created, paid_at: o.paid_at, shipped_at: o.shipped_at,
+  tracking: o.tracking, created: o.created, paid_at: o.paid_at, shipped_at: o.shipped_at, moving_at: o.moving_at, delivered_at: o.delivered_at,
 });
 
 /** What every box costs over its list price right now (catalog.ts extraAt): paid orders at their paying, open

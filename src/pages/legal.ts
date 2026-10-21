@@ -4,7 +4,7 @@
 export const SELLER = "BuidlGuidl DAO LLC";
 const ADDR = "3307 S College Ave Unit 104, Fort Collins, CO 80525";
 const MAIL = "wedgie@buidlguidl.com";
-const UPDATED = "October 17, 2026";
+const UPDATED = "October 20, 2026";
 
 const TERMS = `
 <h1>Terms of Sale</h1>
@@ -62,7 +62,7 @@ const PRIVACY = `
 <p>Card payments are handled by Stripe, under <a href="https://stripe.com/privacy" target="_blank" rel="noopener">Stripe's privacy policy</a>. We never see your card number. Stripe may ask for a billing address; that stays with Stripe. USDC payments are public on the blockchain, like any transaction.</p>
 
 <h2>Orders</h2>
-<p>We keep what you ordered and its status. We delete an order 30 days after it ships or is canceled, or 30 days after it was made if it was never paid. An unpaid order that got some USDC is kept until it's sorted out with you.</p>
+<p>We keep what you ordered and its status. Once it ships, the dates USPS has it moving and delivers it (never where). We delete an order 30 days after it ships or is canceled, or 30 days after it was made if it was never paid. An unpaid order that got some USDC is kept until it's sorted out with you.</p>
 
 <h2>Your wedgie</h2>
 <p>The site talks to a wedgie only after you tap Connect, and only in your browser. Nothing about your wedgie or its keys is sent to us.</p>

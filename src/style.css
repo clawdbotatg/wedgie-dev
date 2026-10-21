@@ -260,6 +260,17 @@ html, body { overflow-x: clip; }
 .orders-row .o-st { text-align: right; white-space: nowrap; }
 .orders-row.st-paid .o-st, .orders-row.st-shipped .o-st { color: var(--mint-d); }
 .orders-row.st-expired, .orders-row.st-canceled { opacity: .6; }
+/* an order's steps (src/shop/steps.ts): pixel sprites, grey till done, the newest one bounces */
+.o-steps { list-style: none; display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; padding: 0; margin: 18px 0; text-align: center; }
+.o-steps li { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
+.o-steps svg { width: 100%; max-width: 64px; aspect-ratio: 1; image-rendering: pixelated; filter: grayscale(1); opacity: .3; }
+.o-steps b { font-size: 14px; line-height: 1.15; color: var(--muted); }
+.o-steps .fine { font-size: 12px; }
+.o-steps .done svg { filter: none; opacity: 1; }
+.o-steps .done b { color: var(--ink); }
+.o-steps .now svg { animation: o-hop 1.2s ease-in-out infinite; }
+@keyframes o-hop { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-6px); } }
+@media (prefers-reduced-motion: reduce) { .o-steps .now svg { animation: none; } }
 .connect-btn .n { font-family: var(--mono); font-size: 14px; background: rgba(0,0,0,.18); border-radius: 999px; padding: 1px 8px; }
 .connect { min-height: 60vh; padding-top: 40px; }
 .setup { display: grid; gap: 12px; margin: 0 auto 24px; max-width: 640px; }
