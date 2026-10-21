@@ -375,7 +375,13 @@ export function safe(main: HTMLElement) {
       : `<p class="fine">Plug in your wedgie. <button class="btn btn-sm" id="s-drive">Help</button></p>`;
     else if (!Drive.inApp() && !W.supported()) h += `<p class="fine">This browser can't talk to a wedgie over USB. Use Chrome, Edge or Brave on a computer.</p>${HOME}`;
     else if (!Drive.inApp() && !W.armed()) h += `<p class="row">${HOME}<a class="btn" href="/connect">Connect a wedgie</a></p>`;
-    else if (!ws.length) h += `<p class="fine">Plug it in. Not showing? <a href="/connect">Connect</a> it first.</p>${HOME}`;
+    else if (!ws.length) {
+      // plugged in but not ready: say why (another tab has it open, …) or that it's still connecting, never "plug it in"
+      const all = Drive.inApp() ? [] : W.wedgies().filter((w) => w.state !== "gone"), bad = all.find((w) => w.state === "error");
+      h += bad ? `<p><b>${esc(bad.error || "The wedgie didn't answer.")}</b></p>`
+        : all.length ? `<p class="fine">Connecting to the wedgie.</p>`
+        : `<p class="fine">Plug it in. Not showing? <a href="/connect">Connect</a> it first.</p>${HOME}`;
+    }
     else if (!app.length) h += `<p class="fine">It isn't running the Safe Signer yet. <a class="btn btn-sm btn-green" href="/connect/${esc(ws[0].short)}">Install Safe Signer</a> (on its page, Software).</p>`;
     else if (!key) h += noKey === "swap" ? `<p><b>This wedgie's chip is locked with a key that isn't Safe Signer's.</b> It never signs with it. Swap the chip.</p>`
       : noKey === "lock" ? `<p><b>Its key is from before keys were locked.</b> On the wedgie: green locks it for good (only if you made it), red makes your own.</p>`
