@@ -8,11 +8,11 @@
 //      wallet (sets up the signer contract, runs at once)
 //   2. Change the threshold to 2: proposed by the wedgie (A on it), run at once (1 of 2 was enough)
 //   3. New transaction, 0.001 ETH, signed with the wedgie: into the queue; Sign with wallet; Execute.
-//      Then a 6 KB contract call: the wedgie gets it in safe_data pieces
+//      Then a 6 KB contract call: the wedgie gets it in safe_data pieces. Then Reject: a Cancel at the same nonce runs
 //   4. back to the list: the Safe is the wedgie's now. Make a new Safe: wallet + wedgie, 2 of 2, one
 //      transaction, then its page; the list has both
 // (Safe's real API: tools/safelive.mjs.) Needs anvil and Node 23+.
-// Serve dist first (npm run build && npx vite preview --port 4173), then: node tools/safeprobe.mjs [url] [outdir]
+// Serve dist first (npm run build && npx vite preview --port 4173), then (ALCHEMY_API_KEY from .env): node tools/safeprobe.mjs [url] [outdir]
 import { chromium } from "playwright-core";
 import { readdirSync } from "node:fs";
 import { homedir } from "node:os";
@@ -23,7 +23,7 @@ import { SignClient } from "@walletconnect/sign-client";
 import * as E from "../src/safe/eth.ts";
 
 const base = (process.argv[2] || "http://localhost:4173").replace(/\/$/, ""), out = process.argv[3];
-const RPC = process.env.BASE_RPC || "https://mainnet.base.org", PORT = 8598, URL = `http://127.0.0.1:${PORT}`;
+const RPC = process.env.BASE_RPC || `https://base-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`, PORT = 8598, URL = `http://127.0.0.1:${PORT}`;
 const anvil = spawn("anvil", ["--fork-url", RPC, "--port", String(PORT), "--mnemonic-random", "--hardfork", "osaka", "--silent"], { stdio: "inherit" });
 process.on("exit", () => anvil.kill());
 let id = 0;
@@ -110,10 +110,11 @@ await ctx.addInitScript((me) => {
     return r;
   } };
 }, me);
-// the page's public RPC for Base = the fork
+// the page's reads for Base (/api/rpc?chain=8453) = the fork
 // ... and like the real one, it rate-limits a burst: the first reads of the list get 429 (the page must retry, not drop the Safe)
 let busyFor = 4;
-await ctx.route("https://mainnet.base.org/**", async (r) => {
+await ctx.route(/\/api\/rpc\?chain=8453$/, async (r) => {
+  if (/"wedgie_prices"/.test(r.request().postData())) return r.fulfill({ contentType: "application/json", body: JSON.stringify({ jsonrpc: "2.0", id: 1, result: { eth: 2000, tokens: {} } }) });
   if (busyFor > 0 && /eth_getCode/.test(r.request().postData())) { busyFor--; return r.fulfill({ status: 429, headers: { "access-control-allow-origin": "*" }, body: "rate limited" }); }
   r.fulfill({ headers: { "access-control-allow-origin": "*" }, contentType: "application/json", body: await rpcRaw(r.request().postData()) });
 });
@@ -186,7 +187,7 @@ await page.evaluate((m) => localStorage.setItem("wedgie.safe", "base:" + m), min
 await page.goto(`${base}/safe`);
 await wait(() => document.querySelector("#s-me .addr"), null, 30000, "the wedgie's signer address");
 check(eq(await page.getAttribute("#s-me .addr", "data-addr"), signer), `signer address shown: ${signer}`);
-check(new globalThis.URL(page.url()).pathname === "/safe" && !(await page.isHidden("#s-list")) && !(await page.isHidden("#s-create")), "an old saved Safe doesn't open itself: /safe is the list, with Make a new Safe");
+check(new globalThis.URL(page.url()).pathname === "/safe" && !(await page.isHidden("#s-list")) && !!(await page.$("#l-new")), "an old saved Safe doesn't open itself: /safe is the list, with New Safe");
 await wait((s) => document.querySelector(`.safe-row[href$="${s}"]`), hidden, 20000, "the Safe only the wedgie's own list knows");
 check(/Your wedgie's Safes[\s\S]*1 of 1 owner/.test(await page.textContent("#s-list")), "listed from the wedgie's own list (safe_list), though Safe's API doesn't know it");
 check(busyFor === 0, "the public RPC said 429 four times on the way: the page tried again, nothing dropped");
@@ -200,9 +201,9 @@ if (out) await page.screenshot({ path: `${out}/safe-0-list.png`, fullPage: true 
 await page.click(`.safe-row[href$="${mine}"]`);
 await wait(() => !document.querySelector("#s-add")?.hidden, null, 30000, "the Add box");
 check(new globalThis.URL(page.url()).pathname === `/safe/base:${mine}`, `its own page: /safe/base:${short(mine)}`);
-check(/1 of 1 owner must sign/.test(await page.textContent("#s-safe")) && /1 ETH/.test(await page.textContent("#s-safe")), "the Safe: 1 of 1, 1 ETH");
-await wait(() => !/Checking/.test(document.querySelector("#s-wedgie").textContent), null, 20000, "the wedgie checked on Base");
-check(/Not set up on Base yet/.test(await page.textContent("#s-wedgie")), "the wedgie: not set up on Base yet");
+await wait(() => /\$2,000/.test(document.querySelector("#s-safe").textContent), null, 20000, "its worth in dollars");
+check(/1 of 1 owner/.test(await page.textContent("#s-safe")) && /\$2,000/.test(await page.textContent("#s-safe")), "the Safe: 1 of 1, 1 ETH = $2,000 (wedgie_prices)");
+check(/ETH[\s\S]*\$2,000[\s\S]*1 ETH/.test(await page.textContent("#s-assets")), "Assets: ETH, $2,000, 1 ETH");
 if (out) await page.screenshot({ path: `${out}/safe-1-add.png`, fullPage: true });
 await page.click("#a-go");
 await says(/Press Execute/, "add owner signed");     // nothing runs by itself after the sign (e11ce5a): Execute
@@ -210,7 +211,7 @@ await page.click("[data-exec]");
 await says(/Done: it ran/, "added");
 check((await owners(mine)).some((o) => eq(o, signer)), "on chain: the wedgie's signer is an owner");
 check((await rpc("eth_getCode", [signer, "latest"])).length > 2, "on chain: its signer contract was deployed first");
-check(await page.isHidden("#s-add") && /Your wedgie is an owner/.test(await page.textContent("#s-safe")) && /Set up on Base/.test(await page.textContent("#s-wedgie")), "page: an owner now, set up, Add box gone");
+check(await page.isHidden("#s-add") && /your wedgie is one/.test(await page.textContent("#s-safe")) && await page.isHidden("#s-wedgie"), "page: an owner now, set up, Add box gone");
 
 // 1b: WalletConnect (the real relay): an app connects to this Safe (1 of 2 now), asks for 2 calls with
 // wallet_sendCalls; the wedgie signs one MultiSendCallOnly batch, the wallet executes it, the app gets the hash
@@ -218,6 +219,7 @@ const dapp = await SignClient.init({ projectId: "3a8170812b534d0ff9d794f19a901d6
   metadata: { name: "WC probe", description: "test app", url: "https://probe.example", icons: [] } });
 const { uri, approval } = await dapp.connect({ optionalNamespaces: { eip155: { chains: ["eip155:8453"],
   methods: ["wallet_sendCalls", "wallet_getCapabilities", "wallet_getCallsStatus", "eth_sendTransaction"], events: ["chainChanged", "accountsChanged"] } } });
+await page.click("#a-connect");
 await page.fill("#wc-uri", uri);
 await page.click("#wc-go");
 const session = await approval();
@@ -243,6 +245,9 @@ check(/^0x[0-9a-f]{64}$/.test(res.id) && st.status === 200 && st.receipts[0].tra
 await dapp.disconnect({ topic: session.topic, reason: { code: 6000, message: "done" } });
 
 // 2: 2 of 2, proposed by the wedgie: 1 of 2 is enough, so it runs at once
+await page.click("#a-settings");
+await wait(() => document.querySelector("#o-th"), null, 10000, "Settings");
+if (out) await page.screenshot({ path: `${out}/safe-2-settings.png`, fullPage: true });
 await page.selectOption("#o-th", "2");
 await page.click("#o-th-go");
 await says(/Press Execute/, "threshold signed");
@@ -253,6 +258,8 @@ check(await num(mine, "getThreshold()") === 2, "on chain: 2 of 2, on the wedgie'
 
 // 2b: Add an owner (2 of 2 -> 2 of 3), signed with the wedgie: 1 of 2 isn't enough, so queue, wallet, execute
 const third = E.checksum(E.hex(crypto.randomBytes(20)));
+await page.click("#a-settings");
+await wait(() => document.querySelector("#ow-addr") && !document.querySelector("#s-owner").hidden, null, 10000, "Settings: Add an owner");
 await page.fill("#ow-addr", third);
 await page.selectOption("#ow-th", "2");
 await page.click("#ow-wedgie");
@@ -262,28 +269,33 @@ await says(/That's enough: press Execute/, "wallet signed add owner");
 await page.click("[data-exec]");
 await says(/Done: it ran/, "add owner executed");
 check((await owners(mine)).some((o) => eq(o, third)) && await num(mine, "getThreshold()") === 2, "Add an owner: on chain, 2 of 3 (wedgie proposed, wallet signed, executed)");
-check(/2 of 3 owners must sign/.test(await page.textContent("#s-safe")), "page: 2 of 3");
+check(/2 of 3 owners/.test(await page.textContent("#s-safe")), "page: 2 of 3");
+check(await page.isHidden("#s-dock"), "the bottom bar is gone once it ran: " + (await page.isHidden("#s-dock") ? "" : await page.textContent("#s-dock")));
 
 // 3: send ETH: the wedgie signs, the wallet signs, execute
 const to = E.checksum(E.hex(crypto.randomBytes(20)));
 const asked = await asks();
+await page.click("#a-send");
 await page.fill("#n-to", to);
 await page.fill("#n-amt", "0.001");
+if (out) await page.screenshot({ path: `${out}/safe-3a-send.png` });
 await page.click("#n-wedgie");
 await says(/In the queue with the wedgie's signature/, "queued");
 check(await asks() === asked + 1, "the wedgie was asked again");
 await wait(() => document.querySelector("[data-wsign]"), null, 10000, "Sign with wallet");
+check(new RegExp(`Send 0\\.001 ETH to[\\s\\S]*${to.slice(-4)}`).test(await page.textContent("#s-queue")) && /1 of 2 signed/.test(await page.textContent("#s-queue")), "the queue says it in words: Send 0.001 ETH to …, 1 of 2 signed");
 if (out) await page.screenshot({ path: `${out}/safe-3-queue.png`, fullPage: true });
 await page.click("[data-wsign]");
 await says(/That's enough: press Execute/, "wallet signed");
 await page.click("[data-exec]");
 await says(/Done: it ran/, "executed");
 check(BigInt(await rpc("eth_getBalance", [to, "latest"])) === 10n ** 15n, "on chain: 0.001 ETH sent (wedgie + wallet, packed, executed)");
-check(/Nothing waiting/.test(await page.textContent("#s-queue")), "page: the queue is empty");
+check(await page.isHidden("#s-queue"), "page: the queue is empty");
 
 // 3b: a contract call too big for one USB line (6 KB of data): sent to the wedgie in safe_data pieces
 const big = "0x12345678" + "cd".repeat(6000);
 const callee = E.checksum(E.hex(crypto.randomBytes(20)));
+await page.click("#a-send");
 await page.fill("#n-to", callee);
 await page.fill("#n-amt", "");
 await page.click("#s-new details summary");
@@ -296,12 +308,13 @@ await page.click("[data-wsign]");
 await says(/That's enough: press Execute/, "wallet signed the big one");
 await page.click("[data-exec]");
 await says(/Done: it ran/, "big one executed");
-check(/Nothing waiting/.test(await page.textContent("#s-queue")), "on chain: the 6 KB call ran (wedgie's signature over pieces + wallet)");
+check(await page.isHidden("#s-queue"), "on chain: the 6 KB call ran (wedgie's signature over pieces + wallet)");
 
 // 3c: Safe's service is down: the wedgie's signature goes to Instant Wallet's queue; a reload (this browser's copy
 // wiped) still shows it from there; the wallet signs, execute
 safeDown = true;
 const to2 = E.checksum(E.hex(crypto.randomBytes(20)));
+await page.click("#a-send");
 await page.fill("#n-to", to2);
 await page.fill("#n-amt", "0.002");
 await page.click("#n-wedgie");
@@ -309,7 +322,7 @@ await says(/In the queue with the wedgie's signature/, "queued with Safe's servi
 check([...(iwq.get(mine.toLowerCase())?.values() || [])].some((e) => e.sigs.some((x) => eq(x.owner, signer))), "Safe's service down: the wedgie's signature is in Instant Wallet's queue");
 await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("wedgie.safe.q.")).forEach((k) => localStorage.removeItem(k)));
 await page.reload();
-await wait(() => /wedgie signed/.test(document.querySelector("#s-queue")?.textContent || ""), null, 40000, "the queued one, from Instant Wallet, after a reload");
+await wait(() => /wedgie ✓/.test(document.querySelector("#s-queue")?.textContent || ""), null, 60000, "the queued one, from Instant Wallet, after a reload");
 check(/Safe's service didn't answer/.test(await page.textContent("#s-queue")), "page: says Safe's service didn't answer, still shows the queue");
 await page.click("#w-go");      // a reload: the wallet connects again
 await wait(() => document.querySelector("[data-wsign]"), null, 20000, "Sign with wallet, after a reload");
@@ -320,9 +333,27 @@ await says(/Done: it ran/, "executed with Safe's service down");
 check(BigInt(await rpc("eth_getBalance", [to2, "latest"])) === 2n * 10n ** 15n, "on chain: 0.002 ETH sent with Safe's service down (Instant Wallet's queue)");
 safeDown = false;
 
+// 3d: Reject: the wedgie proposes 0.003 ETH, then rejects it: an empty one at the same nonce; the wallet signs
+// that, it runs, and the first one is gone for good
+const to3 = E.checksum(E.hex(crypto.randomBytes(20)));
+await page.click("#a-send");
+await page.fill("#n-to", to3);
+await page.fill("#n-amt", "0.003");
+await page.click("#n-wedgie");
+await says(/In the queue with the wedgie's signature/, "0.003 queued");
+await page.click("[data-reject]");
+await says(/In the queue with the wedgie's signature: cancel/, "cancel queued");
+check(/Cancel #\d+/.test(await page.textContent("#s-queue")) && !(await page.$("[data-reject]")), "the queue: Cancel #n beside it, no second Reject");
+await page.click(".sx-k-cancel [data-wsign]");
+await says(/That's enough: press Execute/, "wallet signed the cancel");
+await page.click(".sx-k-cancel [data-exec]");
+await says(/Done: it ran/, "cancel ran");
+check(BigInt(await rpc("eth_getBalance", [to3, "latest"])) === 0n && await page.isHidden("#s-queue"), "Reject: nothing sent, the queue is empty");
+
 // 4: back to the list (no reload): the Safe is the wedgie's now. Then a new one: wallet + wedgie, 2 of 2
 await page.click('a[href="/safe"][data-nav]');
 await wait((s) => /Your wedgie's Safes/.test(document.querySelector("#s-list").textContent) && document.querySelector(`.safe-row[href$="${s}"]`) && !document.querySelector("#l-wallet"), mine, 30000, "the list: the Safe is the wedgie's now");
+await page.click("#l-new");
 await page.click("#c-me");
 await wait(() => /of 2 owners/.test(document.querySelector("#c-of").textContent), null, 10000, "2 owners counted");
 await page.selectOption("#c-th", "2");
@@ -333,8 +364,8 @@ const made = new globalThis.URL(page.url()).pathname.match(/0x[0-9a-fA-F]{40}/)?
 const os = await owners(made);
 check(os.length === 2 && os.some((o) => eq(o, signer)) && os.some((o) => eq(o, me)), `on chain: new Safe ${made} owned by the wedgie and the wallet`);
 check(await num(made, "getThreshold()") === 2, "on chain: 2 of 2");
-await wait(() => /2 of 2 owners must sign/.test(document.querySelector("#s-safe").textContent), null, 20000, "its page, 2 of 2");
-check(/2 of 2 owners must sign/.test(await page.textContent("#s-safe")), "page: opened the new Safe's own page, 2 of 2");
+await wait(() => /2 of 2 owners/.test(document.querySelector("#s-safe").textContent), null, 20000, "its page, 2 of 2");
+check(/2 of 2 owners/.test(await page.textContent("#s-safe")), "page: opened the new Safe's own page, 2 of 2");
 if (out) await page.screenshot({ path: `${out}/safe-4-made.png`, fullPage: true });
 await page.goBack();
 await wait((a) => [...document.querySelectorAll("#s-list .safe-row")].filter((r) => a.some((x) => r.getAttribute("href").endsWith(x))).length === 2, [mine, made], 30000, "the list has both (Back button)");
@@ -350,6 +381,16 @@ await page.waitForTimeout(1500);
 check(!!(await page.$("#w-go")), "Disconnect sticks after a reload (Connect wallet shows, no address)");
 if (out) await page.screenshot({ path: `${out}/safe-5-list.png`, fullPage: true });
 
+// a phone: the Safe's page and its Receive sheet (pictures only)
+if (out) {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${base}/safe/base:${mine}`);
+  await wait(() => /\$/.test(document.querySelector("#s-safe")?.textContent || ""), null, 30000, "phone: the Safe");
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: `${out}/safe-6-phone.png`, fullPage: true });
+  await page.click("#a-receive");
+  await page.screenshot({ path: `${out}/safe-6-receive.png` });
+}
 check(!errs.length, "no page errors " + errs.join("; "));
 await browser.close();
 console.log(bad ? `${bad} failed` : "all passed");

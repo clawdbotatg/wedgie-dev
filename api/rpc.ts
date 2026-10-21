@@ -1,11 +1,30 @@
 // /api/rpc?chain=<id>: /safe's chain reads, through the shop's Alchemy key (never a public RPC; the key never
 // reaches the browser). One JSON-RPC call per POST, read methods only (READ). Never log a body here.
+// wedgie_prices [token addresses]: {eth, tokens: {address: usd}} from Alchemy's prices API (mainnets only).
 import { env, json, oops, crossSite, db, ipOf } from "./_shop.js";
 
 const HOSTS: Record<number, string> = { 1: "eth-mainnet", 8453: "base-mainnet", 10: "opt-mainnet", 42161: "arb-mainnet",
   84532: "base-sepolia", 11155111: "eth-sepolia" };
 const READ = new Set(["eth_call", "eth_getCode", "eth_getBalance", "eth_getTransactionReceipt", "eth_getTransactionByHash",
-  "eth_blockNumber", "eth_chainId", "eth_getBlockByNumber", "eth_getStorageAt"]);
+  "eth_blockNumber", "eth_chainId", "eth_getBlockByNumber", "eth_getStorageAt", "alchemy_getTokenBalances", "alchemy_getTokenMetadata"]);
+const TEST = new Set([84532, 11155111]);
+
+/** Dollar prices: ETH and up to 25 tokens on one chain. A test chain's coins are worth nothing. */
+async function prices(chain: number, host: string, tokens: unknown[]) {
+  const out: { eth: number | null; tokens: Record<string, number> } = { eth: null, tokens: {} };
+  if (TEST.has(chain)) return out;
+  const list = tokens.filter((a): a is string => typeof a === "string" && /^0x[0-9a-fA-F]{40}$/.test(a)).slice(0, 25);
+  const base = `https://api.g.alchemy.com/prices/v1/${key()}/tokens`;
+  const num = (p: any) => { const v = Number(p?.prices?.find((x: any) => x.currency === "usd")?.value); return v > 0 ? v : null; };
+  const [e, t] = await Promise.all([
+    fetch(`${base}/by-symbol?symbols=ETH`).then((r) => r.json()).catch(() => null),
+    list.length ? fetch(`${base}/by-address`, { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ addresses: list.map((address) => ({ network: host, address })) }) }).then((r) => r.json()).catch(() => null) : null,
+  ]);
+  out.eth = num(e?.data?.[0]);
+  for (const p of t?.data || []) { const v = num(p); if (v && p.address) out.tokens[String(p.address).toLowerCase()] = v; }
+  return out;
+}
 
 /** The Alchemy key: SHOP_RPC_1 is an Alchemy URL ending in /v2/<key>. */
 const key = () => env("ALCHEMY_API_KEY") || (env("SHOP_RPC_1").match(/alchemy\.com\/v2\/([\w-]+)/) || [])[1] || "";
@@ -32,7 +51,9 @@ export async function POST(req: Request) {
   if (text.length > 20_000) return oops("Too big.", 413);
   let b: any;
   try { b = JSON.parse(text); } catch { return oops("Bad request."); }
-  if (!b || Array.isArray(b) || !READ.has(b.method) || !Array.isArray(b.params)) return oops("Not allowed.", 403);
+  if (!b || Array.isArray(b) || !Array.isArray(b.params)) return oops("Not allowed.", 403);
+  if (b.method === "wedgie_prices") return json({ jsonrpc: "2.0", id: b.id ?? 1, result: await prices(Number(new URL(req.url).searchParams.get("chain")), host, b.params) });
+  if (!READ.has(b.method)) return oops("Not allowed.", 403);
   const r = await fetch(`https://${host}.g.alchemy.com/v2/${key()}`, { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", id: b.id ?? 1, method: b.method, params: b.params }) });
   if (!r.ok) return oops("Busy.", r.status === 429 ? 429 : 502);

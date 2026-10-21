@@ -153,6 +153,10 @@
       "destination": "/index.html"
     },
     {
+      "source": "/safe/:id/:sub",
+      "destination": "/index.html"
+    },
+    {
       "source": "/secret",
       "destination": "/index.html"
     },

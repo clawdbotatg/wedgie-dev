@@ -1,15 +1,17 @@
 // wedgie.dev/safe: a wedgie as a signer on a Safe. The wedgie runs the Safe Signer app
 // (clawdbotatg/wedgie-safe): its key lives in the secure chip (ATECC608 or Trust M), it shows each transaction and signs on A.
 // Its key is a Safe owner through Safe's passkey signer contract (eth.ts signerAddress, no RPC).
-// Two views, one page (history.pushState between them, so the wedgie's key is read once):
-//   /safe                    the wedgie, a browser wallet (optional: pays gas, can sign as an owner), every
-//                            Safe the wedgie owns on every chain (Safe's API, plus the ones made or opened in
-//                            this browser), the wallet's Safes it could join, and Make a new Safe
-//   /safe/<chain>:<address>  one Safe: owners, threshold, balance read from the chain (/api/rpc: Alchemy); add the
-//                            wedgie as an owner from a wallet that is one, remove an owner, change the threshold
+// Three views, one page (history.pushState between them, so the wedgie's key is read once), laid out like
+// Instant Wallet: a big balance, three buttons, then what's waiting, what it holds, what happened.
+//   /safe                    every Safe the wedgie owns on every chain, as cards (Safe's API, plus the ones made
+//                            or opened in this browser), the wallet's Safes it could join, New Safe (a sheet)
+//   /safe/<chain>:<address>  one Safe: its balance in dollars, Send / Receive / Connect app (sheets), apps'
+//                            requests, Waiting (sign, execute, reject), Assets (every token), Activity
+//   /safe/<…>/settings       owners, threshold, add the wedgie or an owner, other chains, Safe{Wallet}
+//   - the chain is read through /api/rpc (Alchemy): owners, threshold, balances, tokens, prices
 //   - the queue (Safe's Transaction Service, api.safe.global: no key, CORS open): sign on the wedgie or the
 //     wallet, execute once enough have signed (a wallet sends it, packSignatures puts them together)
-//   - a new transaction (ETH, USDC or raw data), signed by the wedgie or the wallet, into the queue
+//   - every transaction in plain words (src/safe/describe.ts): "Send 100 USDC to bob.eth"
 // Every transaction goes through propose(): one signature, into Safe's queue, where Safe{Wallet} sees it too.
 // Safe{Wallet} can't EXECUTE one the wedgie signed: it pastes a contract signature in place and the Safe
 // reverts GS021 (safe-wallet-monorepo#8808). packSignatures does it right, so execute here.
@@ -21,6 +23,10 @@ import * as W from "../serial/wedgies";
 import * as Drive from "../serial/drive";
 import * as E from "../safe/eth";
 import { address, addressInput, addressOf, watch } from "../safe/address";
+import { describe, type Ctx, type Said } from "../safe/describe";
+import { readAssets, tokenMeta, knownMeta, usd, type Asset } from "../safe/assets";
+import { canScan, scan } from "../safe/scan";
+import qrcode from "qrcode-generator";
 
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 const short = (a: string) => a.slice(0, 6) + "…" + a.slice(-4);
@@ -64,7 +70,7 @@ async function post(url: string, body: unknown) {
 const readUrl = (chain: number) => `${location.origin}/api/rpc?chain=${chain}`;
 let rpcId = 0;
 /** A burst can be rate-limited (a list of Safes reads several at once): wait and try again. */
-async function rpc(chain: number, method: string, params: unknown[]) {
+async function rpc(chain: number, method: string, params: unknown[]): Promise<any> {
   for (let i = 0; ; i++) {
     try {
       const res = await fetch(readUrl(chain), { method: "POST", headers: { "Content-Type": "application/json" },
@@ -72,7 +78,7 @@ async function rpc(chain: number, method: string, params: unknown[]) {
       if (res.status === 429 || res.status >= 500) throw Object.assign(new Error(`${CHAINS[chain].name}: busy (${res.status})`), { again: true });
       const r = await res.json();
       if (r.error) throw new Error(`${CHAINS[chain].name}: ${r.error.message}`);
-      return r.result as string;
+      return r.result;
     } catch (e: any) {
       if (i >= 3 || !(e.again || e instanceof TypeError)) throw e;     // TypeError: the fetch itself failed
       await sleep(600 * 2 ** i);
@@ -136,17 +142,24 @@ export function safe(main: HTMLElement) {
   main.innerHTML = `
   <section class="test-page safe-page">
     <div class="safe-ids" id="s-ids"><div class="safe-id" id="s-me" hidden></div><div class="safe-id safe-id-wallet" id="s-wallet" hidden></div></div>
-    <div class="safe-box recess" id="s-wedgie" hidden></div>
-    <div class="safe-box recess" id="s-list" hidden></div>
-    <div class="safe-box recess" id="s-create" hidden></div>
-    <div class="safe-box recess" id="s-safe" hidden></div>
-    <div class="safe-box recess" id="s-add" hidden></div>
-    <div class="safe-box recess" id="s-owner" hidden></div>
-    <div class="safe-box recess" id="s-new" hidden></div>
-    <div class="safe-box recess" id="s-wc" hidden></div>
-    <div class="safe-box recess" id="s-queue" hidden></div>
+    <div class="sx-banner" id="s-wedgie" hidden></div>
+    <div class="sx-view" id="s-list" hidden></div>
+    <div class="sx-hero" id="s-safe" hidden></div>
+    <div class="sx-banner" id="s-add" hidden></div>
+    <div class="sx-card" id="s-asks" hidden></div>
+    <div class="sx-card" id="s-queue" hidden></div>
+    <div class="sx-card" id="s-assets" hidden></div>
+    <div class="sx-card" id="s-activity" hidden></div>
+    <div class="sx-card" id="s-owners" hidden></div>
+    <div class="sx-card" id="s-owner" hidden></div>
+    <div class="sx-card" id="s-chains" hidden></div>
     <p class="safe-msg" id="s-msg" hidden></p>
     <div class="safe-dock" id="s-dock" hidden><div class="safe-dock-row" id="s-dock-tx"></div><div id="s-dock-msg"></div></div>
+    <div class="sx-sheet" id="s-sheet" hidden><div class="sx-sheet-card" role="dialog" aria-modal="true">
+      <button class="sx-x" id="s-sheet-x" type="button" aria-label="Close">×</button>
+      <div id="s-create" hidden></div><div id="s-new" hidden></div><div id="s-receive" hidden></div><div id="s-wc" hidden></div>
+      <div class="sx-sheet-msg" id="s-sheet-msg" hidden></div>
+    </div></div>
   </section>`;
   const $ = (id: string) => document.getElementById(id)!;
   document.getElementById("connect-btn")?.before($("s-me"));   // the wedgie's address sits beside its Connected button
@@ -172,6 +185,12 @@ export function safe(main: HTMLElement) {
   // this Safe on the other chains: there (true), not yet (false), unknown; recipe = how it was made, to make it again
   let copies: Record<number, boolean | undefined> = {}, recipe: E.Recipe | null = null;
   let queueNote = "";        // which queue sources didn't answer just now
+  let sub: "home" | "settings" = "home";
+  let assets: Asset[] | null = null;              // what the open Safe holds (null: not read yet)
+  let activity: any[] | null = null, activityErr = "";
+  const ethPx: Record<number, number | null> = {};   // ETH's dollar price per chain, for the list's totals
+  // a sheet over the page (a bottom sheet on a phone): one at a time
+  let sheet: "" | "create" | "send" | "receive" | "connect" = "", sendToken: string | null = null;
 
   // the old page's "last Safe" (it opened that one every time): moved into the list once the wedgie is read
   let oldSaved = "";
@@ -183,13 +202,14 @@ export function safe(main: HTMLElement) {
   // While a bar is up it keeps creeping (1-2% every half second, slower near the end), so a wait never looks
   // stuck; each new step jumps it ahead if it's behind (Austin).
   let barAt = 0, creep = 0;
-  const paintBar = () => document.querySelectorAll<HTMLElement>("#s-msg .meter-fill, #s-dock-msg .meter-fill").forEach((f) => f.style.width = `${barAt}%`);
+  const paintBar = () => document.querySelectorAll<HTMLElement>("#s-msg .meter-fill, #s-dock-msg .meter-fill, #s-sheet-msg .meter-fill").forEach((f) => f.style.width = `${barAt}%`);
   const say = (s: string, bad: boolean | number = false) => {
     const el = $("s-msg");
     el.hidden = !s;
     const bar = typeof bad === "number";
     if (bar) barAt = Math.max(barAt, Math.max(8, Math.min(100, bad)));
-    $("s-dock-msg").innerHTML = el.innerHTML = bar
+    $("s-sheet-msg").hidden = !s;
+    $("s-sheet-msg").innerHTML = $("s-dock-msg").innerHTML = el.innerHTML = bar
       ? `${esc(s)}<div class="meter"><div class="meter-track"><div class="meter-fill" style="width:${barAt}%"></div></div></div>`
       : bad ? `<b class="bad">${esc(s)}</b>` : esc(s);
     clearInterval(creep);
@@ -220,6 +240,33 @@ export function safe(main: HTMLElement) {
   }
   const dis = (extra = false) => (busy || asking || extra ? " disabled" : "");
 
+  // ---- plain words for a transaction (src/safe/describe.ts) ----
+  const asked = new Set<string>();     // token contracts whose metadata is being fetched
+  const ctx = (): Ctx => ({
+    safe: safeAddr, owners: info?.owners.length || 1,
+    addr: (a) => eqA(a, safeAddr) ? "this Safe" : address(a, { size: "sm", chain, link: CHAINS[chain].scan }),
+    token: (a) => {
+      const m = knownMeta(chain, a);
+      if (!m && !asked.has(a.toLowerCase())) { asked.add(a.toLowerCase()); const c = chain; tokenMeta(c, a, (m, p) => rpc(c, m, p)).then((x) => { if (x && c === chain) paintAll(); }); }
+      return m;
+    },
+  });
+  const said = (t: any) => describe(t, ctx(), t.dataDecoded?.method);
+  const ICON: Record<Said["kind"], string> = { send: "↑", approve: "✓", owners: "👥", cancel: "⨯", batch: "≡", call: "⚙", danger: "!" };
+  const subsOf = (s: Said) => s.subs?.length ? `<ol class="sx-subs">${s.subs.map((x) => `<li>${x.title}</li>`).join("")}</ol>` : "";
+  /** The Safe's total in dollars, when every price that matters is known; else null. */
+  const total = () => assets && assets[0].price !== null ? assets.reduce((n, a) => n + (a.usd || 0), 0) : null;
+  const ago = (iso: string) => {
+    const s = (Date.now() - Date.parse(iso)) / 1000;
+    return s < 90 ? "just now" : s < 5400 ? `${Math.round(s / 60)} min ago` : s < 129600 ? `${Math.round(s / 3600)} h ago`
+      : new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: s > 3e7 ? "numeric" : undefined });
+  };
+  const tokenBadge = (sym: string) => {
+    let h = 0; for (const ch of sym) h = (h * 31 + ch.charCodeAt(0)) % 360;
+    return `<span class="sx-tok" style="--h:${h}">${esc(sym.slice(0, 1).toUpperCase())}</span>`;
+  };
+  const can = () => wedgieOwns() || isOwner(account);    // someone here can sign for this Safe
+
   // Safes made or opened in this browser, per wedgie: Safe's API lists a new one only seconds later
   const memKey = () => `wedgie.safes.${signer.toLowerCase()}`;
   const remembered = (): string[] => { try { return JSON.parse(localStorage.getItem(memKey()) || "[]"); } catch { return []; } };
@@ -242,17 +289,23 @@ export function safe(main: HTMLElement) {
   // ---- the route ----
   function go(path: string) { history.pushState(null, "", path); show(); }
   function show() {
-    const m = location.pathname.match(/^\/safe\/(\w+):(0x[0-9a-fA-F]{40})\/?$/);
+    const m = location.pathname.match(/^\/safe\/(\w+):(0x[0-9a-fA-F]{40})(\/settings)?\/?$/);
     say("");
+    closeSheet();
     if (m && KEYS[m[1]]) {
+      const same = KEYS[m[1]] === chain && eqA(m[2], safeAddr) && !!info;
+      sub = m[3] ? "settings" : "home";
+      if (same) { paintAll(); window.scrollTo(0, 0); return; }     // Settings and back: the same Safe, already read
       chain = KEYS[m[1]]; safeAddr = E.checksum(m[2]); info = null; queue = []; copies = {}; recipe = null;
-      $("s-new").innerHTML = ""; $("s-owner").innerHTML = "";
+      assets = null; activity = null; activityErr = "";
+      $("s-new").innerHTML = ""; $("s-owner").innerHTML = ""; $("s-wc").innerHTML = "";
       paintAll();
       checkDeployed();
       load();                 // not job(): a create that lands here is still a job
     } else {
+      sub = "home";
       if (location.pathname !== "/safe") history.replaceState(null, "", "/safe");
-      safeAddr = ""; info = null; queue = [];
+      safeAddr = ""; info = null; queue = []; assets = null; activity = null;
       paintAll();
       if (signer && !listing) findSafes();
     }
@@ -284,15 +337,11 @@ export function safe(main: HTMLElement) {
     else if (!key) h += noKey === "swap" ? `<p><b>This wedgie's chip is locked with a key that isn't Safe Signer's.</b> It never signs with it. Swap the chip.</p>`
       : noKey === "lock" ? `<p><b>Its key is from before keys were locked.</b> On the wedgie: green locks it for good (only if you made it), red makes your own.</p>`
       : noKey ? `<p><b>Press the green button on the wedgie to make its key.</b> The chip makes it, locks it for good, and never lets it out.</p>` : `<p class="fine">Reading its key.</p>`;
-    else {
-      if (safeAddr) {
-        const d = deployed[chain];
-        h += `<p class="fine">${d === undefined ? `Checking ${esc(CHAINS[chain].name)}.` : d ? `<span class="good">Set up on ${esc(CHAINS[chain].name)}.</span>`
-          : `Not set up on ${esc(CHAINS[chain].name)} yet: it has to be before its first signature. <button class="btn btn-sm" id="s-deploy"${dis()}>Set it up</button> (a wallet pays a little gas)`}</p>`;
-      }
-    }
+    else if (safeAddr && info && wedgieOwns() && deployed[chain] === false)    // all good: say nothing
+      h += `<p><b>Set up your wedgie on ${esc(CHAINS[chain].name)}</b> before it signs here. <button class="btn btn-sm btn-green" id="s-deploy"${dis()}>Set it up</button></p>
+        <p class="fine">Once per chain. Your wallet pays a little gas.</p>`;
     $("s-wedgie").innerHTML = h;
-    $("s-wedgie").hidden = !h;
+    $("s-wedgie").hidden = !h || sub === "settings";
     // up top, under Connected: the wedgie's Safe owner address (what you'd add to another Safe), a tap copies it
     const me = $("s-me");
     me.hidden = !signer;
@@ -431,28 +480,45 @@ export function safe(main: HTMLElement) {
       .sort((a, b) => +b.wedgie - +a.wedgie || +!!CHAINS[a.chain].test - +!!CHAINS[b.chain].test || a.chain - b.chain);
     listing = false;
     paintList();
+    // each chain's ETH price, for the cards' dollar totals (USDC counts as a dollar)
+    await Promise.all([...new Set(rows.map((r) => r.chain))].filter((c) => !(c in ethPx)).map(async (c) => {
+      try { ethPx[c] = (await rpc(c, "wedgie_prices", []))?.eth ?? null; } catch { ethPx[c] = null; }
+    }));
+    paintList();
   }
+
+  /** A Safe's worth for its card: dollars when ETH's price is known, else its ETH and USDC. */
+  const worth = (c: number, i: Info) => {
+    const p = ethPx[c];
+    if (p) return usd(Number(i.balance) / 1e18 * p + Number(i.usdc || 0n) / 1e6);
+    return `${E.fmt(i.balance, 18, 4)} ETH${i.usdc ? ` · ${E.fmt(i.usdc, 6, 2)} USDC` : ""}`;
+  };
 
   function paintList() {
     const box = $("s-list");
     box.hidden = !!safeAddr || !key;
     if (box.hidden) return;
-    const row = (r: Row) => {
+    const card = (r: Row) => {
       const i = r.info;
-      return `<li><a class="safe-row${r.wedgie ? " btn btn-green" : ""}" data-nav href="${route(r.chain, r.addr)}">${i && isIW(i.owners) ? iwMark : ""}${address(r.addr, { chain: r.chain })}
-        <span>${esc(CHAINS[r.chain].name)}</span><span class="fine">${i ? `${i.threshold} of ${plural(i.owners.length, "owner")} · ${esc(E.fmt(i.balance, 18, 4))} ETH${i.usdc ? ` · ${esc(E.fmt(i.usdc, 6, 2))} USDC` : ""}` : `couldn't read it just now (${esc(r.err || "")}): open it, or Refresh`}</span>
-        ${r.wedgie ? `<span class="safe-open">Open →</span>` : `<span class="fine">your wallet's: add your wedgie</span>`}</a></li>`;
+      return `<li><a class="safe-row sx-safe${r.wedgie ? " sx-mine" : ""}" data-nav href="${route(r.chain, r.addr)}">
+        <span class="sx-safe-top">${i && isIW(i.owners) ? iwMark : ""}${address(r.addr, { chain: r.chain })}<span class="sx-pill${CHAINS[r.chain].test ? " sx-test" : ""}">${esc(CHAINS[r.chain].name)}</span></span>
+        ${i ? `<span class="sx-safe-worth">${esc(worth(r.chain, i))}</span><span class="fine">${i.threshold} of ${plural(i.owners.length, "owner")}${r.wedgie ? "" : " · add your wedgie"}</span>`
+          : `<span class="fine">Couldn't read it just now. Open it, or Refresh.</span>`}</a></li>`;
     };
     const mine = rows.filter((r) => r.wedgie), theirs = rows.filter((r) => !r.wedgie);
-    let h = `<h2>Your wedgie's Safes</h2>`;
-    h += mine.length ? `<ul class="safe-list safe-rows">${mine.map(row).join("")}</ul>`
-      : listing ? `<div class="meter"><div class="meter-track"><div class="meter-fill" id="l-fill" style="width:${listPct}%"></div></div><p class="fine">Looking on every chain.</p></div>` : `<p class="fine">${key ? "None yet. Make one below, or add your wedgie to a Safe you already have." : "Plug in your wedgie to see its Safes."}</p>`;
-    if (theirs.length) h += showWallet
-      ? `<p class="fine"><button class="btn btn-sm" id="l-wallet">Hide your wallet's Safes</button> Open one to add your wedgie as an owner.</p><ul class="safe-list safe-rows">${theirs.map(row).join("")}</ul>`
-      : `<p class="fine"><button class="btn btn-sm" id="l-wallet">Your wallet's Safes (${theirs.length})</button> to add your wedgie to one</p>`;
-    h += `<p class="fine"><button class="btn btn-sm" id="l-refresh"${dis(listing)}>Refresh</button>
-      · Open another: ${addressInput("l-addr", "0x… or ENS name of a Safe")} <select id="l-chain">${chainOpts(newChain)}</select> <button class="btn btn-sm" id="l-open">Open</button></p>`;
+    let h = `<div class="sx-head"><h1>Your wedgie's Safes</h1><button class="btn btn-green" id="l-new"${dis()}>＋ New Safe</button></div>`;
+    h += mine.length ? `<ul class="sx-safes">${mine.map(card).join("")}</ul>`
+      : listing ? `<div class="sx-card"><div class="meter"><div class="meter-track"><div class="meter-fill" id="l-fill" style="width:${listPct}%"></div></div><p class="fine">Looking on every chain.</p></div></div>`
+      : `<div class="sx-card sx-empty"><p><b>No Safes yet.</b></p><p class="fine">Make one, or add your wedgie to a Safe you have.</p></div>`;
+    if (theirs.length) h += `<p class="sx-fold"><button class="btn btn-sm" id="l-wallet">${showWallet ? "Hide your wallet's Safes" : `Your wallet's Safes (${theirs.length})`}</button></p>`
+      + (showWallet ? `<ul class="sx-safes">${theirs.map(card).join("")}</ul>` : "");
+    const typed = (document.getElementById("l-addr") as HTMLInputElement | null)?.value || "", open = !!document.querySelector("#l-more[open]");
+    h += `<details class="sx-more" id="l-more"${open ? " open" : ""}><summary>Open another Safe</summary>
+      <p class="sx-row">${addressInput("l-addr", "0x… or ENS name of a Safe")} <select id="l-chain">${chainOpts(newChain)}</select> <button class="btn btn-sm" id="l-open">Open</button></p></details>
+      <p class="sx-foot"><button class="btn btn-sm" id="l-refresh"${dis(listing)}>Refresh</button></p>`;
     box.innerHTML = h;
+    if (typed) { const el = $("l-addr") as HTMLInputElement; el.value = typed; el.dispatchEvent(new Event("input")); }
+    $("l-new").onclick = () => openSheet("create");
     $("l-refresh").onclick = () => findSafes();
     $("l-wallet")?.addEventListener("click", () => { showWallet = !showWallet; paintList(); });
     $("l-open").onclick = () => {
@@ -467,16 +533,17 @@ export function safe(main: HTMLElement) {
   // ---- /safe: a new Safe with the wedgie as an owner; a browser wallet pays the gas ----
   function paintCreate() {
     const box = $("s-create");
-    box.hidden = !!safeAddr || !key;
+    box.hidden = sheet !== "create" || !key;
     if (box.hidden) return;
     if (document.getElementById("c-go")) { ($("c-go") as HTMLButtonElement).disabled = busy; return; }   // keep what's typed
-    box.innerHTML = `<h2>Make a new Safe</h2>
-      <p class="fine">Owners: your wedgie, and any wallet or other wedgie you add.</p>
-      <div class="safe-owners" id="c-owners"><div class="safe-owner">${address(signer)} <span class="fine">this wedgie</span></div></div>
-      <p><button class="btn btn-sm" id="c-add" aria-label="Add an owner">＋ Owner</button> <button class="btn btn-sm" id="c-me">Add my wallet</button></p>
-      <p><select id="c-th"></select> <span id="c-of"></span> must sign, on <select id="c-chain">${chainOpts(newChain)}</select></p>
-      <p><button class="btn btn-green" id="c-go">Make it</button></p>
-      <p class="fine">Your browser wallet sends one transaction: it sets up your wedgie on that chain and makes the Safe (Safe 1.4.1).</p>`;
+    box.innerHTML = `<h2>New Safe</h2>
+      <p class="sx-label">Owners</p>
+      <div class="safe-owners" id="c-owners"><div class="safe-owner">${address(signer)} <span class="sx-pill">this wedgie</span></div></div>
+      <p class="sx-row"><button class="btn btn-sm" id="c-add" aria-label="Add an owner">＋ Owner</button> <button class="btn btn-sm" id="c-me">Add my wallet</button></p>
+      <p class="sx-row"><select id="c-th"></select> <span id="c-of"></span> must sign</p>
+      <p class="sx-row">On <select id="c-chain">${chainOpts(newChain)}</select></p>
+      <p><button class="btn btn-green sx-wide" id="c-go">Make it</button></p>
+      <p class="fine">Your wallet sends one transaction and pays the gas.</p>`;
     const list = $("c-owners"), th = $("c-th") as HTMLSelectElement;
     let rowN = 0;
     const addRow = (v = "") => {                  // one input per owner; × takes it off
@@ -532,39 +599,68 @@ export function safe(main: HTMLElement) {
     $("s-create").innerHTML = "";
     rows = [];
     go(route(c, a));
-    say(`Made your Safe on ${CHAINS[c].name}. Send it some ETH or tokens, then use New transaction below.`);
+    say(`Made your Safe on ${CHAINS[c].name}. Receive puts money in it.`);
   }
 
-  // ---- /safe/<chain>:<address>: one Safe ----
+  // ---- /safe/<chain>:<address>: one Safe. The top: its name, its worth, three buttons ----
   function paintSafe() {
     const box = $("s-safe");
     box.hidden = !safeAddr;
     if (box.hidden) return;
-    const c = CHAINS[chain];
-    let h = `<p class="fine"><a data-nav href="/safe">← All your Safes</a>
-      <a class="btn btn-sm safe-ui" href="${appLink(chain, safeAddr)}" target="_blank" rel="noopener">Open in Safe{Wallet} ↗</a></p>
-      <h2>${info && isIW(info.owners) ? `${iwMark}Instant Wallet ` : ""}Safe on ${esc(c.name)}</h2>
-      <p>${address(safeAddr, { link: c.scan, size: "lg", long: true, chain })}</p>`;
-    if (info) {
-      const i = info, canChange = wedgieOwns() || isOwner(account);
-      h += `<p>${esc(E.fmt(i.balance, 18))} ETH${i.usdc !== null ? ` · ${esc(E.fmt(i.usdc, 6, 2))} USDC` : ""} ·
-          <a href="${c.scan}/address/${safeAddr}" target="_blank" rel="noopener">explorer</a></p>
-        <p>${i.threshold} of ${plural(i.owners.length, "owner")} must sign${canChange && i.owners.length > 1
-          ? ` · <select id="o-th"${dis()}>${threshOpts(i.owners.length, i.threshold)}</select> <button class="btn btn-sm" id="o-th-go"${dis()}>Change</button>` : ""}</p>
-        <ul class="safe-list">${i.owners.map((o) => `<li>${address(o, { link: c.scan, chain })}${label(o)}${canChange && i.owners.length > 1 ? ` <button class="btn btn-sm" data-rm="${esc(o)}"${dis()}>Remove</button>` : ""}</li>`).join("")}</ul>
-        ${signer ? wedgieOwns() ? `<p class="good">Your wedgie is an owner.</p>` : `<p class="bad">Your wedgie isn't an owner of this Safe.</p>` : ""}`;
-      const others = Object.keys(CHAINS).map(Number).filter((t) => t !== chain);
-      const differs = recipe && recipe.owners.length && (recipe.threshold !== i.threshold || recipe.owners.length !== i.owners.length || recipe.owners.some((o) => !i.owners.some((x) => eqA(x, o))));
-      h += `<div class="safe-info"><p><b>Other chains</b> <span class="fine">same address</span></p><p>${others.map((t) => copies[t]
-        ? `<a class="btn btn-sm" data-nav href="${route(t, safeAddr)}">${esc(CHAINS[t].name)} ✓</a>`
-        : copies[t] === false ? `<button class="btn btn-sm" data-copy="${t}"${dis()}>Deploy on ${esc(CHAINS[t].name)}</button>`
-        : `<span class="fine">${esc(CHAINS[t].name)}…</span>`).join(" ")}</p>
-        ${differs ? `<p class="fine">A new copy starts with this Safe's first owners (${recipe!.threshold} of ${recipe!.owners.length}), not today's.</p>` : ""}</div>`;
+    const c = CHAINS[chain], i = info, home = route(chain, safeAddr), $t = total();
+    const others = Object.keys(CHAINS).map(Number).filter((t) => t !== chain && copies[t]);
+    const worthOf = !i ? "" : $t !== null ? usd($t) : `${E.fmt(i.balance, 18, 4)} ETH`;
+    const who = !i ? "" : `${i.threshold} of ${plural(i.owners.length, "owner")}`
+      + (signer ? wedgieOwns() ? " · your wedgie is one" : " · your wedgie isn't one" : "");
+    let h = `<div class="sx-hero-top">${sub === "settings" ? `<a class="sx-back" data-nav href="${home}">← Back</a>` : `<a class="sx-back" data-nav href="/safe">← Safes</a>`}
+      ${sub === "home" ? `<a class="sx-gear" id="a-settings" data-nav href="${home}/settings">Settings</a>` : ""}</div>
+      <div class="sx-hero-id">${i && isIW(i.owners) ? iwMark : ""}${address(safeAddr, { size: "lg", chain })}</div>
+      <div class="sx-chains"><span class="sx-pill sx-on">${esc(c.name)}</span>${others.map((t) => `<a class="sx-pill" data-nav href="${route(t, safeAddr)}${sub === "settings" ? "/settings" : ""}">${esc(CHAINS[t].name)}</a>`).join("")}</div>`;
+    if (sub === "settings") h += `<div class="sx-total sx-total-sm">Settings</div><div class="sx-sub">${esc(who)}</div>`;
+    else {
+      h += `<div class="sx-total">${i ? esc(worthOf) : "&nbsp;"}</div><div class="sx-sub">${i ? esc(who) : "Opening the Safe"}</div>`;
+      if (i) h += `<div class="sx-actions">
+        ${can() ? `<button class="sx-act" id="a-send"${dis()}><span>↑</span>Send</button>` : ""}
+        <button class="sx-act" id="a-receive"><span>↓</span>Receive</button>
+        ${can() ? `<button class="sx-act" id="a-connect"${dis()}><span>⇄</span>Connect app</button>` : ""}</div>`;
     }
     box.innerHTML = h;
-    box.querySelectorAll<HTMLButtonElement>("[data-copy]").forEach((b) => b.onclick = () => job(() => copyTo(+b.dataset.copy!)));
+    $("a-send")?.addEventListener("click", () => openSheet("send"));
+    $("a-receive")?.addEventListener("click", () => openSheet("receive"));
+    $("a-connect")?.addEventListener("click", () => openSheet("connect"));
+  }
+
+  // ---- Settings: owners and threshold ----
+  function paintOwners() {
+    const box = $("s-owners");
+    box.hidden = !(safeAddr && info && sub === "settings");
+    if (box.hidden) return;
+    const i = info!, c = CHAINS[chain], change = can() && i.owners.length > 1;
+    box.innerHTML = `<h3>Owners</h3>
+      <ul class="sx-rows">${i.owners.map((o) => `<li>${address(o, { link: c.scan, chain })}${label(o)}${change ? `<button class="btn btn-sm sx-end" data-rm="${esc(o)}"${dis()}>Remove</button>` : ""}</li>`).join("")}</ul>
+      <p class="sx-row"><b>${i.threshold} of ${i.owners.length}</b>&nbsp;must sign${change ? `<span class="sx-end"><select id="o-th"${dis()}>${threshOpts(i.owners.length, i.threshold)}</select> <button class="btn btn-sm" id="o-th-go"${dis()}>Change</button></span>` : ""}</p>`;
     box.querySelectorAll<HTMLButtonElement>("[data-rm]").forEach((b) => b.onclick = () => removeOwner(b.dataset.rm!));
     $("o-th-go")?.addEventListener("click", () => changeThreshold(+($("o-th") as HTMLSelectElement).value));
+  }
+
+  // ---- Settings: the same Safe on other chains, and the ways out (Safe{Wallet}, the explorer) ----
+  function paintChains() {
+    const box = $("s-chains");
+    box.hidden = !(safeAddr && info && sub === "settings");
+    if (box.hidden) return;
+    const i = info!, c = CHAINS[chain];
+    const others = Object.keys(CHAINS).map(Number).filter((t) => t !== chain);
+    const differs = recipe && recipe.owners.length && (recipe.threshold !== i.threshold || recipe.owners.length !== i.owners.length || recipe.owners.some((o) => !i.owners.some((x) => eqA(x, o))));
+    box.innerHTML = `<h3>Other chains</h3><p class="fine">Same address on every chain.</p>
+      <ul class="sx-rows">${others.map((t) => `<li><span>${esc(CHAINS[t].name)}${CHAINS[t].test ? ` <span class="fine">test</span>` : ""}</span>${copies[t]
+        ? `<a class="btn btn-sm sx-end" data-nav href="${route(t, safeAddr)}">Open</a>`
+        : copies[t] === false ? `<button class="btn btn-sm sx-end" data-copy="${t}"${dis()}>Deploy</button>` : `<span class="fine sx-end">checking</span>`}</li>`).join("")}</ul>
+      ${differs ? `<p class="fine">A new copy starts with this Safe's first owners (${recipe!.threshold} of ${recipe!.owners.length}), not today's.</p>` : ""}
+      <h3>More</h3>
+      <p class="sx-row"><a class="btn btn-sm" href="${appLink(chain, safeAddr)}" target="_blank" rel="noopener">Open in Safe{Wallet} ↗</a>
+        <a class="btn btn-sm" href="${c.scan}/address/${safeAddr}" target="_blank" rel="noopener">Explorer ↗</a></p>
+      <p class="fine">Execute here: Safe{Wallet} can't run a transaction a wedgie signed yet (GS021, <a href="https://github.com/safe-global/safe-wallet-monorepo/issues/8808" target="_blank" rel="noopener">their bug</a>).</p>`;
+    box.querySelectorAll<HTMLButtonElement>("[data-copy]").forEach((b) => b.onclick = () => job(() => copyTo(+b.dataset.copy!)));
   }
 
   /** The Safe from the chain (the truth), its queue from Safe's API. */
@@ -584,8 +680,10 @@ export function safe(main: HTMLElement) {
       info = i;
       if (signer) { if (wedgieOwns()) { remember(c, a); tellWedgie(c, a); } else forget(c, a); }
       if (!quiet) say("");
-      paintAll();             // the Safe from the chain now; its queue as the sources answer
-      checkCopies(c, a);
+      paintAll();             // the Safe from the chain now; its queue, tokens and history as the sources answer
+      if (!quiet) checkCopies(c, a);
+      loadAssets(c, a, i);
+      loadActivity(c, a);
       const q = await readQueue(c, a, i.nonce);
       if (c !== chain || a !== safeAddr) return;
       queue = q;
@@ -593,13 +691,30 @@ export function safe(main: HTMLElement) {
     paintAll();
   }
 
+  /** Every token it holds, with dollars (src/safe/assets.ts). */
+  async function loadAssets(c: number, a: string, i: Info) {
+    const got = await readAssets(c, a, i.balance, CHAINS[c].usdc ? { address: CHAINS[c].usdc!, balance: i.usdc } : null, (m, p) => rpc(c, m, p));
+    if (c === chain && a === safeAddr) { assets = got; paintSafe(); paintAssets(); paintNew(); }
+  }
+
+  /** What happened: Safe's API (its executed transactions, and money that came in). */
+  async function loadActivity(c: number, a: string) {
+    try {
+      const j = await within(get(`${api(c)}/safes/${a}/all-transactions/?executed=true&queued=false&limit=25`));
+      if (c === chain && a === safeAddr) { activity = j.results || []; activityErr = ""; }
+    } catch (e: any) {
+      if (c === chain && a === safeAddr) { activity = activity || []; activityErr = e.status === 404 ? "" : "Couldn't load it just now."; }
+    }
+    if (c === chain && a === safeAddr) paintActivity();
+  }
+
   // ---- the same Safe on another chain: its creation call again, so the same address ----
   async function checkCopies(c: number, a: string) {
     await Promise.all(Object.keys(CHAINS).map(Number).filter((t) => t !== c).map(async (t) => {
       try { const has = await hasCode(t, a); if (c === chain && a === safeAddr) copies[t] = has; } catch {}
     }));
-    if (c === chain && a === safeAddr) paintSafe();
-    try { const r = await recipeOf(c, a); if (c === chain && a === safeAddr) { recipe = r; paintSafe(); } } catch {}
+    if (c === chain && a === safeAddr) { paintSafe(); paintChains(); }
+    try { const r = await recipeOf(c, a); if (c === chain && a === safeAddr) { recipe = r; paintChains(); } } catch {}
   }
 
   /** How the Safe was made: its creation transaction (from Safe's API), the factory call found in it and checked. */
@@ -696,11 +811,10 @@ export function safe(main: HTMLElement) {
     box.hidden = !(safeAddr && info && signer && !wedgieOwns());
     if (box.hidden) return;
     const i = info!, n = i.owners.length;
-    box.innerHTML = `<h2>Add your wedgie as an owner</h2>
-      <p class="fine">An owner of this Safe does it from their browser wallet. ${i.threshold > 1
-        ? `This Safe needs ${i.threshold} signatures, so it goes to the queue below for the other owners to sign (here or in <a href="${appLink(chain, safeAddr, "transactions/queue")}" target="_blank" rel="noopener">Safe{Wallet}</a>), then anyone executes it here.`
-        : "One signature is enough here, so it runs right away."}</p>
-      <p>Then <select id="a-th"${dis()}>${threshOpts(n + 1, i.threshold)}</select> of ${n + 1} owners must sign. <button class="btn btn-green" id="a-go"${dis()}>Add it with my wallet</button></p>`;
+    box.innerHTML = `<p><b>Add your wedgie as an owner</b></p>
+      <p class="sx-row">Then <select id="a-th"${dis()}>${threshOpts(n + 1, i.threshold)}</select> of ${n + 1} must sign.
+        <button class="btn btn-green" id="a-go"${dis()}>Add it with my wallet</button></p>
+      <p class="fine">${i.threshold > 1 ? `${i.threshold} owners must sign this before it runs.` : "Your wallet must be an owner."}</p>`;
     $("a-go").onclick = () => job(addSigner);
   }
 
@@ -727,15 +841,15 @@ export function safe(main: HTMLElement) {
   // ---- add any owner (a wallet, another wedgie): its own box, built once per Safe so typing survives repaints ----
   function paintOwner() {
     const box = $("s-owner");
-    box.hidden = !(safeAddr && info && (wedgieOwns() || isOwner(account)));
+    box.hidden = !(safeAddr && info && can() && sub === "settings");
     if (box.hidden) return;
     const i = info!;
     if (!document.getElementById("ow-addr")) {
-      box.innerHTML = `<h2>Add an owner</h2>
-        <p class="fine">Any wallet, or another wedgie's Safe owner address (its screen shows it).</p>
-        <p>${addressInput("ow-addr", "0x… or ENS name of the new owner")}</p>
-        <p>Then <select id="ow-th"></select> <span id="ow-of"></span> must sign.</p>
-        <p id="ow-btns"></p>`;
+      box.innerHTML = `<h3>Add an owner</h3>
+        <p>${addressInput("ow-addr", "0x… or ENS name")}</p>
+        <p class="fine">A wallet, or another wedgie (its screen shows its address).</p>
+        <p class="sx-row">Then <select id="ow-th"></select> <span id="ow-of"></span> must sign.</p>
+        <p class="sx-row" id="ow-btns"></p>`;
     }
     const th = $("ow-th") as HTMLSelectElement, keep = +th.value || i.threshold;
     th.innerHTML = threshOpts(i.owners.length + 1, Math.min(keep, i.owners.length + 1));
@@ -758,33 +872,50 @@ export function safe(main: HTMLElement) {
     job(() => propose(safeTx(safeAddr, "0", E.changeThresholdData(th)), by(), `${th} of ${info!.owners.length} must sign`));
   }
 
-  // ---- the queue ----
+  // ---- the queue: each one in words, who signed, and its one next step ----
   function paintQueue() {
     const box = $("s-queue");
-    box.hidden = !(safeAddr && info);
-    if (box.hidden) return;
+    box.hidden = !(safeAddr && info && sub === "home" && (queue.length || queueNote));
+    if (box.hidden) return paintDock();       // an empty queue still takes the bottom bar away
     const i = info!;
     const signed = (t: any, a: string) => !!a && (t.confirmations || []).some((c: any) => eqA(c.owner, a));
+    const cancelled = (n: number) => queue.some((x) => +x.nonce === n && said(x).kind === "cancel");
     const items = queue.map((t, k) => {
-      const n = (t.confirmations || []).length, need = t.confirmationsRequired ?? i.threshold, first = +t.nonce === i.nonce;
-      const what = t.dataDecoded?.method || (t.data && t.data !== "0x" ? "contract call" : `send ${E.fmt(BigInt(t.value), 18)} ETH`);
-      const btns: string[] = [];
-      if (wedgieOwns()) btns.push(ownedBy().every((o) => signed(t, o)) ? `<span class="good">wedgie signed</span>` : `<button class="btn btn-sm btn-green" data-sign="${k}"${dis(!key)}>Sign with wedgie</button>`);
-      if (account && isOwner(account)) btns.push(signed(t, account) ? `<span class="good">wallet signed</span>` : n < need ? `<button class="btn btn-sm" data-wsign="${k}"${dis()}>Sign with wallet</button>` : "");
+      const n = (t.confirmations || []).length, need = t.confirmationsRequired ?? i.threshold, first = +t.nonce === i.nonce, s = said(t);
+      const btns: string[] = [], marks: string[] = [];
+      if (wedgieOwns()) ownedBy().every((o) => signed(t, o)) ? marks.push("wedgie ✓")
+        : btns.push(`<button class="btn btn-sm btn-green" data-sign="${k}"${dis(!key)}>Sign with wedgie</button>`);
+      if (account && isOwner(account)) signed(t, account) ? marks.push("wallet ✓")
+        : n < need && btns.push(`<button class="btn btn-sm" data-wsign="${k}"${dis()}>Sign with wallet</button>`);
       if (n >= need) btns.push(first ? `<button class="btn btn-sm btn-green" data-exec="${k}"${dis()}>Execute</button>` : `<span class="fine">runs after #${i.nonce}</span>`);
-      return `<li><b>#${esc(t.nonce)}</b> ${esc(what)} → ${eqA(t.to, safeAddr) ? "this Safe" : address(t.to, { link: CHAINS[chain].scan, size: "sm", chain })} <span class="fine">${n}/${need} signed</span> ${btns.join(" ")}</li>`;
+      if (can() && s.kind !== "cancel" && !cancelled(+t.nonce)) btns.push(`<button class="btn btn-sm sx-end" data-reject="${k}"${dis()}>Reject</button>`);
+      const dots = Array.from({ length: need }, (_, d) => `<i class="${d < n ? "on" : ""}"></i>`).join("");
+      return `<li class="sx-tx sx-k-${s.kind}">
+        <div class="sx-tx-head"><span class="sx-ic">${ICON[s.kind]}</span><span class="sx-tx-what">${s.title}</span><span class="sx-tx-n">#${esc(t.nonce)}</span></div>
+        ${subsOf(s)}${s.kind === "danger" ? `<p class="sx-warn">This can change how the Safe works. Only sign if you know why.</p>` : ""}
+        <div class="sx-tx-sigs"><span class="sx-dots">${dots}</span>${n} of ${need} signed${marks.length ? ` · ${marks.join(" · ")}` : ""}</div>
+        ${btns.length ? `<div class="sx-row">${btns.join(" ")}</div>` : ""}
+        <details class="sx-more"><summary>Details</summary><dl class="sx-dl">
+          <dt>To</dt><dd>${address(t.to, { link: CHAINS[chain].scan, size: "sm", chain })}</dd>
+          ${BigInt(t.value || 0) ? `<dt>ETH</dt><dd>${esc(E.fmt(BigInt(t.value), 18))}</dd>` : ""}
+          ${t.data && t.data !== "0x" ? `<dt>Data</dt><dd><code>${esc(t.data.length > 202 ? t.data.slice(0, 202) + `… (${(t.data.length - 2) / 2} bytes)` : t.data)}</code></dd>` : ""}
+          ${+t.operation === 1 ? `<dt>Kind</dt><dd>delegate call</dd>` : ""}
+          <dt>Hash</dt><dd><code>${esc(String(t.safeTxHash).slice(0, 10))}…${esc(String(t.safeTxHash).slice(-8))}</code></dd></dl></details></li>`;
     }).join("");
     const ready = /data-exec/.test(items);
-    box.innerHTML = `<h2>${ready ? "Ready: press Execute" : "Waiting to sign"}</h2>${items ? `<ul class="safe-list">${items}</ul>` : `<p class="fine">Nothing waiting.</p>`}
+    box.innerHTML = `<h3>${ready ? "Ready: press Execute" : "Waiting"}${queue.length ? ` <span class="sx-count">${queue.length}</span>` : ""}</h3>
+      ${items ? `<ul class="sx-txs">${items}</ul>` : `<p class="fine">Nothing waiting.</p>`}
       ${queueNote ? `<p class="fine">${esc(queueNote)}</p>` : ""}
-      <p class="fine">Execute here. Safe{Wallet} can't run a transaction a wedgie signed yet (it fails with GS021, <a href="https://github.com/safe-global/safe-wallet-monorepo/issues/8808" target="_blank" rel="noopener">their bug</a>).</p>
-      <p><button class="btn btn-sm" id="s-refresh"${dis()}>Refresh</button>
-        <a class="btn btn-sm" href="${appLink(chain, safeAddr, "transactions/queue")}" target="_blank" rel="noopener">Queue in Safe{Wallet} ↗</a>
-        <a class="btn btn-sm" href="${appLink(chain, safeAddr, "transactions/history")}" target="_blank" rel="noopener">History ↗</a></p>`;
+      <p class="sx-foot"><button class="btn btn-sm" id="s-refresh"${dis()}>Refresh</button></p>`;
     $("s-refresh").onclick = () => job(() => load());
     box.querySelectorAll<HTMLButtonElement>("[data-sign]").forEach((b) => b.onclick = () => job(() => signQueued(queue[+b.dataset.sign!], "wedgie")));
     box.querySelectorAll<HTMLButtonElement>("[data-wsign]").forEach((b) => b.onclick = () => job(() => signQueued(queue[+b.dataset.wsign!], "wallet")));
     box.querySelectorAll<HTMLButtonElement>("[data-exec]").forEach((b) => b.onclick = () => job(async () => { running = queue[+b.dataset.exec!]; paintDock(); try { await execute(running); } finally { running = null; } }));
+    box.querySelectorAll<HTMLButtonElement>("[data-reject]").forEach((b) => b.onclick = () => {
+      const t = queue[+b.dataset.reject!];
+      // a Safe can't delete a queued one: an empty one at the same nonce runs instead, and the first can never run
+      job(() => propose(safeTx(safeAddr, "0", "0x", +t.nonce), by(), `cancel #${t.nonce}`));
+    });
     paintDock();
   }
   /** Stuck to the bottom of the screen while a transaction is ready to run (Austin): its Execute, then its progress. */
@@ -793,16 +924,60 @@ export function safe(main: HTMLElement) {
     const i = info, k = i ? queue.findIndex((t) => +t.nonce === i.nonce && (t.confirmations || []).length >= (t.confirmationsRequired ?? i.threshold)) : -1;
     const t = running || (k >= 0 ? queue[k] : null);
     const dock = $("s-dock");
-    dock.hidden = !(safeAddr && t);
+    dock.hidden = !(safeAddr && t && sub === "home");
     document.body.classList.toggle("has-dock", !dock.hidden);
     document.body.classList.toggle("dock-running", !dock.hidden && !!running);   // the dock shows the progress: no second bar
     document.body.classList.toggle("in-app", Drive.inApp());
     if (dock.hidden) return;
-    const what = t.dataDecoded?.method || (t.data && t.data !== "0x" ? "contract call" : `send ${E.fmt(BigInt(t.value), 18)} ETH`);
-    $("s-dock-tx").innerHTML = `<span class="safe-dock-what"><b>#${esc(t.nonce)}</b> ${esc(what)} → ${eqA(t.to, safeAddr) ? "this Safe" : address(t.to, { size: "sm", chain })}</span>
+    $("s-dock-tx").innerHTML = `<span class="safe-dock-what"><b>#${esc(t.nonce)}</b> ${said(t).title}</span>
       ${running ? "" : `<button class="btn btn-green" id="s-dock-go"${dis()}>Execute</button>`}`;
     $("s-dock-msg").hidden = !running;
     $("s-dock-go")?.addEventListener("click", () => job(async () => { running = t; paintDock(); try { await execute(t); } finally { running = null; } }));
+  }
+
+  // ---- Assets: every token, biggest first; ones with no price folded away ----
+  function paintAssets() {
+    const box = $("s-assets");
+    box.hidden = !(safeAddr && info && sub === "home");
+    if (box.hidden) return;
+    const list = assets || [{ token: null, symbol: "ETH", name: "Ether", decimals: 18, balance: info!.balance, usd: null, price: null } as Asset];
+    const row = (a: Asset) => `<li><button class="sx-asset" type="button" data-tok="${a.token || ""}"${can() ? "" : " disabled"}>${tokenBadge(a.symbol)}
+      <span class="sx-asset-name"><b>${esc(a.symbol)}</b><span class="fine">${esc(a.name)}</span></span>
+      <span class="sx-asset-amt">${a.usd !== null ? `<b>${esc(usd(a.usd))}</b><span class="fine">${esc(E.fmt(a.balance, a.decimals, 4))} ${esc(a.symbol)}</span>` : `<b>${esc(E.fmt(a.balance, a.decimals, 4))}</b>`}</span></button></li>`;
+    const priced = list.filter((a) => a.token === null || a.price !== null), other = list.filter((a) => a.token !== null && a.price === null);
+    const open = !!document.querySelector("#s-other[open]");
+    box.innerHTML = `<h3>Assets</h3><ul class="sx-assets">${priced.map(row).join("")}</ul>
+      ${other.length ? `<details class="sx-more" id="s-other"${open ? " open" : ""}><summary>Other tokens (${other.length})</summary>
+        <p class="fine">No price. Tokens nobody asked for land here: don't trust their names.</p><ul class="sx-assets">${other.map(row).join("")}</ul></details>` : ""}`;
+    box.querySelectorAll<HTMLButtonElement>("[data-tok]").forEach((b) => b.onclick = () => { sendToken = b.dataset.tok || null; openSheet("send"); });
+  }
+
+  // ---- Activity: what ran, and money that came in ----
+  function paintActivity() {
+    const box = $("s-activity");
+    box.hidden = !(safeAddr && info && sub === "home");
+    if (box.hidden) return;
+    const scan = CHAINS[chain].scan, rows: string[] = [];
+    for (const t of activity || []) {
+      if (rows.length >= 15) break;
+      const when = t.executionDate ? ago(t.executionDate) : "";
+      const link = t.transactionHash || t.txHash ? `${scan}/tx/${t.transactionHash || t.txHash}` : "";
+      if (t.txType === "MULTISIG_TRANSACTION") {
+        const s = describe(t, { ...ctx(), past: true }, t.dataDecoded?.method), failed = t.isSuccessful === false;
+        rows.push(`<li><span class="sx-ic">${ICON[s.kind]}</span><span class="sx-act-what"><b>${s.title}</b><span class="fine">#${esc(t.nonce)} · ${esc(when)}${failed ? ` · <span class="bad">failed</span>` : ""}</span></span>${link ? `<a class="sx-end fine" href="${link}" target="_blank" rel="noopener">↗</a>` : ""}</li>`);
+        continue;
+      }
+      // in: ETH, or a token Safe's API trusts (a 0-value or untrusted "transfer" is address poisoning: never shown)
+      for (const x of t.transfers || []) {
+        if (!eqA(x.to, safeAddr) || x.value === "0" || !x.value) continue;
+        const tok = x.type === "ETHER_TRANSFER" ? { symbol: "ETH", decimals: 18 } : x.tokenInfo?.trusted && x.tokenInfo.type === "ERC20" ? x.tokenInfo : null;
+        if (!tok) continue;
+        rows.push(`<li><span class="sx-ic sx-in">↓</span><span class="sx-act-what"><b>Received ${esc(E.fmt(BigInt(x.value), tok.decimals, 4))} ${esc(tok.symbol)}</b><span class="fine">from ${address(x.from, { size: "sm", chain })} · ${esc(when)}</span></span>${link ? `<a class="sx-end fine" href="${link}" target="_blank" rel="noopener">↗</a>` : ""}</li>`);
+      }
+    }
+    box.innerHTML = `<h3>Activity</h3>${rows.length ? `<ul class="sx-acts">${rows.join("")}</ul>`
+      : `<p class="fine">${activity === null ? "Loading." : activityErr || "Nothing yet."}</p>`}
+      <p class="sx-foot"><a class="fine" href="${appLink(chain, safeAddr, "transactions/history")}" target="_blank" rel="noopener">All of it in Safe{Wallet} ↗</a></p>`;
   }
   /** After a sign: the queue is at the bottom, so take the page there (once it's repainted). */
   const toQueue = () => requestAnimationFrame(() => $("s-queue").scrollIntoView({ behavior: "smooth", block: "center" }));
@@ -870,6 +1045,7 @@ export function safe(main: HTMLElement) {
     }
     say("Putting it in the Safe's queue.");
     await share(t, sigs);
+    if (sub === "settings") go(route(chain, safeAddr));     // the queue is on the Safe's page
     await load(true);
     toQueue();
     const left = Math.max(0, info!.threshold - sigs.length);
@@ -910,49 +1086,108 @@ export function safe(main: HTMLElement) {
     say("Done: it ran.");
   }
 
-  // ---- a new transaction ----
+  // ---- Send (a sheet): a token, an amount, who to; the review says it in words before anyone signs ----
+  const sendList = (): Asset[] => assets || [{ token: null, symbol: "ETH", name: "Ether", decimals: 18, balance: info?.balance || 0n, usd: null, price: null },
+    ...(CHAINS[chain].usdc && info?.usdc !== null ? [{ token: CHAINS[chain].usdc!, symbol: "USDC", name: "USD Coin", decimals: 6, balance: info!.usdc!, usd: null, price: null }] : [])];
+  const picked = () => { const v = (document.getElementById("n-tok") as HTMLSelectElement | null)?.value || ""; return sendList().find((a) => (a.token || "") === v) || sendList()[0]; };
   function paintNew() {
     const box = $("s-new");
-    const me = wedgieOwns() || isOwner(account);
-    box.hidden = !(safeAddr && info && me);
+    box.hidden = !(sheet === "send" && safeAddr && info && can());
     if (box.hidden) return;
-    const c = CHAINS[chain];
-    if (!document.getElementById("n-to")) {      // built once per Safe: keep what's typed across repaints
-      box.innerHTML = `<h2>New transaction</h2>
-        <p>${addressInput("n-to", "to: 0x… or ENS name")}</p>
-        <p><input id="n-amt" placeholder="amount" size="12" inputmode="decimal"> <select id="n-tok"><option value="eth">ETH</option>${c.usdc ? `<option value="usdc">USDC</option>` : ""}</select> <button class="btn btn-sm" id="n-max" type="button">Max</button></p>
-        <details class="fine"><summary>Contract call data (optional)</summary><p><input id="n-data" placeholder="data 0x…" size="44" spellcheck="false"></p></details>
-        <p id="n-btns"></p>`;
+    if (!document.getElementById("n-to")) {      // built once per open: keep what's typed across repaints
+      box.innerHTML = `<h2>Send</h2>
+        <div class="sx-amount"><input id="n-amt" placeholder="0" inputmode="decimal" autocomplete="off"><select id="n-tok"></select></div>
+        <p class="sx-row sx-under"><span class="fine" id="n-usd"></span><span class="sx-end"><span class="fine" id="n-has"></span> <button class="btn btn-sm" id="n-max" type="button">Max</button></span></p>
+        <p class="sx-label">To</p><p>${addressInput("n-to", "0x… or ENS name")}</p>
+        <details class="sx-more"><summary>Contract call data</summary><p><input id="n-data" class="sx-mono" placeholder="0x…" spellcheck="false" autocomplete="off"></p><p class="fine">Only with ETH. Leave it empty to just send.</p></details>
+        <div class="sx-review" id="n-review" hidden></div>
+        <p class="sx-row" id="n-btns"></p>`;
       // all of it: the Safe pays no gas itself (the wallet that executes does), so the whole balance can go
-      $("n-max").onclick = () => {
-        const i = info!, usdc = ($("n-tok") as HTMLSelectElement).value === "usdc";
-        ($("n-amt") as HTMLInputElement).value = usdc ? E.fmt(i.usdc ?? 0n, 6, 6) : E.fmt(i.balance, 18, 18);
-      };
+      $("n-max").onclick = () => { const a = picked(); ($("n-amt") as HTMLInputElement).value = E.fmt(a.balance, a.decimals, a.decimals); review(); };
+      for (const id of ["n-amt", "n-tok", "n-data"]) $(id).addEventListener("input", review);
+      $("n-to").addEventListener("input", review);
+      box.addEventListener("address", review);
+      requestAnimationFrame(() => ($("n-amt") as HTMLInputElement).focus());
     }
+    const sel = $("n-tok") as HTMLSelectElement, keep = sendToken !== null ? sendToken : sel.value;
+    sendToken = null;
+    sel.innerHTML = sendList().map((a) => `<option value="${a.token || ""}"${(a.token || "") === keep ? " selected" : ""}>${esc(a.symbol)}</option>`).join("");
     $("n-btns").innerHTML = `${wedgieOwns() ? `<button class="btn btn-green" id="n-wedgie"${dis(!key)}>Sign with wedgie</button> ` : ""}${isOwner(account) ? `<button class="btn" id="n-wallet"${dis()}>Sign with wallet</button>` : ""}`;
     $("n-wedgie")?.addEventListener("click", () => job(() => newTx("wedgie")));
     $("n-wallet")?.addEventListener("click", () => job(() => newTx("wallet")));
+    review();
+  }
+  /** What the inputs make, or why they don't make one yet. */
+  function draft(): { t: E.SafeTx; what: string } {
+    const to = addressOf($("n-to") as HTMLInputElement) || ($("n-to") as HTMLInputElement).value.trim(), amt = ($("n-amt") as HTMLInputElement).value.trim() || "0";
+    const a = picked(), data = ($("n-data") as HTMLInputElement).value.trim() || "0x";
+    if (!E.isAddress(to)) throw new Error("Who to? An address or an ENS name.");
+    E.bytes(data);
+    const n = E.units(amt, a.decimals);
+    if (n > a.balance) throw new Error(`The Safe has ${E.fmt(a.balance, a.decimals)} ${a.symbol}.`);
+    if (a.token) {
+      if (data !== "0x") throw new Error(`Data goes with ETH, not ${a.symbol}.`);
+      if (!n) throw new Error("How much?");
+      return { t: safeTx(a.token, "0", E.transferData(E.checksum(to), n)), what: `send ${amt} ${a.symbol} to ${short(to)}` };
+    }
+    if (!n && data === "0x") throw new Error("How much?");
+    return { t: safeTx(to, n.toString(), data), what: data === "0x" ? `send ${amt} ETH to ${short(to)}` : `call ${short(to)}` };
+  }
+  function review() {
+    const a = picked(), amt = ($("n-amt") as HTMLInputElement | null)?.value.trim() || "";
+    $("n-has").textContent = `${E.fmt(a.balance, a.decimals, 4)} ${a.symbol}`;
+    let v = 0; try { v = Number(E.units(amt || "0", a.decimals)) / 10 ** a.decimals; } catch {}
+    $("n-usd").textContent = a.price !== null && v ? `≈ ${usd(v * a.price)}` : "";
+    const box = $("n-review");
+    try {
+      const { t } = draft(), s = describe(t, ctx()), left = Math.max(0, info!.threshold - (wedgieOwns() ? ownedBy().length : 1));
+      box.innerHTML = `<p><b>${s.title}</b></p><p class="fine">${left ? `Then ${plural(left, "more owner")} must sign.` : "Then press Execute."} Your wedgie shows it before it signs.</p>`;
+      box.hidden = false; box.classList.remove("sx-review-no");
+    } catch (e) {
+      box.hidden = !amt && !($("n-to") as HTMLInputElement).value.trim();
+      box.innerHTML = `<p class="fine">${esc(msgOf(e))}</p>`; box.classList.add("sx-review-no");
+    }
+  }
+  async function newTx(who: "wedgie" | "wallet") {
+    const { t, what } = draft();
+    await propose(t, who, what);
+    closeSheet();
   }
 
-  async function newTx(who: "wedgie" | "wallet") {
-    const to = addressOf($("n-to") as HTMLInputElement) || ($("n-to") as HTMLInputElement).value.trim(), amt = ($("n-amt") as HTMLInputElement).value.trim() || "0";
-    const tok = ($("n-tok") as HTMLSelectElement).value, data = ($("n-data") as HTMLInputElement).value.trim() || "0x";
-    if (!E.isAddress(to)) throw new Error("The to address isn't an address.");
-    E.bytes(data);
-    let t: E.SafeTx, what: string;
-    if (tok === "usdc") {
-      if (data !== "0x") throw new Error("Data goes with ETH, not USDC.");
-      const n = E.units(amt, 6);
-      if (info!.usdc !== null && n > info!.usdc) throw new Error(`The Safe has ${E.fmt(info!.usdc, 6, 2)} USDC.`);
-      t = safeTx(CHAINS[chain].usdc!, "0", E.transferData(E.checksum(to), n)); what = `send ${amt} USDC to ${short(to)}`;
-    } else {
-      const v = E.units(amt, 18);
-      if (v > info!.balance) throw new Error(`The Safe has ${E.fmt(info!.balance, 18)} ETH.`);
-      t = safeTx(to, v.toString(), data); what = data === "0x" ? `send ${amt} ETH to ${short(to)}` : `call ${short(to)}`;
-    }
-    await propose(t, who, what);
-    ($("n-to") as HTMLInputElement).value = ""; $("n-to").dispatchEvent(new Event("input")); ($("n-amt") as HTMLInputElement).value = ""; ($("n-data") as HTMLInputElement).value = "";
+  // ---- Receive (a sheet): the address big, a QR, which chain ----
+  function paintReceive() {
+    const box = $("s-receive");
+    box.hidden = !(sheet === "receive" && safeAddr);
+    if (box.hidden || box.dataset.for === `${chain}:${safeAddr}`) return;
+    box.dataset.for = `${chain}:${safeAddr}`;
+    const q = qrcode(0, "M"); q.addData(safeAddr); q.make();
+    box.innerHTML = `<h2>Receive</h2>
+      <div class="sx-qr">${q.createSvgTag({ cellSize: 6, margin: 2, scalable: true })}</div>
+      <p class="sx-recv-addr">${esc(safeAddr)}</p>
+      <p><button class="btn btn-green sx-wide" id="r-copy">Copy address</button></p>
+      <p class="sx-warn-soft">Only on <b>${esc(CHAINS[chain].name)}</b>. Money sent on another chain lands on a Safe that may not exist there.</p>`;
+    $("r-copy").onclick = () => navigator.clipboard.writeText(safeAddr).then(() => { $("r-copy").textContent = "Copied"; setTimeout(() => { const b = document.getElementById("r-copy"); if (b) b.textContent = "Copy address"; }, 1500); });
   }
+
+  // ---- the sheet ----
+  function openSheet(k: typeof sheet) {
+    sheet = k; say("");
+    if (k === "send") $("s-new").innerHTML = "";        // a fresh form each time
+    if (k === "receive") delete $("s-receive").dataset.for;
+    $("s-sheet").hidden = false;
+    document.body.classList.add("sx-sheet-open");
+    paintAll();
+  }
+  function closeSheet() {
+    if (!sheet) return;
+    sheet = ""; stopScan();
+    $("s-sheet").hidden = true;
+    document.body.classList.remove("sx-sheet-open");
+    paintAll();
+  }
+  $("s-sheet-x").onclick = closeSheet;
+  $("s-sheet").addEventListener("click", (e) => { if (e.target === $("s-sheet") && !busy) closeSheet(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && sheet && !busy) closeSheet(); });
 
   // ---- WalletConnect: this Safe in an app (Uniswap, …); its batches signed on the wedgie (src/safe/walletconnect.ts) ----
   let wcm: typeof import("../safe/walletconnect") | null = null, wcSessions: import("../safe/walletconnect").Session[] = [];
@@ -962,7 +1197,7 @@ export function safe(main: HTMLElement) {
     if (wcm) return wcm;
     const m = await import("../safe/walletconnect");
     await m.start({
-      onAsk: (a) => { asks.push(a); paintAll(); if (!eqA(a.safe, safeAddr)) say(`${a.dapp.name} is waiting for Safe ${short(a.safe)}: open it to sign.`); },
+      onAsk: (a) => { asks.push(a); if (sheet === "connect") closeSheet(); paintAll(); if (!eqA(a.safe, safeAddr)) say(`${a.dapp.name} is waiting for Safe ${short(a.safe)}: open it to sign.`); },
       onChange: () => { m.sessions().then((l) => { wcSessions = l; paintWc(); }); },
       onError: (msg) => say(msg, true),
       receipt: (c, h) => rpc(c, "eth_getTransactionReceipt", [h]).then((x: any) => x),
@@ -984,32 +1219,53 @@ export function safe(main: HTMLElement) {
     const b = icons.get(u);
     return b ? `<img class="wc-icon" src="${b}" alt="">` : "";
   };
+  // Connect app (a sheet): scan the app's WalletConnect code, or paste its link; the apps connected here
+  let scanning: { stop: () => void } | null = null;
+  const stopScan = () => { scanning?.stop(); scanning = null; const v = document.getElementById("wc-cam"); if (v) v.hidden = true; };
+  async function pairWith(uri: string) {
+    const m = await wcStart();
+    say("Connecting to the app.");
+    await m.pair(uri.trim(), safeAddr, chain);
+    try { localStorage.setItem(WC_ON, "1"); } catch {}
+    say("Connected. Use the app: what it asks for shows up here.");
+  }
   function paintWc() {
     const box = $("s-wc");
-    box.hidden = !(safeAddr && info && (wedgieOwns() || isOwner(account)));
+    box.hidden = !(sheet === "connect" && safeAddr && info && can());
     if (box.hidden) return;
     if (!document.getElementById("wc-uri")) {     // built once per Safe: keep a pasted link across repaints
-      box.innerHTML = `<h2>Use this Safe in an app</h2>
-        <p class="fine">In the app (Uniswap, Aave, …) pick WalletConnect, copy its link, and paste it here. The app's
-        transactions come here; the wedgie signs them, approve + swap as one.</p>
-        <p class="wc-pair"><input id="wc-uri" placeholder="wc:…" spellcheck="false" autocomplete="off"> <button class="btn btn-sm" id="wc-go">Connect</button></p>
-        <div id="wc-list"></div><div id="wc-asks"></div>`;
-      $("wc-go").onclick = () => job(async () => {
-        const el = $("wc-uri") as HTMLInputElement, m = await wcStart();
-        say("Connecting to the app.");
-        await m.pair(el.value, safeAddr, chain);
-        el.value = "";
-        try { localStorage.setItem(WC_ON, "1"); } catch {}
-        say("Connected. Use the app: what it asks for shows up here.");
+      box.innerHTML = `<h2>Connect an app</h2>
+        <p class="fine">In the app (Uniswap, Aave, …) pick WalletConnect. Its requests come here, and your wedgie signs them.</p>
+        ${canScan() ? `<p><button class="btn btn-green sx-wide" id="wc-scan">Scan its code</button></p><div class="sx-cam" id="wc-cam" hidden></div>` : ""}
+        <p class="sx-label">Or paste its link</p>
+        <p class="sx-row wc-pair"><input id="wc-uri" class="sx-mono" placeholder="wc:…" spellcheck="false" autocomplete="off"> <button class="btn btn-sm" id="wc-go">Connect</button></p>
+        <div id="wc-list"></div>`;
+      $("wc-go").onclick = () => job(async () => { const el = $("wc-uri") as HTMLInputElement; await pairWith(el.value); el.value = ""; });
+      $("wc-scan")?.addEventListener("click", () => {
+        if (scanning) return stopScan();
+        const cam = $("wc-cam"); cam.hidden = false;
+        const s = scanning = scan(cam);
+        s.done.then((uri) => { stopScan(); if (!/^wc:/.test(uri)) return say("That code isn't a WalletConnect link.", true); job(() => pairWith(uri)); },
+          (e: Error) => { if (e.message !== "stopped") say(e.message, true); stopScan(); });
       });
     }
     const mine = wcSessions.filter((x) => eqA(x.safe, safeAddr) && x.chainId === chain);
-    $("wc-list").innerHTML = mine.length ? `<ul class="safe-list">${mine.map((x) => `<li>${icon(x.dapp.icon)}<b>${esc(x.dapp.name)}</b> <span class="fine">${esc(x.dapp.url.replace(/^https?:\/\//, ""))}</span> <button class="btn btn-sm" data-wcoff="${esc(x.topic)}"${dis()}>Disconnect</button></li>`).join("")}</ul>` : "";
+    $("wc-list").innerHTML = mine.length ? `<p class="sx-label">Connected</p><ul class="sx-rows">${mine.map((x) => `<li>${icon(x.dapp.icon)}<span><b>${esc(x.dapp.name)}</b> <span class="fine">${esc(x.dapp.url.replace(/^https?:\/\//, ""))}</span></span><button class="btn btn-sm sx-end" data-wcoff="${esc(x.topic)}"${dis()}>Disconnect</button></li>`).join("")}</ul>` : "";
     $("wc-list").querySelectorAll<HTMLButtonElement>("[data-wcoff]").forEach((b) => b.onclick = () => job(() => wcm!.disconnect(b.dataset.wcoff!)));
+  }
+
+  // what connected apps ask for: on the Safe's page, above the queue
+  function paintAsks() {
+    const box = $("s-asks");
     const here = asks.filter((a) => eqA(a.safe, safeAddr) && a.chainId === chain);
-    $("wc-asks").innerHTML = here.map((a, k) => `<div class="wc-ask"><p><b>${esc(a.dapp.name)}</b> asks for ${plural(a.calls.length, "call")}${a.calls.length > 1 ? ", run as one" : ""}:</p>
-      <ol>${a.calls.map((c) => `<li>${address(c.to, { link: CHAINS[chain].scan, size: "sm", chain })}${c.value ? ` + ${esc(E.fmt(c.value, 18))} ETH` : ""} <span class="fine">${(c.data.length - 2) / 2} bytes of data</span></li>`).join("")}</ol>
-      <p>${wedgieOwns() ? `<button class="btn btn-green" data-wcsign="${k}"${dis(!key)}>Sign with wedgie</button> ` : ""}${isOwner(account) ? `<button class="btn" data-wcwallet="${k}"${dis()}>Sign with wallet</button> ` : ""}<button class="btn btn-sm" data-wcno="${k}"${dis()}>Reject</button></p></div>`).join("");
+    box.hidden = !(safeAddr && info && here.length && sub === "home");
+    if (box.hidden) return;
+    box.innerHTML = `<h3>Apps asking</h3>` + here.map((a, k) => {
+      const calls = a.calls.map((c) => describe({ to: c.to, value: c.value, data: c.data }, ctx()));
+      return `<div class="sx-tx wc-ask"><div class="sx-tx-head">${icon(a.dapp.icon)}<span class="sx-tx-what"><b>${esc(a.dapp.name)}</b> asks for ${plural(a.calls.length, "action")}${a.calls.length > 1 ? ", run as one" : ""}</span></div>
+      <ol class="sx-subs">${calls.map((s) => `<li>${s.title}</li>`).join("")}</ol>
+      <div class="sx-row">${wedgieOwns() ? `<button class="btn btn-sm btn-green" data-wcsign="${k}"${dis(!key)}>Sign with wedgie</button> ` : ""}${isOwner(account) ? `<button class="btn btn-sm" data-wcwallet="${k}"${dis()}>Sign with wallet</button> ` : ""}<button class="btn btn-sm sx-end" data-wcno="${k}"${dis()}>Reject</button></div></div>`;
+    }).join("");
     const run = (a: (typeof asks)[0], who: "wedgie" | "wallet") => job(async () => {
       try {
         if (!account) account = await wallet(chain);       // it sends the Safe tx and pays the gas
@@ -1035,7 +1291,10 @@ export function safe(main: HTMLElement) {
     });
   }
 
-  function paintAll() { paintWedgie(); paintWallet(); paintList(); paintCreate(); paintSafe(); paintAdd(); paintQueue(); paintOwner(); paintNew(); paintWc(); }
+  function paintAll() {
+    paintWedgie(); paintWallet(); paintList(); paintCreate(); paintSafe(); paintAdd(); paintAsks(); paintQueue(); paintAssets(); paintActivity();
+    paintOwners(); paintOwner(); paintChains(); paintNew(); paintReceive(); paintWc();
+  }
 
   W.onChange(paintWedgie);
   if (W.armed()) W.start();
