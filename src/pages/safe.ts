@@ -720,7 +720,7 @@ export function safe(main: HTMLElement) {
         ${read.length ? `<span class="sx-safe-worth">${esc(n !== null ? usd(n) : read.map((r) => worth(r.chain, r.info!)).join(" · "))}</span>` : ""}
         ${i ? `<span class="fine">${i.threshold} of ${plural(i.owners.length, "owner")}${g.some((r) => r.wedgie) ? "" : " · add your wedgie"}</span>`
           : `<span class="fine">Couldn't read it just now. Open it, or Refresh.</span>`}
-        <span class="sx-chains sx-chains-sm">${chains.map((t) => `<span class="sx-pill${CHAINS[t].test ? " sx-test" : ""}">${chainLogo(t)}${esc(CHAINS[t].name)}</span>`).join("")}</span></a></li>`;
+        <span class="sx-chains sx-chains-sm">${chains.map((t) => `<span class="sx-pill${CHAINS[t].test ? " sx-test" : ""}" title="${esc(CHAINS[t].name)}">${chainLogo(t)}</span>`).join("")}</span></a></li>`;
     };
     // most money first (a Safe that couldn't be priced yet: after the ones that could)
     const sum = (g: Row[]) => g.reduce((n, r) => n + (r.info ? worthUsd(r.chain, r.info) ?? 0 : 0), 0);
