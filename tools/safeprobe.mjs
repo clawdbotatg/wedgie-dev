@@ -108,7 +108,7 @@ await ctx.addInitScript((me) => {
     const r = await window.__rpc(method, params || []);
     if (r && r.__err) throw new Error(r.__err);
     return r;
-  } };
+  }, on() {}, removeListener() {} };      // wagmi (RainbowKit's Browser Wallet) listens for account changes
 }, me);
 // the page's reads for Base (/api/rpc?chain=8453) = the fork
 // ... and like the real one, it rate-limits a burst: the first reads of the list get 429 (the page must retry, not drop the Safe)
@@ -172,6 +172,13 @@ await ctx.route("https://instantwallet.io/api/safe/queue**", async (r) => {
 
 let bad = 0;
 const check = (ok, what) => { console.log(ok ? "ok  " : "FAIL", what); if (!ok) bad++; };
+// Connect wallet always opens RainbowKit's picker (no jumping to the browser's wallet): pick the browser one.
+// After a reload the wallet from last time comes back on its own, so there may be no button to press.
+async function connectWallet() {
+  if (await page.$("#w-go")) await page.click("#w-go");
+  const pick = page.getByRole("button", { name: /Browser Wallet/ });
+  await pick.waitFor({ timeout: 4000 }).then(() => pick.click(), () => {});
+}
 const page = await ctx.newPage();
 const errs = [];
 page.on("pageerror", (e) => errs.push(e.message));
@@ -191,7 +198,7 @@ check(new globalThis.URL(page.url()).pathname === "/safe" && !(await page.isHidd
 await wait((s) => document.querySelector(`.safe-row[href$="${s}"]`), hidden, 20000, "the Safe only the wedgie's own list knows");
 check(/Your wedgie's Safes[\s\S]*1 of 1 owner/.test(await page.textContent("#s-list")), "listed from the wedgie's own list (safe_list), though Safe's API doesn't know it");
 check(busyFor === 0, "the public RPC said 429 four times on the way: the page tried again, nothing dropped");
-await page.click("#w-go");
+await connectWallet();
 await wait(() => document.querySelector("#l-wallet"), null, 20000, "the wallet's Safes, folded");
 check(!(await page.$(`.safe-row[href$="${mine}"]`)) && /Your wallet's Safes \(1\)/.test(await page.textContent("#s-list")), "the wallet's Safes are folded away: Your wallet's Safes (1)");
 await page.click("#l-wallet");
@@ -330,7 +337,7 @@ await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("
 await page.reload();
 await wait(() => /wedgie ✓/.test(document.querySelector("#s-queue")?.textContent || ""), null, 60000, "the queued one, from Instant Wallet, after a reload");
 check(/Safe's service didn't answer/.test(await page.textContent("#s-queue")), "page: says Safe's service didn't answer, still shows the queue");
-await page.click("#w-go");      // a reload: the wallet connects again
+await connectWallet();      // a reload: the wallet comes back
 await wait(() => document.querySelector("[data-wsign]"), null, 20000, "Sign with wallet, after a reload");
 await page.click("[data-wsign]");
 await says(/That's enough: press Execute/, "wallet signed with Safe's service down");
