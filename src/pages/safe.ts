@@ -608,14 +608,15 @@ export function safe(main: HTMLElement) {
     box.hidden = !safeAddr;
     if (box.hidden) return;
     const c = CHAINS[chain], i = info, home = route(chain, safeAddr), $t = total();
-    const others = Object.keys(CHAINS).map(Number).filter((t) => t !== chain && copies[t]);
+    const on = Object.keys(CHAINS).map(Number).filter((t) => t === chain || copies[t]);   // fixed order: a tap only recolors
     const worthOf = !i ? "" : $t !== null ? usd($t) : `${E.fmt(i.balance, 18, 4)} ETH`;
     const who = !i ? "" : `${i.threshold} of ${plural(i.owners.length, "owner")}`
       + (signer ? wedgieOwns() ? " · your wedgie is one" : " · your wedgie isn't one" : "");
     let h = `<div class="sx-hero-top">${sub === "settings" ? `<a class="sx-back" data-nav href="${home}">← Back</a>` : `<a class="sx-back" data-nav href="/safe">← Safes</a>`}
       ${sub === "home" ? `<a class="sx-gear" id="a-settings" data-nav href="${home}/settings">Settings</a>` : ""}</div>
       <div class="sx-hero-id">${i && isIW(i.owners) ? iwMark : ""}${address(safeAddr, { size: "lg", chain })}</div>
-      <div class="sx-chains"><span class="sx-pill sx-on">${esc(c.name)}</span>${others.map((t) => `<a class="sx-pill" data-nav href="${route(t, safeAddr)}${sub === "settings" ? "/settings" : ""}">${esc(CHAINS[t].name)}</a>`).join("")}</div>`;
+      <div class="sx-chains">${on.map((t) => t === chain ? `<span class="sx-pill sx-on">${esc(c.name)}</span>`
+        : `<a class="sx-pill" data-nav href="${route(t, safeAddr)}${sub === "settings" ? "/settings" : ""}">${esc(CHAINS[t].name)}</a>`).join("")}</div>`;
     if (sub === "settings") h += `<div class="sx-total sx-total-sm">Settings</div><div class="sx-sub">${esc(who)}</div>`;
     else {
       h += `<div class="sx-total">${i ? esc(worthOf) : "&nbsp;"}</div><div class="sx-sub">${i ? esc(who) : "Opening the Safe"}</div>`;
