@@ -239,7 +239,7 @@ def resume(j):
         run(j.get("id"), j.get("m") or {}, lambda *a: True, progress)
     except Exception as e:
         W.failed(j.get("id"), e)
-    time.sleep_ms(100)
+    time.sleep_ms(500)                  # the last answer gets out before the reset drops USB
     W.restarting = True
     restart()
 
@@ -437,7 +437,7 @@ def run(mid, m, ask, show=None):
                 W.log("installed", title, version)
                 W.send({"id": qid, "type": "done", "version": version})
                 write = []
-                time.sleep_ms(100)
+                time.sleep_ms(500)          # "done" gets out before the reset drops USB (100 ms lost it now and then)
                 W.restarting = True         # main.py lets this SystemExit through
                 restart()
                 return                      # (the emulator's soft_reset returns: it restarts once this does)

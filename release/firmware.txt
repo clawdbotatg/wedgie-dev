@@ -17,7 +17,7 @@ f0224e865a8f55c77b0c13d353b4663e6d9642e99439d98c3045dea3f594ef91  grove.py
 2cec32b1db4f308ae0457f380ef97cfd033df0a5369cb1a727d0dff26b872ca4  hatch.mpy
 e48b5026c29584c98ffd8abb53f313c5f012adc41cf8fc6a1e5b0dee30915226  home.bin
 a853621f0087dd9b513c40c674cc5ed7d5b95ae3b314cbac65fbc15d1473d7e2  inbox.mpy
-3869b3b34dd65caa77e6763c20e3abf13474b512d87e28974a0242925b66de0a  job.mpy
+3210e6c2019f804c91b1633551f854aab2e1dd6e2deb7de9c98b2a3721a83826  job.mpy
 0cf9561df639b610056d896dbf503f37d4df3c1ef59eab58dfd3118913be23aa  keypad.py
 190c16fd1084d6d288bfbaf0221baaae479f144f46f58a1dae0fe4219e4bd384  lcd.mpy
 acc497a596ea3b740743ed07d2f534644ae339a4fc70c26faa5f7ce53ab409f2  loader.mpy
@@ -56,4 +56,4 @@ e20d454f74229b3aaa09a15829cbb6b85aa50c6b3bf229287b9cdbff73bee90d  wedgiedrive.mp
 @app  {"mod":"safe","name":"Safe Signer","entry":"run","usb":true,"files":["safe.py","safe_read.py","safe_keccak.py","safe_addr.py","safe_blockie.py","safe_key.py"]}
 @app  {"mod":"secret","name":"Secrets","entry":"run","usb":true,"files":["secret.py","secret_box.py"]}
 @app  {"mod":"welcome","name":"Welcome","entry":"run","files":["welcome.py"]}
-@serial  7
+@serial  8
