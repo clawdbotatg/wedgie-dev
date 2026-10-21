@@ -568,6 +568,8 @@ body.test-mode .top, body.test-mode .foot { display: none; }
 .upd-card .meter { margin-top: 4px; }
 .upd-card .meter-track { height: 22px; padding: 4px; }
 .unplug-tip { flex-basis: 100%; text-align: center; margin: 4px 0 0; }
+.crash { flex-basis: 100%; text-align: center; margin: 40px 0 0; }
+.crash-q { font-size: 24px; font-weight: 800; margin: 0 0 16px; }
 /* Press A on your wedgie (ui/askmodal.ts) */
 .ask-a { width: min(520px, 100%); }
 .ask-a .ask-3d { height: 260px; }
