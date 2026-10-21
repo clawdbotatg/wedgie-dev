@@ -144,7 +144,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
             <h4>Console</h4>
             <pre class="recess out log" id="d-log"></pre>
           </details>
-          <p class="fine wd-report">Something wrong? <a href="#" id="d-report">Send a bug report</a>.</p>
+          <div class="wd-report"><p class="crash-q">Something wrong?</p><button class="btn btn-lg btn-red" id="d-report">Send a bug report</button></div>
         </div>
       </div>
     </div>
@@ -152,7 +152,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
   const $ = <T extends Element = HTMLElement>(s: string) => main.querySelector(s) as T;
   $<HTMLAnchorElement>(".back").onclick = (e) => { e.preventDefault(); go("/connect"); };
   // The bug report reads its log over live USB while we hold the port; busy or not live: the page's side only.
-  $<HTMLAnchorElement>("#d-report").onclick = (e) => {
+  $<HTMLButtonElement>("#d-report").onclick = (e) => {
     e.preventDefault();
     const r = link;
     bugReport(w || undefined, r && liveFs() && !busy ? () => readLog((p) => FS.get(r, p, true)) : undefined);

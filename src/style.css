@@ -162,7 +162,7 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 22px; }
 .report .note, .report .email { width: 100%; border: 0; padding: 12px 14px; font: inherit; font-size: 16px; color: var(--ink); outline: none; resize: vertical; }
 .report .out { max-height: 260px; font-size: 12px; }
 .report p { margin: 0; }
-.wd-report { text-align: center; margin: 18px 0 0; }
+.wd-report { text-align: center; margin: 32px 0 0; }
 .kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 16px 0 0; font-size: 15px; }
 .kv dt { color: var(--muted); font-weight: 700; }
 .kv dd { margin: 0; font-weight: 700; min-width: 0; }
