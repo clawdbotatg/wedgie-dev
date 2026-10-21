@@ -375,7 +375,10 @@ check(onWedgie.includes(`8453:${made.toLowerCase()}`) && onWedgie.includes(`8453
 // 5: Disconnect: the wallet is gone, and stays gone after a reload
 await page.click("#w-off");
 await wait(() => document.querySelector("#w-go"), null, 10000, "Connect wallet again");
-await page.reload();
+const t0 = Date.now();
+await page.reload({ waitUntil: "domcontentloaded" });
+await wait((a) => [...document.querySelectorAll("#s-list .safe-row")].filter((r) => a.some((x) => r.getAttribute("href").endsWith(x))).length === 2, [mine, made], 3000, "the saved list, at once");
+check(true, `a reload shows the saved list at once (${Date.now() - t0} ms), before the wedgie or any chain answers`);
 await wait(() => document.querySelector("#s-me .addr"), null, 30000, "reloaded");
 await page.waitForTimeout(1500);
 check(!!(await page.$("#w-go")), "Disconnect sticks after a reload (Connect wallet shows, no address)");

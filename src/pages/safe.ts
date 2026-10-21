@@ -185,8 +185,9 @@ export function safe(main: HTMLElement) {
   let driveState = "";
   const ask = <T,>(w: W.Wedgie, fn: (r: Drive.Asker) => Promise<T>): Promise<T> => w === DRIVE ? Drive.withDrive(fn) : W.withRepl(w, fn);
   const present = (w: W.Wedgie) => w === DRIVE ? driveState === "here" : W.wedgies().includes(w);
+  // a wedgie gone: its address and list stay (a reload shows them); the next key read says if it's another
   if (Drive.inApp()) {
-    const look = async () => { const s = await Drive.status().catch(() => "away"); if (s !== driveState) { driveState = s; if (s !== "here") { wedgie = null; key = null; signer = ""; signers = []; } paintAll(); } };
+    const look = async () => { const s = await Drive.status().catch(() => "away"); if (s !== driveState) { driveState = s; if (s !== "here") { wedgie = null; key = null; } paintAll(); } };
     look(); setInterval(look, 1500);
   }
   let chunk = 0;          // hex chars per safe_data piece (its hello's safe_chunk), 0: this app can't take pieces
@@ -294,6 +295,28 @@ export function safe(main: HTMLElement) {
   };
   const forget = (c: number, a: string) => localStorage.setItem(memKey(), JSON.stringify(remembered().filter((k) => k !== `${CHAINS[c].key}:${E.checksum(a)}`)));
 
+  // The last list, saved: a reload shows it at once (before the wedgie answers, before every chain is asked),
+  // then the page checks again and repaints. Only addresses and balances: nothing that signs.
+  const LAST = "wedgie.safe.last";
+  const saveLast = () => {
+    try {
+      localStorage.setItem(LAST, JSON.stringify({ x: key?.x, y: key?.y, px: ethPx, rows: rows.filter((r) => r.wedgie && r.info).map((r) => ({ ...r, wallet: false,
+        info: { ...r.info, balance: String(r.info!.balance), usdc: r.info!.usdc === null ? null : String(r.info!.usdc) } })) }));
+    } catch {}
+  };
+  const loadLast = () => {
+    try {
+      const l = JSON.parse(localStorage.getItem(LAST) || "null");
+      if (!l?.x || !l?.y || !Array.isArray(l.rows)) return;
+      signer = E.signerAddress(l.x, l.y); signers = E.signerAddresses(l.x, l.y);
+      Object.assign(ethPx, l.px || {});
+      rows = l.rows.filter((r: any) => CHAINS[r.chain]).map((r: any) => ({ ...r, info: { ...r.info, balance: BigInt(r.info.balance), usdc: r.info.usdc === null ? null : BigInt(r.info.usdc) } }));
+    } catch { rows = []; }
+  };
+  let lastFind = 0, findAgain = false;      // when the list was last checked: back from a Safe within a minute, no new check
+  // a Safe this browser made or opened that the list doesn't have yet
+  const unlisted = () => remembered().some((k) => { const [c, x] = k.split(":"); return !rows.some((r) => r.chain === KEYS[c] && eqA(r.addr, x)); });
+
   /** Put a Safe on the wedgie's own list, so every computer it's plugged into lists it (safe-4+). */
   async function tellWedgie(c: number, a: string) {
     const k = `${c}:${a.toLowerCase()}`;
@@ -327,7 +350,7 @@ export function safe(main: HTMLElement) {
       if (location.pathname !== "/safe") history.replaceState(null, "", "/safe");
       safeAddr = ""; info = null; queue = []; assets = null; activity = null;
       paintAll();
-      if (signer && !listing) findSafes();
+      if (signer && !listing && (Date.now() - lastFind > 60_000 || unlisted())) findSafes();
     }
     window.scrollTo(0, 0);
   }
@@ -383,6 +406,7 @@ export function safe(main: HTMLElement) {
         return;
       }
       noKey = false;
+      const before = signer;
       key = h.safe; signer = E.signerAddress(key!.x, key!.y); signers = E.signerAddresses(key!.x, key!.y); chunk = +h.safe_chunk || 0;
       // newer apps work out the address themselves and show it: the two must agree
       if (h.signer && !eqA(h.signer, signer)) { key = null; signer = ""; signers = []; throw new Error(`The wedgie says its address is ${h.signer}, this page works out ${E.signerAddress(h.safe.x, h.safe.y)}. Not using it: tell us.`); }
@@ -394,7 +418,10 @@ export function safe(main: HTMLElement) {
         onWedgie = l.type === "safe_list" && Array.isArray(l.safes) ? l.safes : null;
       } catch { onWedgie = null; }
       paintAll();
-      if (safeAddr) { checkDeployed(); if (info && wedgieOwns()) remember(chain, safeAddr); } else findSafes();
+      if (!eqA(before, signer)) { rows = []; lastFind = 0; }    // another wedgie than last time: not its list
+      const news = (onWedgie || []).some((k) => !rows.some((r) => `${r.chain}:${r.addr.toLowerCase()}` === k.toLowerCase()));
+      if (safeAddr) { checkDeployed(); if (info && wedgieOwns()) remember(chain, safeAddr); }
+      else if (!listing && (news || Date.now() - lastFind > 60_000)) findSafes();
       keyTries = 0;
     } catch (e) {
       // Right after a reload the port is often still held by the page that just closed, or the wedgie is busy:
@@ -458,7 +485,8 @@ export function safe(main: HTMLElement) {
   // ---- /safe: every Safe the wedgie (and the wallet) owns, on every chain ----
   async function findSafes() {
     if (!signer && !account) return;
-    listing = true; listPct = 8; paintList();
+    if (listing) { findAgain = true; return; }    // a wallet or wedgie arrived mid-check: once more after
+    listing = true; listPct = 8; lastFind = Date.now(); paintList();
     // the bar: asking Safe's API on every chain is the first 70%, reading each Safe from its chain the rest
     let asked = 0, read = 0, nAsk = IDS.length * (signers.length + (account ? 1 : 0)), nRead = 0;
     const tick = () => {
@@ -501,10 +529,12 @@ export function safe(main: HTMLElement) {
     listing = false;
     paintList();
     // each chain's coin price, for the cards' dollar totals (USDC counts as a dollar)
-    await Promise.all([...new Set(rows.map((r) => r.chain))].filter((c) => !(c in ethPx)).map(async (c) => {
+    await Promise.all([...new Set(rows.map((r) => r.chain))].map(async (c) => {
       try { ethPx[c] = (await rpc(c, "wedgie_prices", []))?.eth ?? null; } catch { ethPx[c] = null; }
     }));
     paintList();
+    if (key) saveLast();
+    if (findAgain) { findAgain = false; findSafes(); }
   }
 
   /** A Safe's dollars on one chain (native coin + USDC), null with no price yet; a test chain's coins: none. */
@@ -518,7 +548,7 @@ export function safe(main: HTMLElement) {
 
   function paintList() {
     const box = $("s-list");
-    box.hidden = !!safeAddr || !key;
+    box.hidden = !!safeAddr || !signer;
     if (box.hidden) return;
     // one card per address: the same Safe on several chains is one Safe, its worth all of them together
     const groups = (list: Row[]) => {
@@ -549,7 +579,7 @@ export function safe(main: HTMLElement) {
     const typed = (document.getElementById("l-addr") as HTMLInputElement | null)?.value || "", open = !!document.querySelector("#l-more[open]");
     h += `<details class="sx-more" id="l-more"${open ? " open" : ""}><summary>Open another Safe</summary>
       <p class="sx-row">${addressInput("l-addr", "0x… or ENS name of a Safe")} <select id="l-chain">${chainOpts(newChain)}</select> <button class="btn btn-sm" id="l-open">Open</button></p></details>
-      <p class="sx-foot"><button class="btn btn-sm" id="l-refresh"${dis(listing)}>Refresh</button></p>`;
+      <p class="sx-foot"><button class="btn btn-sm" id="l-refresh"${dis(listing)}>${listing ? "Checking every chain…" : "Refresh"}</button></p>`;
     box.innerHTML = h;
     if (typed) { const el = $("l-addr") as HTMLInputElement; el.value = typed; el.dispatchEvent(new Event("input")); }
     $("l-new").onclick = () => openSheet("create");
@@ -1362,5 +1392,6 @@ export function safe(main: HTMLElement) {
     }), () => {});
   else if (!localStorage.getItem(OFF))
     eth()?.request({ method: "eth_accounts" }).then((a: string[]) => { if (a?.[0]) { account = E.checksum(a[0]); paintAll(); if (!safeAddr) findSafes(); } }, () => {});
+  loadLast();
   show();
 }
