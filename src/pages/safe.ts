@@ -168,6 +168,7 @@ export function safe(main: HTMLElement) {
     <div class="sx-first" id="s-first" hidden><div class="sx-spin sx-spin-big"></div></div>
     <div class="sx-banner" id="s-wedgie" hidden></div>
     <div class="sx-view" id="s-list" hidden></div>
+    <div class="sx-card sx-iw" id="s-iw" hidden></div>
     <div class="sx-hero" id="s-safe" hidden></div>
     <div class="sx-banner" id="s-add" hidden></div>
     <div class="sx-card" id="s-asks" hidden></div>
@@ -743,8 +744,12 @@ export function safe(main: HTMLElement) {
   // ---- /safe/<chain>:<address>: one Safe. The top: its name, its worth, three buttons ----
   function paintSafe() {
     paintSpin();
-    const box = $("s-safe");
+    const box = $("s-safe"), iw = $("s-iw");
     box.hidden = !safeAddr;
+    // an Instant Wallet Safe: say so on top, and send them there (it has no link to one Safe: its passkey opens it)
+    iw.hidden = !(safeAddr && info && isIW(info.owners));
+    if (!iw.hidden && !iw.innerHTML) iw.innerHTML = `<img src="/img/instantwallet.png" alt=""><b>Instant Wallet</b>
+      <a class="btn btn-green btn-sm sx-end" href="https://instantwallet.io" target="_blank" rel="noopener">Open</a>`;
     if (box.hidden) return;
     const c = CHAINS[chain], i = info, home = route(chain, safeAddr), $t = total(), g = grand();
     const on = IDS.filter((t) => t === chain || copies[t]);   // fixed order: a tap only recolors
@@ -754,7 +759,7 @@ export function safe(main: HTMLElement) {
       + (signer ? wedgieOwns() ? " · your wedgie is one" : " · your wedgie isn't one" : "");
     let h = `<div class="sx-hero-top">${sub === "settings" ? `<a class="sx-back" data-nav href="${home}">← Back</a>` : `<a class="sx-back" data-nav href="/safe">← Safes</a>`}
       ${sub === "home" ? `<a class="sx-gear" id="a-settings" data-nav href="${home}/settings">Settings</a>` : ""}</div>
-      <div class="sx-hero-id">${i && isIW(i.owners) ? iwMark : ""}${address(safeAddr, { size: "lg", chain })}${g !== null ? `<span class="sx-grand"><b>${esc(usd(g))}</b> on all chains</span>` : ""}</div>
+      <div class="sx-hero-id">${address(safeAddr, { size: "lg", chain })}${g !== null ? `<span class="sx-grand"><b>${esc(usd(g))}</b> on all chains</span>` : ""}</div>
       <div class="sx-chains">${on.map((t) => t === chain ? `<span class="sx-pill sx-on">${chainLogo(t)}${esc(c.name)}</span>`
         : `<a class="sx-pill" data-nav href="${route(t, safeAddr)}${sub === "settings" ? "/settings" : ""}">${chainLogo(t)}${esc(CHAINS[t].name)}</a>`).join("")}</div>`;
     if (sub === "settings") h += `<div class="sx-total sx-total-sm">Settings</div><div class="sx-sub">${esc(who)}</div>`;

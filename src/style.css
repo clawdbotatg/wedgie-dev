@@ -851,6 +851,9 @@ body.sx-sheet-open #s-msg { display: none; }
 .order-fields input, .order-fields select { font: inherit; font-size: 16px; padding: 8px 10px; border: 1px solid #cfcfca; border-radius: 10px; background: #fff; min-width: 0; }
 .order-fields .fine { font-weight: 400; }
 @media (max-width: 560px) { .order-fields { grid-template-columns: 1fr 1fr; } .order-fields label:nth-of-type(4) { grid-column: 1 / -1; } }
+.sx-iw { display: flex; align-items: center; gap: 14px; font-size: 22px; }
+.sx-iw[hidden] { display: none; }
+.sx-iw img { width: 52px; height: auto; image-rendering: pixelated; }
 .iw-mark { width: 22px; height: auto; vertical-align: middle; margin-right: 6px; align-self: center; }
 
 /* the price's green * and its "why" box (src/shop/why.ts) */
