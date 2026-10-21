@@ -15,23 +15,48 @@ let client: PublicClient | null = null, v: V | null = null;
 let ready: Promise<void> | null = null;
 const up = async () => { if (ready) await ready; return !!client; };
 
+// Names and avatars outlive the page (localStorage): a reload paints them at once, checked again after a day.
+// A read that fails (the RPC busy, the per-IP limit) never counts as "no name": the last known one stays.
+const STORE = "wedgie.ens", DAY = 86_400_000, PIC_MAX = 48_000;
+let seen: { n: Record<string, { name: string | null; at: number }>; p: Record<string, { src: string; at: number }> } = { n: {}, p: {} };
+try { const s = JSON.parse(localStorage.getItem(STORE) || "{}"); seen = { n: s.n || {}, p: s.p || {} }; } catch {}
+const save = () => {
+  const trim = (o: Record<string, { at: number }>, max: number) => Object.keys(o).sort((a, b) => o[b].at - o[a].at).slice(max).forEach((k) => delete o[k]);
+  trim(seen.n, 500); trim(seen.p, 40);
+  try { localStorage.setItem(STORE, JSON.stringify(seen)); } catch {}
+};
+const fresh = (x?: { at: number }) => !!x && Date.now() - x.at < DAY;
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** f() until it answers: a busy RPC gets a few more tries (the per-IP limit lifts within a minute). */
+async function tries<T>(f: () => Promise<T>): Promise<T> {
+  for (const ms of [3000, 15_000, 45_000]) { try { return await f(); } catch {} await wait(ms); }
+  return f();
+}
+
 const names = new Map<string, Promise<string | null>>();
 const known = new Map<string, { name: string; avatar?: string }>();   // what's resolved: painted straight in
 const key = (a: string, chain?: number) => `${chain || 1}:${a.toLowerCase()}`;
+for (const [k, x] of Object.entries(seen.n)) if (x.name) known.set(k, { name: x.name, avatar: seen.p[x.name]?.src });
 /** The address's primary ENS name (on `chain` first, then Ethereum's), checked forward by the resolver, or null. */
 export function ensName(a: string, chain?: number): Promise<string | null> {
-  const k = key(a, chain);
+  const k = key(a, chain), last = seen.n[k];
   if (!names.has(k)) names.set(k, (async () => {
-    if (!(await up())) return null;
+    if (fresh(last)) return last.name;
+    if (!(await up())) return last?.name ?? null;
     const address = E.checksum(a) as `0x${string}`;
-    let name: string | null = null;
-    if (chain && chain !== 1) name = await client!.getEnsName({ address, coinType: v!.toCoinType(chain) }).catch(() => null);
-    if (!name) name = await client!.getEnsName({ address }).catch(() => null);
-    if (!name) return null;
-    known.set(k, { name });
-    ensAvatar(name).then((av) => { if (av) known.set(k, { name: name!, avatar: av }); });
+    // viem answers null for "no name" and throws when the read failed
+    const name = await tries(async () => {
+      let n: string | null = null;
+      if (chain && chain !== 1) n = await client!.getEnsName({ address, coinType: v!.toCoinType(chain) });
+      return n || await client!.getEnsName({ address });
+    }).catch(() => undefined);
+    if (name === undefined) { names.delete(k); return last?.name ?? null; }
+    seen.n[k] = { name, at: Date.now() }; save();
+    if (!name) { known.delete(k); return null; }
+    known.set(k, { name, avatar: seen.p[name]?.src });
+    ensAvatar(name).then((av) => { if (av) known.set(k, { name, avatar: av }); });
     return name;
-  })().catch(() => null));
+  })().catch(() => last?.name ?? null));
   return names.get(k)!;
 }
 
@@ -48,11 +73,13 @@ export function ensAddress(name: string): Promise<string | null> {
 }
 
 const avatars = new Map<string, Promise<string | null>>();
-/** The name's avatar picture as a blob: URL, or null. Fetched, not an <img src>: this site is cross-origin
- *  isolated (COEP require-corp, for the emulator) and that blocks other sites' images. viem reads the avatar
- *  record (https, ipfs, NFTs); ENS's metadata service is the fallback. */
+/** The name's avatar picture (a data: URL when small enough to keep, else a blob: URL), or null. Fetched, not an
+ *  <img src>: this site is cross-origin isolated (COEP require-corp, for the emulator) and that blocks other sites'
+ *  images. viem reads the avatar record (https, ipfs, NFTs); ENS's metadata service is the fallback. */
 export function ensAvatar(name: string): Promise<string | null> {
+  const last = seen.p[name];
   if (!avatars.has(name)) avatars.set(name, (async () => {
+    if (fresh(last)) return last.src;
     await up();
     const urls = [await client?.getEnsAvatar({ name: v!.normalize(name) }).catch(() => null),
       `https://metadata.ens.domains/mainnet/avatar/${encodeURIComponent(name)}`];
@@ -60,11 +87,17 @@ export function ensAvatar(name: string): Promise<string | null> {
       if (!u) continue;
       try {
         const r = await fetch(u);
-        if (r.ok && (r.headers.get("content-type") || "").startsWith("image/")) return URL.createObjectURL(await r.blob());
+        if (!r.ok || !(r.headers.get("content-type") || "").startsWith("image/")) continue;
+        const blob = await r.blob();
+        if (blob.size > PIC_MAX) return URL.createObjectURL(blob);
+        const src = await new Promise<string>((ok, no) => { const f = new FileReader(); f.onload = () => ok(f.result as string); f.onerror = no; f.readAsDataURL(blob); });
+        seen.p[name] = { src, at: Date.now() }; save();
+        return src;
       } catch {}
     }
-    return null;
-  })().catch(() => null));
+    avatars.delete(name);   // nothing came back: ask again next time, keep the last one meanwhile
+    return last?.src ?? null;
+  })().catch(() => last?.src ?? null));
   return avatars.get(name)!;
 }
 
