@@ -690,6 +690,8 @@ body.dock-running #s-msg { display: none; }
 .sx-first { display: grid; place-items: center; min-height: 50vh; }
 .sx-spin-big { position: static; width: 44px; height: 44px; border-width: 5px; }
 @keyframes sx-spin { to { transform: rotate(360deg); } }
+.sx-btn-wait { display: inline-grid; place-items: center; min-width: 92px; pointer-events: none; }
+.sx-spin-in { position: static; }
 .sx-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .sx-end { margin-left: auto; }
 .sx-foot { display: flex; justify-content: flex-end; margin: 10px 0 0 !important; }

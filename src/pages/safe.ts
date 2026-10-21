@@ -209,7 +209,7 @@ export function safe(main: HTMLElement) {
   const deployed: Record<number, boolean | undefined> = {};
   // this Safe on the other chains: there (true), not yet (false), unknown; recipe = how it was made, to make it again
   let copies: Record<number, boolean | undefined> = {}, recipe: E.Recipe | null = null;
-  let worths: Record<number, number | null> = {}, looked = false;   // this Safe's dollars on each chain it's on (null: no price)
+  let worths: Record<number, number | null> = {}, looked = false, checked = false;   // checked: every chain was asked just now   // this Safe's dollars on each chain it's on (null: no price)
   let queueNote = "";        // which queue sources didn't answer just now
   let sub: "home" | "settings" = "home";
   let assets: Asset[] | null = null;              // what the open Safe holds (null: not read yet)
@@ -794,7 +794,8 @@ export function safe(main: HTMLElement) {
     box.innerHTML = `<h3>Other chains</h3><p class="fine">Same address on every chain.</p>
       <ul class="sx-rows">${others.map((t) => `<li><span>${chainLogo(t)}${esc(CHAINS[t].name)}${CHAINS[t].test ? ` <span class="fine">test</span>` : ""}</span>${copies[t]
         ? `<a class="btn btn-sm sx-end" data-nav href="${route(t, safeAddr)}">Open</a>`
-        : copies[t] === false ? `<button class="btn btn-sm sx-end" data-copy="${t}"${dis()}>Deploy</button>` : `<span class="fine sx-end">checking</span>`}</li>`).join("")}</ul>
+        : copies[t] === false ? `<button class="btn btn-sm sx-end" data-copy="${t}"${dis()}>Deploy</button>` : checked ? `<button class="btn btn-sm sx-end" disabled title="This chain didn't answer">Can't check</button>`
+          : `<span class="btn btn-sm sx-end sx-btn-wait" aria-label="Checking"><span class="sx-spin sx-spin-in"></span></span>`}</li>`).join("")}</ul>
       ${differs ? `<p class="fine">A new copy starts with this Safe's first owners (${recipe!.threshold} of ${recipe!.owners.length}), not today's.</p>` : ""}
       <h3>More</h3>
       <p class="sx-row"><a class="btn btn-sm" href="${appLink(chain, safeAddr)}" target="_blank" rel="noopener">Open in Safe{Wallet} ↗</a>
@@ -872,6 +873,7 @@ export function safe(main: HTMLElement) {
     return n;
   };
   async function checkCopies(c: number, a: string) {
+    checked = false;
     await Promise.all(IDS.filter((t) => t !== c).map(async (t) => {
       try {
         // one read says if it's there and what it holds (readSafe), not a getCode and then that
@@ -881,7 +883,7 @@ export function safe(main: HTMLElement) {
         if (i) { worths[t] = await worthOn(t, a, i); paintSafe(); }
       } catch {}
     }));
-    if (c === chain && a === safeAddr) { looked = true; copies[c] = true; saveSeen(a, copies); saveView(c, a); paintSafe(); paintChains(); }
+    if (c === chain && a === safeAddr) { looked = true; checked = true; copies[c] = true; saveSeen(a, copies); saveView(c, a); paintSafe(); paintChains(); }
     try { const r = await recipeOf(c, a); if (c === chain && a === safeAddr) { recipe = r; paintChains(); } } catch {}
   }
 
