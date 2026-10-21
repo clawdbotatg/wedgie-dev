@@ -764,6 +764,10 @@ body.dock-running #s-msg { display: none; }
 .sx-warn-soft { padding: 10px 14px; border-radius: 14px; background: #fff8e1; font-size: 14px; }
 .sx-subs { margin: 0; padding-left: 48px; font-size: 14px; }
 .sx-subs li { margin: 4px 0; }
+.sx-bot { margin: 0 !important; padding-left: 46px; font-weight: 700; font-size: 15px; }   /* src/safe/explain.ts */
+.sx-bot-wait { color: var(--muted); }
+.sx-cs { margin-top: 4px; font-weight: 600; }
+.sx-tx-head + .sx-cs { padding-left: 46px; }
 .sx-tx-sigs { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); font-weight: 700; }
 .sx-dots { display: inline-flex; gap: 4px; }
 .sx-dots i { width: 10px; height: 10px; border-radius: 50%; background: #d6d8d3; }

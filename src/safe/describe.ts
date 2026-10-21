@@ -4,7 +4,8 @@
 import * as E from "./eth";
 
 export type Token = { symbol: string; decimals: number };
-export type Said = { title: string; kind: "send" | "approve" | "owners" | "cancel" | "batch" | "call" | "danger"; subs?: Said[] };
+export type Said = { title: string; kind: "send" | "approve" | "owners" | "cancel" | "batch" | "call" | "danger"; subs?: Said[];
+  more?: string };   // more: HTML under the title (src/safe/explain.ts)
 export type Ctx = {
   safe: string;
   addr: (a: string) => string;           // an address as HTML (the address component)

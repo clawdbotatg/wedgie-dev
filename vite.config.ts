@@ -65,10 +65,10 @@ function loaderManifest(): Plugin {
 
 // The shop's server (api/*.ts, Vercel functions in production) under `vite` and `vite preview`, so the
 // probes can order end to end. Always the dev database branch (SHOP_DATABASE_URL_DEV in .env), never
-// the real orders. Only SHOP_* and STRIPE_* come from .env.
+// the real orders. Only SHOP_*, STRIPE_* and BANKR_LLM_* (api/explain.ts) come from .env.
 function shopApi(): Plugin {
   const env = loadEnv("development", process.cwd(), "");
-  for (const [k, v] of Object.entries(env)) if (/^(SHOP_|STRIPE_)/.test(k) && !(k in process.env)) process.env[k] = v;
+  for (const [k, v] of Object.entries(env)) if (/^(SHOP_|STRIPE_|BANKR_LLM_)/.test(k) && !(k in process.env)) process.env[k] = v;
   process.env.SHOP_DATABASE_URL = process.env.SHOP_DATABASE_URL_DEV || "";
   let load: (u: string) => Promise<Record<string, any>>;
   const mw: Connect.NextHandleFunction = async (req, res, next) => {

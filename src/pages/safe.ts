@@ -24,6 +24,7 @@ import * as Drive from "../serial/drive";
 import * as E from "../safe/eth";
 import { address, addressInput, addressOf, watch } from "../safe/address";
 import { describe, type Ctx, type Said } from "../safe/describe";
+import { explain, callsOf } from "../safe/explain";
 import { readAssets, tokenMeta, knownMeta, usd, type Asset } from "../safe/assets";
 import { canScan, scan } from "../safe/scan";
 import qrcode from "qrcode-generator";
@@ -280,7 +281,8 @@ export function safe(main: HTMLElement) {
       return m;
     },
   });
-  const said = (t: any) => describe(t, ctx(), t.dataDecoded?.method);
+  // what describe.ts can't read: clear signing, else 🤖 (src/safe/explain.ts)
+  const said = (t: any) => { const s = describe(t, ctx(), t.dataDecoded?.method); return explain(s, callsOf(t, s), chain, safeAddr, ctx().addr, paintAll); };
   const ICON: Record<Said["kind"], string> = { send: "↑", approve: "✓", owners: "👥", cancel: "⨯", batch: "≡", call: "⚙", danger: "!" };
   const subsOf = (s: Said) => s.subs?.length ? `<ol class="sx-subs">${s.subs.map((x) => `<li>${x.title}</li>`).join("")}</ol>` : "";
   /** The Safe's total in dollars, when every price that matters is known; else null. */
@@ -1069,7 +1071,7 @@ export function safe(main: HTMLElement) {
       const dots = Array.from({ length: need }, (_, d) => `<i class="${d < n ? "on" : ""}"></i>`).join("");
       return `<li class="sx-tx sx-k-${s.kind}">
         <div class="sx-tx-head"><span class="sx-ic">${ICON[s.kind]}</span><span class="sx-tx-what">${s.title}</span><span class="sx-tx-n">#${esc(t.nonce)}</span></div>
-        ${subsOf(s)}${s.kind === "danger" ? `<p class="sx-warn">This can change how the Safe works. Only sign if you know why.</p>` : ""}
+        ${subsOf(s)}${s.more || ""}${s.kind === "danger" ? `<p class="sx-warn">This can change how the Safe works. Only sign if you know why.</p>` : ""}
         <div class="sx-tx-sigs"><span class="sx-dots">${dots}</span>${n} of ${need} signed${marks.length ? ` · ${marks.join(" · ")}` : ""}</div>
         ${btns.length ? `<div class="sx-row">${btns.join(" ")}</div>` : ""}
         <details class="sx-more"><summary>Details</summary><dl class="sx-dl">
@@ -1453,9 +1455,10 @@ export function safe(main: HTMLElement) {
     box.hidden = !(safeAddr && info && here.length && sub === "home");
     if (box.hidden) return;
     box.innerHTML = `<h3>Apps asking</h3>` + here.map((a, k) => {
-      const calls = a.calls.map((c) => describe({ to: c.to, value: c.value, data: c.data }, ctx()));
+      const x = explain({ title: "", kind: "batch", subs: a.calls.map((c) => describe({ to: c.to, value: c.value, data: c.data }, ctx())) },
+        a.calls, chain, safeAddr, ctx().addr, paintAll), calls = x.subs!;
       return `<div class="sx-tx wc-ask"><div class="sx-tx-head">${icon(a.dapp)}<span class="sx-tx-what"><b>${esc(a.dapp.name)}</b> asks for ${plural(a.calls.length, "action")}${a.calls.length > 1 ? ", run as one" : ""}</span></div>
-      <ol class="sx-subs">${calls.map((s) => `<li>${s.title}</li>`).join("")}</ol>
+      <ol class="sx-subs">${calls.map((s) => `<li>${s.title}</li>`).join("")}</ol>${x.more || ""}
       <div class="sx-row">${wedgieOwns() ? `<button class="btn btn-sm btn-green" data-wcsign="${k}"${dis(!key)}>Sign with wedgie</button> ` : ""}${isOwner(account) ? `<button class="btn btn-sm" data-wcwallet="${k}"${dis()}>Sign with wallet</button> ` : ""}<button class="btn btn-sm sx-end" data-wcno="${k}"${dis()}>Reject</button></div></div>`;
     }).join("");
     const run = (a: (typeof asks)[0], who: "wedgie" | "wallet") => job(async () => {

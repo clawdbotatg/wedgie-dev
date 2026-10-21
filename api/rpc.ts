@@ -4,7 +4,7 @@
 // the chain's own coin (ETH, POL, …).
 import { env, json, oops, crossSite, db, ipOf } from "./_shop.js";
 
-const HOSTS: Record<number, string> = { 1: "eth-mainnet", 8453: "base-mainnet", 10: "opt-mainnet", 42161: "arb-mainnet",
+export const HOSTS: Record<number, string> = { 1: "eth-mainnet", 8453: "base-mainnet", 10: "opt-mainnet", 42161: "arb-mainnet",
   137: "polygon-mainnet", 43114: "avax-mainnet", 56: "bnb-mainnet", 100: "gnosis-mainnet", 42220: "celo-mainnet",
   146: "sonic-mainnet", 5042: "arc-mainnet", 4663: "robinhood-mainnet", 84532: "base-sepolia", 11155111: "eth-sepolia" };
 // each chain's own coin, as Alchemy's prices API names it (ETH if not here; Arc's coin is USDC: a dollar)
@@ -44,7 +44,7 @@ async function pricesNow(chain: number, host: string, tokens: unknown[]) {
 }
 
 /** The Alchemy key: SHOP_RPC_1 is an Alchemy URL ending in /v2/<key>. */
-const key = () => env("ALCHEMY_API_KEY") || (env("SHOP_RPC_1").match(/alchemy\.com\/v2\/([\w-]+)/) || [])[1] || "";
+export const key = () => env("ALCHEMY_API_KEY") || (env("SHOP_RPC_1").match(/alchemy\.com\/v2\/([\w-]+)/) || [])[1] || "";
 
 // A /safe page reads every 1.5 s while it waits: about 40 a minute. Past these, the IP waits (the key costs money).
 const PER_MIN = 300, PER_DAY = 20_000;
