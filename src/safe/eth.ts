@@ -158,6 +158,16 @@ export function aggregate3(calls: { to: string; allowFailure: boolean; data: str
   return call("aggregate3((address,bool,bytes)[])", [{ dyn: cat(word(calls.length), encode(calls.map(one))) }]);
 }
 
+/** aggregate3's return, (bool success, bytes returnData)[]: each call's answer, "0x" when it failed. */
+export function unaggregate(ret: string): { ok: boolean; data: string }[] {
+  const b = bytes(ret), num = (at: number) => Number(BigInt(hex(b.slice(at, at + 32))));
+  const arr = num(0), n = num(arr), base = arr + 32;
+  return Array.from({ length: n }, (_, i) => {
+    const t = base + num(base + 32 * i), d = t + num(t + 32), len = num(d);
+    return { ok: num(t) === 1, data: hex(b.slice(d + 32, d + 32 + len)) };
+  });
+}
+
 /** One wallet transaction: the wedgie's signer contract (if it isn't there yet), then the Safe. */
 export function newSafeData(x: string, y: string, owners: string[], threshold: number, salt: bigint) {
   const Z = new Uint8Array(32);

@@ -115,7 +115,7 @@ await ctx.addInitScript((me) => {
 let busyFor = 4;
 await ctx.route(/\/api\/rpc\?chain=8453$/, async (r) => {
   if (/"wedgie_prices"/.test(r.request().postData())) return r.fulfill({ contentType: "application/json", body: JSON.stringify({ jsonrpc: "2.0", id: 1, result: { eth: 2000, tokens: {} } }) });
-  if (busyFor > 0 && /eth_getCode/.test(r.request().postData())) { busyFor--; return r.fulfill({ status: 429, headers: { "access-control-allow-origin": "*" }, body: "rate limited" }); }
+  if (busyFor > 0 && /eth_getCode|eth_call/.test(r.request().postData())) { busyFor--; return r.fulfill({ status: 429, headers: { "access-control-allow-origin": "*" }, body: "rate limited" }); }
   r.fulfill({ headers: { "access-control-allow-origin": "*" }, contentType: "application/json", body: await rpcRaw(r.request().postData()) });
 });
 // Safe's Transaction Service, in memory (owners from the chain)

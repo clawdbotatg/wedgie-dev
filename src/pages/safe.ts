@@ -91,12 +91,13 @@ async function rpc(chain: number, method: string, params: unknown[]): Promise<an
     try {
       const res = await fetch(readUrl(chain), { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jsonrpc: "2.0", id: ++rpcId, method, params }) });
-      if (res.status === 429 || res.status >= 500) throw Object.assign(new Error(`${CHAINS[chain].name}: busy (${res.status})`), { again: true });
+      // 429: /api/rpc's own limit ("Too many reads") or Alchemy's ("Busy."): say which
+      if (res.status === 429 || res.status >= 500) throw Object.assign(new Error(`${CHAINS[chain].name}: ${(await res.json().catch(() => null))?.error || "busy"} (${res.status})`), { again: true });
       const r = await res.json();
       if (r.error) throw new Error(`${CHAINS[chain].name}: ${r.error.message}`);
       return r.result;
     } catch (e: any) {
-      if (i >= 3 || !(e.again || e instanceof TypeError)) throw e;     // TypeError: the fetch itself failed
+      if (i >= 5 || !(e.again || e instanceof TypeError)) throw e;     // TypeError: the fetch itself failed (~20 s of tries)
       await sleep(600 * 2 ** i);
     }
   }
@@ -145,13 +146,18 @@ type Row = { chain: number; addr: string; wedgie: boolean; wallet: boolean; info
 const KEYS = Object.fromEntries(IDS.map((id) => [CHAINS[id].key, id]));
 const route = (chain: number, a: string) => `/safe/${CHAINS[chain].key}:${a}`;
 
-/** Owners, threshold, nonce, balances: from the chain, not Safe's API (which can lag a block or more). */
+/** Owners, threshold, nonce, balances: from the chain, not Safe's API (which can lag a block or more). One read
+ * (Multicall3): a page with many Safes on many chains stays under /api/rpc's limit. */
 async function readSafe(c: number, a: string): Promise<Info> {
-  if (!(await hasCode(c, a))) throw Object.assign(new Error(`There's no Safe at ${short(a)} on ${CHAINS[c].name}.`), { gone: true });
-  const [owners, th, n, bal, usdc] = await Promise.all([view(c, a, E.selector("getOwners()")), view(c, a, E.selector("getThreshold()")),
-    view(c, a, E.selector("nonce()")), rpc(c, "eth_getBalance", [a, "latest"]),
-    CHAINS[c].usdc ? view(c, CHAINS[c].usdc!, E.call("balanceOf(address)", [E.aword(a)])).catch(() => null) : Promise.resolve(null)]);
-  return { owners: E.addrs(owners), threshold: Number(BigInt(th)), nonce: Number(BigInt(n)), balance: BigInt(bal), usdc: usdc ? BigInt(usdc) : null };
+  const u = CHAINS[c].usdc, calls = [{ to: a, allowFailure: true, data: E.selector("getOwners()") },
+    { to: a, allowFailure: true, data: E.selector("getThreshold()") }, { to: a, allowFailure: true, data: E.selector("nonce()") },
+    { to: E.MULTICALL3, allowFailure: true, data: E.call("getEthBalance(address)", [E.aword(a)]) },
+    ...(u ? [{ to: u, allowFailure: true, data: E.call("balanceOf(address)", [E.aword(a)]) }] : [])];
+  const [owners, th, n, bal, usdc] = E.unaggregate(await view(c, E.MULTICALL3, E.aggregate3(calls)));
+  // no code there: every call "works" and says nothing; not a Safe: getOwners fails
+  if (!owners.ok || owners.data.length < 130 || !th.ok || !n.ok) throw Object.assign(new Error(`There's no Safe at ${short(a)} on ${CHAINS[c].name}.`), { gone: true });
+  return { owners: E.addrs(owners.data), threshold: Number(BigInt(th.data)), nonce: Number(BigInt(n.data)), balance: BigInt(bal.data),
+    usdc: usdc?.ok && usdc.data.length > 2 ? BigInt(usdc.data) : null };
 }
 
 export function safe(main: HTMLElement) {
@@ -811,9 +817,8 @@ export function safe(main: HTMLElement) {
 
   // ---- the same Safe on another chain: its creation call again, so the same address ----
   /** Dollars this Safe holds on chain t (a test chain's coins: none), or null with no price. */
-  async function worthOn(t: number, a: string) {
+  async function worthOn(t: number, a: string, i: Info) {
     if (CHAINS[t].test) return 0;
-    const i = await readSafe(t, a);
     const got = await readAssets(t, a, CHAINS[t].native, i.balance, CHAINS[t].usdc ? { address: CHAINS[t].usdc!, balance: i.usdc } : null, (m, p) => rpc(t, m, p));
     return got[0].price === null ? null : got.reduce((n, x) => n + (x.usd || 0), 0);
   }
@@ -828,10 +833,11 @@ export function safe(main: HTMLElement) {
   async function checkCopies(c: number, a: string) {
     await Promise.all(IDS.filter((t) => t !== c).map(async (t) => {
       try {
-        const has = await hasCode(t, a);
+        // one read says if it's there and what it holds (readSafe), not a getCode and then that
+        const i = await readSafe(t, a).catch((e) => { if (e?.gone) return null; throw e; });
         if (c !== chain || a !== safeAddr) return;
-        copies[t] = has;
-        if (has) { worths[t] = await worthOn(t, a); paintSafe(); }
+        copies[t] = !!i;
+        if (i) { worths[t] = await worthOn(t, a, i); paintSafe(); }
       } catch {}
     }));
     if (c === chain && a === safeAddr) { looked = true; copies[c] = true; saveSeen(a, copies); paintSafe(); paintChains(); }
