@@ -95,7 +95,7 @@ async function rpc(chain: number, method: string, params: unknown[]): Promise<an
       // 429: /api/rpc's own limit ("Too many reads") or Alchemy's ("Busy."): say which
       if (res.status === 429 || res.status >= 500) throw Object.assign(new Error(`${CHAINS[chain].name}: ${(await res.json().catch(() => null))?.error || "busy"} (${res.status})`), { again: true });
       const r = await res.json();
-      if (r.error) throw new Error(`${CHAINS[chain].name}: ${r.error.message}`);
+      if (r.error) throw new Error(`${CHAINS[chain].name}: ${r.error.message || r.error}`);    // a JSON-RPC error, or /api/rpc's own
       return r.result;
     } catch (e: any) {
       if (i >= 5 || !(e.again || e instanceof TypeError)) throw e;     // TypeError: the fetch itself failed (~20 s of tries)

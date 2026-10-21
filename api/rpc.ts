@@ -75,6 +75,8 @@ export async function POST(req: Request) {
   if (mk && META.has(mk)) return json({ jsonrpc: "2.0", id: b.id ?? 1, result: META.get(mk) });
   const r = await fetch(`https://${host}.g.alchemy.com/v2/${key()}`, { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", id: b.id ?? 1, method: b.method, params: b.params }) });
+  // 401/403: this chain isn't turned on for the key (Alchemy dashboard). Not "busy": the page shouldn't retry it
+  if (r.status === 401 || r.status === 403) return oops("This chain isn't on for wedgie.dev yet.", 404);
   if (!r.ok) return oops("Busy.", r.status === 429 ? 429 : 502);
   const out = await r.json();
   if (mk && out?.result && typeof out.result.decimals === "number") { if (META.size > 5000) META.clear(); META.set(mk, out.result); }
