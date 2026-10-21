@@ -9,7 +9,7 @@
 //                            requests, Waiting (sign, execute, reject), Assets (every token), Activity
 //   /safe/<…>/settings       owners, threshold, add the wedgie or an owner, other chains, Safe{Wallet}
 //   - the chain is read through /api/rpc (Alchemy): owners, threshold, balances, tokens, prices
-//   - the queue (Safe's Transaction Service, api.safe.global: no key, CORS open): sign on the wedgie or the
+//   - the queue (Safe's Transaction Service, through /api/safe with our key): sign on the wedgie or the
 //     wallet, execute once enough have signed (a wallet sends it, packSignatures puts them together)
 //   - every transaction in plain words (src/safe/describe.ts): "Send 100 USDC to bob.eth"
 // Every transaction goes through propose(): one signature, into Safe's queue, where Safe{Wallet} sees it too.
@@ -71,15 +71,27 @@ const appLink = (chain: number, safe: string, path = "home") => `https://app.saf
 const LINE_MAX = 6000;      // the wedgie drops a USB line over 6 KB
 const DATA_MAX = 8000;      // wedgie-safe safe_data pieces: up to this many bytes (what an RP2040 heap joins safely)
 
+// Safe's service goes through /api/safe (our key: without one Safe allows 5,000 reads a month per IP, and one person's
+// page used that up, 10-21), at most 3 at a time (the key: 5 a second). A local preview has no /api: straight there.
+const SAFE = "https://api.safe.global/tx-service/";
+const via = (url: string) => url.startsWith(SAFE) && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname)
+  ? `${location.origin}/api/safe?u=${encodeURIComponent(url.slice(SAFE.length))}` : url;
+let safeBusy = 0;
+const safeWait: (() => void)[] = [];
+async function safeFetch(url: string, init?: RequestInit) {
+  if (safeBusy >= 3) await new Promise<void>((r) => safeWait.push(r));
+  safeBusy++;
+  try { return await fetch(via(url), init); } finally { safeBusy--; safeWait.shift()?.(); }
+}
 async function get(url: string) {
-  const r = await fetch(url);
+  const r = await safeFetch(url);
   if (!r.ok) throw Object.assign(new Error(`Safe's API: ${r.status} ${(await r.text()).slice(0, 200)}`), { status: r.status });
   return r.json();
 }
 /** Give up on a slow answer: a busy service never holds the page. */
 const within = <T,>(p: Promise<T>, ms = SLOW_MS) => Promise.race([p, sleep(ms).then((): T => { throw new Error("no answer"); })]);
 async function post(url: string, body: unknown) {
-  const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const r = await safeFetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   if (!r.ok) throw new Error(`Safe's API said no: ${r.status} ${(await r.text()).slice(0, 300)}`);
 }
 
@@ -611,7 +623,7 @@ export function safe(main: HTMLElement) {
     box.hidden = false;
     box.innerHTML = !account ? `<button class="btn btn-sm btn-wallet" id="w-go"${dis()}>Connect wallet</button>`
       : `<span class="safe-id-tag">wallet</span>${address(account)}${isOwner(account) ? `<span class="good">owner</span>` : ""}
-      <button class="btn btn-sm" id="w-off"${dis()}>Disconnect</button>`;
+      <button class="btn btn-sm" id="w-off">Disconnect</button>`;
     $("w-go")?.addEventListener("click", () => job(async () => {
       account = await wallet(safeAddr ? chain : newChain);
       if (!listened.has(wcp)) { listened.add(wcp); wcp.on?.("accountsChanged", onAccounts); }   // a switch in the wallet shows here
@@ -620,12 +632,14 @@ export function safe(main: HTMLElement) {
     }));
     $("w-off")?.addEventListener("click", async () => {
       account = ""; showWallet = false;
-      try { localStorage.setItem(OFF, "1"); } catch {}
-      // MetaMask and most others forget this site's permission; a wallet that can't, the page still stops using
-      try { await eth().request({ method: "wallet_revokePermissions", params: [{ eth_accounts: {} }] }); } catch {}
-      if (wcp) { try { localStorage.removeItem(WCP); } catch {} wcp = null; (await rainbow()).disconnect(); }
+      try { localStorage.setItem(OFF, "1"); localStorage.removeItem(WCP); } catch {}
       rows = rows.filter((r) => r.wedgie).map((r) => ({ ...r, wallet: false }));
+      // the page lets go at once; the wallet hears it after. A WalletConnect wallet may never answer the revoke:
+      // awaiting it left Disconnect doing nothing (Austin, 10-21)
+      const p = wcp; wcp = null;
       paintAll();
+      p?.request({ method: "wallet_revokePermissions", params: [{ eth_accounts: {} }] }).catch(() => {});
+      rainbow().then((r) => r.disconnect()).catch(() => {});
     });
   }
   const listened = new WeakSet<object>();
