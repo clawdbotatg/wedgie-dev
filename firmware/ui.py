@@ -114,10 +114,9 @@ def page(d, head, lines=(), hint="", show=True):
         d.show()
 
 
-def buttons(d, yes="yes", no="no", wait=False):
-    """The two answer bars at the bottom: green and red, the colors of the case's yes and no buttons.
-    wait: yes is grey (a signed job's check is still running: yes waits for its check or warning sign)."""
-    d.fill_rect(0, 184, 240, 26, GREY if wait else GREEN)
+def buttons(d, yes="yes", no="no"):
+    """The two answer bars at the bottom: green and red, the colors of the case's yes and no buttons."""
+    d.fill_rect(0, 184, 240, 26, GREEN)
     d.center_text(yes[:COLS_BIG], 189, WHITE, 2)
     d.fill_rect(0, 214, 240, 26, RED)
     d.center_text(no[:COLS_BIG], 219, WHITE, 2)
@@ -169,8 +168,7 @@ def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None, scary=Fa
     (scale 3, a word a line, or scale 2 for long words): an update's version, an app's name.
     sig(tick): a signed job's check (slot._sig), run once the question is up, a dot pulsing after big
     meanwhile; it turns into a green check (True), a red warning sign (False) or nothing (None: it
-    couldn't check; job.py does after the yes). No answers at any time; yes is grey and does nothing
-    until the check is done (Austin, 10-20: the check or the warning sign before the yes). Without
+    couldn't check; job.py does after the yes). A press answers at any time, checked or not. Without
     sig there's never a check: it means only "this wedgie checked the signature" (Austin, 10-19)."""
     if d.width < 240:
         import small
@@ -207,30 +205,23 @@ def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None, scary=Fa
                 break
             say(d, x, y, fg, 1, fg)
             y += 14
-    buttons(d, yes, no, bool(sig))
+    buttons(d, yes, no)
     if scary:                               # the no bar is red on red: a white line keeps it a button
         d.fill_rect(0, 212, 240, 2, WHITE)
     d.show()
     global drawn
     drawn = time.ticks_ms()
-    return wait(k, ms, sig, at and (lambda s: mark(d, at[0], at[1], s)), sig and (lambda: _yes(d, yes)))
-
-
-def _yes(d, yes):
-    d.fill_rect(0, 184, 240, 26, GREEN)
-    d.center_text(yes[:COLS_BIG], 189, WHITE, 2)
-    d.show_rect(0, 184, 240, 26)
+    return wait(k, ms, sig, at and (lambda s: mark(d, at[0], at[1], s)))
 
 
 class _Answered(BaseException):     # a press during the check: not an Exception, so release_ok can't eat it
     pass
 
 
-def wait(k, ms, sig=None, show=None, ready=None):
+def wait(k, ms, sig=None, show=None):
     """The answer to a question just drawn: A True, Y False, nothing in ms False. Presses in its first SETTLE
     ms are dropped (audit 10-18: a computer could pop a question under a finger already pressing A).
-    sig, show: ask's check, and what draws its mark (show(s), s as ui.mark). signed: what it found. While
-    the check runs only Y answers (an A is dropped); ready() then redraws yes as live."""
+    sig, show: ask's check, and what draws its mark (show(s), s as ui.mark). signed: what it found."""
     global said_no, signed
     said_no = False
     signed = None
@@ -241,7 +232,7 @@ def wait(k, ms, sig=None, show=None, ready=None):
 
         def tick(_=None):                   # ~30 times a check (p256.verify): the keys, then the dot
             for key in k.pressed():
-                if key == "Y" and time.ticks_diff(time.ticks_ms(), t0) >= SETTLE:
+                if key in ("A", "Y") and time.ticks_diff(time.ticks_ms(), t0) >= SETTLE:
                     got.append(key)
                     raise _Answered
             n[0] += 1
@@ -253,10 +244,9 @@ def wait(k, ms, sig=None, show=None, ready=None):
         except _Answered:
             pass
         if got:
-            said_no = True
-            return False
+            said_no = got[0] == "Y"
+            return got[0] == "A"
         show and show(signed)
-        ready and ready()                   # an A during the check was dropped by tick (k.pressed)
     while time.ticks_diff(time.ticks_ms(), t0) < ms:
         for key in k.pressed():
             if key in ("A", "Y") and time.ticks_diff(time.ticks_ms(), t0) >= SETTLE:
