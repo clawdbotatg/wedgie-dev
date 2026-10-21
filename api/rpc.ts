@@ -13,8 +13,21 @@ const READ = new Set(["eth_call", "eth_getCode", "eth_getBalance", "eth_getTrans
   "eth_blockNumber", "eth_chainId", "eth_getBlockByNumber", "eth_getStorageAt", "alchemy_getTokenBalances", "alchemy_getTokenMetadata"]);
 const TEST = new Set([84532, 11155111]);
 
+// Kept while this function instance is warm: a price for a minute, a token's name and decimals for good (they never
+// change). Fewer Alchemy calls, and a page that asks again gets its answer at once.
+const PRICED = new Map<string, { at: number; v: any }>(), META = new Map<string, any>();
+const PRICE_MS = 60_000;
+
 /** Dollar prices: the chain's coin and up to 25 tokens on one chain. A test chain's coins are worth nothing. */
 async function prices(chain: number, host: string, tokens: unknown[]) {
+  const k = chain + ":" + tokens.map(String).map((t) => t.toLowerCase()).sort().join(","), hit = PRICED.get(k);
+  if (hit && Date.now() - hit.at < PRICE_MS) return hit.v;
+  const v = await pricesNow(chain, host, tokens);
+  if (PRICED.size > 500) PRICED.clear();
+  PRICED.set(k, { at: Date.now(), v });
+  return v;
+}
+async function pricesNow(chain: number, host: string, tokens: unknown[]) {
   const out: { eth: number | null; tokens: Record<string, number> } = { eth: null, tokens: {} };
   if (TEST.has(chain)) return out;
   const list = tokens.filter((a): a is string => typeof a === "string" && /^0x[0-9a-fA-F]{40}$/.test(a)).slice(0, 25);
@@ -58,8 +71,12 @@ export async function POST(req: Request) {
   if (!b || Array.isArray(b) || !Array.isArray(b.params)) return oops("Not allowed.", 403);
   if (b.method === "wedgie_prices") return json({ jsonrpc: "2.0", id: b.id ?? 1, result: await prices(Number(new URL(req.url).searchParams.get("chain")), host, b.params) });
   if (!READ.has(b.method)) return oops("Not allowed.", 403);
+  const mk = b.method === "alchemy_getTokenMetadata" ? `${host}:${String(b.params[0]).toLowerCase()}` : "";
+  if (mk && META.has(mk)) return json({ jsonrpc: "2.0", id: b.id ?? 1, result: META.get(mk) });
   const r = await fetch(`https://${host}.g.alchemy.com/v2/${key()}`, { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", id: b.id ?? 1, method: b.method, params: b.params }) });
   if (!r.ok) return oops("Busy.", r.status === 429 ? 429 : 502);
-  return json(await r.json());
+  const out = await r.json();
+  if (mk && out?.result && typeof out.result.decimals === "number") { if (META.size > 5000) META.clear(); META.set(mk, out.result); }
+  return json(out);
 }

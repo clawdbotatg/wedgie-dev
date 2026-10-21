@@ -264,7 +264,8 @@ export function safe(main: HTMLElement) {
     busy = true; paintAll();
     try { await fn(); } catch (e) { fail(e); } finally { busy = false; paintAll(); }
   }
-  const dis = (extra = false) => (busy || asking || extra ? " disabled" : "");
+  // stale: the Safe on screen is the saved copy (viewCache) till the chain answers: nothing signs off an old nonce
+  const dis = (extra = false) => (busy || asking || stale || extra ? " disabled" : "");
 
   // ---- plain words for a transaction (src/safe/describe.ts) ----
   const asked = new Set<string>();     // token contracts whose metadata is being fetched
@@ -329,6 +330,36 @@ export function safe(main: HTMLElement) {
   const saveSeen = (a: string, on: Record<number, boolean | undefined>) => {
     try { const all = JSON.parse(localStorage.getItem(SEEN) || "{}"); all[a.toLowerCase()] = IDS.filter((t) => on[t]); localStorage.setItem(SEEN, JSON.stringify(all)); } catch {}
   };
+  // Each Safe as last seen (owners, balances, tokens, its other chains), saved: opening it shows that at once, then
+  // the chain's answer replaces it. Buttons wait for the fresh one (stale). Never the queue (always read fresh), never
+  // the history (big: a full localStorage would stop every other save on the page). The last 20 Safes.
+  const VIEW = "wedgie.safe.view";
+  let stale = false;
+  const big = (_k: string, v: unknown) => typeof v === "bigint" ? { $n: String(v) } : v;
+  const unbig = (_k: string, v: any) => v && typeof v === "object" && "$n" in v ? BigInt(v.$n) : v;
+  const saveView = (c: number, a: string) => {
+    if (!info || !assets) return;
+    try {
+      const all = JSON.parse(localStorage.getItem(VIEW) || "{}");
+      delete all[`${c}:${a.toLowerCase()}`];      // re-added last: the newest at the end
+      all[`${c}:${a.toLowerCase()}`] = JSON.stringify({ info, assets: assets.slice(0, 30), worths, at: Date.now() }, big);
+      const keys = Object.keys(all);
+      for (const k of keys.slice(0, Math.max(0, keys.length - 20))) delete all[k];
+      localStorage.setItem(VIEW, JSON.stringify(all));
+    } catch {}
+  };
+  const dropView = (c: number, a: string) => {
+    try { const all = JSON.parse(localStorage.getItem(VIEW) || "{}"); delete all[`${c}:${a.toLowerCase()}`]; localStorage.setItem(VIEW, JSON.stringify(all)); } catch {}
+  };
+  const loadView = (c: number, a: string) => {
+    try {
+      const v = JSON.parse(localStorage.getItem(VIEW) || "{}")[`${c}:${a.toLowerCase()}`];
+      if (!v) return false;
+      const o = JSON.parse(v, unbig);
+      info = o.info; assets = o.assets; Object.assign(worths, o.worths || {}); stale = true; looked = true;
+      return true;
+    } catch { return false; }
+  };
   let lastFind = 0, findAgain = false;      // when the list was last checked: back from a Safe within a minute, no new check
   // a Safe this browser made or opened that the list doesn't have yet
   const unlisted = () => remembered().some((k) => { const [c, x] = k.split(":"); return !rows.some((r) => r.chain === KEYS[c] && eqA(r.addr, x)); });
@@ -358,13 +389,14 @@ export function safe(main: HTMLElement) {
       if (sameAddr) copies[was] = true; else { copies = seenOn(m[2]); worths = {}; looked = false; }
       assets = null; assetsErr = false; activity = null; activityErr = "";
       $("s-new").innerHTML = ""; $("s-owner").innerHTML = ""; $("s-wc").innerHTML = "";
+      stale = false; loadView(chain, safeAddr);
       paintAll();
       checkDeployed();
       load();                 // not job(): a create that lands here is still a job
     } else {
       sub = "home";
       if (location.pathname !== "/safe") history.replaceState(null, "", "/safe");
-      safeAddr = ""; info = null; queue = []; assets = null; activity = null;
+      safeAddr = ""; info = null; stale = false; queue = []; assets = null; activity = null;
       paintAll();
       if (signer && !listing && (Date.now() - lastFind > 60_000 || unlisted())) findSafes();
     }
@@ -783,7 +815,7 @@ export function safe(main: HTMLElement) {
       }
       opening = false;
       if (c !== chain || a !== safeAddr) return;
-      info = i;
+      info = i; stale = false;
       if (signer) { if (wedgieOwns()) { remember(c, a); tellWedgie(c, a); } else forget(c, a); }
       if (!quiet) say("");
       paintAll();             // the Safe from the chain now; its queue, tokens and history as the sources answer
@@ -793,14 +825,19 @@ export function safe(main: HTMLElement) {
       const q = await readQueue(c, a, i.nonce);
       if (c !== chain || a !== safeAddr) return;
       queue = q;
-    } catch (e) { opening = false; paintSpin(); if (c === chain && a === safeAddr) { info = null; queue = []; if (!quiet) fail(e); } }
+    } catch (e: any) {
+      opening = false; paintSpin();
+      if (e?.gone) dropView(c, a);       // not there (any more): no saved copy of it
+      // couldn't read it just now (busy): the saved copy stays up, buttons off, till Refresh works
+      if (c === chain && a === safeAddr) { if (!stale || e?.gone) { info = null; stale = false; } queue = []; if (!quiet) fail(e); paintAll(); }
+    }
     paintAll();
   }
 
   /** Every token it holds, with dollars (src/safe/assets.ts). */
   async function loadAssets(c: number, a: string, i: Info) {
     const got = await readAssets(c, a, CHAINS[c].native, i.balance, CHAINS[c].usdc ? { address: CHAINS[c].usdc!, balance: i.usdc } : null, (m, p) => rpc(c, m, p));
-    if (c === chain && a === safeAddr) { assets = got; paintSafe(); paintAssets(); paintNew(); }
+    if (c === chain && a === safeAddr) { assets = got; paintSafe(); paintAssets(); paintNew(); saveView(c, a); }
   }
 
 
@@ -840,7 +877,7 @@ export function safe(main: HTMLElement) {
         if (i) { worths[t] = await worthOn(t, a, i); paintSafe(); }
       } catch {}
     }));
-    if (c === chain && a === safeAddr) { looked = true; copies[c] = true; saveSeen(a, copies); paintSafe(); paintChains(); }
+    if (c === chain && a === safeAddr) { looked = true; copies[c] = true; saveSeen(a, copies); saveView(c, a); paintSafe(); paintChains(); }
     try { const r = await recipeOf(c, a); if (c === chain && a === safeAddr) { recipe = r; paintChains(); } } catch {}
   }
 
