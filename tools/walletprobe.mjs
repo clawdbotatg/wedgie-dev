@@ -14,6 +14,7 @@ await ctx.addInitScript(() => {
     if (method === "eth_accounts") return new Promise(() => {});
     if (method === "eth_requestAccounts") return [me];
     if (method === "eth_chainId") return "0x1";
+    if (method === "wallet_revokePermissions") return new Promise(() => {});   // like a WalletConnect wallet: never answers
     return null; } };
   window.ethereum = eth;
   const info = { uuid: "1", name: "Rainbow", icon: "data:image/svg+xml,<svg/>", rdns: "me.rainbow" };
@@ -32,7 +33,16 @@ await p.goto((process.argv[2] || "http://localhost:4173").replace(/\/$/, "") + "
 await p.click("#w-go");
 await p.waitForTimeout(3000);
 const d = await p.evaluate(() => [...document.querySelectorAll('[role="dialog"]')].map((x) => [x.getBoundingClientRect().width, x.textContent.slice(0, 80)]));
-const ok = d.some(([w, t]) => w > 0 && /Connect a Wallet/.test(t) && /Rainbow/.test(t));
-console.log(ok ? "ok   Connect wallet opens the picker, Rainbow in it, with a remembered connection" : "FAIL no picker: " + JSON.stringify(d));
+let bad = 0;
+const check = (ok, what) => { console.log(ok ? "ok  " : "FAIL", what); if (!ok) bad++; };
+check(d.some(([w, t]) => w > 0 && /Connect a Wallet/.test(t) && /Rainbow/.test(t)), "Connect wallet opens the picker, Rainbow in it, with a remembered connection");
+// pick it, then Disconnect: the page lets go at once, though the wallet never answers the revoke
+await p.locator('[role="dialog"] button', { hasText: "Rainbow" }).first().click();
+const on = await p.waitForSelector("#w-off", { timeout: 8000 }).then(() => true, () => false);
+check(on, "picked Rainbow: connected (Disconnect shows)");
+if (on) {
+  await p.click("#w-off");
+  check(await p.waitForSelector("#w-go", { timeout: 2000 }).then(() => true, () => false), "Disconnect lets go at once, though the wallet never answers");
+}
 await b.close();
-process.exit(ok ? 0 : 1);
+process.exit(bad ? 1 : 0);
