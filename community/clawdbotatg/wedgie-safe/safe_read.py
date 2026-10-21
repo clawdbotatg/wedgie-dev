@@ -3,7 +3,7 @@
 import binascii
 import safe as A
 from ui import INK, MUTED, GREEN_D, RED
-from safe import word, aword, unhex, hx, short, amount, CHAINS, BIG, ADDR
+from safe import word, aword, unhex, hx, short, amount, coin, CHAINS, BIG, ADDR
 
 # tokens the wedgie knows itself: (chain, address) -> (symbol, decimals). Others show their raw amount.
 TOKENS = {
@@ -49,7 +49,7 @@ K_FEE = "e0a4e7171a966a6c2f8a346d61492f1479248405e8f190113096dd36aed44e2b"    # 
 ROLE = "86c37482ef7146c27eb2859f3f7443e45fcbc4e32caa3c89515918953dd30949"     # instant-wallet.burner: the one role
 # what each allowance is: (what it's called, symbol, decimals, what it's for)
 LIMITS = {K_USDC: ("Daily limit", "USDC", 6, "a day with just Face ID"),
-          K_ETH: ("Daily limit", "ETH", 18, "a day with just Face ID"),
+          K_ETH: ("Daily limit", None, 18, "a day with just Face ID"),     # None: the chain's coin
           K_FEE: ("Fee limit", "USDC", 6, "a day for fees")}
 # Instant Wallet's relay: it sends the transactions and is paid a fee in the batch. Built in, never from the host.
 RELAY = "0x4cfab32186e65e2a39ec0e882e11380cbf2f8a2f"
@@ -153,11 +153,11 @@ def _uniswap(tx):
         to, eth_out = hx(calls[1][4 + 44:4 + 64]), True
     elif len(calls) != 1:
         return None
-    get = "%s ETH" % amount(min_out, 18) if eth_out else _amt(tx, z, min_out)
+    get = "%s %s" % (amount(min_out, 18), coin(tx)) if eth_out else _amt(tx, z, min_out)
     if tx["value"] and not (_tok(tx, a)[0] == "WETH" and amt_in == tx["value"]):   # ETH sent, but the swap pays
-        pay = [(_amt(tx, a, amt_in), RED, BIG), ("and sends %s ETH" % amount(tx["value"], 18), RED)]   # something else
+        pay = [(_amt(tx, a, amt_in), RED, BIG), ("and sends %s %s" % (amount(tx["value"], 18), coin(tx)), RED)]   # something else
     else:                                                                            # (audit 10-18)
-        pay = [("%s ETH" % amount(tx["value"], 18) if tx["value"] else _amt(tx, a, amt_in), INK, BIG)]
+        pay = [("%s %s" % (amount(tx["value"], 18), coin(tx)) if tx["value"] else _amt(tx, a, amt_in), INK, BIG)]
     return "Swap", [("pay", MUTED)] + pay + [("get at least", MUTED), (get, INK, BIG),
                     ("to this Safe", GREEN_D) if to == safe else ("to " + short(to) + "!", RED)]
 
@@ -200,7 +200,7 @@ def _roles(tx, sel):
     t = _aarg(data, 1) if len(data) >= 68 else ""
     if sel in ("0c6c76b8", "0172a43a", "7508dd98") and binascii.hexlify(_arg(data, 0)).decode() != ROLE:
         return "Daily limit", [("another role", MUTED), ("can't read it", RED, BIG)]     # (audit 10-18)
-    what = _tok(tx, t)[0] or ("ETH sends" if t == MULTICALL3 else short(t))
+    what = _tok(tx, t)[0] or (coin(tx) + " sends" if t == MULTICALL3 else short(t))
     if sel == "0c6c76b8" and len(data) == 68:               # scopeTarget(role, target)
         ok = _tok(tx, t)[0] == "USDC" or t == MULTICALL3     # what Instant Wallet's limits spend through
         return "Daily limit", [("can spend", MUTED), (what, INK if ok else RED, BIG)]
@@ -218,10 +218,12 @@ def _roles(tx, sel):
         bal, most = int.from_bytes(_arg(data, 1), "big"), int.from_bytes(_arg(data, 2), "big")
         if k in LIMITS and (bal > refill or most != refill):     # spendable now / at most: more than a day's (audit 10-18)
             name, sym, dec, why = LIMITS[k]
+            sym = sym or coin(tx)
             return name, [("%s %s" % (amount(max(bal, most), dec), sym), RED, BIG), ("can go at once", RED),
                           ("then %s %s" % (amount(refill, dec), sym), MUTED)]
         if k in LIMITS:
             name, sym, dec, why = LIMITS[k]
+            sym = sym or coin(tx)
             return name, [("%s %s" % (amount(refill, dec), sym), INK, BIG),
                                                  (why if per == 86400 else "every %ds" % per, MUTED if per == 86400 else RED)]
         return "Daily limit", [("%d" % refill, RED, BIG), ("of what? can't tell", RED)]
@@ -264,7 +266,7 @@ def _rule(tx, data, target):
         return "Fee limit", [("fees to", RED)] + _addr_lines("", r, RED)[1:] + [("get their own limit", INK)]
     if target == MULTICALL3 and sel == "174dea71" and c == [(0, 5, 5, ""), (0, 4, 0, ""), (0, 0, 29, K_ETH), (1, 3, 0, ""),
                                                             (3, 1, 0, ""), (3, 1, 0, ""), (3, 1, 0, ""), (3, 2, 0, "")]:
-        return "Daily limit", [("ETH", INK, BIG), ("to anyone", INK)]
+        return "Daily limit", [(coin(tx), INK, BIG), ("to anyone", INK)]
     return None
 
 
@@ -288,9 +290,9 @@ def describe(tx):
     if tx["operation"] == 1:            # (a MultiSend batch never gets here: confirm reads its actions)
         return "Danger", [("can take all", RED, BIG)] + _addr_lines("", to, RED)[1:]
     if not data:
-        return "Fee" if to == RELAY else "Send", out + [("%s ETH" % amount(tx["value"], 18), INK, BIG)] + _who(to, safe)
+        return "Fee" if to == RELAY else "Send", out + [("%s %s" % (amount(tx["value"], 18), coin(tx)), INK, BIG)] + _who(to, safe)
     if tx["value"] and to not in ROUTERS:
-        out.append(("+ %s ETH" % amount(tx["value"], 18), RED))
+        out.append(("+ %s %s" % (amount(tx["value"], 18), coin(tx)), RED))
     n1, n2 = lambda: int.from_bytes(_arg(data, 1), "big"), lambda: int.from_bytes(_arg(data, 2), "big")
     if to == safe and sel == "0d582f13" and len(data) == 68:
         return "Add owner", out + _owner(_aarg(data, 0), INK) + [_then(n1())]
@@ -340,7 +342,7 @@ def describe(tx):
     if to in ROUTERS:
         far = _lifi_to(data, safe) if to == LIFI else None     # a Uniswap call _uniswap couldn't read: can't tell
         return ("Bridge" if far else "Swap"), out + [("via " + ROUTERS[to], INK)] + \
-            ([("pay", MUTED), ("%s ETH" % amount(tx["value"], 18), INK, BIG)] if tx["value"] else []) + \
+            ([("pay", MUTED), ("%s %s" % (amount(tx["value"], 18), coin(tx)), INK, BIG)] if tx["value"] else []) + \
             ([("to this Safe", GREEN_D)] if far == 0 else
              [("to this Safe on", INK), (CHAINS.get(far, "chain %d" % far), INK, BIG)] if far else
              [("can't tell who gets it", RED)]) + \

@@ -129,6 +129,7 @@ const limit = { ...tx("0x40A2aCCbd92BCA938b02010E17A5b8929b49130D", pack([
 const cases = [
   ["change the daily limit (3 actions, 1 page)", limit, 1],
   ["send 0.5 ETH", tx("0x" + "77".repeat(20), "0x", "500000000000000000"), 1],
+  ["send 0.5 POL on Polygon", { ...tx("0x" + "77".repeat(20), "0x", "500000000000000000"), chainId: 137 }, 1],
   ["add owner: itself", tx(safe, E.addOwnerData(signer, 2)), 1],
   ["remove owner: itself", tx(safe, E.removeOwnerData(E.SENTINEL, signer, 1)), 1],
   [`MultiSend batch, ${n} USDC sends (${JSON.stringify(batch).length} B line)`, batch, n],

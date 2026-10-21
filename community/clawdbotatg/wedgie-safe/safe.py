@@ -32,7 +32,7 @@ import save
 import ui
 from ui import WHITE, INK, MUTED, GREEN_D, RED
 
-FW = "safe-19"
+FW = "safe-21"
 RP_ID = b"wedgie.dev"
 FIELDS = '"origin":"https://wedgie.dev"'
 ASK_MS = 120000
@@ -41,8 +41,16 @@ SETTLE = 600        # ms a page is up before a press can answer it
 DOMAIN_TYPEHASH = binascii.unhexlify("47e79534a245952e8b16893a336b85a3d9ea9fa8c573f3d803afb92a79469218")
 SAFE_TX_TYPEHASH = binascii.unhexlify("bb8310d486368db6bd6f849402fdd73ad53d316b5a4b2644ad6efe0f941286d8")
 
-CHAINS = {1: "Ethereum", 10: "Optimism", 100: "Gnosis", 137: "Polygon", 8453: "Base", 42161: "Arbitrum",
-          84532: "Base Sepolia", 11155111: "Sepolia"}
+CHAINS = {1: "Ethereum", 10: "Optimism", 56: "BNB Chain", 100: "Gnosis", 137: "Polygon", 146: "Sonic", 999: "HyperEVM",
+          4663: "Robinhood", 5042: "Arc", 8453: "Base", 9745: "Plasma", 42161: "Arbitrum", 42220: "Celo",
+          43114: "Avalanche", 84532: "Base Sepolia", 11155111: "Sepolia"}
+# the coin a tx's value is in, where it isn't ETH (18 decimals on all of them, Arc's USDC too)
+NATIVE = {56: "BNB", 100: "XDAI", 137: "POL", 146: "S", 999: "HYPE", 5042: "USDC", 9745: "XPL", 42220: "CELO",
+          43114: "AVAX"}
+
+
+def coin(tx):
+    return NATIVE.get(tx["chainId"], "ETH")
 SAFES_MAX = 32          # Safes the wedgie remembers (save "safes")
 CHUNK = 4000            # hex chars per safe_data line (a USB line is at most 6 KB)
 # bytes of tx data the wedgie takes in pieces. Joining them needs one free block that size, and how big a
