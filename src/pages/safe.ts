@@ -161,6 +161,81 @@ async function readSafe(c: number, a: string): Promise<Info> {
     usdc: usdc?.ok && usdc.data.length > 2 ? BigInt(usdc.data) : null };
 }
 
+// ---- what a Safe has besides owners: modules (each can move money without the owners) and guards ----
+// No standard says what a module does. What works: NAME()/VERSION() (Safe's and Candide's), a 4337 module's
+// SUPPORTED_ENTRYPOINT(), Zodiac's avatar() (Roles answers allowances(), Delay txCooldown()). Instant Wallet uses
+// Candide's recovery (7, 14 or 60 days: no getter, so by address) and Zodiac Roles for the phone's daily limit
+// (its keys: instant-wallet web/lib/safe/config.ts). Read only: nothing here changes a module.
+type Limit = { sym: string; dec: number; max: bigint; left: bigint; days: number };
+type Addon = { addr: string; kind: "recovery" | "limit" | "roles" | "allowance" | "delay" | "4337" | "other"; name: string;
+  guardians?: string[]; need?: number; days?: number; running?: { owners: string[]; at: number; approvals: number };
+  members?: string[]; limits?: Limit[]; who?: { addr: string; limits: Limit[] }[]; wait?: number };
+type Addons = { mods: Addon[]; guards: string[] };
+const RECOVERY_DAYS: Record<string, number> = { "0x088f6cfd8bb1ddb1bb069ccb3fc1a98927d233f2": 7,
+  "0x9bacd92f4687db306d7ded5d4513a51ea05df25b": 14, "0x6aa9a8ad0582db61a97a6e30eba22ba143d1e960": 60 };
+const IW_KEYS = { usdc: E.hex(E.keccakText("instant-wallet.burner.usdc")), eth: E.hex(E.keccakText("instant-wallet.burner.eth")) };
+// Safe's storage slots: the guard (checks every transaction), the module guard (Safe 1.5: checks module calls)
+const GUARD_SLOTS = ["guard_manager.guard.address", "module_manager.module_guard.address"].map((k) => E.hex(E.keccakText(k)));
+const wd = (d: string, i: number) => BigInt("0x" + (d.slice(2 + 64 * i, 66 + 64 * i) || "0"));
+const wAddr = (d: string, i: number) => E.checksum("0x" + d.slice(26 + 64 * i, 66 + 64 * i));
+/** An address[] whose head is word i (its offset counted from word `base`). */
+const arrAt = (d: string, i: number, base = 0) => { const o = base + Number(wd(d, i)) / 32; return Array.from({ length: Math.min(50, Number(wd(d, o))) }, (_, k) => wAddr(d, o + 1 + k)); };
+const str = (d: string) => { try { const o = Number(wd(d, 0)) / 32, n = Number(wd(d, o)), h = d.slice(2 + 64 * (o + 1), 2 + 64 * (o + 1) + 2 * n);
+  return new TextDecoder().decode(E.bytes("0x" + h)).replace(/[^\x20-\x7e]/g, "").slice(0, 40); } catch { return ""; } };
+/** A Zodiac Roles allowance now: its balance plus refills since, capped (instant-wallet state.ts avail). */
+function rolesLimit(d: string, sym: string, dec: number): Limit | null {
+  const [refill, max, period, balance, at] = [0, 1, 2, 3, 4].map((i) => wd(d, i));
+  if (!max) return null;
+  const n = period && BigInt(Math.floor(Date.now() / 1000)) > at ? (BigInt(Math.floor(Date.now() / 1000)) - at) / period : 0n;
+  const b = balance + n * refill;
+  return { sym, dec, max, left: b > max ? (balance > max ? balance : max) : b, days: Number(period) / 86400 };
+}
+async function readAddons(c: number, safe: string): Promise<Addons> {
+  const many = async (calls: { to: string; data: string }[]) => calls.length ? E.unaggregate(await view(c, E.MULTICALL3, E.aggregate3(calls.map((x) => ({ ...x, allowFailure: true }))))) : [];
+  const [mods, ...gs] = await many([{ to: safe, data: E.call("getModulesPaginated(address,uint256)", [E.aword(E.SENTINEL), E.word(20)]) },
+    ...GUARD_SLOTS.map((s) => ({ to: safe, data: E.call("getStorageAt(uint256,uint256)", [E.word(s), E.word(1)]) }))]);
+  const guards = gs.filter((g) => g.ok && g.data.length >= 194 && wd(g.data, 2) !== 0n).map((g) => wAddr(g.data, 2));
+  const list = mods.ok && mods.data.length >= 194 ? arrAt(mods.data, 0) : [];
+  const probes = (m: string) => [E.selector("NAME()"), E.selector("SUPPORTED_ENTRYPOINT()"), E.call("getGuardians(address)", [E.aword(safe)]),
+    E.call("threshold(address)", [E.aword(safe)]), E.call("getRecoveryRequest(address)", [E.aword(safe)]), E.selector("avatar()"),
+    E.selector("txCooldown()"), E.call("getModulesPaginated(address,uint256)", [E.aword(E.SENTINEL), E.word(20)]),
+    E.call("allowances(bytes32)", [E.word(IW_KEYS.usdc)]), E.call("allowances(bytes32)", [E.word(IW_KEYS.eth)]),
+    E.call("getDelegates(address,uint48,uint8)", [E.aword(safe), E.word(0), E.word(10)])].map((data) => ({ to: m, data }));
+  const got = await many(list.flatMap(probes));
+  const usdc = CHAINS[c].usdc;
+  const out: Addon[] = [];
+  for (const [k, m] of list.entries()) {
+    const [name, ep, gd, th, req, av, cool, mem, au, ae, del] = got.slice(k * 11, k * 11 + 11), ok = (x: { ok: boolean; data: string }, n = 66) => x.ok && x.data.length >= n;
+    const nm = ok(name, 194) ? str(name.data) : "";
+    if (ok(gd, 130) && ok(th) && ok(req, 386)) {
+      const r = req.data, t = Number(wd(r, 0)) / 32, at = Number(wd(r, t + 2)) * 1000;
+      out.push({ addr: m, kind: "recovery", name: nm || "Social recovery", guardians: arrAt(gd.data, 0), need: Number(wd(th.data, 0)),
+        days: RECOVERY_DAYS[m.toLowerCase()], running: at ? { owners: arrAt(r, t + 3, t), at, approvals: Number(wd(r, t)) } : undefined });
+    } else if (ok(ep) && wd(ep.data, 0) >> 160n === 0n && wd(ep.data, 0)) out.push({ addr: m, kind: "4337", name: nm || "4337 module" });
+    else if (/allowance module/i.test(nm) && ok(del, 194)) out.push({ addr: m, kind: "allowance", name: nm, members: arrAt(del.data, 0) });
+    else if (ok(av) && ok(au, 322)) {
+      const limits = [usdc && rolesLimit(au.data, "USDC", 6), rolesLimit(ae.data, nat(c), 18)].filter((x): x is Limit => !!x);
+      out.push({ addr: m, kind: limits.length ? "limit" : "roles", name: "Zodiac Roles", limits, members: ok(mem, 194) ? arrAt(mem.data, 0) : [] });
+    } else if (ok(av) && ok(cool)) out.push({ addr: m, kind: "delay", name: "Zodiac Delay", wait: Number(wd(cool.data, 0)) });
+    else out.push({ addr: m, kind: "other", name: nm });
+  }
+  // Safe's own spending limit: each delegate's tokens, then each token's allowance [amount, spent, reset minutes, …]
+  for (const a of out.filter((x) => x.kind === "allowance")) {
+    const del = a.members!, toks = await many(del.map((d) => ({ to: a.addr, data: E.call("getTokens(address,address)", [E.aword(safe), E.aword(d)]) })));
+    const pairs = del.flatMap((d, i) => toks[i].ok && toks[i].data.length >= 130 ? E.addrs(toks[i].data).slice(0, 5).map((t) => [d, t]) : []);
+    const al = await many(pairs.map(([d, t]) => ({ to: a.addr, data: E.call("getTokenAllowance(address,address,address)", [E.aword(safe), E.aword(d), E.aword(t)]) })));
+    a.who = del.map((d) => ({ addr: d, limits: [] }));
+    for (const [i, [d, t]] of pairs.entries()) {
+      if (!al[i].ok || al[i].data.length < 322) continue;
+      const amt = wd(al[i].data, 0), spent = wd(al[i].data, 1), reset = Number(wd(al[i].data, 2)), last = Number(wd(al[i].data, 3));
+      const due = reset > 0 && Date.now() / 60000 > last + reset;     // past its reset: the whole amount again
+      const meta = Number(BigInt(t)) === 0 ? { symbol: nat(c), decimals: 18 } : knownMeta(c, t) || await tokenMeta(c, t, (mm, p) => rpc(c, mm, p)).catch(() => null);
+      a.who.find((w) => w.addr === d)!.limits.push({ sym: meta?.symbol || short(t), dec: meta?.decimals ?? 18, max: amt, left: due ? amt : amt > spent ? amt - spent : 0n, days: reset / 1440 });
+    }
+  }
+  return { mods: out, guards };
+}
+
 export function safe(main: HTMLElement) {
   main.innerHTML = `
   <section class="test-page safe-page">
@@ -178,6 +253,7 @@ export function safe(main: HTMLElement) {
     <div class="sx-card" id="s-assets" hidden></div>
     <div class="sx-card" id="s-activity" hidden></div>
     <div class="sx-card" id="s-owners" hidden></div>
+    <div class="sx-card" id="s-addons" hidden></div>
     <div class="sx-card" id="s-owner" hidden></div>
     <div class="sx-card" id="s-chains" hidden></div>
     <p class="safe-msg" id="s-msg" hidden></p>
@@ -217,6 +293,7 @@ export function safe(main: HTMLElement) {
   let sub: "home" | "settings" = "home";
   let assets: Asset[] | null = null;              // what the open Safe holds (null: not read yet)
   let activity: any[] | null = null, activityErr = "";
+  let addons: Addons | null = null;               // its modules and guards (null: not read yet)
   const ethPx: Record<number, number | null> = {};   // the native coin's dollar price per chain, for the list's totals
   // a sheet over the page (a bottom sheet on a phone): one at a time
   let sheet: "" | "create" | "send" | "receive" | "connect" = "", sendToken: string | null = null;
@@ -395,7 +472,7 @@ export function safe(main: HTMLElement) {
       const was = chain, sameAddr = eqA(m[2], safeAddr);    // another chain of this Safe: keep what's known of the others
       chain = KEYS[m[1]]; safeAddr = E.checksum(m[2]); info = null; queue = []; recipe = null;
       if (sameAddr) copies[was] = true; else { copies = seenOn(m[2]); worths = {}; looked = false; }
-      assets = null; assetsErr = false; activity = null; activityErr = "";
+      assets = null; assetsErr = false; activity = null; activityErr = ""; addons = null;
       $("s-new").innerHTML = ""; $("s-owner").innerHTML = ""; $("s-wc").innerHTML = "";
       stale = false; loadView(chain, safeAddr);
       paintAll();
@@ -751,8 +828,11 @@ export function safe(main: HTMLElement) {
     box.hidden = !safeAddr;
     // an Instant Wallet Safe: say so on top, and send them there (it has no link to one Safe: its passkey opens it)
     iw.hidden = !(safeAddr && info && isIW(info.owners));
-    if (!iw.hidden && !iw.innerHTML) iw.innerHTML = `<img src="/img/instantwallet.png" alt=""><b>Instant Wallet</b>
-      <a class="btn btn-green btn-sm sx-end" href="https://instantwallet.io" target="_blank" rel="noopener">Open</a>`;
+    // with its recovery and daily limit under it (repainted only when they change: the button stays put under a tap)
+    const iwh = iw.hidden ? "" : `<div class="sx-iw-top"><img src="/img/instantwallet.png" alt=""><b>Instant Wallet</b>
+      <a class="btn btn-green btn-sm sx-end" href="https://instantwallet.io" target="_blank" rel="noopener">Open</a></div>`
+      + (addons ? `<ul class="sx-rows">${addonRows(addons.mods.filter((m) => m.kind === "recovery" || m.kind === "limit"), false)}</ul>` : "");
+    if (iw.dataset.h !== iwh) { iw.dataset.h = iwh; iw.innerHTML = iwh; }
     if (box.hidden) return;
     const c = CHAINS[chain], i = info, home = route(chain, safeAddr), $t = total(), g = grand();
     const on = IDS.filter((t) => t === chain || copies[t]);   // fixed order: a tap only recolors
@@ -777,6 +857,37 @@ export function safe(main: HTMLElement) {
     $("a-send")?.addEventListener("click", () => openSheet("send"));
     $("a-receive")?.addEventListener("click", () => openSheet("receive"));
     $("a-connect")?.addEventListener("click", () => openSheet("connect"));
+  }
+
+  // ---- add-ons (readAddons): a line each, in Instant Wallet's card and in Settings ----
+  const when = (ms: number) => new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const every = (d: number) => d === 1 ? "a day" : d === 7 ? "a week" : d ? `every ${+d.toFixed(1)} days` : "in all";
+  const amt = (n: bigint, l: Limit) => `${E.fmt(n, l.dec, l.dec > 6 ? 4 : 2)} ${esc(l.sym)}`;
+  const limits = (ls: Limit[]) => ls.length ? `<b>${ls.map((l) => amt(l.max, l)).join(" + ")} ${every(ls[0].days)}</b> <span class="fine">${ls.map((l) => amt(l.left, l)).join(" + ")} left</span>` : "nothing set";
+  const waits = (s: number) => s >= 86400 ? plural(Math.round(s / 86400), "day") : s >= 3600 ? plural(Math.round(s / 3600), "hour") : plural(Math.round(s / 60), "minute");
+  /** One add-on: its name (and in Settings the module's address), then what it does. */
+  const addonRow = (k: string, body: string, m: string, full: boolean) => `<li class="sx-addon"><div class="sx-addon-k"><b>${k}</b>${full && m
+    ? `<span class="sx-end">${address(m, { link: CHAINS[chain].scan, chain })}</span>` : ""}</div>${body ? `<div class="sx-addon-v">${body}</div>` : ""}</li>`;
+  function addonRows(list: Addon[], full: boolean) {
+    const who = (as: string[]) => as.map((g) => `<div>${address(g, { chain })}</div>`).join("");
+    return list.map((m) => {
+      if (m.kind === "recovery") return addonRow(`Recovery${m.days ? ` · ${m.days} days` : ""}`, (m.guardians!.length ? who(m.guardians!) : "No one yet")
+        + (m.need! > 1 ? `<div class="fine">${m.need} of ${m.guardians!.length} must agree</div>` : ""), m.addr, full)
+        + (m.running ? `<li class="sx-warn">Recovery running: new owners ${Date.now() < m.running.at ? `on ${when(m.running.at)}` : "any time now"} (${m.running.approvals} of ${m.need} agreed)</li>` : "");
+      if (m.kind === "limit") return addonRow("Spending limit", limits(m.limits!) + (full && m.members!.length ? `<div class="fine">for</div>${who(m.members!)}` : ""), m.addr, full);
+      if (m.kind === "allowance") return addonRow("Spending limit", m.who?.length ? m.who.map((w) => `${who([w.addr])}<div>${limits(w.limits)}</div>`).join("") : "No one yet", m.addr, full);
+      if (m.kind === "roles") return addonRow("Zodiac Roles", `${plural(m.members!.length, "key")} can act within set rules`, m.addr, full);
+      if (m.kind === "delay") return addonRow("Delay", `A module's transaction waits ${waits(m.wait!)}`, m.addr, full);
+      if (m.kind === "4337") return addonRow("4337", "Owners sign, any bundler sends", m.addr, full);
+      return addonRow(esc(m.name) || "Unknown module", `<span class="sx-warn">Can move money without the owners</span>`, m.addr, full);
+    }).join("");
+  }
+  function paintAddons() {
+    const box = $("s-addons");
+    box.hidden = !(safeAddr && info && sub === "settings");
+    if (box.hidden) return;
+    const a = addons, rows = a ? addonRows(a.mods, true) + a.guards.map((g) => addonRow("Guard", "Checks every transaction", g, true)).join("") : "";
+    box.innerHTML = `<h3>Add-ons</h3>${!a ? `<p class="fine">Checking.</p>` : rows ? `<ul class="sx-rows">${rows}</ul>` : `<p class="fine">None: a plain Safe.</p>`}`;
   }
 
   // ---- Settings: owners and threshold ----
@@ -836,6 +947,7 @@ export function safe(main: HTMLElement) {
       if (!quiet) checkCopies(c, a);
       loadAssets(c, a, i).catch(() => { if (c === chain && a === safeAddr) { assetsErr = true; paintSpin(); } });
       loadActivity(c, a);
+      readAddons(c, a).then((x) => { if (c === chain && a === safeAddr) { addons = x; paintSafe(); paintAddons(); } }, () => {});
       const q = await readQueue(c, a, i.nonce);
       if (c !== chain || a !== safeAddr) return;
       queue = q;
@@ -1488,7 +1600,7 @@ export function safe(main: HTMLElement) {
 
   function paintAll() {
     paintWedgie(); paintWallet(); paintList(); paintCreate(); paintSafe(); paintAdd(); paintAsks(); paintQueue(); paintApps(); paintAssets(); paintActivity();
-    paintOwners(); paintOwner(); paintChains(); paintNew(); paintReceive(); paintWc();
+    paintOwners(); paintAddons(); paintOwner(); paintChains(); paintNew(); paintReceive(); paintWc();
   }
 
   W.onChange(paintWedgie);
