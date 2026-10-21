@@ -67,12 +67,17 @@ def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None, scary=Fa
         y += 10
     _lines(d, lines, y, fg, cols=11)
     no, yes = no[:5], yes[:5]
-    d.fill_rect(124 - 8 * len(yes), 0, 8 * len(yes) + 4, 12, fg)
-    d.text(yes, 126 - 8 * len(yes), 2, bg)
+
+    def ready():                            # yes shows once a signed job's check is done (ui.wait)
+        d.fill_rect(124 - 8 * len(yes), 0, 8 * len(yes) + 4, 12, fg)
+        d.text(yes, 126 - 8 * len(yes), 2, bg)
+        d.show_rect(124 - 8 * len(yes), 0, 8 * len(yes) + 4, 12)
+    if not sig:
+        ready()
     d.text(no, 128 - 8 * len(no), 56, fg)
     d.show()
     ui.drawn = time.ticks_ms()
-    return ui.wait(k, ms, sig, at and (lambda s: _mark(d, at[0], at[1], s)))
+    return ui.wait(k, ms, sig, at and (lambda s: _mark(d, at[0], at[1], s)), sig and ready)
 
 
 def busy(d, title, what=""):
