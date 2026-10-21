@@ -227,7 +227,8 @@ check(session.namespaces.eip155.accounts.some((a) => eq(a, `eip155:8453:${mine}`
 const wcAsk = (method, params) => dapp.request({ topic: session.topic, chainId: "eip155:8453", request: { method, params } });
 const caps = await wcAsk("wallet_getCapabilities", [mine, ["0x2105"]]);
 check(caps?.["0x2105"]?.atomic?.status === "supported", "WalletConnect: atomic batches supported on Base");
-await wait(() => /WC probe/.test(document.querySelector("#wc-list")?.textContent || ""), null, 20000, "the app listed");
+await wait(() => /WC probe/.test(document.querySelector("#s-apps:not([hidden])")?.textContent || ""), null, 20000, "the app listed on the Safe's page");
+check(await page.isHidden("#s-sheet") && await page.isVisible("#s-apps [data-wcoff]"), "WalletConnect: the sheet closed, the app shows above Assets with Disconnect");
 const wa = E.checksum(E.hex(crypto.randomBytes(20))), wb = E.checksum(E.hex(crypto.randomBytes(20)));
 const sent = wcAsk("wallet_sendCalls", [{ version: "2.0.0", chainId: "0x2105", from: mine, atomicRequired: true,
   calls: [{ to: wa, value: "0x5af3107a4000" }, { to: wb, value: "0xb5e620f48000", data: "0x" }] }]);

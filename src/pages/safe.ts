@@ -172,6 +172,7 @@ export function safe(main: HTMLElement) {
     <div class="sx-banner" id="s-add" hidden></div>
     <div class="sx-card" id="s-asks" hidden></div>
     <div class="sx-card" id="s-queue" hidden></div>
+    <div class="sx-card" id="s-apps" hidden></div>
     <div class="sx-card" id="s-assets" hidden></div>
     <div class="sx-card" id="s-activity" hidden></div>
     <div class="sx-card" id="s-owners" hidden></div>
@@ -1384,7 +1385,7 @@ export function safe(main: HTMLElement) {
     const m = await import("../safe/walletconnect");
     await m.start({
       onAsk: (a) => { asks.push(a); if (sheet === "connect") closeSheet(); paintAll(); if (!eqA(a.safe, safeAddr)) say(`${a.dapp.name} is waiting for Safe ${short(a.safe)}: open it to sign.`); },
-      onChange: () => { m.sessions().then((l) => { wcSessions = l; paintWc(); }); },
+      onChange: () => { m.sessions().then((l) => { wcSessions = l; paintApps(); }); },
       onError: (msg) => say(msg, true),
       receipt: (c, h) => rpc(c, "eth_getTransactionReceipt", [h]).then((x: any) => x),
     });
@@ -1393,18 +1394,9 @@ export function safe(main: HTMLElement) {
   }
   try { if (localStorage.getItem(WC_ON)) wcStart().catch(() => {}); } catch {}
 
-  // an app's logo, fetched as a blob: the site's COEP (require-corp) blocks other sites' <img src>
-  const icons = new Map<string, string | null>();
-  const icon = (u?: string) => {
-    if (!u) return "";
-    if (!icons.has(u)) {
-      icons.set(u, null);
-      fetch(u).then((r) => (r.ok && (r.headers.get("content-type") || "").startsWith("image/") ? r.blob() : null))
-        .then((b) => { if (b) { icons.set(u, URL.createObjectURL(b)); paintWc(); } }, () => {});
-    }
-    const b = icons.get(u);
-    return b ? `<img class="wc-icon" src="${b}" alt="">` : "";
-  };
+  // an app's logo through /api/icon (the site's COEP blocks other sites' <img>); its first letter if none
+  const icon = (d: { name: string; icon?: string }) =>
+    tokenBadge(d.name, d.icon && /^https:\/\//.test(d.icon) ? `/api/icon?u=${encodeURIComponent(d.icon)}` : null);
   // Connect app (a sheet): scan the app's WalletConnect code, or paste its link; the apps connected here
   let scanning: { stop: () => void } | null = null;
   const stopScan = () => { scanning?.stop(); scanning = null; const v = document.getElementById("wc-cam"); if (v) v.hidden = true; };
@@ -1413,7 +1405,8 @@ export function safe(main: HTMLElement) {
     say("Connecting to the app.");
     await m.pair(uri.trim(), safeAddr, chain);
     try { localStorage.setItem(WC_ON, "1"); } catch {}
-    say("Connected. Use the app: what it asks for shows up here.");
+    closeSheet();
+    say(`Connected. What the app asks for shows up here.`);
   }
   function paintWc() {
     const box = $("s-wc");
@@ -1425,7 +1418,7 @@ export function safe(main: HTMLElement) {
         ${canScan() ? `<p><button class="btn btn-green sx-wide" id="wc-scan">Scan its code</button></p><div class="sx-cam" id="wc-cam" hidden></div>` : ""}
         <p class="sx-label">Or paste its link</p>
         <p class="sx-row wc-pair"><input id="wc-uri" class="sx-mono" placeholder="wc:…" spellcheck="false" autocomplete="off"> <button class="btn btn-sm" id="wc-go">Connect</button></p>
-        <div id="wc-list"></div>`;
+`;
       $("wc-go").onclick = () => job(async () => { const el = $("wc-uri") as HTMLInputElement; await pairWith(el.value); el.value = ""; });
       $("wc-scan")?.addEventListener("click", () => {
         if (scanning) return stopScan();
@@ -1435,9 +1428,16 @@ export function safe(main: HTMLElement) {
           (e: Error) => { if (e.message !== "stopped") say(e.message, true); stopScan(); });
       });
     }
+  }
+
+  // the apps connected to this Safe: on its page, above Assets, each with Disconnect
+  function paintApps() {
+    const box = $("s-apps");
     const mine = wcSessions.filter((x) => eqA(x.safe, safeAddr) && x.chainId === chain);
-    $("wc-list").innerHTML = mine.length ? `<p class="sx-label">Connected</p><ul class="sx-rows">${mine.map((x) => `<li>${icon(x.dapp.icon)}<span><b>${esc(x.dapp.name)}</b> <span class="fine">${esc(x.dapp.url.replace(/^https?:\/\//, ""))}</span></span><button class="btn btn-sm sx-end" data-wcoff="${esc(x.topic)}"${dis()}>Disconnect</button></li>`).join("")}</ul>` : "";
-    $("wc-list").querySelectorAll<HTMLButtonElement>("[data-wcoff]").forEach((b) => b.onclick = () => job(() => wcm!.disconnect(b.dataset.wcoff!)));
+    box.hidden = !(safeAddr && info && mine.length && sub === "home");
+    if (box.hidden) return;
+    box.innerHTML = `<h3>Connected</h3><ul class="sx-rows">${mine.map((x) => `<li class="wc-app">${icon(x.dapp)}<span class="sx-asset-name"><b>${esc(x.dapp.name)}</b><span class="fine">${esc(x.dapp.url.replace(/^https?:\/\//, ""))}</span></span><button class="btn btn-sm sx-end" data-wcoff="${esc(x.topic)}"${dis()}>Disconnect</button></li>`).join("")}</ul>`;
+    box.querySelectorAll<HTMLButtonElement>("[data-wcoff]").forEach((b) => b.onclick = () => job(() => wcm!.disconnect(b.dataset.wcoff!)));
   }
 
   // what connected apps ask for: on the Safe's page, above the queue
@@ -1448,7 +1448,7 @@ export function safe(main: HTMLElement) {
     if (box.hidden) return;
     box.innerHTML = `<h3>Apps asking</h3>` + here.map((a, k) => {
       const calls = a.calls.map((c) => describe({ to: c.to, value: c.value, data: c.data }, ctx()));
-      return `<div class="sx-tx wc-ask"><div class="sx-tx-head">${icon(a.dapp.icon)}<span class="sx-tx-what"><b>${esc(a.dapp.name)}</b> asks for ${plural(a.calls.length, "action")}${a.calls.length > 1 ? ", run as one" : ""}</span></div>
+      return `<div class="sx-tx wc-ask"><div class="sx-tx-head">${icon(a.dapp)}<span class="sx-tx-what"><b>${esc(a.dapp.name)}</b> asks for ${plural(a.calls.length, "action")}${a.calls.length > 1 ? ", run as one" : ""}</span></div>
       <ol class="sx-subs">${calls.map((s) => `<li>${s.title}</li>`).join("")}</ol>
       <div class="sx-row">${wedgieOwns() ? `<button class="btn btn-sm btn-green" data-wcsign="${k}"${dis(!key)}>Sign with wedgie</button> ` : ""}${isOwner(account) ? `<button class="btn btn-sm" data-wcwallet="${k}"${dis()}>Sign with wallet</button> ` : ""}<button class="btn btn-sm sx-end" data-wcno="${k}"${dis()}>Reject</button></div></div>`;
     }).join("");
@@ -1478,7 +1478,7 @@ export function safe(main: HTMLElement) {
   }
 
   function paintAll() {
-    paintWedgie(); paintWallet(); paintList(); paintCreate(); paintSafe(); paintAdd(); paintAsks(); paintQueue(); paintAssets(); paintActivity();
+    paintWedgie(); paintWallet(); paintList(); paintCreate(); paintSafe(); paintAdd(); paintAsks(); paintQueue(); paintApps(); paintAssets(); paintActivity();
     paintOwners(); paintOwner(); paintChains(); paintNew(); paintReceive(); paintWc();
   }
 
