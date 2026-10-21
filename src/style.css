@@ -704,7 +704,9 @@ body.dock-running #s-msg { display: none; }
   box-shadow: 0 1px 0 rgba(0,0,0,.04), 0 10px 30px -18px rgba(20,20,20,.35); transition: transform .12s, box-shadow .12s; }
 .sx-safe:hover { transform: translateY(-2px); box-shadow: 0 1px 0 rgba(0,0,0,.04), 0 16px 34px -16px rgba(20,20,20,.4); }
 .sx-safe.sx-mine { box-shadow: inset 0 0 0 2px var(--mint), 0 10px 30px -18px rgba(22,140,52,.5); }
-.sx-safe-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sx-safe-top { display: flex; align-items: center; gap: 8px; }
+.sx-chains-sm { margin-top: 4px; gap: 5px; }
+.sx-chains-sm .sx-pill { height: 24px; font-size: 12px; padding: 0 9px; }
 .sx-safe-worth { font-size: 28px; font-weight: 900; letter-spacing: -.02em; line-height: 1.1; margin-top: 6px; }
 .sx-empty { text-align: center; padding: 34px 22px; }
 .sx-fold { margin: 0 !important; }
@@ -714,6 +716,9 @@ body.dock-running #s-msg { display: none; }
   box-shadow: 0 24px 40px -24px rgba(0,0,0,.6); }
 .sx-hero a { color: inherit; }
 .sx-hero .fine { color: rgba(255,255,255,.65); }
+.sx-hero-id { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sx-grand { margin-left: auto; font-size: 14px; color: rgba(255,255,255,.65); white-space: nowrap; }
+.sx-grand b { color: #fff; font-size: 20px; font-weight: 900; margin-right: 4px; }
 .sx-hero-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
 .sx-back, .sx-gear { font-weight: 800; font-size: 15px; text-decoration: none; opacity: .8; }
 .sx-back:hover, .sx-gear:hover { opacity: 1; }
@@ -789,6 +794,7 @@ body.sx-sheet-open #s-msg { display: none; }
   .sx-sheet { place-items: end stretch; padding: 0; }
   .sx-sheet-card { width: 100%; max-height: 92vh; border-radius: 28px 28px 0 0; padding-bottom: calc(22px + env(safe-area-inset-bottom)); }
   .sx-hero { padding: 18px 18px 20px; border-radius: 24px; }
+  .sx-grand { margin-left: 0; flex-basis: 100%; }
   .sx-card, .sx-banner { padding: 18px 16px; border-radius: 20px; }
   .sx-safes { grid-template-columns: 1fr; }
 }

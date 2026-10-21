@@ -1,15 +1,19 @@
 // /api/rpc?chain=<id>: /safe's chain reads, through the shop's Alchemy key (never a public RPC; the key never
 // reaches the browser). One JSON-RPC call per POST, read methods only (READ). Never log a body here.
-// wedgie_prices [token addresses]: {eth, tokens: {address: usd}} from Alchemy's prices API (mainnets only).
+// wedgie_prices [token addresses]: {eth, tokens: {address: usd}} from Alchemy's prices API (mainnets only); eth is
+// the chain's own coin (ETH, POL, …).
 import { env, json, oops, crossSite, db, ipOf } from "./_shop.js";
 
 const HOSTS: Record<number, string> = { 1: "eth-mainnet", 8453: "base-mainnet", 10: "opt-mainnet", 42161: "arb-mainnet",
-  84532: "base-sepolia", 11155111: "eth-sepolia" };
+  137: "polygon-mainnet", 43114: "avax-mainnet", 56: "bnb-mainnet", 100: "gnosis-mainnet", 42220: "celo-mainnet",
+  146: "sonic-mainnet", 5042: "arc-mainnet", 4663: "robinhood-mainnet", 84532: "base-sepolia", 11155111: "eth-sepolia" };
+// each chain's own coin, as Alchemy's prices API names it (ETH if not here; Arc's coin is USDC: a dollar)
+const COIN: Record<number, string> = { 137: "POL", 43114: "AVAX", 56: "BNB", 100: "XDAI", 42220: "CELO", 146: "S", 5042: "USDC" };
 const READ = new Set(["eth_call", "eth_getCode", "eth_getBalance", "eth_getTransactionReceipt", "eth_getTransactionByHash",
   "eth_blockNumber", "eth_chainId", "eth_getBlockByNumber", "eth_getStorageAt", "alchemy_getTokenBalances", "alchemy_getTokenMetadata"]);
 const TEST = new Set([84532, 11155111]);
 
-/** Dollar prices: ETH and up to 25 tokens on one chain. A test chain's coins are worth nothing. */
+/** Dollar prices: the chain's coin and up to 25 tokens on one chain. A test chain's coins are worth nothing. */
 async function prices(chain: number, host: string, tokens: unknown[]) {
   const out: { eth: number | null; tokens: Record<string, number> } = { eth: null, tokens: {} };
   if (TEST.has(chain)) return out;
@@ -17,7 +21,7 @@ async function prices(chain: number, host: string, tokens: unknown[]) {
   const base = `https://api.g.alchemy.com/prices/v1/${key()}/tokens`;
   const num = (p: any) => { const v = Number(p?.prices?.find((x: any) => x.currency === "usd")?.value); return v > 0 ? v : null; };
   const [e, t] = await Promise.all([
-    fetch(`${base}/by-symbol?symbols=ETH`).then((r) => r.json()).catch(() => null),
+    fetch(`${base}/by-symbol?symbols=${COIN[chain] || "ETH"}`).then((r) => r.json()).catch(() => null),
     list.length ? fetch(`${base}/by-address`, { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ addresses: list.map((address) => ({ network: host, address })) }) }).then((r) => r.json()).catch(() => null) : null,
   ]);

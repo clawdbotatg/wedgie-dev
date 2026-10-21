@@ -10,6 +10,7 @@ export type Ctx = {
   addr: (a: string) => string;           // an address as HTML (the address component)
   token: (a: string) => Token | null;    // what's known about a token contract, or null (yet)
   owners: number;                        // how many owners the Safe has now
+  native?: string;                       // the chain's coin (ETH, POL, …)
   past?: boolean;                        // history: today's owner count says nothing about then
 };
 
@@ -30,7 +31,7 @@ const wNum = (d: string, i: number) => BigInt("0x" + (word(d, i) || "0"));
 
 /** How much of a token, in its own units when it's known ("100 USDC"), else raw. */
 export function amount(v: bigint, token: string | null, ctx: Ctx) {
-  if (!token) return `${E.fmt(v, 18, 6)} ETH`;
+  if (!token) return `${E.fmt(v, 18, 6)} ${esc(ctx.native || "ETH")}`;
   const t = ctx.token(token);
   return t ? `${E.fmt(v, t.decimals, Math.min(6, t.decimals))} ${esc(t.symbol)}` : `${v} of token ${ctx.addr(token)}`;
 }

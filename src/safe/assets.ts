@@ -1,7 +1,7 @@
-// What a Safe holds: ETH, every ERC-20 Alchemy finds (alchemy_getTokenBalances through /api/rpc), and dollar
+// What a Safe holds: the chain's coin (ETH, POL, …), every ERC-20 Alchemy finds (alchemy_getTokenBalances through /api/rpc), and dollar
 // prices (wedgie_prices). A token with no price is folded away as "other": that's where airdropped spam lands.
-// Alchemy down or a fork with no alchemy_ methods: ETH and USDC from the chain, no dollars.
-export type Asset = { token: string | null; symbol: string; name: string; decimals: number; balance: bigint; usd: number | null; price: number | null; logo: string | null };
+// Alchemy down or a fork with no alchemy_ methods: the coin and USDC from the chain, no dollars.
+export type Asset = { token: string | null; symbol: string; name: string; decimals: number; balance: bigint; usd: number | null; price: number | null; logo?: string | null };
 type Rpc = (method: string, params: unknown[]) => Promise<any>;
 
 const META = "wedgie.safe.tokens";       // token metadata, per chain:address: it never changes
@@ -24,20 +24,23 @@ export async function tokenMeta(chain: number, token: string, rpc: Rpc) {
 }
 export const knownMeta = (chain: number, token: string) => meta[`${chain}:${token.toLowerCase()}`] || null;
 
-/** usdc: the chain's USDC (always listed, and known even without Alchemy). */
-export async function readAssets(chain: number, safe: string, eth: bigint, usdc: { address: string; balance: bigint | null } | null, rpc: Rpc): Promise<Asset[]> {
+// Arc's coin is USDC, and this token is the same money again: never a second row
+const TWIN: Record<number, string> = { 5042: "0x3600000000000000000000000000000000000000" };
+
+/** native: the chain's coin. usdc: the chain's USDC (always listed, and known even without Alchemy). */
+export async function readAssets(chain: number, safe: string, native: { symbol: string; name: string; logo: string }, eth: bigint, usdc: { address: string; balance: bigint | null } | null, rpc: Rpc): Promise<Asset[]> {
   if (usdc) meta[`${chain}:${usdc.address.toLowerCase()}`] = { symbol: "USDC", name: "USD Coin", decimals: 6, logo: "/img/tokens/usdc.png" };
   let held: { token: string; balance: bigint }[] = usdc && usdc.balance !== null ? [{ token: usdc.address, balance: usdc.balance }] : [];
   try {
     const r = await rpc("alchemy_getTokenBalances", [safe, "erc20"]);
     const found = (r?.tokenBalances || []).map((b: any) => ({ token: String(b.contractAddress), balance: BigInt(b.tokenBalance || "0x0") }))
-      .filter((b: any) => b.balance > 0n).slice(0, 40);
+      .filter((b: any) => b.balance > 0n && b.token.toLowerCase() !== TWIN[chain]).slice(0, 40);
     held = [...held.filter((h) => !found.some((f: any) => f.token.toLowerCase() === h.token.toLowerCase())), ...found];
   } catch {}
   const metas = await Promise.all(held.map((h) => tokenMeta(chain, h.token, rpc)));
   let px: { eth: number | null; tokens: Record<string, number> } = { eth: null, tokens: {} };
   try { px = await rpc("wedgie_prices", held.slice(0, 25).map((h) => h.token)); } catch {}
-  const out: Asset[] = [{ token: null, symbol: "ETH", name: "Ether", decimals: 18, balance: eth, logo: "/img/tokens/eth.png", price: px.eth, usd: px.eth === null ? null : Number(eth) / 1e18 * px.eth }];
+  const out: Asset[] = [{ token: null, ...native, decimals: 18, balance: eth, price: px.eth, usd: px.eth === null ? null : Number(eth) / 1e18 * px.eth }];
   held.forEach((h, i) => {
     const m = metas[i];
     if (!m) return;

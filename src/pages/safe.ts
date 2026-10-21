@@ -34,24 +34,39 @@ const Z = "0x" + "0".repeat(40);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const msgOf = (e: any) => e?.message || String(e);
 
-// Every one has the P-256 precompile the wedgie's signer contract uses. key = Safe's short name (its API, app.safe.global).
+// Every one has the P-256 precompile the wedgie's signer contract uses (checked on chain 2026-10-21: HyperEVM and
+// Plasma don't, so a wedgie can't sign there), Safe 1.4.1 and the passkey signer factory. key = Safe's API short
+// name (app: app.safe.global's, when it differs). native: the chain's own coin (Arc's is USDC: no second USDC row).
 // rpc: only handed to a wallet that adds the chain; the page's own reads go through /api/rpc (readUrl)
-type Chain = { name: string; key: string; logo?: string; rpc: string; scan: string; usdc?: string; test?: boolean };
-const chainLogo = (t: number) => CHAINS[t]?.logo ? `<img class="sx-chain-img" src="${CHAINS[t].logo}" alt="">` : "";
+type Coin = { symbol: string; name: string; logo: string };
+type Chain = { name: string; key: string; app?: string; logo: string; native: Coin; rpc: string; scan: string; usdc?: string; test?: boolean };
+const ETHER: Coin = { symbol: "ETH", name: "Ether", logo: "/img/tokens/eth.png" };
+const coin = (symbol: string, name: string, f: string): Coin => ({ symbol, name, logo: `/img/tokens/${f}` });
 const CHAINS: Record<number, Chain> = {
-  8453: { name: "Base", key: "base", logo: "/img/chains/base.webp", rpc: "https://mainnet.base.org", scan: "https://basescan.org", usdc: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" },
-  1: { name: "Ethereum", key: "eth", logo: "/img/chains/ethereum.webp", rpc: "https://ethereum-rpc.publicnode.com", scan: "https://etherscan.io", usdc: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48" },
-  10: { name: "Optimism", key: "oeth", logo: "/img/chains/optimism.svg", rpc: "https://mainnet.optimism.io", scan: "https://optimistic.etherscan.io", usdc: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85" },
-  42161: { name: "Arbitrum", key: "arb1", logo: "/img/chains/arbitrum.svg", rpc: "https://arb1.arbitrum.io/rpc", scan: "https://arbiscan.io", usdc: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831" },
-  84532: { name: "Base Sepolia", key: "basesep", logo: "/img/chains/base.webp", rpc: "https://sepolia.base.org", scan: "https://sepolia.basescan.org", usdc: "0x036CbD53842c5426634e7929541eC2318f3dCF7e", test: true },
-  11155111: { name: "Sepolia", key: "sep", logo: "/img/chains/ethereum.webp", rpc: "https://ethereum-sepolia-rpc.publicnode.com", scan: "https://sepolia.etherscan.io", usdc: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238", test: true },
+  8453: { name: "Base", key: "base", logo: "/img/chains/base.webp", native: ETHER, rpc: "https://mainnet.base.org", scan: "https://basescan.org", usdc: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" },
+  1: { name: "Ethereum", key: "eth", logo: "/img/chains/ethereum.webp", native: ETHER, rpc: "https://ethereum-rpc.publicnode.com", scan: "https://etherscan.io", usdc: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48" },
+  10: { name: "Optimism", key: "oeth", logo: "/img/chains/optimism.svg", native: ETHER, rpc: "https://mainnet.optimism.io", scan: "https://optimistic.etherscan.io", usdc: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85" },
+  42161: { name: "Arbitrum", key: "arb1", logo: "/img/chains/arbitrum.svg", native: ETHER, rpc: "https://arb1.arbitrum.io/rpc", scan: "https://arbiscan.io", usdc: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831" },
+  137: { name: "Polygon", key: "pol", app: "matic", logo: "/img/chains/polygon.svg", native: coin("POL", "Polygon", "pol.png"), rpc: "https://polygon-rpc.com", scan: "https://polygonscan.com", usdc: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359" },
+  43114: { name: "Avalanche", key: "avax", logo: "/img/chains/avalanche.svg", native: coin("AVAX", "Avalanche", "avax.png"), rpc: "https://api.avax.network/ext/bc/C/rpc", scan: "https://snowtrace.io", usdc: "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E" },
+  56: { name: "BNB Chain", key: "bnb", logo: "/img/chains/bsc.svg", native: coin("BNB", "BNB", "bnb.png"), rpc: "https://bsc-dataseed.bnbchain.org", scan: "https://bscscan.com" },
+  100: { name: "Gnosis", key: "gno", logo: "/img/chains/gnosis.svg", native: coin("XDAI", "xDAI", "xdai.png"), rpc: "https://rpc.gnosischain.com", scan: "https://gnosisscan.io", usdc: "0x2a22f9c3b484c3629090FeED35F17Ff8F88f76F0" },
+  42220: { name: "Celo", key: "celo", logo: "/img/chains/celo.svg", native: coin("CELO", "Celo", "celo.png"), rpc: "https://forno.celo.org", scan: "https://celoscan.io", usdc: "0xcebA9300f2b948710d2653dD7B07f33A8B32118C" },
+  146: { name: "Sonic", key: "sonic", logo: "/img/chains/sonic.svg", native: coin("S", "Sonic", "s.png"), rpc: "https://rpc.soniclabs.com", scan: "https://sonicscan.org", usdc: "0x29219dd400f2Bf60E5a23d13Be72B486D4038894" },
+  5042: { name: "Arc", key: "arc", logo: "/img/chains/arc.svg", native: coin("USDC", "USD Coin", "usdc.png"), rpc: "https://rpc.mainnet.arc.io", scan: "https://explorer.arc.io" },
+  4663: { name: "Robinhood", key: "robinhood", logo: "/img/chains/robinhood.svg", native: ETHER, rpc: "https://rpc.mainnet.chain.robinhood.com", scan: "https://robinhoodchain.blockscout.com" },
+  84532: { name: "Base Sepolia", key: "basesep", logo: "/img/chains/base.webp", native: ETHER, rpc: "https://sepolia.base.org", scan: "https://sepolia.basescan.org", usdc: "0x036CbD53842c5426634e7929541eC2318f3dCF7e", test: true },
+  11155111: { name: "Sepolia", key: "sep", logo: "/img/chains/ethereum.webp", native: ETHER, rpc: "https://ethereum-sepolia-rpc.publicnode.com", scan: "https://sepolia.etherscan.io", usdc: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238", test: true },
 };
+const IDS = [8453, 1, 10, 42161, 137, 43114, 56, 100, 42220, 146, 5042, 4663, 84532, 11155111];   // the order they're shown in
+const nat = (c: number) => CHAINS[c].native.symbol;
+const chainLogo = (t: number) => CHAINS[t] ? `<img class="sx-chain-img" src="${CHAINS[t].logo}" alt="">` : "";
 const api = (chain: number) => `https://api.safe.global/tx-service/${CHAINS[chain].key}/api/v1`;
 // The queue lives in three places, so a slow or down Safe Transaction Service doesn't stop a Safe: Safe's API,
 // Instant Wallet's shared queue (mainnets; it checks each signature on chain), and this browser.
 const IWQ = "https://instantwallet.io/api/safe/queue";
 const SLOW_MS = 8000;
-const appLink = (chain: number, safe: string, path = "home") => `https://app.safe.global/${path}?safe=${CHAINS[chain].key}:${safe}`;
+const appLink = (chain: number, safe: string, path = "home") => `https://app.safe.global/${path}?safe=${CHAINS[chain].app || CHAINS[chain].key}:${safe}`;
 const LINE_MAX = 6000;      // the wedgie drops a USB line over 6 KB
 const DATA_MAX = 8000;      // wedgie-safe safe_data pieces: up to this many bytes (what an RP2040 heap joins safely)
 
@@ -106,7 +121,7 @@ async function wallet(chain: number): Promise<string> {
       if (e?.code !== 4902) throw e;       // the wallet doesn't know this chain yet: add it
       const c = CHAINS[chain];
       await eth().request({ method: "wallet_addEthereumChain", params: [{ chainId: want, chainName: c.name, rpcUrls: [c.rpc],
-        nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 }, blockExplorerUrls: [c.scan] }] });
+        nativeCurrency: { name: c.native.name, symbol: c.native.symbol, decimals: 18 }, blockExplorerUrls: [c.scan] }] });
     }
   }
   return E.checksum(from);
@@ -127,7 +142,7 @@ async function send(chain: number, to: string, data: string, say: (s: string, pc
 
 type Info = { owners: string[]; threshold: number; nonce: number; balance: bigint; usdc: bigint | null };
 type Row = { chain: number; addr: string; wedgie: boolean; wallet: boolean; info?: Info | null; err?: string; gone?: boolean };
-const KEYS = Object.fromEntries(Object.entries(CHAINS).map(([id, c]) => [c.key, +id]));
+const KEYS = Object.fromEntries(IDS.map((id) => [CHAINS[id].key, id]));
 const route = (chain: number, a: string) => `/safe/${CHAINS[chain].key}:${a}`;
 
 /** Owners, threshold, nonce, balances: from the chain, not Safe's API (which can lag a block or more). */
@@ -185,11 +200,12 @@ export function safe(main: HTMLElement) {
   const deployed: Record<number, boolean | undefined> = {};
   // this Safe on the other chains: there (true), not yet (false), unknown; recipe = how it was made, to make it again
   let copies: Record<number, boolean | undefined> = {}, recipe: E.Recipe | null = null;
+  let worths: Record<number, number | null> = {}, looked = false;   // this Safe's dollars on each chain it's on (null: no price)
   let queueNote = "";        // which queue sources didn't answer just now
   let sub: "home" | "settings" = "home";
   let assets: Asset[] | null = null;              // what the open Safe holds (null: not read yet)
   let activity: any[] | null = null, activityErr = "";
-  const ethPx: Record<number, number | null> = {};   // ETH's dollar price per chain, for the list's totals
+  const ethPx: Record<number, number | null> = {};   // the native coin's dollar price per chain, for the list's totals
   // a sheet over the page (a bottom sheet on a phone): one at a time
   let sheet: "" | "create" | "send" | "receive" | "connect" = "", sendToken: string | null = null;
 
@@ -232,7 +248,7 @@ export function safe(main: HTMLElement) {
   const threshOpts = (n: number, at: number) => Array.from({ length: n }, (_, i) => `<option${i + 1 === at ? " selected" : ""}>${i + 1}</option>`).join("");
   const label = (a: string) => mine(a) ? " <b>this wedgie</b>" : eqA(a, account) ? " <b>your wallet</b>" : "";
   const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
-  const chainOpts = (at: number) => Object.entries(CHAINS).map(([id, c]) => `<option value="${id}"${+id === at ? " selected" : ""}>${esc(c.name)}${c.test ? " (test)" : ""}</option>`).join("");
+  const chainOpts = (at: number) => IDS.map((id) => [id, CHAINS[id]] as const).map(([id, c]) => `<option value="${id}"${+id === at ? " selected" : ""}>${esc(c.name)}${c.test ? " (test)" : ""}</option>`).join("");
   /** Run one thing at a time; buttons say so while it runs. */
   async function job(fn: () => Promise<unknown>) {
     if (busy) return;
@@ -244,7 +260,7 @@ export function safe(main: HTMLElement) {
   // ---- plain words for a transaction (src/safe/describe.ts) ----
   const asked = new Set<string>();     // token contracts whose metadata is being fetched
   const ctx = (): Ctx => ({
-    safe: safeAddr, owners: info?.owners.length || 1,
+    safe: safeAddr, owners: info?.owners.length || 1, native: nat(chain),
     addr: (a) => eqA(a, safeAddr) ? "this Safe" : address(a, { size: "sm", chain, link: CHAINS[chain].scan }),
     token: (a) => {
       const m = knownMeta(chain, a);
@@ -298,7 +314,9 @@ export function safe(main: HTMLElement) {
       const same = KEYS[m[1]] === chain && eqA(m[2], safeAddr) && !!info;
       sub = m[3] ? "settings" : "home";
       if (same) { paintAll(); window.scrollTo(0, 0); return; }     // Settings and back: the same Safe, already read
-      chain = KEYS[m[1]]; safeAddr = E.checksum(m[2]); info = null; queue = []; copies = {}; recipe = null;
+      const was = chain, sameAddr = eqA(m[2], safeAddr);    // another chain of this Safe: keep what's known of the others
+      chain = KEYS[m[1]]; safeAddr = E.checksum(m[2]); info = null; queue = []; recipe = null;
+      if (sameAddr) copies[was] = true; else { copies = {}; worths = {}; looked = false; }
       assets = null; activity = null; activityErr = "";
       $("s-new").innerHTML = ""; $("s-owner").innerHTML = ""; $("s-wc").innerHTML = "";
       paintAll();
@@ -442,7 +460,7 @@ export function safe(main: HTMLElement) {
     if (!signer && !account) return;
     listing = true; listPct = 8; paintList();
     // the bar: asking Safe's API on every chain is the first 70%, reading each Safe from its chain the rest
-    let asked = 0, read = 0, nAsk = Object.keys(CHAINS).length * (signers.length + (account ? 1 : 0)), nRead = 0;
+    let asked = 0, read = 0, nAsk = IDS.length * (signers.length + (account ? 1 : 0)), nRead = 0;
     const tick = () => {
       listPct = Math.max(8, nRead ? 70 + 30 * read / nRead : 70 * asked / nAsk);
       const f = document.getElementById("l-fill"); if (f) f.style.width = `${listPct}%`;
@@ -461,7 +479,7 @@ export function safe(main: HTMLElement) {
         }
       }
     };
-    await Promise.all(Object.keys(CHAINS).map(Number).map(async (c) => {
+    await Promise.all(IDS.map(async (c) => {
       await Promise.all(signers.map(async (a) => { for (const s of await of(c, a)) add(c, s, "wedgie"); asked++; tick(); }));
       if (account) { for (const s of await of(c, account)) add(c, s, "wallet"); asked++; tick(); }
     }));
@@ -482,32 +500,46 @@ export function safe(main: HTMLElement) {
       .sort((a, b) => +b.wedgie - +a.wedgie || +!!CHAINS[a.chain].test - +!!CHAINS[b.chain].test || a.chain - b.chain);
     listing = false;
     paintList();
-    // each chain's ETH price, for the cards' dollar totals (USDC counts as a dollar)
+    // each chain's coin price, for the cards' dollar totals (USDC counts as a dollar)
     await Promise.all([...new Set(rows.map((r) => r.chain))].filter((c) => !(c in ethPx)).map(async (c) => {
       try { ethPx[c] = (await rpc(c, "wedgie_prices", []))?.eth ?? null; } catch { ethPx[c] = null; }
     }));
     paintList();
   }
 
-  /** A Safe's worth for its card: dollars when ETH's price is known, else its ETH and USDC. */
+  /** A Safe's dollars on one chain (native coin + USDC), null with no price yet; a test chain's coins: none. */
+  const worthUsd = (c: number, i: Info) => CHAINS[c].test ? 0 : ethPx[c] ? Number(i.balance) / 1e18 * ethPx[c]! + Number(i.usdc || 0n) / 1e6 : null;
+  /** A Safe's worth for its card: dollars when the coin's price is known, else its coin and USDC. */
   const worth = (c: number, i: Info) => {
     const p = ethPx[c];
     if (p) return usd(Number(i.balance) / 1e18 * p + Number(i.usdc || 0n) / 1e6);
-    return `${E.fmt(i.balance, 18, 4)} ETH${i.usdc ? ` · ${E.fmt(i.usdc, 6, 2)} USDC` : ""}`;
+    return `${E.fmt(i.balance, 18, 4)} ${nat(c)}${i.usdc ? ` · ${E.fmt(i.usdc, 6, 2)} USDC` : ""}`;
   };
 
   function paintList() {
     const box = $("s-list");
     box.hidden = !!safeAddr || !key;
     if (box.hidden) return;
-    const card = (r: Row) => {
-      const i = r.info;
-      return `<li><a class="safe-row sx-safe${r.wedgie ? " sx-mine" : ""}" data-nav href="${route(r.chain, r.addr)}">
-        <span class="sx-safe-top">${i && isIW(i.owners) ? iwMark : ""}${address(r.addr, { chain: r.chain })}<span class="sx-pill${CHAINS[r.chain].test ? " sx-test" : ""}">${chainLogo(r.chain)}${esc(CHAINS[r.chain].name)}</span></span>
-        ${i ? `<span class="sx-safe-worth">${esc(worth(r.chain, i))}</span><span class="fine">${i.threshold} of ${plural(i.owners.length, "owner")}${r.wedgie ? "" : " · add your wedgie"}</span>`
-          : `<span class="fine">Couldn't read it just now. Open it, or Refresh.</span>`}</a></li>`;
+    // one card per address: the same Safe on several chains is one Safe, its worth all of them together
+    const groups = (list: Row[]) => {
+      const by = new Map<string, Row[]>();
+      for (const r of list) by.set(r.addr.toLowerCase(), [...(by.get(r.addr.toLowerCase()) || []), r]);
+      return [...by.values()];
     };
-    const mine = rows.filter((r) => r.wedgie), theirs = rows.filter((r) => !r.wedgie);
+    const card = (g: Row[]) => {
+      const read = g.filter((r) => r.info), $s = read.map((r) => worthUsd(r.chain, r.info!));
+      const n = $s.every((x) => x !== null) ? $s.reduce((a, x) => a! + x!, 0)! : null;
+      // opens on the chain with the most in it
+      const top = read.slice().sort((x, y) => (worthUsd(y.chain, y.info!) ?? 0) - (worthUsd(x.chain, x.info!) ?? 0))[0] || g[0], i = top.info;
+      const chains = IDS.filter((t) => g.some((r) => r.chain === t));
+      return `<li><a class="safe-row sx-safe${g.some((r) => r.wedgie) ? " sx-mine" : ""}" data-nav href="${route(top.chain, top.addr)}">
+        <span class="sx-safe-top">${i && isIW(i.owners) ? iwMark : ""}${address(top.addr, { chain: top.chain })}</span>
+        ${read.length ? `<span class="sx-safe-worth">${esc(n !== null ? usd(n) : read.map((r) => worth(r.chain, r.info!)).join(" · "))}</span>` : ""}
+        ${i ? `<span class="fine">${i.threshold} of ${plural(i.owners.length, "owner")}${g.some((r) => r.wedgie) ? "" : " · add your wedgie"}</span>`
+          : `<span class="fine">Couldn't read it just now. Open it, or Refresh.</span>`}
+        <span class="sx-chains sx-chains-sm">${chains.map((t) => `<span class="sx-pill${CHAINS[t].test ? " sx-test" : ""}">${chainLogo(t)}${esc(CHAINS[t].name)}</span>`).join("")}</span></a></li>`;
+    };
+    const all = groups(rows), mine = all.filter((g) => g.some((r) => r.wedgie)), theirs = all.filter((g) => !g.some((r) => r.wedgie));
     let h = `<div class="sx-head"><h1>Your wedgie's Safes</h1><button class="btn btn-green" id="l-new"${dis()}>＋ New Safe</button></div>`;
     h += mine.length ? `<ul class="sx-safes">${mine.map(card).join("")}</ul>`
       : listing ? `<div class="sx-card"><div class="meter"><div class="meter-track"><div class="meter-fill" id="l-fill" style="width:${listPct}%"></div></div><p class="fine">Looking on every chain.</p></div></div>`
@@ -609,14 +641,14 @@ export function safe(main: HTMLElement) {
     const box = $("s-safe");
     box.hidden = !safeAddr;
     if (box.hidden) return;
-    const c = CHAINS[chain], i = info, home = route(chain, safeAddr), $t = total();
-    const on = Object.keys(CHAINS).map(Number).filter((t) => t === chain || copies[t]);   // fixed order: a tap only recolors
-    const worthOf = !i ? "" : $t !== null ? usd($t) : `${E.fmt(i.balance, 18, 4)} ETH`;
+    const c = CHAINS[chain], i = info, home = route(chain, safeAddr), $t = total(), g = grand();
+    const on = IDS.filter((t) => t === chain || copies[t]);   // fixed order: a tap only recolors
+    const worthOf = !i ? "" : $t !== null ? usd($t) : `${E.fmt(i.balance, 18, 4)} ${nat(chain)}`;
     const who = !i ? "" : `${i.threshold} of ${plural(i.owners.length, "owner")}`
       + (signer ? wedgieOwns() ? " · your wedgie is one" : " · your wedgie isn't one" : "");
     let h = `<div class="sx-hero-top">${sub === "settings" ? `<a class="sx-back" data-nav href="${home}">← Back</a>` : `<a class="sx-back" data-nav href="/safe">← Safes</a>`}
       ${sub === "home" ? `<a class="sx-gear" id="a-settings" data-nav href="${home}/settings">Settings</a>` : ""}</div>
-      <div class="sx-hero-id">${i && isIW(i.owners) ? iwMark : ""}${address(safeAddr, { size: "lg", chain })}</div>
+      <div class="sx-hero-id">${i && isIW(i.owners) ? iwMark : ""}${address(safeAddr, { size: "lg", chain })}${g !== null ? `<span class="sx-grand"><b>${esc(usd(g))}</b> on all chains</span>` : ""}</div>
       <div class="sx-chains">${on.map((t) => t === chain ? `<span class="sx-pill sx-on">${chainLogo(t)}${esc(c.name)}</span>`
         : `<a class="sx-pill" data-nav href="${route(t, safeAddr)}${sub === "settings" ? "/settings" : ""}">${chainLogo(t)}${esc(CHAINS[t].name)}</a>`).join("")}</div>`;
     if (sub === "settings") h += `<div class="sx-total sx-total-sm">Settings</div><div class="sx-sub">${esc(who)}</div>`;
@@ -652,7 +684,7 @@ export function safe(main: HTMLElement) {
     box.hidden = !(safeAddr && info && sub === "settings");
     if (box.hidden) return;
     const i = info!, c = CHAINS[chain];
-    const others = Object.keys(CHAINS).map(Number).filter((t) => t !== chain);
+    const others = IDS.filter((t) => t !== chain);
     const differs = recipe && recipe.owners.length && (recipe.threshold !== i.threshold || recipe.owners.length !== i.owners.length || recipe.owners.some((o) => !i.owners.some((x) => eqA(x, o))));
     box.innerHTML = `<h3>Other chains</h3><p class="fine">Same address on every chain.</p>
       <ul class="sx-rows">${others.map((t) => `<li><span>${chainLogo(t)}${esc(CHAINS[t].name)}${CHAINS[t].test ? ` <span class="fine">test</span>` : ""}</span>${copies[t]
@@ -696,7 +728,7 @@ export function safe(main: HTMLElement) {
 
   /** Every token it holds, with dollars (src/safe/assets.ts). */
   async function loadAssets(c: number, a: string, i: Info) {
-    const got = await readAssets(c, a, i.balance, CHAINS[c].usdc ? { address: CHAINS[c].usdc!, balance: i.usdc } : null, (m, p) => rpc(c, m, p));
+    const got = await readAssets(c, a, CHAINS[c].native, i.balance, CHAINS[c].usdc ? { address: CHAINS[c].usdc!, balance: i.usdc } : null, (m, p) => rpc(c, m, p));
     if (c === chain && a === safeAddr) { assets = got; paintSafe(); paintAssets(); paintNew(); }
   }
 
@@ -712,11 +744,31 @@ export function safe(main: HTMLElement) {
   }
 
   // ---- the same Safe on another chain: its creation call again, so the same address ----
+  /** Dollars this Safe holds on chain t (a test chain's coins: none), or null with no price. */
+  async function worthOn(t: number, a: string) {
+    if (CHAINS[t].test) return 0;
+    const i = await readSafe(t, a);
+    const got = await readAssets(t, a, CHAINS[t].native, i.balance, CHAINS[t].usdc ? { address: CHAINS[t].usdc!, balance: i.usdc } : null, (m, p) => rpc(t, m, p));
+    return got[0].price === null ? null : got.reduce((n, x) => n + (x.usd || 0), 0);
+  }
+  /** All chains together, once every one was looked at; null till then (or with no price somewhere). */
+  const grand = () => {
+    const $t = total(), others = IDS.filter((t) => t !== chain && copies[t]);
+    if ($t === null || !others.length || !looked) return null;     // a chain that couldn't be read: left out
+    let n = $t;
+    for (const t of others) { const w = worths[t]; if (w === undefined || w === null) return null; n += w; }
+    return n;
+  };
   async function checkCopies(c: number, a: string) {
-    await Promise.all(Object.keys(CHAINS).map(Number).filter((t) => t !== c).map(async (t) => {
-      try { const has = await hasCode(t, a); if (c === chain && a === safeAddr) copies[t] = has; } catch {}
+    await Promise.all(IDS.filter((t) => t !== c).map(async (t) => {
+      try {
+        const has = await hasCode(t, a);
+        if (c !== chain || a !== safeAddr) return;
+        copies[t] = has;
+        if (has) { worths[t] = await worthOn(t, a); paintSafe(); }
+      } catch {}
     }));
-    if (c === chain && a === safeAddr) { paintSafe(); paintChains(); }
+    if (c === chain && a === safeAddr) { looked = true; paintSafe(); paintChains(); }
     try { const r = await recipeOf(c, a); if (c === chain && a === safeAddr) { recipe = r; paintChains(); } } catch {}
   }
 
@@ -900,7 +952,7 @@ export function safe(main: HTMLElement) {
         ${btns.length ? `<div class="sx-row">${btns.join(" ")}</div>` : ""}
         <details class="sx-more"><summary>Details</summary><dl class="sx-dl">
           <dt>To</dt><dd>${address(t.to, { link: CHAINS[chain].scan, size: "sm", chain })}</dd>
-          ${BigInt(t.value || 0) ? `<dt>ETH</dt><dd>${esc(E.fmt(BigInt(t.value), 18))}</dd>` : ""}
+          ${BigInt(t.value || 0) ? `<dt>${nat(chain)}</dt><dd>${esc(E.fmt(BigInt(t.value), 18))}</dd>` : ""}
           ${t.data && t.data !== "0x" ? `<dt>Data</dt><dd><code>${esc(t.data.length > 202 ? t.data.slice(0, 202) + `… (${(t.data.length - 2) / 2} bytes)` : t.data)}</code></dd>` : ""}
           ${+t.operation === 1 ? `<dt>Kind</dt><dd>delegate call</dd>` : ""}
           <dt>Hash</dt><dd><code>${esc(String(t.safeTxHash).slice(0, 10))}…${esc(String(t.safeTxHash).slice(-8))}</code></dd></dl></details></li>`;
@@ -943,7 +995,7 @@ export function safe(main: HTMLElement) {
     const box = $("s-assets");
     box.hidden = !(safeAddr && info && sub === "home");
     if (box.hidden) return;
-    const list = assets || [{ token: null, symbol: "ETH", name: "Ether", decimals: 18, balance: info!.balance, usd: null, price: null } as Asset];
+    const list = assets || [{ token: null, ...CHAINS[chain].native, decimals: 18, balance: info!.balance, usd: null, price: null } as Asset];
     const row = (a: Asset) => `<li><button class="sx-asset" type="button" data-tok="${a.token || ""}"${can() ? "" : " disabled"}>${tokenBadge(a.symbol, a.logo)}
       <span class="sx-asset-name"><b>${esc(a.symbol)}</b><span class="fine">${esc(a.name)}</span></span>
       <span class="sx-asset-amt">${a.usd !== null ? `<b>${esc(usd(a.usd))}</b><span class="fine">${esc(E.fmt(a.balance, a.decimals, 4))} ${esc(a.symbol)}</span>` : `<b>${esc(E.fmt(a.balance, a.decimals, 4))}</b>`}</span></button></li>`;
@@ -970,10 +1022,10 @@ export function safe(main: HTMLElement) {
         rows.push(`<li><span class="sx-ic">${ICON[s.kind]}</span><span class="sx-act-what"><b>${s.title}</b><span class="fine">#${esc(t.nonce)} · ${esc(when)}${failed ? ` · <span class="bad">failed</span>` : ""}</span></span>${link ? `<a class="sx-end fine" href="${link}" target="_blank" rel="noopener">↗</a>` : ""}</li>`);
         continue;
       }
-      // in: ETH, or a token Safe's API trusts (a 0-value or untrusted "transfer" is address poisoning: never shown)
+      // in: the coin, or a token Safe's API trusts (a 0-value or untrusted "transfer" is address poisoning: never shown)
       for (const x of t.transfers || []) {
         if (!eqA(x.to, safeAddr) || x.value === "0" || !x.value) continue;
-        const tok = x.type === "ETHER_TRANSFER" ? { symbol: "ETH", decimals: 18 } : x.tokenInfo?.trusted && x.tokenInfo.type === "ERC20" ? x.tokenInfo : null;
+        const tok = x.type === "ETHER_TRANSFER" ? { symbol: nat(chain), decimals: 18 } : x.tokenInfo?.trusted && x.tokenInfo.type === "ERC20" ? x.tokenInfo : null;
         if (!tok) continue;
         rows.push(`<li><span class="sx-ic sx-in">↓</span><span class="sx-act-what"><b>Received ${esc(E.fmt(BigInt(x.value), tok.decimals, 4))} ${esc(tok.symbol)}</b><span class="fine">from ${address(x.from, { size: "sm", chain })} · ${esc(when)}</span></span>${link ? `<a class="sx-end fine" href="${link}" target="_blank" rel="noopener">↗</a>` : ""}</li>`);
       }
@@ -1090,7 +1142,7 @@ export function safe(main: HTMLElement) {
   }
 
   // ---- Send (a sheet): a token, an amount, who to; the review says it in words before anyone signs ----
-  const sendList = (): Asset[] => assets || [{ token: null, symbol: "ETH", name: "Ether", decimals: 18, balance: info?.balance || 0n, usd: null, price: null, logo: null },
+  const sendList = (): Asset[] => assets || [{ token: null, ...CHAINS[chain].native, decimals: 18, balance: info?.balance || 0n, usd: null, price: null },
     ...(CHAINS[chain].usdc && info?.usdc !== null ? [{ token: CHAINS[chain].usdc!, symbol: "USDC", name: "USD Coin", decimals: 6, balance: info!.usdc!, usd: null, price: null, logo: null }] : [])];
   const picked = () => { const v = (document.getElementById("n-tok") as HTMLSelectElement | null)?.value || ""; return sendList().find((a) => (a.token || "") === v) || sendList()[0]; };
   function paintNew() {
@@ -1102,7 +1154,7 @@ export function safe(main: HTMLElement) {
         <div class="sx-amount"><input id="n-amt" placeholder="0" inputmode="decimal" autocomplete="off"><select id="n-tok"></select></div>
         <p class="sx-row sx-under"><span class="fine" id="n-usd"></span><span class="sx-end"><span class="fine" id="n-has"></span> <button class="btn btn-sm" id="n-max" type="button">Max</button></span></p>
         <p class="sx-label">To</p><p>${addressInput("n-to", "0x… or ENS name")}</p>
-        <details class="sx-more"><summary>Contract call data</summary><p><input id="n-data" class="sx-mono" placeholder="0x…" spellcheck="false" autocomplete="off"></p><p class="fine">Only with ETH. Leave it empty to just send.</p></details>
+        <details class="sx-more"><summary>Contract call data</summary><p><input id="n-data" class="sx-mono" placeholder="0x…" spellcheck="false" autocomplete="off"></p><p class="fine">Only with ${esc(nat(chain))}. Leave it empty to just send.</p></details>
         <div class="sx-review" id="n-review" hidden></div>
         <p class="sx-row" id="n-btns"></p>`;
       // all of it: the Safe pays no gas itself (the wallet that executes does), so the whole balance can go
@@ -1129,12 +1181,12 @@ export function safe(main: HTMLElement) {
     const n = E.units(amt, a.decimals);
     if (n > a.balance) throw new Error(`The Safe has ${E.fmt(a.balance, a.decimals)} ${a.symbol}.`);
     if (a.token) {
-      if (data !== "0x") throw new Error(`Data goes with ETH, not ${a.symbol}.`);
+      if (data !== "0x") throw new Error(`Data goes with ${nat(chain)}, not ${a.symbol}.`);
       if (!n) throw new Error("How much?");
       return { t: safeTx(a.token, "0", E.transferData(E.checksum(to), n)), what: `send ${amt} ${a.symbol} to ${short(to)}` };
     }
     if (!n && data === "0x") throw new Error("How much?");
-    return { t: safeTx(to, n.toString(), data), what: data === "0x" ? `send ${amt} ETH to ${short(to)}` : `call ${short(to)}` };
+    return { t: safeTx(to, n.toString(), data), what: data === "0x" ? `send ${amt} ${nat(chain)} to ${short(to)}` : `call ${short(to)}` };
   }
   function review() {
     const a = picked(), amt = ($("n-amt") as HTMLInputElement | null)?.value.trim() || "";
