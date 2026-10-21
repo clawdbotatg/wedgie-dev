@@ -9,7 +9,7 @@
 import nodemailer from "nodemailer";
 import { appendFileSync } from "node:fs";
 import { env, hmac, sha256, randomHex, type db } from "./_shop.js";
-import { ITEMS, SHIPS, type Line } from "../src/shop/catalog.js";
+import { nameOf, SHIPS, type Line } from "../src/shop/catalog.js";
 
 export const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const key = () => env("SHOP_MAIL_KEY");
@@ -44,7 +44,7 @@ ${lines.map((l) => `<p style="margin:0 0 16px">${esc(l).replace(/\n/g, "<br>")}<
   await smtp.sendMail({ from: `wedgie <${env("SHOP_MAIL_USER")}>`, to, subject, text, html });
 }
 
-const items = (lines: Line[] | null) => (lines || []).map((l) => `${l.qty} × ${ITEMS[l.item].name}`).join(", ");
+const items = (lines: Line[] | null) => (lines || []).map((l) => `${l.qty} × ${nameOf(l.item)}`).join(", ");
 const usd = (c: number) => "$" + (c / 100).toFixed(c % 100 ? 2 : 0);
 const link = async (origin: string, id: string) => `${origin}/order/${id}#${await tokenOf(id)}`;
 

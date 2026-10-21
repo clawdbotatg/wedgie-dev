@@ -8,7 +8,7 @@
 // Env: SHOP_DATABASE_URL, STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET (card), SHOP_PAY_TO (USDC),
 // SHOP_ADMIN_TOKEN (omen's orders.py), SHOP_RPC_<chainId> (an Alchemy URL: never a public RPC).
 import { neon } from "@neondatabase/serverless";
-import { ITEMS, PAY_CHAINS, QUOTE, cartLines, extraAt, type Cart, type Line } from "../src/shop/catalog.js";
+import { nameOf, PAY_CHAINS, QUOTE, cartLines, extraAt, type Cart, type Line } from "../src/shop/catalog.js";
 
 declare const process: { env: Record<string, string | undefined> };
 export const env = (k: string) => process.env[k] || "";
@@ -212,7 +212,7 @@ export async function checkout(o: Pick<Order, "id" | "cart" | "lines">, origin: 
     f[`line_items[${i}][quantity]`] = String(l.qty);
     f[`line_items[${i}][price_data][currency]`] = "usd";
     f[`line_items[${i}][price_data][unit_amount]`] = String(l.cents);
-    f[`line_items[${i}][price_data][product_data][name]`] = ITEMS[l.item].name;
+    f[`line_items[${i}][price_data][product_data][name]`] = nameOf(l.item);
   });
   return stripe("checkout/sessions", f) as Promise<{ id: string; url: string }>;
 }

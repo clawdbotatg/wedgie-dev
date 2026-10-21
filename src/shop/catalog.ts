@@ -1,14 +1,16 @@
 // What the shop sells. Read by the order page and by the server (api/), so a price lives in one place.
-// Prices are US dollars in cents, shipping included (US only: Ground Advantage is ~$6, international
-// is $16-30, over the $10 we'll eat; wedgie-shipping README).
+// Prices are US dollars in cents, US shipping included (Ground Advantage is ~$6). Outside the US: a flat ABROAD
+// per order (USPS international is $16-30; wedgie-shipping README). The buyer pays any import tax.
 export const ITEMS = {
   wedgie: { name: "wedgie", what: "Assembled: pico, screen, chip, and case. Plug it in and go.", cents: 6700 },
   kit: { name: "wedgie kit", what: "Every part and the case, with assembly instructions. You need wire cutters, tape, tweezers, and a USB data cable that fits your Pico (USB-C or micro USB, depending on the model).", cents: 5700 },
 } as const;
 export type Item = keyof typeof ITEMS;
-export type Cart = Record<Item, number>;
+export type Cart = Record<Item, number> & { abroad?: boolean };   // abroad: ships outside the US (only that bit, never the country)
 export const MAX_EACH = 3, MAX_BOXES = 3;   // per order, wedgies and kits together (one person can't hold all the stock)
-export const SHIPS = "Ships within a week, US only.";
+export const ABROAD = 2000;
+export const SHIPS = "Ships within a week.";
+export const ABROAD_NOTE = "Outside the US: $20 shipping. You pay any import tax when it arrives.";
 
 // The price follows demand: each box sold adds BUMP to the next one (wedgies and kits together). That extra
 // melts away evenly, all of it 24 hours after the last sale, so a quiet day is back at $67. Whole cents,
@@ -22,7 +24,8 @@ export function extraAt(sales: Sale[], now: number) {
   for (const s of [...sales].sort((a, b) => a.at - b.at)) { e = melt(s.at - t) + BUMP * s.n; t = s.at; }
   return melt(now - t);
 }
-export type Line = { item: Item; qty: number; cents: number };
+export type Line = { item: Item | "ship"; qty: number; cents: number };
+export const nameOf = (i: Line["item"]) => i === "ship" ? "Shipping outside the US" : ITEMS[i].name;
 export function cartLines(c: Cart, extra: number): Line[] {
   const lines: Line[] = [];
   let x = extra;
@@ -30,6 +33,7 @@ export function cartLines(c: Cart, extra: number): Line[] {
     const cents = ITEMS[k].cents + x, last = lines[lines.length - 1];
     if (last?.item === k && last.cents === cents) last.qty++; else lines.push({ item: k, qty: 1, cents });
   }
+  if (c.abroad) lines.push({ item: "ship", qty: 1, cents: ABROAD });
   return lines;
 }
 export const cartCents = (c: Cart, extra: number) => cartLines(c, extra).reduce((t, l) => t + l.qty * l.cents, 0);
@@ -37,6 +41,7 @@ export function cartOk(c: unknown): c is Cart {
   const o = c as Record<string, unknown>;
   if (!o || typeof o !== "object") return false;
   const ns = (Object.keys(ITEMS) as Item[]).map((k) => o[k]);
+  if (o.abroad !== undefined && typeof o.abroad !== "boolean") return false;
   return ns.every((n) => Number.isInteger(n) && (n as number) >= 0 && (n as number) <= MAX_EACH) && ns.some((n) => (n as number) > 0)
     && ns.reduce((t: number, n) => t + (n as number), 0) <= MAX_BOXES;
 }
@@ -57,5 +62,13 @@ export const PAY_CHAINS: Record<number, { name: string; usdc: string; scan: stri
 };
 
 // What the buyer types, sealed in their browser (seal.ts) before it leaves it.
-export type ShipTo = { name: string; line1: string; line2: string; city: string; state: string; zip: string; email: string };
+// country: ISO code; outside the US, state and zip are whatever the buyer types (province, postal code), plus a phone.
+export type ShipTo = { name: string; line1: string; line2: string; city: string; state: string; zip: string; country: string; phone: string; email: string };
 export const STATES = "AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY PR VI GU AS MP AA AE AP".split(" ");
+
+// Where we ship outside the US (ISO codes; the page shows each in the buyer's language). Left out: US embargoes and
+// export bans on electronics (Cuba, Iran, North Korea, Syria, Russia, Belarus) and places USPS doesn't take mail.
+export const COUNTRIES = ("AD AE AG AI AL AM AO AR AT AU AW AZ BA BB BD BE BF BG BH BJ BM BN BO BR BS BT BW BZ CA CH CI CL CM CN CO CR CV CW CY CZ "
+  + "DE DJ DK DM DO DZ EC EE EG ES ET FI FJ FO FR GA GB GD GE GH GI GL GM GN GR GT GY HK HN HR HU ID IE IL IN IS IT JM JO JP KE KG KH KN KR KW KY KZ "
+  + "LA LB LC LI LK LS LT LU LV MA MC MD ME MG MK MN MO MT MU MV MW MX MY MZ NA NC NE NG NI NL NO NP NZ OM PA PE PF PG PH PK PL PT PY QA RO RS RW "
+  + "SA SC SE SG SI SK SL SM SN SR SV SZ TC TG TH TJ TN TO TR TT TW TZ UA UG UY UZ VC VG VN WS ZA ZM").split(" ");

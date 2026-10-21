@@ -119,7 +119,7 @@ export function home(main: HTMLElement): Promise<unknown> {
         <div class="row">
           <a class="btn btn-green" id="order-go" href="/order">Order</a>
         </div>
-        <p class="fine">Card or USDC. Ships within a week, US only.</p>
+        <p class="fine">Card or USDC. Ships within a week, worldwide.</p>
       </div>
     </div>
   </section>

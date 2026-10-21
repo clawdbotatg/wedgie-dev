@@ -36,7 +36,7 @@ async function create(sql: Awaited<ReturnType<typeof db>>, b: any, origin: strin
   if (!cartOk(b?.cart)) return oops("Pick what you'd like.");
   if (typeof b.sealed !== "string" || !/^v1\.[A-Za-z0-9_.-]{40,4000}$/.test(b.sealed)) return oops("The address didn't come through sealed.");
   if (typeof b.email !== "string" || b.email.length > 100 || !EMAIL.test(b.email.trim())) return oops("Fill in your email.");
-  const cart = { wedgie: b.cart.wedgie, kit: b.cart.kit };
+  const cart = { wedgie: b.cart.wedgie, kit: b.cart.kit, ...(b.cart.abroad ? { abroad: true } : {}) };
   await expireOld(sql);
   const many = await tooMany(sql, ip);
   if (many) return oops(many, 429);

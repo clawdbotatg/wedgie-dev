@@ -83,12 +83,16 @@ page.on("request", (r) => { if (r.url().includes("/api/")) sent.push(r.postData(
 const shot = (n) => out && page.screenshot({ path: `${out}/shop-${n}.png`, fullPage: true });
 
 const NAME = "Probe Buyer " + crypto.randomBytes(3).toString("hex"), STREET = "1600 Probe Street";
-async function newOrder(kits = 0) {
+async function newOrder(kits = 0, abroad = false) {
   await page.goto(SITE + "/order");
   await page.waitForFunction(() => !document.querySelector("#o-usdc").disabled);
   if (kits) await page.locator('[data-item=kit] [data-d="1"]').click();
   await page.fill("[name=name]", NAME); await page.fill("[name=line1]", STREET); await page.fill("[name=city]", "Testville");
-  await page.selectOption("[name=state]", "CO"); await page.fill("[name=zip]", "80202"); await page.fill("[name=email]", "probe@example.com");
+  if (abroad) {
+    await page.selectOption("[name=country]", "ES");
+    await page.fill("[name=region]", "Madrid"); await page.fill("[name=postal]", "28001"); await page.fill("[name=phone]", "+34 600 000 000");
+  } else { await page.selectOption("[name=state]", "CO"); await page.fill("[name=zip]", "80202"); }
+  await page.fill("[name=email]", "probe@example.com");
   await page.locator("#o-usdc").click();
   await page.waitForURL(/\/order\/[0-9a-f]{12}$/);
   await page.getByText("Copy amount").waitFor();
@@ -155,8 +159,16 @@ await rpc("anvil_mine", ["0x3"]);
 await page.getByText("Paid, thank you").waitFor({ timeout: 30000 });
 ok(true, "ETH sent instead of USDC: counted at the ETH price, paid");
 
-// 4: paid after the buyer left the page: the shipping computer's list finds it
-const third = await newOrder();
+// 4: paid after the buyer left the page: the shipping computer's list finds it. Shipped to Spain: +$20.
+await page.goto(SITE + "/order");
+await page.waitForFunction(() => !document.querySelector("#o-usdc").disabled);
+const usTotal = await page.locator("#o-total").innerText();
+await page.selectOption("[name=country]", "ES");
+const esTotal = await page.locator("#o-total").innerText();
+ok(Number(esTotal.slice(1)) - Number(usTotal.slice(1)) === 20 && await page.locator("[name=phone]").isVisible() && !(await page.locator("[name=state]").isVisible()),
+  `outside the US: $20 more (${usTotal} -> ${esTotal}), a phone, no US state`);
+const third = await newOrder(0, true);
+ok(await page.getByText("Shipping outside the US at $20").isVisible(), "the order shows the $20 shipping line");
 const dep3 = await page.locator("[data-copy]").nth(1).getAttribute("data-copy");
 const price3 = BigInt(Math.round(Number(await page.locator("[data-copy]").first().getAttribute("data-copy")) * 1e6));
 await page.goto("about:blank");
@@ -167,6 +179,7 @@ await rpc("anvil_mine", ["0x3"]);
 ok(await leftNow() === 3, `5 boxes paid: 3 left (${await leftNow()})`);
 const list = py("list");
 ok(list.includes(first) && list.includes(NAME) && list.includes("Testville, CO 80202") && list.includes(second) && list.includes(third), "orders.py list opens the paid orders' addresses, the one paid with the page closed too");
+ok(list.includes("ABROAD") && list.includes("Testville, Madrid 28001") && list.includes("   ES") && list.includes("phone: +34 600 000 000"), "orders.py list shows the abroad order's country and phone");
 py("ship", first, "9400100000000000000001");
 await page.goto(SITE + "/order/" + first);
 await page.getByText("Shipped.").waitFor();

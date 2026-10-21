@@ -20,7 +20,7 @@ const TERMS = `
 <p>We never see or keep your keys. We can't recover a lost key, a lost device, or lost funds, and we're not responsible for any transaction you sign.</p>
 
 <h2>Price and payment</h2>
-<p>The price moves with demand (shown on the order page). The price you see when you pay is the price you pay. Shipping is included. US only. Up to 3 per order.</p>
+<p>The price moves with demand (shown on the order page). The price you see when you pay is the price you pay. US shipping is included. Outside the US, shipping is $20 per order, and you pay any import tax or duty when it arrives. We don't ship to Cuba, Iran, North Korea, Syria, Russia or Belarus. Up to 3 per order.</p>
 <p>Card payments go through Stripe. A USDC order gets its own address: send USDC (or ETH) there on Ethereum, Base, Arbitrum, or Optimism, in one send or several, until it adds up to the price. Only native USDC counts, not bridged USDC (USDC.e, USDbC). A full payment that arrives after the price ran out still counts. If you send too much, write to us and we'll send the extra back.</p>
 
 <h2>Shipping</h2>

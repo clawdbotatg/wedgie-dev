@@ -1,6 +1,6 @@
 # The shop (/order)
 
-Sells assembled wedgies and kits, US only. Code: `src/pages/order.ts`, `src/shop/`, `api/`.
+Sells assembled wedgies and kits. US shipping included; outside the US +$20 per order (`ABROAD`, catalog.ts), buyer pays import tax. The server knows only that an order is abroad (`cart.abroad`), never the country: that's in the sealed address. Code: `src/pages/order.ts`, `src/shop/`, `api/`.
 Privacy rules (sealed address, hashed email): `CLAUDE.md`, "The shop".
 
 ## Who sells

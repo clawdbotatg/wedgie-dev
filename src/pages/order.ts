@@ -7,7 +7,7 @@
 // quotes it again at today's price.
 // An order's token (its proof you made it) stays in this browser and in the link we show; the server keeps
 // only its hash. api/order.ts is the other side.
-import { ITEMS, MAX_EACH, MAX_BOXES, SHIPS, STATES, PAY_CHAINS, SHOP_ENS, cartLines, cartCents, type Cart, type Item, type ShipTo } from "../shop/catalog";
+import { ITEMS, MAX_EACH, MAX_BOXES, SHIPS, ABROAD_NOTE, STATES, COUNTRIES, PAY_CHAINS, SHOP_ENS, cartLines, cartCents, nameOf, type Cart, type Item, type ShipTo } from "../shop/catalog";
 import qrcode from "qrcode-generator";
 import { WHY, STAR, wire } from "../shop/why";
 import { seal, SEAL_KEY } from "../shop/seal";
@@ -19,6 +19,7 @@ const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&
 const usd = (cents: number) => "$" + (cents / 100).toFixed(cents % 100 ? 2 : 0);
 const clock = (ms: number) => { const t = Math.ceil(ms / 1000); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`; };
 const usdc = (u: string) => { const n = BigInt(u); return `${n / 1_000_000n}.${(n % 1_000_000n).toString().padStart(6, "0").replace(/0{1,4}$/, "")}`; };   // 20.00, 60.487806
+const place = (c: string) => { try { return new Intl.DisplayNames(undefined, { type: "region" }).of(c) || c; } catch { return c; } };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const msgOf = (e: any) => e?.message || String(e);
 const eth = () => (window as any).ethereum;
@@ -139,7 +140,7 @@ async function list(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
   };
   yours.forEach(([i, o]) => api({ id: i, token: o.token }).then((v: View) => {
     const row = box.querySelector<HTMLElement>(`[data-id="${i}"]`)!;
-    const items = v.lines ? v.lines.map((l) => `${l.qty} × ${ITEMS[l.item].name}`).join(", ") : "";
+    const items = v.lines ? v.lines.map((l) => `${l.qty} × ${nameOf(l.item)}`).join(", ") : "";
     row.querySelector(".o-what")!.textContent = `${items} · ${usd(v.cents)}${o.at ? " · " + new Date(o.at).toLocaleDateString() : ""}`;
     row.querySelector(".o-st")!.textContent = v.delivered_at ? "Delivered" : v.moving_at ? "On the way" : STATUS[v.status] || v.status;
     row.classList.add("st-" + v.status);
@@ -160,6 +161,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
           <div class="qty"><button class="btn btn-sm" data-d="-1" aria-label="fewer">−</button><b class="n"></b><button class="btn btn-sm" data-d="1" aria-label="more">+</button></div>
         </div>`).join("")}
       <p class="order-total"><b id="o-total"></b> <span class="fine">shipped. ${esc(SHIPS)}</span></p>
+      <p class="fine">${esc(ABROAD_NOTE)}</p>
       <p class="fine" id="o-lines" hidden></p>
       ${WHY}
     </div>
@@ -168,12 +170,16 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
       <p class="fine">Your address is locked right here in your browser with a key only our shipping computer has.
         Our server, the card processor and the blockchain never see it, and we delete it once the box is in the mail.</p>
       <form class="order-fields" id="o-addr" autocomplete="on">
+        <label class="wide">Country <select name="country" autocomplete="shipping country"><option value="US">United States</option>${COUNTRIES.map((c) => [c, place(c)]).sort((a, b) => a[1].localeCompare(b[1])).map(([c, n]) => `<option value="${c}">${esc(n)}</option>`).join("")}</select></label>
         <label class="wide">Name <input name="name" autocomplete="shipping name" maxlength="80"></label>
         <label class="wide">Address <input name="line1" autocomplete="shipping address-line1" maxlength="100"></label>
         <label class="wide">Apt, suite <span class="fine">(optional)</span> <input name="line2" autocomplete="shipping address-line2" maxlength="100"></label>
         <label>City <input name="city" autocomplete="shipping address-level2" maxlength="60"></label>
-        <label>State <select name="state" autocomplete="shipping address-level1"><option value=""></option>${STATES.map((s) => `<option>${s}</option>`).join("")}</select></label>
-        <label>ZIP <input name="zip" autocomplete="shipping postal-code" inputmode="numeric" maxlength="10"></label>
+        <label class="us">State <select name="state" autocomplete="shipping address-level1"><option value=""></option>${STATES.map((s) => `<option>${s}</option>`).join("")}</select></label>
+        <label class="us">ZIP <input name="zip" autocomplete="shipping postal-code" inputmode="numeric" maxlength="10"></label>
+        <label class="abroad" hidden>State, province <span class="fine">(if any)</span> <input name="region" autocomplete="shipping address-level1" maxlength="60"></label>
+        <label class="abroad" hidden>Postal code <input name="postal" autocomplete="shipping postal-code" maxlength="12"></label>
+        <label class="wide abroad" hidden>Phone <span class="fine">(for customs and the courier)</span> <input name="phone" type="tel" autocomplete="tel" maxlength="30"></label>
         <label class="wide">Email <span class="fine">${session() ? "(signed in)" : "(for the tracking number; never shared)"}</span> <input name="email" type="email" autocomplete="email" maxlength="100" value="${esc(lastEmail())}"${session() && lastEmail() ? " readonly" : ""}></label>
       </form>
     </div>
@@ -199,7 +205,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
     box.querySelector("#o-total")!.textContent = usd(cartCents(cart, extra));
     const lines = cartLines(cart, extra), el = box.querySelector<HTMLElement>("#o-lines")!;
     el.hidden = lines.length < 2;
-    el.textContent = lines.map((x) => `${x.qty} × ${ITEMS[x.item].name} at ${usd(x.cents)}`).join(" + ");
+    el.textContent = lines.map((x) => `${x.qty} × ${nameOf(x.item)} at ${usd(x.cents)}`).join(" + ");
   };
   box.querySelectorAll<HTMLElement>(".order-line").forEach((l) => l.querySelectorAll<HTMLButtonElement>("button").forEach((b) => (b.onclick = () => {
     const k = l.dataset.item as Item, d = Number(b.dataset.d);
@@ -216,6 +222,17 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
   const addr = box.querySelector<HTMLFormElement>("#o-addr")!;
   addr.onsubmit = (e) => e.preventDefault();
   addr.addEventListener("input", () => count("form"));
+  // Outside the US: province and postal code instead of state and ZIP, a phone, and the shipping line in the price.
+  const country = addr.querySelector<HTMLSelectElement>("[name=country]")!;
+  const where = () => {
+    const abroad = country.value !== "US";
+    addr.querySelectorAll<HTMLElement>(".us").forEach((e) => (e.hidden = abroad));
+    addr.querySelectorAll<HTMLElement>(".abroad").forEach((e) => (e.hidden = !abroad));
+    if (abroad) cart.abroad = true; else delete cart.abroad;
+    paint();
+  };
+  country.addEventListener("change", where);
+  where();
   const card = box.querySelector<HTMLButtonElement>("#o-card")!, crypto = box.querySelector<HTMLButtonElement>("#o-usdc")!;
   const openEl = box.querySelector<HTMLElement>("#o-open")!;
   let shop: { card: boolean; usdc: boolean } = { card: false, usdc: false };
@@ -231,9 +248,12 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
 
   const shipTo = (): ShipTo | null => {
     const v = (n: string) => (box.querySelector<HTMLInputElement>(`[name=${n}]`)!.value || "").trim();
-    const s: ShipTo = { name: v("name"), line1: v("line1"), line2: v("line2"), city: v("city"), state: v("state"), zip: v("zip"), email: v("email") };
-    const bad = !s.name ? "your name" : !s.line1 ? "your street address" : !s.city ? "your city" : !STATES.includes(s.state) ? "your state"
-      : !/^\d{5}(-\d{4})?$/.test(s.zip) ? "a 5-digit ZIP" : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.email) ? "your email" : "";
+    const c = country.value, us = c === "US";
+    const s: ShipTo = { name: v("name"), line1: v("line1"), line2: v("line2"), city: v("city"), state: v(us ? "state" : "region"), zip: v(us ? "zip" : "postal"),
+      country: c, phone: us ? "" : v("phone"), email: v("email") };
+    const bad = !s.name ? "your name" : !s.line1 ? "your street address" : !s.city ? "your city"
+      : us && !STATES.includes(s.state) ? "your state" : us && !/^\d{5}(-\d{4})?$/.test(s.zip) ? "a 5-digit ZIP"
+      : !us && !/\d{6,}/.test(s.phone.replace(/\D/g, "")) ? "your phone" : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.email) ? "your email" : "";
     if (bad) { say(`Fill in ${bad}.`, true); return null; }
     if (!cartCents(cart, extra)) { say("Pick at least one.", true); return null; }
     return s;
@@ -260,7 +280,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
 
 // ---- one order ----
 const WHYNOT = [["price", "Price"], ["time", "Ran out of time"], ["pay", "Couldn't pay"], ["looking", "Just looking"]];
-type View = { id: string; cart: Cart; lines: { item: Item; qty: number; cents: number }[] | null; cents: number; pay: string; status: string; chain: number | null; usdc: string | null; payTo?: string;
+type View = { id: string; cart: Cart; lines: { item: Item | "ship"; qty: number; cents: number }[] | null; cents: number; pay: string; status: string; chain: number | null; usdc: string | null; payTo?: string;
   tracking: string | null; url?: string; why?: string; left?: number; got?: string; checking?: boolean;
   created: string; paid_at: string | null; shipped_at: string | null; moving_at?: string | null; delivered_at?: string | null };
 
@@ -291,7 +311,7 @@ function status(id: string, box: HTMLElement, say: (s: string, bad?: boolean) =>
     if (now === shown) return;     // polling: don't wipe a half-pasted transaction hash
     shown = now;
     const c = v.chain ? PAY_CHAINS[v.chain] : null;
-    const items = v.lines ? v.lines.map((l) => `${l.qty} × ${esc(ITEMS[l.item].name)} at ${usd(l.cents)}`).join(", ")
+    const items = v.lines ? v.lines.map((l) => `${l.qty} × ${esc(nameOf(l.item))} at ${usd(l.cents)}`).join(", ")
       : (Object.keys(ITEMS) as Item[]).filter((k) => v!.cart[k]).map((k) => `${v!.cart[k]} × ${esc(ITEMS[k].name)}`).join(", ");
     let h = `<div class="safe-box recess"><h2>Order ${esc(v.id)}</h2><p>${items} · <b>${usd(v.cents)}</b> shipped</p>`;
     if (v.status === "new" && v.pay === "card") h += `<p>Not paid yet. This price holds for <b class="o-left"></b>.</p>${v.url ? `<p><a class="btn" href="${esc(v.url)}">Pay by card</a></p>` : ""}`;

@@ -822,6 +822,7 @@ body.sx-sheet-open #s-msg { display: none; }
 .order-fields { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px 12px; }
 .order-fields label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; font-weight: 700; }
 .order-fields label.wide { grid-column: 1 / -1; }
+.order-fields label[hidden] { display: none; }
 .order-fields input, .order-fields select { font: inherit; font-size: 16px; padding: 8px 10px; border: 1px solid #cfcfca; border-radius: 10px; background: #fff; min-width: 0; }
 .order-fields .fine { font-weight: 400; }
 @media (max-width: 560px) { .order-fields { grid-template-columns: 1fr 1fr; } .order-fields label:nth-of-type(4) { grid-column: 1 / -1; } }
