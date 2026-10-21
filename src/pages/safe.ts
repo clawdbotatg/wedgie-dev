@@ -598,7 +598,9 @@ export function safe(main: HTMLElement) {
           : `<span class="fine">Couldn't read it just now. Open it, or Refresh.</span>`}
         <span class="sx-chains sx-chains-sm">${chains.map((t) => `<span class="sx-pill${CHAINS[t].test ? " sx-test" : ""}">${chainLogo(t)}${esc(CHAINS[t].name)}</span>`).join("")}</span></a></li>`;
     };
-    const all = groups(rows), mine = all.filter((g) => g.some((r) => r.wedgie)), theirs = all.filter((g) => !g.some((r) => r.wedgie));
+    // most money first (a Safe that couldn't be priced yet: after the ones that could)
+    const sum = (g: Row[]) => g.reduce((n, r) => n + (r.info ? worthUsd(r.chain, r.info) ?? 0 : 0), 0);
+    const all = groups(rows).sort((x, y) => sum(y) - sum(x)), mine = all.filter((g) => g.some((r) => r.wedgie)), theirs = all.filter((g) => !g.some((r) => r.wedgie));
     let h = `<div class="sx-head"><h1>Your wedgie's Safes</h1><button class="btn btn-green" id="l-new"${dis()}>＋ New Safe</button></div>`;
     h += mine.length ? `<ul class="sx-safes">${mine.map(card).join("")}</ul>`
       : listing ? ``
