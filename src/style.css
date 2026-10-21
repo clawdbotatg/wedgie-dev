@@ -689,6 +689,8 @@ body.dock-running #s-msg { display: none; }
 .sx-foot { display: flex; justify-content: flex-end; margin: 10px 0 0 !important; }
 .sx-label { font-size: 13px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin: 16px 0 6px !important; }
 .sx-pill { display: inline-flex; align-items: center; height: 26px; padding: 0 11px; border-radius: 999px; background: #eef0ec; color: var(--ink); font-size: 13px; font-weight: 800; text-decoration: none; white-space: nowrap; }
+.sx-chain-img { width: 16px; height: 16px; border-radius: 50%; margin-right: 6px; flex-shrink: 0; object-fit: cover; vertical-align: -3px; }
+.sx-tok-img { object-fit: cover; background: #fff; }
 .sx-pill.sx-test { background: #fdf0d5; }
 .sx-count { display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 7px; box-sizing: border-box; border-radius: 999px; background: var(--ink); color: #fff; font-size: 13px; }
 .sx-wide { width: 100%; }

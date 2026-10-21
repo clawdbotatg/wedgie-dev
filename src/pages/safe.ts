@@ -36,14 +36,15 @@ const msgOf = (e: any) => e?.message || String(e);
 
 // Every one has the P-256 precompile the wedgie's signer contract uses. key = Safe's short name (its API, app.safe.global).
 // rpc: only handed to a wallet that adds the chain; the page's own reads go through /api/rpc (readUrl)
-type Chain = { name: string; key: string; rpc: string; scan: string; usdc?: string; test?: boolean };
+type Chain = { name: string; key: string; logo?: string; rpc: string; scan: string; usdc?: string; test?: boolean };
+const chainLogo = (t: number) => CHAINS[t]?.logo ? `<img class="sx-chain-img" src="${CHAINS[t].logo}" alt="">` : "";
 const CHAINS: Record<number, Chain> = {
-  8453: { name: "Base", key: "base", rpc: "https://mainnet.base.org", scan: "https://basescan.org", usdc: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" },
-  1: { name: "Ethereum", key: "eth", rpc: "https://ethereum-rpc.publicnode.com", scan: "https://etherscan.io", usdc: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48" },
-  10: { name: "Optimism", key: "oeth", rpc: "https://mainnet.optimism.io", scan: "https://optimistic.etherscan.io", usdc: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85" },
-  42161: { name: "Arbitrum", key: "arb1", rpc: "https://arb1.arbitrum.io/rpc", scan: "https://arbiscan.io", usdc: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831" },
-  84532: { name: "Base Sepolia", key: "basesep", rpc: "https://sepolia.base.org", scan: "https://sepolia.basescan.org", usdc: "0x036CbD53842c5426634e7929541eC2318f3dCF7e", test: true },
-  11155111: { name: "Sepolia", key: "sep", rpc: "https://ethereum-sepolia-rpc.publicnode.com", scan: "https://sepolia.etherscan.io", usdc: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238", test: true },
+  8453: { name: "Base", key: "base", logo: "/img/chains/base.webp", rpc: "https://mainnet.base.org", scan: "https://basescan.org", usdc: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" },
+  1: { name: "Ethereum", key: "eth", logo: "/img/chains/ethereum.webp", rpc: "https://ethereum-rpc.publicnode.com", scan: "https://etherscan.io", usdc: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48" },
+  10: { name: "Optimism", key: "oeth", logo: "/img/chains/optimism.svg", rpc: "https://mainnet.optimism.io", scan: "https://optimistic.etherscan.io", usdc: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85" },
+  42161: { name: "Arbitrum", key: "arb1", logo: "/img/chains/arbitrum.svg", rpc: "https://arb1.arbitrum.io/rpc", scan: "https://arbiscan.io", usdc: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831" },
+  84532: { name: "Base Sepolia", key: "basesep", logo: "/img/chains/base.webp", rpc: "https://sepolia.base.org", scan: "https://sepolia.basescan.org", usdc: "0x036CbD53842c5426634e7929541eC2318f3dCF7e", test: true },
+  11155111: { name: "Sepolia", key: "sep", logo: "/img/chains/ethereum.webp", rpc: "https://ethereum-sepolia-rpc.publicnode.com", scan: "https://sepolia.etherscan.io", usdc: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238", test: true },
 };
 const api = (chain: number) => `https://api.safe.global/tx-service/${CHAINS[chain].key}/api/v1`;
 // The queue lives in three places, so a slow or down Safe Transaction Service doesn't stop a Safe: Safe's API,
@@ -261,7 +262,8 @@ export function safe(main: HTMLElement) {
     return s < 90 ? "just now" : s < 5400 ? `${Math.round(s / 60)} min ago` : s < 129600 ? `${Math.round(s / 3600)} h ago`
       : new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: s > 3e7 ? "numeric" : undefined });
   };
-  const tokenBadge = (sym: string) => {
+  const tokenBadge = (sym: string, logo?: string | null) => {
+    if (logo) return `<img class="sx-tok sx-tok-img" src="${esc(logo)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'sx-tok',textContent:${esc(JSON.stringify(sym.slice(0, 1).toUpperCase()))}}))">`;
     let h = 0; for (const ch of sym) h = (h * 31 + ch.charCodeAt(0)) % 360;
     return `<span class="sx-tok" style="--h:${h}">${esc(sym.slice(0, 1).toUpperCase())}</span>`;
   };
@@ -501,7 +503,7 @@ export function safe(main: HTMLElement) {
     const card = (r: Row) => {
       const i = r.info;
       return `<li><a class="safe-row sx-safe${r.wedgie ? " sx-mine" : ""}" data-nav href="${route(r.chain, r.addr)}">
-        <span class="sx-safe-top">${i && isIW(i.owners) ? iwMark : ""}${address(r.addr, { chain: r.chain })}<span class="sx-pill${CHAINS[r.chain].test ? " sx-test" : ""}">${esc(CHAINS[r.chain].name)}</span></span>
+        <span class="sx-safe-top">${i && isIW(i.owners) ? iwMark : ""}${address(r.addr, { chain: r.chain })}<span class="sx-pill${CHAINS[r.chain].test ? " sx-test" : ""}">${chainLogo(r.chain)}${esc(CHAINS[r.chain].name)}</span></span>
         ${i ? `<span class="sx-safe-worth">${esc(worth(r.chain, i))}</span><span class="fine">${i.threshold} of ${plural(i.owners.length, "owner")}${r.wedgie ? "" : " · add your wedgie"}</span>`
           : `<span class="fine">Couldn't read it just now. Open it, or Refresh.</span>`}</a></li>`;
     };
@@ -615,8 +617,8 @@ export function safe(main: HTMLElement) {
     let h = `<div class="sx-hero-top">${sub === "settings" ? `<a class="sx-back" data-nav href="${home}">← Back</a>` : `<a class="sx-back" data-nav href="/safe">← Safes</a>`}
       ${sub === "home" ? `<a class="sx-gear" id="a-settings" data-nav href="${home}/settings">Settings</a>` : ""}</div>
       <div class="sx-hero-id">${i && isIW(i.owners) ? iwMark : ""}${address(safeAddr, { size: "lg", chain })}</div>
-      <div class="sx-chains">${on.map((t) => t === chain ? `<span class="sx-pill sx-on">${esc(c.name)}</span>`
-        : `<a class="sx-pill" data-nav href="${route(t, safeAddr)}${sub === "settings" ? "/settings" : ""}">${esc(CHAINS[t].name)}</a>`).join("")}</div>`;
+      <div class="sx-chains">${on.map((t) => t === chain ? `<span class="sx-pill sx-on">${chainLogo(t)}${esc(c.name)}</span>`
+        : `<a class="sx-pill" data-nav href="${route(t, safeAddr)}${sub === "settings" ? "/settings" : ""}">${chainLogo(t)}${esc(CHAINS[t].name)}</a>`).join("")}</div>`;
     if (sub === "settings") h += `<div class="sx-total sx-total-sm">Settings</div><div class="sx-sub">${esc(who)}</div>`;
     else {
       h += `<div class="sx-total">${i ? esc(worthOf) : "&nbsp;"}</div><div class="sx-sub">${i ? esc(who) : "Opening the Safe"}</div>`;
@@ -653,7 +655,7 @@ export function safe(main: HTMLElement) {
     const others = Object.keys(CHAINS).map(Number).filter((t) => t !== chain);
     const differs = recipe && recipe.owners.length && (recipe.threshold !== i.threshold || recipe.owners.length !== i.owners.length || recipe.owners.some((o) => !i.owners.some((x) => eqA(x, o))));
     box.innerHTML = `<h3>Other chains</h3><p class="fine">Same address on every chain.</p>
-      <ul class="sx-rows">${others.map((t) => `<li><span>${esc(CHAINS[t].name)}${CHAINS[t].test ? ` <span class="fine">test</span>` : ""}</span>${copies[t]
+      <ul class="sx-rows">${others.map((t) => `<li><span>${chainLogo(t)}${esc(CHAINS[t].name)}${CHAINS[t].test ? ` <span class="fine">test</span>` : ""}</span>${copies[t]
         ? `<a class="btn btn-sm sx-end" data-nav href="${route(t, safeAddr)}">Open</a>`
         : copies[t] === false ? `<button class="btn btn-sm sx-end" data-copy="${t}"${dis()}>Deploy</button>` : `<span class="fine sx-end">checking</span>`}</li>`).join("")}</ul>
       ${differs ? `<p class="fine">A new copy starts with this Safe's first owners (${recipe!.threshold} of ${recipe!.owners.length}), not today's.</p>` : ""}
@@ -942,7 +944,7 @@ export function safe(main: HTMLElement) {
     box.hidden = !(safeAddr && info && sub === "home");
     if (box.hidden) return;
     const list = assets || [{ token: null, symbol: "ETH", name: "Ether", decimals: 18, balance: info!.balance, usd: null, price: null } as Asset];
-    const row = (a: Asset) => `<li><button class="sx-asset" type="button" data-tok="${a.token || ""}"${can() ? "" : " disabled"}>${tokenBadge(a.symbol)}
+    const row = (a: Asset) => `<li><button class="sx-asset" type="button" data-tok="${a.token || ""}"${can() ? "" : " disabled"}>${tokenBadge(a.symbol, a.logo)}
       <span class="sx-asset-name"><b>${esc(a.symbol)}</b><span class="fine">${esc(a.name)}</span></span>
       <span class="sx-asset-amt">${a.usd !== null ? `<b>${esc(usd(a.usd))}</b><span class="fine">${esc(E.fmt(a.balance, a.decimals, 4))} ${esc(a.symbol)}</span>` : `<b>${esc(E.fmt(a.balance, a.decimals, 4))}</b>`}</span></button></li>`;
     const priced = list.filter((a) => a.token === null || a.price !== null), other = list.filter((a) => a.token !== null && a.price === null);
@@ -1088,8 +1090,8 @@ export function safe(main: HTMLElement) {
   }
 
   // ---- Send (a sheet): a token, an amount, who to; the review says it in words before anyone signs ----
-  const sendList = (): Asset[] => assets || [{ token: null, symbol: "ETH", name: "Ether", decimals: 18, balance: info?.balance || 0n, usd: null, price: null },
-    ...(CHAINS[chain].usdc && info?.usdc !== null ? [{ token: CHAINS[chain].usdc!, symbol: "USDC", name: "USD Coin", decimals: 6, balance: info!.usdc!, usd: null, price: null }] : [])];
+  const sendList = (): Asset[] => assets || [{ token: null, symbol: "ETH", name: "Ether", decimals: 18, balance: info?.balance || 0n, usd: null, price: null, logo: null },
+    ...(CHAINS[chain].usdc && info?.usdc !== null ? [{ token: CHAINS[chain].usdc!, symbol: "USDC", name: "USD Coin", decimals: 6, balance: info!.usdc!, usd: null, price: null, logo: null }] : [])];
   const picked = () => { const v = (document.getElementById("n-tok") as HTMLSelectElement | null)?.value || ""; return sendList().find((a) => (a.token || "") === v) || sendList()[0]; };
   function paintNew() {
     const box = $("s-new");
