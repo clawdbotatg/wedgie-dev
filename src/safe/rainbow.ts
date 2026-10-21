@@ -70,7 +70,7 @@ function mount() {
   if (mounted) return;
   mounted = true;
   const el = document.body.appendChild(document.createElement("div"));
-  createRoot(el).render(h(WagmiProvider, { config },
+  createRoot(el).render(h(WagmiProvider, { config, reconnectOnMount: false },   // start() reconnects, only when wanted
     h(QueryClientProvider, { client: new QueryClient() },
       h(RainbowKitProvider, { theme: lightTheme({ accentColor: "#2e9e4f" }), modalSize: "compact", children: h(Bridge) }))));
 }
@@ -83,16 +83,16 @@ export async function start(cb: (p: any | null) => void) {
   cb(getAccount(config).isConnected ? await provider() : null);
 }
 
-/** Open RainbowKit's modal; resolves with the provider once a wallet is connected. */
+/** Open RainbowKit's modal; resolves with the provider once a wallet is connected. Always the picker (you chose to
+ * connect: you choose the wallet; the last one used is on top), never a silent reconnect to the remembered one. */
 export async function connect(): Promise<any> {
   mount();
-  if (getAccount(config).isConnected) {
-    const p = await provider();
-    if (p) return p;
-    await wDisconnect(config).catch(() => {});     // connected on paper, no wallet behind it: pick again
-  }
+  // a remembered connection (wagmi.store) being restored keeps RainbowKit's openConnectModal undefined: the click
+  // did nothing (Austin, 10-21). Drop it first, then wait for the modal to be openable.
+  await wDisconnect(config).catch(() => {});
   for (let i = 0; !open && i < 50; i++) await new Promise((r) => setTimeout(r, 100));
-  return new Promise((res, rej) => { waiting = { res, rej }; open?.(); });
+  if (!open) throw new Error("The wallet list didn't open. Reload and try again.");
+  return new Promise((res, rej) => { waiting = { res, rej }; open!(); });
 }
 
 export const disconnect = () => { try { localStorage.removeItem(LINK + ".late"); } catch {} return wDisconnect(config).catch(() => {}); };
