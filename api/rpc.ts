@@ -3,6 +3,7 @@
 // wedgie_prices [token addresses]: {eth, tokens: {address: usd}, logos: {address: url}} from Alchemy's prices API
 // (mainnets only); eth is the chain's own coin (ETH, POL, …). DexScreener fills the long tail, as in Instant Wallet:
 // a price Alchemy doesn't have, and a logo (Alchemy has none for most small tokens).
+// Morpho vault shares: Morpho's API (no DEX has them).
 import { env, json, oops, crossSite, db, ipOf } from "./_shop.js";
 
 export const HOSTS: Record<number, string> = { 1: "eth-mainnet", 8453: "base-mainnet", 10: "opt-mainnet", 42161: "arb-mainnet",
@@ -61,8 +62,28 @@ async function pricesNow(chain: number, host: string, tokens: unknown[]) {
       if (!out.tokens[a] && v > 0) out.tokens[a] = v;
     }
   }
+  await morpho(chain, all.filter((a) => !out.tokens[a]), out.tokens);
   for (const a of all) { const l = logo(chain + ":" + a); if (l) out.logos[a] = l; }
   return out;
+}
+
+/** Morpho vault shares (sirloinUSDC, …): no DEX trades them, so Morpho's API gives their price (a share's worth of
+ *  the asset) and the curator's logo. It lists only vaults Morpho's factories made: a spam token can't be one. */
+async function morpho(chain: number, ask: string[], tokens: Record<string, number>) {
+  if (!ask.length || !DEX[chain]) return;
+  const w = `(where: {address_in: ${JSON.stringify(ask)}, chainId_in: [${chain}]})`;
+  const r: any = await fetch("https://api.morpho.org/graphql", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query: `{ vaults${w} { items { address state { sharePriceUsd } metadata { image } } }
+      vaultV2s${w} { items { address sharePrice asset { price { usd } } metadata { image } } } }` }) })
+    .then((x) => (x.ok ? x.json() : null)).catch(() => null);
+  const got = [...(r?.data?.vaults?.items || []).map((v: any) => [v.address, Number(v.state?.sharePriceUsd), v.metadata?.image]),
+    ...(r?.data?.vaultV2s?.items || []).map((v: any) => [v.address, Number(v.sharePrice) * Number(v.asset?.price?.usd), v.metadata?.image])];
+  for (const [addr, v, img] of got) {
+    const a = String(addr).toLowerCase();
+    if (!ask.includes(a)) continue;
+    if (v > 0) tokens[a] = v;
+    if (typeof img === "string" && img.startsWith("https://")) LOGOS.set(chain + ":" + a, { at: Date.now(), v: img });
+  }
 }
 
 /** The Alchemy key: SHOP_RPC_1 is an Alchemy URL ending in /v2/<key>. */

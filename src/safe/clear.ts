@@ -20,7 +20,7 @@ function file(tag: string, chain: number, name: string) {
   return files.get(k)!;
 }
 
-/** The calls in a MultiSend batch (hex without 0x): operation, to, data each (describe.ts's unbatch, kept here so
+/** The calls in a MultiSend batch (its calldata, hex without 0x): operation, to, data each (describe.ts's unbatch, kept here so
  *  the chip test can load this file in Node). */
 function unbatch(hex: string) {
   const n = parseInt(hex.slice(72, 136), 16) * 2, p = hex.slice(136, 136 + n), out = [];
@@ -48,7 +48,7 @@ const head = (n: number) => n < 24 ? (0x80 + n).toString(16) : n < 256 ? "98" + 
 export async function bundle(tag: string, chain: number, t: { to: string; data?: string | null; operation?: number | string }) {
   const data = (t.data || "0x").slice(2).toLowerCase();
   const calls = +(t.operation || 0) === 1 && data.startsWith(MULTISEND)
-    ? unbatch(data.slice(8)).filter((c) => c.operation === 0)
+    ? unbatch(data).filter((c) => c.operation === 0)
     : [{ to: t.to, data }];
   const top: string[] = [], inner: string[] = [], seen = new Set<string>();
   for (const c of calls) {
