@@ -431,7 +431,7 @@ export function format(main: HTMLElement) {
       reset();
       const noMp = false;
       status("Can't talk to it", noMp ? "Something other than MicroPython is on it. Unplug it, hold BOOTSEL, plug it back in." : bad.error || "", "bad");
-      buttons(`<button class="btn" id="t-retry">Try again</button>`);
+      buttons(`<button class="btn btn-green" id="t-retry">Try again</button>`);
       $("t-retry").onclick = () => { tested.delete(bad.key); W.reidentify(bad); };
       return;
     }
@@ -451,14 +451,14 @@ export function format(main: HTMLElement) {
       : current ? `It has the latest firmware (${latest}). Test only checks the chip, shake, buttons and colors and changes nothing. Format and test wipes it and sets it up fresh first.`
       : "Test it wipes it, sets it up fresh, then tests it.");
     if (!document.getElementById("t-go") || !!document.getElementById("t-test") !== current)
-      buttons(current ? `<button class="btn btn-green" id="t-test">Test only</button><button class="btn" id="t-go">Format and test</button>`
+      buttons(current ? `<button class="btn" id="t-go">Format and test</button><button class="btn btn-green" id="t-test">Test only</button>`
         : `<button class="btn btn-green" id="t-go">Test it</button>`);
     $("t-go").onclick = () => { go = true; buttons(""); pick(); };
     if (current) $("t-test").onclick = () => { buttons(""); void run(w!, true); };
   }
   // Without the profile, the first sight of a unit needs a tap.
   function idle() {
-    buttons(`<button class="btn btn-green" id="t-used">Pick it</button><button class="btn" id="t-new">New Pico</button>
+    buttons(`<button class="btn" id="t-new">New Pico</button><button class="btn btn-green" id="t-used">Pick it</button>
       <p class="fine">Plugged in and nothing happens? Chrome needs a tap: Pick it for a wedgie, New Pico for a blank one.</p>`);
     $("t-new").onclick = () => { pickBoot().then(() => pick(), () => {}); };
     $("t-used").onclick = () => { W.connectNew().catch(() => {}); };

@@ -47,7 +47,7 @@ export function code(main: HTMLElement) {
     <div class="card code-prompt">
       <h3>1. Give this to your AI</h3>
       <div class="code-ask recess"><code>${esc(PROMPT)}</code><input id="c-idea" placeholder="a snake game" autocomplete="off" spellcheck="false"></div>
-      <div class="row"><button class="btn btn-green" id="c-copy">Copy</button><a class="btn" href="/code.md" target="_blank" rel="noopener">Read the skill</a></div>
+      <div class="row"><a class="btn" href="/code.md" target="_blank" rel="noopener">Read the skill</a><button class="btn btn-green" id="c-copy">Copy</button></div>
       <p class="fine">Claude Code, Codex, Cursor: anything that can read a web page and write files. It makes a folder with a <code>wedgie.json</code> and the game in it.</p>
     </div>
 
@@ -75,7 +75,7 @@ export function code(main: HTMLElement) {
             <h4>Saves <span class="fine">kept between runs; edit one to start anywhere</span></h4>
             <div id="c-save-list"></div>
             <textarea class="recess code-save-edit" id="c-save-edit" spellcheck="false" hidden></textarea>
-            <div class="row" id="c-save-btns" hidden><button class="btn btn-sm btn-green" id="c-save-put">Save and run again</button><button class="btn btn-sm" id="c-save-del">Delete</button></div>
+            <div class="row" id="c-save-btns" hidden><button class="btn btn-sm btn-red" id="c-save-del">Delete</button><button class="btn btn-sm btn-green" id="c-save-put">Save and run again</button></div>
           </div>
           <h4>Output</h4>
           <pre class="recess out code-out" id="c-out"></pre>

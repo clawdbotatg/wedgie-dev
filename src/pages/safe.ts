@@ -1306,7 +1306,7 @@ export function safe(main: HTMLElement) {
     const th = $("ow-th") as HTMLSelectElement, keep = +th.value || i.threshold;
     th.innerHTML = threshOpts(i.owners.length + 1, Math.min(keep, i.owners.length + 1));
     $("ow-of").textContent = `of ${i.owners.length + 1} owners`;
-    $("ow-btns").innerHTML = `${isOwner(account) ? `<button class="btn" id="ow-wallet"${dis()}>Sign with wallet</button>` : ""}${wedgieOwns() ? `<button class="btn btn-green sx-end" id="ow-wedgie"${dis()}>Sign with wedgie</button>` : ""}`;   // primary on the right
+    $("ow-btns").innerHTML = `${isOwner(account) ? `<button class="btn${wedgieOwns() ? "" : " btn-green sx-end"}" id="ow-wallet"${dis()}>Sign with wallet</button>` : ""}${wedgieOwns() ? `<button class="btn btn-green sx-end" id="ow-wedgie"${dis()}>Sign with wedgie</button>` : ""}`;   // primary on the right
     $("ow-wedgie")?.addEventListener("click", () => job(() => addOwner("wedgie")));
     $("ow-wallet")?.addEventListener("click", () => job(() => addOwner("wallet")));
   }
@@ -1690,7 +1690,7 @@ export function safe(main: HTMLElement) {
     sendToken = null;
     sel.innerHTML = sendList().map((a) => `<option value="${a.token || ""}"${(a.token || "") === keep ? " selected" : ""}>${esc(a.symbol)}</option>`).join("");
     paintTok();
-    $("n-btns").innerHTML = `${isOwner(account) ? `<button class="btn" id="n-wallet"${dis()}>Sign with wallet</button>` : ""}${wedgieOwns() ? `<button class="btn btn-green sx-end" id="n-wedgie"${dis()}>Sign with wedgie</button>` : ""}`;   // primary on the right
+    $("n-btns").innerHTML = `${isOwner(account) ? `<button class="btn${wedgieOwns() ? "" : " btn-green sx-end"}" id="n-wallet"${dis()}>Sign with wallet</button>` : ""}${wedgieOwns() ? `<button class="btn btn-green sx-end" id="n-wedgie"${dis()}>Sign with wedgie</button>` : ""}`;   // primary on the right
     $("n-wedgie")?.addEventListener("click", () => job(() => newTx("wedgie")));
     $("n-wallet")?.addEventListener("click", () => job(() => newTx("wallet")));
     review();
