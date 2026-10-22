@@ -1331,11 +1331,11 @@ export function safe(main: HTMLElement) {
       if (account && isOwner(account)) signed(t, account) ? marks.push("wallet ✓")
         : n < need && (btns.push(`<button class="btn btn-sm${green ? " btn-green" : ""}" data-wsign="${k}"${dis()}>Sign with wallet</button>`), green = false);
       if (n >= need) btns.push(first ? `<button class="btn btn-sm ${run.length > 1 ? "btn-grey" : "btn-green"}" data-exec="${k}"${dis()}>Execute</button>` : `<span class="fine">runs after #${i.nonce}</span>`);
-      const rej = t.wc && !n ? `<button class="btn btn-sm" data-wcno="${k}"${dis()}>Reject</button>`      // only here: nothing to cancel
+      const rej = t.wc && !n ? `<button class="btn btn-sm btn-grey" data-wcno="${k}"${dis()}>Reject</button>`      // only here: nothing to cancel
         // Remove (red) far left, then Reject (Austin). Remove only where it can work: Safe's service deletes only for
         // the wallet that proposed it (a wedgie can't sign that)
         : (account && isOwner(account) && (!t.inSafe || (t.proposer && eqA(t.proposer, account))) ? `<button class="btn btn-sm btn-red" data-remove="${k}"${dis()}>Remove</button> ` : "")
-        + (can() && s.kind !== "cancel" && !cancelled(+t.nonce) ? `<button class="btn btn-sm" data-reject="${k}"${dis()}>Reject</button>` : "");
+        + (can() && s.kind !== "cancel" && !cancelled(+t.nonce) ? `<button class="btn btn-sm btn-grey" data-reject="${k}"${dis()}>Reject</button>` : "");
       const dots = Array.from({ length: need }, (_, d) => `<i class="${d < n ? "on" : ""}"></i>`).join("");
       return `<li class="sx-tx sx-k-${s.kind}">
         <div class="sx-tx-head"><span class="sx-ic">${ICON[s.kind]}</span><span class="sx-tx-what">${s.title}</span><span class="sx-tx-n">#${esc(t.nonce)}</span></div>
