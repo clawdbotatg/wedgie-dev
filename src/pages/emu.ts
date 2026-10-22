@@ -18,6 +18,27 @@ const KEYMAP: Record<string, string> = {
 };
 const MIN_HOLD = 250;                   // ms: a click is a real press, long enough for any app's poll
 
+// ---- Screenshot: the screen at 3x into one folder, picked once (kept in IndexedDB; Chrome asks again only
+// if it forgets the permission). No folder API (Safari, Firefox): a download instead.
+function shotDb<T>(fn: (s: IDBObjectStore) => IDBRequest<T>, mode: IDBTransactionMode = "readonly") {
+  return new Promise<T | undefined>((res) => {
+    const o = indexedDB.open("wedgie-emu-shots", 1);
+    o.onupgradeneeded = () => o.result.createObjectStore("kv");
+    o.onsuccess = () => { const r = fn(o.result.transaction("kv", mode).objectStore("kv")); r.onsuccess = () => res(r.result); r.onerror = () => res(undefined); };
+    o.onerror = () => res(undefined);
+  });
+}
+async function shotFolder(): Promise<FileSystemDirectoryHandle | null> {
+  if (!("showDirectoryPicker" in window)) return null;
+  let dir = (await shotDb((s) => s.get("dir"))) as FileSystemDirectoryHandle | undefined;
+  if (dir && (await (dir as any).requestPermission({ mode: "readwrite" })) !== "granted") dir = undefined;
+  if (!dir) {
+    dir = await (window as any).showDirectoryPicker({ id: "wedgie-shots", mode: "readwrite" }) as FileSystemDirectoryHandle;
+    await shotDb((s) => s.put(dir, "dir"), "readwrite");
+  }
+  return dir;
+}
+
 export function emu(main: HTMLElement) {
   main.innerHTML = `
   <section class="emu">
@@ -25,6 +46,7 @@ export function emu(main: HTMLElement) {
     <div class="emu-status" id="emu-status">Starting…</div>
     <div class="emu-bar"><div id="emu-bar-fill"></div></div>
     <div class="row emu-actions">
+      <button class="btn btn-sm btn-green" id="emu-shot">Screenshot</button>
       <button class="btn btn-sm" id="emu-power">Replug</button>
       <button class="btn btn-sm btn-red" id="emu-wipe">Wipe</button>
     </div>
@@ -44,10 +66,11 @@ export function emu(main: HTMLElement) {
   const shots: { t: number; png: string }[] = [];
   const st = { id: "", speed: 0, usb: false, owner: false, setup: "" as string, p: 0 };
 
+  let note = "";        // a few seconds of "Saved X" over the status line
   const status = () => {
     const short = st.id.slice(-6).toUpperCase();
     const usb = !st.usb ? "USB: not up" : st.owner ? "USB: in use by a tab" : "USB: plugged in";
-    $("emu-status").textContent = st.setup || `${short ? "ID " + short + " · " : ""}${Math.round(st.speed * 100)}% of real speed · ${usb}`;
+    $("emu-status").textContent = st.setup || note || `${short ? "ID " + short + " · " : ""}${Math.round(st.speed * 100)}% of real speed · ${usb}`;
     ($("emu-bar-fill") as HTMLElement).style.width = st.setup ? `${Math.round(8 + 92 * st.p)}%` : "0";
     $("emu-bar-fill").parentElement!.hidden = !st.setup;
   };
@@ -126,10 +149,32 @@ export function emu(main: HTMLElement) {
     });
 
     $("emu-power").onclick = () => worker.postMessage({ t: "power" });
+    $("emu-shot").onclick = () => shoot().catch((e) => { $("emu-status").textContent = "Screenshot didn't save: " + (e?.message || e); });
     $("emu-wipe").onclick = () => {
       if (!confirm("Wipe its flash? Apps and saves go, the firmware goes back to new. Its ID and its chip's keys stay, like a real one.")) return;
       worker.postMessage({ t: "wipe" });
     };
+
+    async function shoot() {
+      const big = document.createElement("canvas");
+      big.width = big.height = 720;
+      const bg = big.getContext("2d")!;
+      bg.imageSmoothingEnabled = false;
+      bg.drawImage(screen, 0, 0, 720, 720);
+      const blob = await new Promise<Blob>((r) => big.toBlob((b) => r(b!), "image/png"));
+      const name = `${st.id.slice(-6).toUpperCase()}-${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.png`;
+      const dir = await shotFolder();
+      if (dir) {
+        const w = await (await dir.getFileHandle(name, { create: true })).createWritable();
+        await w.write(blob); await w.close();
+        note = `Saved ${name} in ${dir.name}`; status();
+        setTimeout(() => { note = ""; status(); }, 4000);
+      } else {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob); a.download = name; a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      }
+    }
 
     // For an agent (or the console): the same presses a person makes.
     (window as any).wedgie = {
