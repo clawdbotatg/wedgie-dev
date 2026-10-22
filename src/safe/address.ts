@@ -45,10 +45,16 @@ export function ensName(a: string, chain?: number): Promise<string | null> {
     if (!(await up())) return last?.name ?? null;
     const address = E.checksum(a) as `0x${string}`;
     // viem answers null for "no name" and throws when the read failed
+    // Both at once: a chain's name goes through ENS's gateway for that chain, which can hang (Optimism's took 23 s,
+    // 2026-10-21). It gets 3 s; past that (or failing) Ethereum's name shows.
     const name = await tries(async () => {
-      let n: string | null = null;
-      if (chain && chain !== 1) n = await client!.getEnsName({ address, coinType: v!.toCoinType(chain) });
-      return n || await client!.getEnsName({ address });
+      const main = client!.getEnsName({ address });
+      if (chain && chain !== 1) {
+        const n = await Promise.race([client!.getEnsName({ address, coinType: v!.toCoinType(chain) }).catch(() => null),
+          wait(3000).then(() => null)]);
+        if (n) { main.catch(() => {}); return n; }
+      }
+      return main;
     }).catch(() => undefined);
     if (name === undefined) { names.delete(k); return last?.name ?? null; }
     seen.n[k] = { name, at: Date.now() }; save();
