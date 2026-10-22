@@ -817,6 +817,8 @@ body.dock-running #s-msg { display: none; }
 /* sheets */
 .sx-sheet { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 20px; background: rgba(20,20,20,.45); }
 .sx-sheet[hidden] { display: none; }
+.sx-ask { z-index: 70; }
+.sx-ask-q { margin: 0 0 18px; font-size: 17px; font-weight: 700; line-height: 1.4; }
 .sx-sheet-card { position: relative; width: min(100%, 480px); max-height: calc(100vh - 40px); overflow: auto; box-sizing: border-box; padding: 26px 24px 22px;
   border-radius: 28px; background: var(--card); box-shadow: 0 30px 60px -20px rgba(0,0,0,.5); text-align: left; }
 .sx-sheet-card > div[hidden] { display: none; }

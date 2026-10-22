@@ -14,6 +14,7 @@ import { seal, SEAL_KEY } from "../shop/seal";
 import { transferData } from "../safe/eth";
 import { count, errKey } from "../shop/count";
 import { STEPS, sprite } from "../shop/steps";
+import { askYes } from "../ui/askyes";
 
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 const usd = (cents: number) => "$" + (cents / 100).toFixed(cents % 100 ? 2 : 0);
@@ -358,8 +359,8 @@ function status(id: string, box: HTMLElement, say: (s: string, bad?: boolean) =>
     tick();
     box.querySelectorAll<HTMLButtonElement>("[data-copy]").forEach((b) => (b.onclick = () => navigator.clipboard.writeText(b.dataset.copy!).then(() => say("Copied."))));
     box.querySelector<HTMLButtonElement>("#o-copy")!.onclick = () => navigator.clipboard.writeText(link).then(() => say("Copied."));
-    box.querySelector<HTMLButtonElement>("#o-forget")!.onclick = () => {
-      if (!confirm("Remove this order from this computer? Save the link first.")) return;
+    box.querySelector<HTMLButtonElement>("#o-forget")!.onclick = async () => {
+      if (!await askYes("Remove this order from this computer? Save the link first.", "Remove")) return;
       const m = mem(); delete m[id]; localStorage.setItem(MEM, JSON.stringify(m));
       location.href = Object.keys(m).length ? "/orders" : "/";
     };

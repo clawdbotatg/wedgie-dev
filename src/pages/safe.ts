@@ -19,6 +19,7 @@
 // Nothing here remembers "the" Safe: a wedgie has many. The list comes from Safe's API (every chain), the
 // wedgie itself (safe_list: the Safes it signed for or was told about, wedgie-safe safe-4+; the page tells it
 // with safe_note), and this browser's own memory (per wedgie). Each is checked on chain before it's shown.
+import { askYes } from "../ui/askyes";
 import * as W from "../serial/wedgies";
 import * as Drive from "../serial/drive";
 import * as E from "../safe/eth";
@@ -1270,8 +1271,9 @@ export function safe(main: HTMLElement) {
   function removeOwner(o: string) {
     const i = info!, at = i.owners.findIndex((x) => eqA(x, o));
     const th = Math.min(i.threshold, i.owners.length - 1);
-    if (mine(o) && !confirm("Remove this wedgie as an owner? It won't be able to sign for this Safe.")) return;
-    job(() => propose(safeTx(safeAddr, "0", E.removeOwnerData(at ? i.owners[at - 1] : E.SENTINEL, o, th)), by(), `remove owner ${short(o)}, then ${th} must sign`));
+    if (mine(o)) { askYes("Remove this wedgie as an owner? It won't be able to sign for this Safe.", "Remove owner").then((y) => y && go()); return; }
+    go();
+    function go() { job(() => propose(safeTx(safeAddr, "0", E.removeOwnerData(at ? i.owners[at - 1] : E.SENTINEL, o, th)), by(), `remove owner ${short(o)}, then ${th} must sign`)); }
   }
   // ---- add any owner (a wallet, another wedgie): its own box, built once per Safe so typing survives repaints ----
   function paintOwner() {
@@ -1380,7 +1382,7 @@ export function safe(main: HTMLElement) {
    */
   async function removeQueued(t: any) {
     const need = t.confirmationsRequired ?? info!.threshold;
-    if ((t.confirmations || []).length >= need && !confirm(`#${t.nonce} has all its signatures, so anyone who has them could still run it. Reject is the sure way. Remove it anyway?`)) return;
+    if ((t.confirmations || []).length >= need && !await askYes(`#${t.nonce} is fully signed. Anyone with its signatures can still run it. To stop it for sure, use Reject.`, "Remove anyway")) return;
     const from = account = await wallet(chain);
     if (!isOwner(from)) throw new Error(`This wallet (${short(from)}) isn't an owner of this Safe.`);
     const c = chain, a = safeAddr, h = String(t.safeTxHash).toLowerCase();
