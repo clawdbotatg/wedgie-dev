@@ -1553,7 +1553,7 @@ export function safe(main: HTMLElement) {
     const box = $("n-review");
     try {
       const { t } = draft(), s = describe(t, ctx()), left = Math.max(0, info!.threshold - (wedgieOwns() ? ownedBy().length : 1));
-      box.innerHTML = `<p><b>${s.title}</b></p><p class="fine">${left ? `Then ${plural(left, "more owner")} must sign.` : "Then press Execute."} Your wedgie shows it before it signs.</p>`;
+      box.innerHTML = `<p><b>${s.title}</b></p>${left ? `<p class="fine">Then ${plural(left, "more owner")} must sign.</p>` : ""}`;
       box.hidden = false; box.classList.remove("sx-review-no");
     } catch (e) {
       box.hidden = !amt && !($("n-to") as HTMLInputElement).value.trim();
