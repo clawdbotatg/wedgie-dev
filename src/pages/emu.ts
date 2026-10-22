@@ -47,6 +47,7 @@ export function emu(main: HTMLElement) {
   live.width = live.height = 240;
   const lg = live.getContext("2d")!;
   let w3d: Wedgie3D | null = null;
+  const shots: { t: number; png: string }[] = [];
   const st = { id: "", speed: 0, usb: false, owner: false, setup: "" as string, p: 0 };
 
   const status = () => {
@@ -76,6 +77,11 @@ export function emu(main: HTMLElement) {
           d[o] = (c >> 8) & 0xf8; d[o + 1] = (c >> 3) & 0xfc; d[o + 2] = (c << 3) & 0xf8; d[o + 3] = 255;
         }
         g.putImageData(img, 0, 0);
+        shots.push({ t: Date.now(), png: "" });          // the last 60 screens, for a screen that flashed by
+        if (shots.length > 60) shots.shift();
+        const last = shots[shots.length - 1];
+        last.png = screen.toDataURL("image/png");
+        if (shots.length > 1 && shots[shots.length - 2].png === last.png) shots.pop();
         lg.drawImage(screen, 0, 0);
       } else if (m.t === "stat") {
         const first = !st.id;
@@ -117,7 +123,11 @@ export function emu(main: HTMLElement) {
     addEventListener("keyup", (e) => { const k = KEYMAP[e.code]; if (k && kbd.delete(e.code)) hold(k, false, e.code); });
     addEventListener("blur", () => { for (const c of kbd) hold(KEYMAP[c], false, c); kbd.clear(); });
 
-    place3D($("emu-3d"), { interactive: true, screen: live, eager: true, onKey: (k, down) => hold(k, down, "3d") }).then((w) => {
+    // ?no3d: just the screen, big (a headless browser has no GPU: tools/emu.mjs)
+    if (new URLSearchParams(location.search).has("no3d")) {
+      live.style.cssText = "width:480px;max-width:100%;image-rendering:pixelated;border-radius:10px";
+      $("emu-3d").appendChild(live);
+    } else place3D($("emu-3d"), { interactive: true, screen: live, eager: true, onKey: (k, down) => hold(k, down, "3d") }).then((w) => {
       w3d = w;
       w?.setColor("base", baseColor(null));      // no secure chip in it: the grey base of a chipless wedgie
     });
@@ -135,6 +145,8 @@ export function emu(main: HTMLElement) {
       press: (k: string, ms = MIN_HOLD) => new Promise<void>((r) => { hold(k, true); setTimeout(() => { hold(k, false); setTimeout(r, MIN_HOLD); }, ms); }),
       hold: (k: string, down: boolean) => hold(k, down),
       screen: () => screen.toDataURL("image/png"),
+      /** The last n different screens, oldest first: [{t, png}] (t: Date.now() when drawn). */
+      history: (n = 10) => shots.slice(-n),
       get id() { return st.id; },
       get speed() { return st.speed; },
     };
