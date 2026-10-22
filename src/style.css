@@ -850,8 +850,9 @@ body.sx-sheet-open #s-msg { display: none; }
 .sx-tok-on { position: relative; flex-shrink: 0; display: inline-flex; }
 .sx-tok-on .sx-chain-img { position: absolute; right: -3px; bottom: -3px; width: 18px; height: 18px; margin: 0; box-shadow: 0 0 0 2px #fff; background: #fff; }
 .sx-tokbtn .sx-tok { width: 30px; height: 30px; font-size: 14px; }
+.sx-tokbtn .sx-tok-on .sx-chain-img { width: 14px; height: 14px; right: -2px; bottom: -2px; }
 .sx-caret { font-size: 12px; opacity: .6; }
-.sx-toklist { position: absolute; z-index: 5; top: calc(100% + 6px); left: 0; right: 0; max-height: 320px; overflow-y: auto; margin: 0; padding: 6px;
+.sx-toklist { position: absolute; z-index: 5; top: calc(100% + 6px); left: 0; right: 0; max-height: 320px; overflow-y: auto; overflow-x: hidden; margin: 0; padding: 6px;
   background: var(--card); border-radius: 18px; box-shadow: 0 1px 0 rgba(0,0,0,.04), 0 18px 40px -12px rgba(20,20,20,.35); }
 .sx-toklist .sx-picked { background: #f4f4f1; }
 .sx-toklist, .sx-toklist li { list-style: none; }

@@ -1651,7 +1651,7 @@ export function safe(main: HTMLElement) {
   }
   function paintTok() {
     const a = picked(), list = sendList().filter((x) => x.token === null || x.price !== null || x.token === a.token);   // no spam in the picker
-    $("n-tokbtn").innerHTML = `${tokenBadge(a.symbol, a.logo)}<b>${esc(a.symbol)}</b><span class="sx-caret">▾</span>`;
+    $("n-tokbtn").innerHTML = `<span class="sx-tok-on">${tokenBadge(a.symbol, a.logo)}${chainLogo(chain)}</span><b>${esc(a.symbol)}</b><span class="sx-caret">▾</span>`;
     $("n-toklist").innerHTML = list.map((x) => `<li><button class="sx-asset${x === a ? " sx-picked" : ""}" type="button" role="option" data-pick="${x.token || ""}">${assetInner(x)}</button></li>`).join("");
   }
   /** What the inputs make, or why they don't make one yet. */
