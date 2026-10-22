@@ -1315,8 +1315,10 @@ export function safe(main: HTMLElement) {
     const i = info!;
     const signed = (t: any, a: string) => !!a && (t.confirmations || []).some((c: any) => eqA(c.owner, a));
     const cancelled = (n: number) => queue.some((x) => +x.nonce === n && said(x).kind === "cancel");
-    // one green button on the page (Austin): the bottom bar's Execute when one is ready, else the first Sign with wedgie
+    // one green action on the page (Austin): the bottom bar's (Execute, or Execute all), and any button here that does
+    // the same thing; with nothing ready, the first sign button
     let green = !readyNext();
+    const run = readyRun();
     const items = queue.map((t, k) => {
       const n = (t.confirmations || []).length, need = t.confirmationsRequired ?? i.threshold, first = +t.nonce === i.nonce, s = said(t);
       const btns: string[] = [], marks: string[] = [];
@@ -1326,7 +1328,7 @@ export function safe(main: HTMLElement) {
       }
       if (account && isOwner(account)) signed(t, account) ? marks.push("wallet ✓")
         : n < need && (btns.push(`<button class="btn btn-sm${green ? " btn-green" : ""}" data-wsign="${k}"${dis()}>Sign with wallet</button>`), green = false);
-      if (n >= need) btns.push(first ? `<button class="btn btn-sm" data-exec="${k}"${dis()}>Execute</button>` : `<span class="fine">runs after #${i.nonce}</span>`);
+      if (n >= need) btns.push(first ? `<button class="btn btn-sm${run.length > 1 ? "" : " btn-green"}" data-exec="${k}"${dis()}>Execute</button>` : `<span class="fine">runs after #${i.nonce}</span>`);
       const rej = t.wc && !n ? `<button class="btn btn-sm" data-wcno="${k}"${dis()}>Reject</button>`      // only here: nothing to cancel
         : (can() && s.kind !== "cancel" && !cancelled(+t.nonce) ? `<button class="btn btn-sm" data-reject="${k}"${dis()}>Reject</button> ` : "")
         + (account && isOwner(account) ? `<button class="btn btn-sm" data-remove="${k}"${dis()}>Remove</button>` : "");
@@ -1343,8 +1345,8 @@ export function safe(main: HTMLElement) {
           ${+t.operation === 1 ? `<dt>Kind</dt><dd>delegate call</dd>` : ""}
           <dt>Hash</dt><dd><code>${esc(String(t.safeTxHash).slice(0, 10))}…${esc(String(t.safeTxHash).slice(-8))}</code></dd></dl></details></li>`;
     }).join("");
-    const ready = /data-exec/.test(items), run = readyRun();
-    box.innerHTML = `<h3 class="sx-row">${ready ? "Ready: press Execute" : "Waiting"}${queue.length ? ` <span class="sx-count">${queue.length}</span>` : ""}${run.length > 1 ? `<button class="btn btn-sm sx-end" id="s-execall"${dis()}>Execute all ${run.length}</button>` : ""}</h3>
+    const ready = /data-exec/.test(items);
+    box.innerHTML = `<h3 class="sx-row">${ready ? "Ready: press Execute" : "Waiting"}${queue.length ? ` <span class="sx-count">${queue.length}</span>` : ""}${run.length > 1 ? `<button class="btn btn-sm btn-green sx-end" id="s-execall"${dis()}>Execute all ${run.length}</button>` : ""}</h3>
       ${items ? `<ul class="sx-txs">${items}</ul>` : `<p class="fine">Nothing waiting.</p>`}
       ${queueNote ? `<p class="fine">${esc(queueNote)}</p>` : ""}
       <p class="sx-foot"><button class="btn btn-sm" id="s-refresh"${dis()}>Refresh</button></p>`;
