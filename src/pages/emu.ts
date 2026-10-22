@@ -16,7 +16,6 @@ const KEYMAP: Record<string, string> = {
   KeyW: "up", KeyS: "down", KeyA: "left", KeyD: "right", ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right",
   Space: "press", Enter: "press", KeyJ: "A", KeyK: "B", KeyL: "X", Semicolon: "Y",
 };
-const READY = "wedgie.emu.ready";       // the board ID whose setup finished
 const MIN_HOLD = 250;                   // ms: a click is a real press, long enough for any app's poll
 
 export function emu(main: HTMLElement) {
@@ -84,10 +83,9 @@ export function emu(main: HTMLElement) {
         if (shots.length > 1 && shots[shots.length - 2].png === last.png) shots.pop();
         lg.drawImage(screen, 0, 0);
       } else if (m.t === "stat") {
-        const first = !st.id;
         Object.assign(st, { id: m.id, speed: m.speed, usb: m.usb, owner: m.owner });
         status();
-        if (first) setupIfNew();
+        if (m.bare && m.usb) setup();
       } else if (m.t === "error") $("emu-status").textContent = "Broke: " + m.error;
     };
     worker.postMessage({ t: "boot" });
@@ -135,8 +133,6 @@ export function emu(main: HTMLElement) {
     $("emu-power").onclick = () => worker.postMessage({ t: "power" });
     $("emu-wipe").onclick = () => {
       if (!confirm("Wipe its flash? Apps and saves go, the firmware goes back to new. Its ID and its chip's keys stay, like a real one.")) return;
-      try { localStorage.removeItem(READY); } catch {}
-      st.id = "";
       worker.postMessage({ t: "wipe" });
     };
 
@@ -158,31 +154,19 @@ export function emu(main: HTMLElement) {
         look();
       });
     }
-    // Wedgie firmware answers hello once it's up (its USB replugs ~1 s after power-up: wait that out).
-    async function says(port: V.VirtualPort) {
-      st.setup = "Starting up"; status();
-      await new Promise((r) => setTimeout(r, 4000));
-      if (!port.connected) port = await findPort();
-      const r = new Repl(port as unknown as SerialPort);
-      try {
-        await r.open();
-        for (let i = 0; i < 15; i++) if (await r.hello(1500)) return true;
-        return false;
-      } catch { return false; } finally { await r.close().catch(() => {}); st.setup = ""; status(); }
-    }
-
-    // ---- first visit: install the firmware and Welcome, as the bench does a new board ----
-    async function setupIfNew() {
-      let ready = "";
-      try { ready = localStorage.getItem(READY) || ""; } catch {}
-      if (ready === st.id) return;
-      // Started from the ready-made flash (tools/emuimage.mjs): it says hello on its own.
-      const port0 = await findPort();
-      if (await says(port0)) { try { localStorage.setItem(READY, st.id); } catch {} return; }
+    // ---- only MicroPython on it (no ready-made image, tools/emuimage.mjs): install the firmware and
+    // Welcome over its USB, as the bench does a new board. Slow (~10 min).
+    let setting = false;
+    async function setup() {
+      if (setting) return;
+      setting = true;
       st.setup = "Setting up: waiting for its USB"; status();
       try {
-        const r = new Repl(port0 as unknown as SerialPort);
-        await r.open();
+        await new Promise((r) => setTimeout(r, 1500));
+        const r = new Repl((await findPort()) as unknown as SerialPort);
+        for (let i = 0; ; i++) {          // a wedgie.dev tab may be identifying it: wait our turn
+          try { await r.open(); break; } catch (e) { if (i > 20) throw e; await new Promise((res) => setTimeout(res, 1000)); }
+        }
         try {
           const prog = (p: number, what: string) => { st.p = p; st.setup = `Setting up: ${what}`; status(); };
           const m = await firmwareManifest();
@@ -190,12 +174,12 @@ export function emu(main: HTMLElement) {
           const welcome = m.carts.find((c) => c.mod === "welcome");
           if (welcome) await useApp(r, welcome, (p, w) => prog(0.8 + p * 0.2, w), { launcher: false, manifest: m });
         } finally { await r.close(); }
-        try { localStorage.setItem(READY, st.id); } catch {}
         st.setup = ""; status();
+        worker.postMessage({ t: "setup" });
         worker.postMessage({ t: "power" });        // unplugged and plugged back in: it boots its firmware
       } catch (e: any) {
         st.setup = `Setup failed: ${e?.message || e}. Wipe to try again.`; status();
-      }
+      } finally { setting = false; }
     }
   }
 }

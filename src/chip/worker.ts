@@ -49,6 +49,7 @@ async function load(fresh = false) {
   // Pico with only MicroPython on it, which /emu then sets up over USB (slow).
   flash = saved?.length === FLASH_BYTES ? saved : await newFlash();
   if (!saved) await kv("flash", flash.slice()).catch(() => {});
+  else bare = !!(await kv("bare").catch(() => false));
   chipState = (await kv("trustm").catch(() => undefined)) || newTrustM();
   chipDirty = true;
   const tm = trustM(chipState, () => chip?.ms ?? 0, () => { chipDirty = true; });
@@ -64,6 +65,8 @@ async function load(fresh = false) {
 async function newFlash() {
   const img = flashFromUf2(new Uint8Array(await (await fetch("/mp/RPI_PICO.uf2")).arrayBuffer()));
   const r = await fetch("/emu/wedgie-fs.img.gz").catch(() => null);
+  bare = !r?.ok;
+  await kv("bare", bare).catch(() => {});
   if (r?.ok) {
     let fs = new Uint8Array(await r.arrayBuffer());
     if (fs[0] === 0x1f && fs[1] === 0x8b) fs = new Uint8Array(await new Response(new Blob([fs]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer());
@@ -81,7 +84,9 @@ function frame() {
   scope.postMessage({ t: "frame", buf: copy.buffer }, [copy.buffer]);
 }
 let speed = 0;
-const stat = () => scope.postMessage({ t: "stat", speed, usb: !!chip?.connected, owner: !!owner, id });
+// bare: only MicroPython on it (no ready-made image): the page sets it up over USB, then says {t:"setup"}
+let bare = false;
+const stat = () => scope.postMessage({ t: "stat", speed, usb: !!chip?.connected, owner: !!owner, id, bare });
 
 // ---- the run loop: the chip's time never runs ahead of the wall clock ----------------------------
 // It usually runs behind (JS is slower than the chip): then it runs flat out and doesn't try to catch up.
@@ -144,6 +149,7 @@ scope.onmessage = async (e) => {
   try {
     if (m.t === "boot") { await load(); go(); ch.postMessage({ t: "here", id, usb: chip!.connected }); stat(); }
     else if (m.t === "key") key(m.k, m.down);
+    else if (m.t === "setup") { bare = false; await kv("bare", false).catch(() => {}); }
     else if (m.t === "power") { owner = null; chip?.powerCycle(); }
     else if (m.t === "wipe") {
       owner = null;
