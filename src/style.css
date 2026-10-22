@@ -89,7 +89,7 @@ html.ready #app { opacity: 1; }
 .kicker { display: inline-block; font-weight: 900; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--mint-d); margin-bottom: 10px; }
 
 /* ---- layout ---- */
-.top { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 22px;
+.top { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: flex-start; gap: 12px; padding: 12px 22px;
   background: rgba(244,244,241,.96); backdrop-filter: blur(12px); box-shadow: 0 1px 0 rgba(0,0,0,.05); -webkit-backdrop-filter: blur(12px); }
 .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
 .brand img { filter: drop-shadow(0 3px 4px rgba(0,0,0,.18)); }
