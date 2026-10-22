@@ -209,13 +209,14 @@ def logo(d, path="logo.bin"):
         return None
 
 
-def screen(title="", what="", bar=True):
+def screen(title="", what="", bar=True, sub=""):
     """The boot screen with the boot bar, for anything with progress (an install, an update): the logo,
     title over it, what under the bar, the bar empty. Returns the bar (bar.to(0..1) fills it) or None
     without bar.bin. The one progress bar a wedgie shows: don't draw another.
     bar=False: the bar drawn empty into the framebuffer and nothing kept (the bar's pieces take 9 KB in one
     block: on an app's heap that failed, the Wallet's at the yes). For a screen up while an app is still
-    loaded, or with nothing to measure; the install draws the real bar after its clean restart."""
+    loaded, or with nothing to measure; the install draws the real bar after its clean restart.
+    sub: small, under the title (an install's version: "ea626bc Oct 22")."""
     import ui
     d = lcd.LCD()
     if d.width < 240:                       # a small screen (oled.py): no logo, no bar
@@ -225,6 +226,8 @@ def screen(title="", what="", bar=True):
     lines = [l for l in ui.wrap(title, ui.COLS_BIG) if l][:2]
     for i, l in enumerate(lines):
         d.center_text(l[:ui.COLS_BIG], (30 if len(lines) == 1 else 16) + i * 24, ui.INK, 2)
+    if sub:
+        d.center_text(sub[:ui.COLS_SMALL], 52 if len(lines) == 1 else 62, ui.MUTED)
     if what:
         d.center_text(what[:ui.COLS_SMALL], 214, ui.MUTED)
     if not bar:

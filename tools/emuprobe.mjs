@@ -261,7 +261,7 @@ try {
   check(/page ok/.test(pg), "ui.page draws");
 
   // an install's screen is the boot screen with the boot bar (loader.screen), not a bar of its own
-  const pr = await page.evaluate(() => window.vw.exec("import slot, job\nslot.stop()\njob._prog = None\njob.progress('Installing Hello...', 'hello.py', 0.1)\njob.progress('Installing Hello...', 'hello.py', 0.6)\nprint('bar:', bool(job._prog[1]))"));
+  const pr = await page.evaluate(() => window.vw.exec("import slot, job\nslot.stop()\njob._prog = None\njob._ver_line = 'ea626bc Oct 22'\njob.progress('Installing Hello...', 'hello.py', 0.1)\njob.progress('Installing Hello...', 'hello.py', 0.6)\nprint('bar:', bool(job._prog[1]))"));
   await page.waitForTimeout(600);
   await page.locator(".vw").screenshot({ path: `${out}/emu-installing.png` });
   check(/bar: True/.test(pr), `install screen uses the boot bar (${pr.trim()})`);
@@ -277,7 +277,7 @@ try {
   await page.locator(".vw").screenshot({ path: `${out}/emu-update-ask.png` });
   await page.evaluate(() => window.vw.press("Y", 150));
   check((await upd).trim() === "False", "the update question: Y says no");
-  const ins = page.evaluate(() => window.vw.exec("import slot; slot.ask('Install Safe Signer', True, '0.3.32')"));
+  const ins = page.evaluate(() => window.vw.exec("import slot; slot.ask('Install Safe Signer', True, '0.3.32', None, 'ea626bc Oct 22')"));
   await page.waitForTimeout(800);
   await page.locator(".vw").screenshot({ path: `${out}/emu-install-ask.png` });
   await page.evaluate(() => window.vw.press("Y", 150));
@@ -289,7 +289,7 @@ try {
   const ver = rel[0].split("\n")[1].slice(8);
   const asking = page.evaluate(() => new Promise((res) => { const t0 = performance.now(); const off = window.vw.onOutput((l) => { if (l.includes("@asked")) { off(); res([performance.now() - t0, l]); } }); setTimeout(() => { off(); res([-1, ""]); }, 10000); }));
   // the title is the signed app's name (job.py check); a list from before 0.3.12 names no apps, so no apps then
-  const go = req({ id: 70, type: "job", job: "Install Buttons", version: ver, write: ["buttons.py"], delete: ["hello.py"], apps: /^@app {2}/m.test(rel[0]) ? JSON.stringify([{ mod: "buttons", v: "x" }]) : null }, 30000);
+  const go = req({ id: 70, type: "job", job: "Install Buttons", version: ver, write: ["buttons.py"], delete: ["hello.py"], ver: "ea626bc Oct 22", apps: /^@app {2}/m.test(rel[0]) ? JSON.stringify([{ mod: "buttons", v: "x" }]) : null }, 30000);
   const [askedMs, askedLine] = await asking;
   await page.waitForTimeout(800);
   await page.locator(".vw").screenshot({ path: `${out}/emu-job-ask.png` });

@@ -45,6 +45,9 @@ export function firmwareManifest(): Promise<Manifest> {
   return manifest;
 }
 
+/** An app's version as its wedgie shows it under "Installing X" (0.3.59+): "ea626bc Oct 22", its commit. */
+export const appVer = (c: Cart) => c.sha ? [c.sha.slice(0, 7), c.at ? new Date(c.at).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""].filter(Boolean).join(" ") : "";
+
 /** A cart's version from its files' sha256s, in carts.json order. Same as cartV in tools/fw.mjs. */
 export async function cartV(hashes: (string | null)[]) {
   const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(hashes.join("\n")));
@@ -261,7 +264,7 @@ const signedList = () => release ||= Promise.all(["release.txt", "release.sig"].
 /** Run one checked job: the number of files sent, or false (nothing asked, nothing changed) when a file
  *  isn't in the signed list. late (0.3.10+): the job carries only its name, version and files, so the
  *  question is up at once; after the yes go the signed list, a look at what's there, then what differs. */
-async function job(r: Repl, m: Manifest, title: string, write: string[], del: string[], apps: any[] | null, onProgress: (p: number, what: string) => void, late = false): Promise<{ sent: number } | false> {
+async function job(r: Repl, m: Manifest, title: string, write: string[], del: string[], apps: any[] | null, onProgress: (p: number, what: string) => void, late = false, ver = ""): Promise<{ sent: number } | false> {
   // late: the signed list goes after the yes, so the question doesn't wait for its download. The
   // manifest lists the same files (tools/fw.mjs and tools/sign.mjs publish the same set).
   // A written .mpy's old .py: job.py's commit removes it (0.3.12+, the only firmware that gets checked
@@ -285,7 +288,7 @@ async function job(r: Repl, m: Manifest, title: string, write: string[], del: st
   const site = performance.now() - (askStart || performance.now()), sent = Date.now();
   const asked = r.request({ type: "job", job: title, ...(rel ? { release: rel.text, sig: rel.sig } : { version: m.version }), write, delete: del, apps: apps && JSON.stringify(apps),
     bytes: write.reduce((t, n) => t + (m.files.find((f) => f.name === n)?.size || 0), 0),    // the wedgie's bar weighs the file part by it
-    ...(binOf.get(r) ? { raw: true } : {}), ...(list ? { list: 1 } : {}) }, 120000,
+    ...(binOf.get(r) ? { raw: true } : {}), ...(list ? { list: 1 } : {}), ...(ver ? { ver } : {}) }, 120000,
     // its question asks for the signed list: whole lines, ~512 bytes a piece (it hashes each and drops it), then the signature
     list ? () => relP.then(async ({ text, sig }) => {
       for (let o = 0; o < text.length;) {
@@ -461,7 +464,7 @@ export async function useApp(r: Repl, cart: Cart, onProgress: (p: number, what: 
     const del = !oneThing.get(r) ? others(m, ch, cart.mod) : activeOf(m, ch) === cart.mod ? [] : mineOf(m, ch).filter((n) => !cart.files.includes(n));
     for (const n of write) ch.hashes[n] = sha(n);
     for (const n of del) ch.hashes[n] = null;
-    const j = await job(r, m, `Install ${cart.name}`, write, del, await appsFor(m, ch, cart.mod), onProgress, !!ch.late);
+    const j = await job(r, m, `Install ${cart.name}`, write, del, await appsFor(m, ch, cart.mod), onProgress, !!ch.late, appVer(cart));
     if (j) {
       onProgress(1, j.sent ? "in" : "already in");
       return { written: j.sent, restarted: true };

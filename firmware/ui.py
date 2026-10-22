@@ -188,7 +188,8 @@ def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None, scary=Fa
         sc = 3 if max(len(w) for w in t) <= 8 else 2
         t = wrap(big, 8 if sc == 3 else 13)[:2]
         h = 8 * sc + 4
-        y = 34 + (150 - (36 + h * len(t) - 4)) // 2      # the block centered between band and buttons
+        two = len(lines) > 1                # two lines under it (an install's version, what it replaces): up 14
+        y = 34 + (150 - (14 if two else 0) - (36 + h * len(t) - 4)) // 2      # the block centered between band and buttons
         d.center_text(question[:COLS_BIG], y, fg, 2)
         y += 36
         for i, s in enumerate(t):
@@ -197,7 +198,7 @@ def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None, scary=Fa
             d.big_text(s, x, y, fg, sc)
             y += h
         at = (x + w + 8, y - h + (8 * sc - 13) // 2)
-        y = 168
+        y = 154 if two else 168
     else:
         at = None
         y = max(title(d, question, 48, 2, fg) + 12, 108)
@@ -266,9 +267,10 @@ def wait(k, ms, sig=None, show=None, ready=None):
     return False
 
 
-def progress(head, what="", bar=True):
+def progress(head, what="", bar=True, sub=""):
     """The one progress screen: the boot logo and the boot bar (loader.screen). Returns the bar
     (bar.to(0..1)) or None; loader.what(text) changes the line under it. bar=False: the bar drawn empty
-    and nothing kept (no RAM), for nothing to measure or a screen up while an app is still loaded."""
+    and nothing kept (no RAM), for nothing to measure or a screen up while an app is still loaded.
+    sub: a small line under the title (an install's version)."""
     import loader
-    return loader.screen(head, what, bar)
+    return loader.screen(head, what, bar, sub)

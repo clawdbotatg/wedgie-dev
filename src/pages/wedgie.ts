@@ -17,7 +17,7 @@ import { place3D, idScreen as idCanvas, colorScreen, baseColor } from "../ui/pla
 import type { Wedgie3D } from "../ui/wedgie3d";
 import * as W from "../serial/wedgies";
 import { pyStr, type Repl } from "../serial/repl";
-import { installCore, useApp, removeApp, takeOver, setAskHint, askHint, firmwareManifest, lastAsk, type Cart, type Manifest } from "../serial/install";
+import { installCore, useApp, appVer, removeApp, takeOver, setAskHint, askHint, firmwareManifest, lastAsk, type Cart, type Manifest } from "../serial/install";
 import * as FS from "../serial/files";
 import { cartHtml } from "../ui/cart";
 import { compare, githubHead, verLink, type Ver } from "../apps/version";
@@ -228,8 +228,8 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
       case "live": return canvas;
       case "id": return idCanvas(s.id, s.sub);
       case "color": return colorScreen(s.css);
-      case "ask": return askScreen(s.job, true);           // what the wedgie asks, as it asks it
-      case "loading": return bootScreen(s.title || "Installing", s.what || "", s.p);   // the wedgie's own boot bar
+      case "ask": return askScreen(s.job, true, "", s.ver);           // what the wedgie asks, as it asks it
+      case "loading": return bootScreen(s.title || "Installing", s.what || "", s.p, s.sub);   // the wedgie's own boot bar
       case "text": return idCanvas(s.text);
       default: return colorScreen("#101012");
     }
@@ -451,10 +451,10 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     if ((wrongChip(c) || oldFw(c)) && confirmChip !== c.mod) { confirmChip = c.mod; paint(); return; }
     confirmChip = "";
     busy = "cart"; inserting[c.mod] = 0; paint();
-    const T = `Installing ${c.name}`;
-    setScreen({ kind: "loading", p: 0, title: T });
+    const T = `Installing ${c.name}`, sub = appVer(c);
+    setScreen({ kind: "loading", p: 0, title: T, sub });
     try {
-      const res = await useApp(r, c, (p, what) => { inserting[c.mod] = p; setScreen(what === ASK_TEXT ? { kind: "ask", job: `Install ${c.name}` } : { kind: "loading", p, title: T, what }); paint(); }, { manifest: view() });
+      const res = await useApp(r, c, (p, what) => { inserting[c.mod] = p; setScreen(what === ASK_TEXT ? { kind: "ask", job: `Install ${c.name}`, ver: sub } : { kind: "loading", p, title: T, what, sub }); paint(); }, { manifest: view() });
       delete inserting[c.mod];
       status(`Restarting it into <b>${esc(c.name)}</b>…${askTime()}`);
       // The soft reset: a fresh heap for the new app (a checked install restarts itself). The port may drop;

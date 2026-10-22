@@ -309,14 +309,15 @@ def _saves_only(p, t="get"):
 ASK_MS = 60000      # no answer to "let this computer in?" in a minute is a no
 
 
-def ask(job="", checked=False, v="", sig=None):
+def ask(job="", checked=False, v="", sig=None, ver=""):
     """Let the computer do `job` (what it says it wants, e.g. "Install Safe signer", "Update firmware to
     0.3.30")? ui.ask: only a real press answers, green yes, red no. Nothing comes off USB meanwhile, so the
     computer waits. Only for a checked job (job.py: only files signed by wedgie.dev go on, so the green
     check): anything that gives the computer the REPL asks the red question (hatch.ask, let_in), never
     this calm one with the computer's own title on it. Few words, big (Austin, 2026-10-09): the job,
     the version it puts on when it's an update (v: the one job.py holds the signed list to), and after
-    it the signature check (sig: _sig; ui.ask turns its dot into a check or a warning sign)."""
+    it the signature check (sig: _sig; ui.ask turns its dot into a check or a warning sign). ver: an
+    install's app version, small under its name (the site's words, cosmetic: "ea626bc Oct 22")."""
     if not checked:
         return False
     W.asked_ms = None
@@ -329,7 +330,7 @@ def ask(job="", checked=False, v="", sig=None):
         ok = ui.ask(d, head, ms=ASK_MS, big=str(v or "?")[:12], sig=sig)
     elif head.startswith("Install "):                  # "Install" over the app's name, big
         new = head[8:]
-        ok = ui.ask(d, "Install", ["replaces " + name] if name and name != new else (), ms=ASK_MS, big=new, sig=sig)
+        ok = ui.ask(d, "Install", ([ver] if ver else []) + (["replaces " + name] if name and name != new else []), ms=ASK_MS, big=new, sig=sig)
     elif head in ("Uninstall the app", "Take its app off"):
         ok = ui.ask(d, "Uninstall", ms=ASK_MS, big=name or "its app", sig=sig)
     else:
@@ -420,7 +421,8 @@ def _job(mid, m):
     if _older(v):                       # never asked: an old signed list puts back an old core and its holes
         W.send({"id": mid, "type": "error", "error": "older than this wedgie: %s" % v})   # (job.check holds the signed one too)
         return False
-    if not ask(title, True, v, _sig(mid, m, v) if m.get("list") else None):
+    ver = str(m.get("ver") or "")[:20]  # the app's version, as the site words it (cosmetic)
+    if not ask(title, True, v, _sig(mid, m, v) if m.get("list") else None, ver):
         W.send({"id": mid, "type": "refused", "asked_ms": W.asked_ms})
         return False
     if ui.signed is False:              # the warning sign was up: a yes changes nothing
@@ -432,7 +434,7 @@ def _job(mid, m):
         return False
     W.save_job({"id": mid, "m": m, "asked_ms": W.asked_ms})
     try:                                # the yes shows at once: the install's screen (the restart keeps it:
-        ui.progress(W.doing(title).replace("...", ""), "starting", bar=False)    # splash.show(keep)). No bar
+        ui.progress(W.doing(title).replace("...", ""), "starting", False, ver)    # splash.show(keep)). No bar
     except Exception as e:              # here: its 9 KB failed on the Wallet's heap; install mode draws it
         print("slot: progress:", e)
     _to_job()

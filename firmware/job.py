@@ -185,6 +185,7 @@ def _nope(mid, e):
 
 
 _prog = None     # [title, the boot bar, the line under it] while the job runs
+_ver_line = ""   # the app's version under the title (the job's "ver": cosmetic, the site's words)
 
 
 def progress(title, what, p):
@@ -193,7 +194,7 @@ def progress(title, what, p):
     global _prog
     import ui, loader
     if not _prog or _prog[0] != title:
-        _prog = [title, ui.progress(title.replace("...", ""), what or ""), what]
+        _prog = [title, ui.progress(title.replace("...", ""), what or "", True, _ver_line), what]
     elif what is not None and what != _prog[2]:
         loader.what(what)
         _prog[2] = what
@@ -264,7 +265,9 @@ def run(mid, m, ask, show=None):
     """Ask, then check and take the files. ask(job, checked, version) -> bool is the slot's yes/no screen (the slot
     asks a 0.3.10+ job itself before loading this, and passes a yes); show(title, what, p) draws the
     progress screen (the moment A is pressed, then as files arrive)."""
+    global _ver_line
     show = show or (lambda *a: None)
+    _ver_line = str(m.get("ver") or "")[:20]
     late = "release" not in m           # the list comes after the yes (0.3.10+ hosts)
     sn = 0                              # the signed list's serial: kept at commit (wedgie.SERIAL)
     try:

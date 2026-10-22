@@ -3,8 +3,8 @@
 // black base. Colours from picowallet emu/web/device3d.js.
 export type Screen =
   | { kind: "off" }
-  | { kind: "loading"; p: number; title?: string; what?: string }
-  | { kind: "ask"; job: string }
+  | { kind: "loading"; p: number; title?: string; what?: string; sub?: string }
+  | { kind: "ask"; job: string; ver?: string }
   | { kind: "id"; id: string; sub?: string }
   | { kind: "color"; css: string }
   | { kind: "text"; text: string }

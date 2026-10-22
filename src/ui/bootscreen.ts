@@ -9,7 +9,7 @@ let bar: { X: number; Y: number; W: number; H: number; F0: number; F1: number; C
 let loading: Promise<void> | null = null;
 const canvas = document.createElement("canvas");
 canvas.width = canvas.height = 240;
-let last: [string, string, number] = ["", "", 0];
+let last: [string, string, number, string] = ["", "", 0, ""];
 
 function load() {
   return loading ||= Promise.all(["logo.bin", "bar.bin"].map((n) => fetch("/fw/" + n).then((r) => r.arrayBuffer()))).then(([lb, bb]) => {
@@ -40,7 +40,7 @@ function piece(img: ImageData, s: Uint8Array, rows: number, y0: number, a: numbe
   }
 }
 
-function draw(title: string, what: string, p: number) {
+function draw(title: string, what: string, p: number, sub = "") {
   const g = canvas.getContext("2d")!;
   if (!logo || !bar) { g.fillStyle = P.WHITE; g.fillRect(0, 0, 240, 240); return; }
   const img = g.createImageData(240, 240);
@@ -70,13 +70,15 @@ function draw(title: string, what: string, p: number) {
   for (const w of words) { if (lines[lines.length - 1] && (lines[lines.length - 1] + " " + w).length > 15) lines.push(""); lines[lines.length - 1] = (lines[lines.length - 1] + " " + w).trim(); }
   const ls = lines.filter(Boolean).slice(0, 2);
   ls.forEach((s, i) => g.fillText(s, 120, (ls.length === 1 ? 30 : 16) + i * 24));
+  if (sub) { g.fillStyle = P.MUTED; g.font = "8px Silkscreen, monospace"; g.fillText(sub.slice(0, 28), 120, ls.length === 1 ? 52 : 62); }
   if (what) { g.fillStyle = P.MUTED; g.font = "8px Silkscreen, monospace"; g.fillText(what.slice(0, 28), 120, 214); }
 }
 
-/** The boot screen with the bar at p (0..1): one canvas, redrawn in place (the 3D wedgie shows it live). */
-export function bootScreen(title: string, what: string, p: number) {
-  last = [title, what, p];
-  draw(title, what, p);
+/** The boot screen with the bar at p (0..1): one canvas, redrawn in place (the 3D wedgie shows it live).
+ *  sub: small under the title (an install's version, loader.screen's sub). */
+export function bootScreen(title: string, what: string, p: number, sub = "") {
+  last = [title, what, p, sub];
+  draw(title, what, p, sub);
   load();
   return canvas;
 }

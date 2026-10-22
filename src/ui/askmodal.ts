@@ -16,7 +16,7 @@ function wrap(s: string, n: number) {
 }
 
 /** The wedgie's own question screen (firmware/slot.py ask), drawn the same way. */
-export function askScreen(job: string, checked = false, version = "") {
+export function askScreen(job: string, checked = false, version = "", ver = "") {
   const c = document.createElement("canvas");
   c.width = c.height = 240;
   const g = c.getContext("2d")!;
@@ -54,6 +54,7 @@ export function askScreen(job: string, checked = false, version = "") {
       const cx = x + w + 8, cy = y - h + (8 * sc - 13) / 2;
       g.fillStyle = P.GREY; g.beginPath(); g.arc(cx + 8, cy + 6, 6, 0, 7); g.fill(); g.fillStyle = P.INK;
       g.textAlign = "center";
+      if (ver && q === "Install") { g.fillStyle = P.INK; g.font = "8px Silkscreen, monospace"; g.fillText(ver.slice(0, 28), 120, 168); }   // ui.ask's lines
     } else {
       g.font = "16px Silkscreen, monospace";
       wrap(q, 15).slice(0, 2).forEach((s, i) => g.fillText(s, 120, 48 + i * 24));
