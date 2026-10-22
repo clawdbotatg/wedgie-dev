@@ -129,7 +129,13 @@ const hasCode = async (chain: number, a: string) => (await rpc(chain, "eth_getCo
 let wcp: any = null;
 const WCP = "wedgie.safe.wc";        // set once a wallet connected this way: its session is restored on the next visit
 const eth = () => wcp;
-const rainbow = () => import("../safe/rainbow");
+// Loaded once, early (see the end of mount): each deploy deletes the last one's chunks, so a page left open
+// across a deploy failed at Make it with "Failed to fetch dynamically imported module" (Austin, 10-21)
+let rk: Promise<typeof import("../safe/rainbow")> | null = null;
+const rainbow = () => rk ??= import("../safe/rainbow").catch((e) => {
+  rk = null;
+  throw /dynamically imported|Importing a module script/i.test(String(e?.message)) ? new Error("wedgie.dev was just updated. Reload the page.") : e;
+});
 async function wallet(chain: number): Promise<string> {
   if (!eth()) { wcp = await (await rainbow()).connect(); try { localStorage.setItem(WCP, "1"); } catch {} }
   const [from] = await eth().request({ method: "eth_requestAccounts" });
@@ -1663,6 +1669,7 @@ export function safe(main: HTMLElement) {
   if (W.armed()) W.start();
   if (localStorage.getItem(WCP) && !localStorage.getItem(OFF))      // the wallet from last time, back on its own
     rainbow().then((r) => r.start(onWallet), () => {});
+  else (window.requestIdleCallback ?? setTimeout)(() => rainbow().catch(() => {}));
   loadLast();
   show();
 }
