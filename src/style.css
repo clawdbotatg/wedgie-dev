@@ -701,6 +701,8 @@ body.dock-running #s-msg { display: none; }
 .sx-spin-in { position: static; }
 .sx-spin-h { position: static; display: inline-block; vertical-align: middle; width: 24px; height: 24px; margin-left: 14px; }
 .sx-spin-h[hidden] { display: none; }
+.sx-spin-dark { border-color: rgba(255,255,255,.18); border-top-color: var(--mint); }
+.sx-total > .sx-spin-h:first-child { margin-left: 0; }
 .sx-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .sx-end { margin-left: auto; }
 .sx-foot { display: flex; justify-content: flex-end; margin: 10px 0 0 !important; }

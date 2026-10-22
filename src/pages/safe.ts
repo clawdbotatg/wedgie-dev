@@ -117,8 +117,9 @@ async function rpc(chain: number, method: string, params: unknown[]): Promise<an
       if (r.error) throw new Error(`${CHAINS[chain].name}: ${r.error.message || r.error}`);    // a JSON-RPC error, or /api/rpc's own
       return r.result;
     } catch (e: any) {
-      if (i >= 5 || !(e.again || e instanceof TypeError)) throw e;     // TypeError: the fetch itself failed (~20 s of tries)
-      await sleep(600 * 2 ** i);
+      // TypeError: the fetch itself failed. ~80 s of tries: /api/rpc's limit is per minute
+      if (i >= 8 || !(e.again || e instanceof TypeError)) throw e;
+      await sleep(Math.min(600 * 2 ** i, 20_000));
     }
   }
 }
@@ -548,7 +549,10 @@ export function safe(main: HTMLElement) {
     // on the list: after its heading instead
     const inList = document.getElementById("l-spin");
     if (inList) inList.hidden = !on || big || $("s-list").hidden;
-    $("s-spin").hidden = !on || big || !!(inList && !$("s-list").hidden);
+    // on a Safe: in its card, where the number lands (s-hspin)
+    const inSafe = document.getElementById("s-hspin");
+    if (inSafe) inSafe.hidden = !on;
+    $("s-spin").hidden = !on || big || !!(inList && !$("s-list").hidden) || !!(inSafe && !$("s-safe").hidden);
     $("s-first").hidden = !big;
   }
   // No wedgie here: the way back to get one (same as /connect without one).
@@ -907,7 +911,6 @@ export function safe(main: HTMLElement) {
 
   // ---- /safe/<chain>:<address>: one Safe. The top: its name, its worth, three buttons ----
   function paintSafe() {
-    paintSpin();
     const box = $("s-safe"), iw = $("s-iw");
     box.hidden = !safeAddr;
     // an Instant Wallet Safe: say so on top, and send them there (it has no link to one Safe: its passkey opens it)
@@ -917,7 +920,7 @@ export function safe(main: HTMLElement) {
       <a class="btn btn-green btn-sm sx-end" href="https://instantwallet.io" target="_blank" rel="noopener">Open</a></div>`
       + (addons ? `<ul class="sx-rows">${addonRows(addons.mods.filter((m) => m.kind === "recovery" || m.kind === "limit"), false)}</ul>` : "");
     if (iw.dataset.h !== iwh) { iw.dataset.h = iwh; iw.innerHTML = iwh; }
-    if (box.hidden) return;
+    if (box.hidden) { paintSpin(); return; }
     const c = CHAINS[chain], i = info, home = route(chain, safeAddr), $t = total(), g = grand();
     const on = IDS.filter((t) => t === chain || copies[t]);   // fixed order: a tap only recolors
     // no number till the dollars are known (a coin amount first, then dollars, is a jump); no price at all: the coin
@@ -929,15 +932,17 @@ export function safe(main: HTMLElement) {
       <div class="sx-hero-id">${address(safeAddr, { size: "lg", long: true, chain })}${g !== null ? `<span class="sx-grand"><b>${esc(usd(g))}</b> on all chains</span>` : ""}</div>
       <div class="sx-chains">${on.map((t) => t === chain ? `<span class="sx-pill sx-on">${chainLogo(t)}${esc(c.name)}</span>`
         : `<a class="sx-pill" data-nav href="${route(t, safeAddr)}${sub === "settings" ? "/settings" : ""}">${chainLogo(t)}${esc(CHAINS[t].name)}</a>`).join("")}</div>`;
-    if (sub === "settings") h += `<div class="sx-total sx-total-sm">Settings</div><div class="sx-sub">${esc(who)}</div>`;
+    const spin = `<span class="sx-spin sx-spin-h sx-spin-dark" id="s-hspin" hidden aria-label="Loading"></span>`;
+    if (sub === "settings") h += `<div class="sx-total sx-total-sm">Settings${spin}</div><div class="sx-sub">${esc(who)}</div>`;
     else {
-      h += `<div class="sx-total">${worthOf ? esc(worthOf) : "&nbsp;"}</div><div class="sx-sub">${i ? esc(who) : "Opening the Safe"}</div>`;
+      h += `<div class="sx-total">${worthOf ? esc(worthOf) : ""}${spin}&#8203;</div><div class="sx-sub">${i ? esc(who) : "Opening the Safe"}</div>`;
       if (i) h += `<div class="sx-actions">
         ${can() ? `<button class="sx-act" id="a-send"${dis()}><span>↑</span>Send</button>` : ""}
         <button class="sx-act" id="a-receive"><span>↓</span>Receive</button>
         ${can() ? `<button class="sx-act" id="a-connect"${dis()}><span>⇄</span>Connect app</button>` : ""}</div>`;
     }
     box.innerHTML = h;
+    paintSpin();
     $("a-send")?.addEventListener("click", () => openSheet("send"));
     $("a-receive")?.addEventListener("click", () => openSheet("receive"));
     $("a-connect")?.addEventListener("click", () => openSheet("connect"));

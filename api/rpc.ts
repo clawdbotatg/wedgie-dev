@@ -69,7 +69,7 @@ async function pricesNow(chain: number, host: string, tokens: unknown[]) {
 export const key = () => env("ALCHEMY_API_KEY") || (env("SHOP_RPC_1").match(/alchemy\.com\/v2\/([\w-]+)/) || [])[1] || "";
 
 // A /safe page reads every 1.5 s while it waits: about 40 a minute. Past these, the IP waits (the key costs money).
-const PER_MIN = 300, PER_DAY = 20_000;
+const PER_MIN = 600, PER_DAY = 20_000;
 async function overLimit(req: Request) {
   if (!env("SHOP_DATABASE_URL")) return false;
   try {
