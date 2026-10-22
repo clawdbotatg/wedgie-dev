@@ -1276,8 +1276,9 @@ export function safe(main: HTMLElement) {
   function paintAssets() {
     paintSpin();
     const box = $("s-assets");
-    // zero balances aren't shown (ETH and USDC are always read, to send from); nothing held = no card
-    const list = (assets || (info ? [{ token: null, ...CHAINS[chain].native, decimals: 18, balance: info.balance, usd: null, price: null } as Asset] : [])).filter((a) => a.balance > 0n);
+    // zero, or priced under a penny (dust, often fake tokens sent to it), isn't shown, as in Instant Wallet; nothing left = no card
+    const list = (assets || (info ? [{ token: null, ...CHAINS[chain].native, decimals: 18, balance: info.balance, usd: null, price: null } as Asset] : []))
+      .filter((a) => a.balance > 0n && !(a.usd !== null && a.usd < 0.01));
     box.hidden = !(safeAddr && info && sub === "home" && (assets || assetsErr) && list.length);
     if (box.hidden) return;
     const row = (a: Asset) => `<li><button class="sx-asset" type="button" data-tok="${a.token || ""}"${can() ? "" : " disabled"}>${assetInner(a)}</button></li>`;
