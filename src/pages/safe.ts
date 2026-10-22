@@ -1333,7 +1333,8 @@ export function safe(main: HTMLElement) {
       if (n >= need) btns.push(first ? `<button class="btn btn-sm ${run.length > 1 ? "btn-grey" : "btn-green"}" data-exec="${k}"${dis()}>Execute</button>` : `<span class="fine">runs after #${i.nonce}</span>`);
       const rej = t.wc && !n ? `<button class="btn btn-sm" data-wcno="${k}"${dis()}>Reject</button>`      // only here: nothing to cancel
         : (can() && s.kind !== "cancel" && !cancelled(+t.nonce) ? `<button class="btn btn-sm" data-reject="${k}"${dis()}>Reject</button> ` : "")
-        + (account && isOwner(account) ? `<button class="btn btn-sm" data-remove="${k}"${dis()}>Remove</button>` : "");
+        // only where it can work: Safe's service deletes only for the wallet that proposed it (a wedgie can't sign that)
+        + (account && isOwner(account) && (!t.inSafe || (t.proposer && eqA(t.proposer, account))) ? `<button class="btn btn-sm" data-remove="${k}"${dis()}>Remove</button>` : "");
       const dots = Array.from({ length: need }, (_, d) => `<i class="${d < n ? "on" : ""}"></i>`).join("");
       return `<li class="sx-tx sx-k-${s.kind}">
         <div class="sx-tx-head"><span class="sx-ic">${ICON[s.kind]}</span><span class="sx-tx-what">${s.title}</span><span class="sx-tx-n">#${esc(t.nonce)}</span></div>
