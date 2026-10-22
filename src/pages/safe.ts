@@ -1282,13 +1282,13 @@ export function safe(main: HTMLElement) {
       if (account && isOwner(account)) signed(t, account) ? marks.push("wallet ✓")
         : n < need && btns.push(`<button class="btn btn-sm" data-wsign="${k}"${dis()}>Sign with wallet</button>`);
       if (n >= need) btns.push(first ? `<button class="btn btn-sm btn-green" data-exec="${k}"${dis()}>Execute</button>` : `<span class="fine">runs after #${i.nonce}</span>`);
-      if (can() && s.kind !== "cancel" && !cancelled(+t.nonce)) btns.push(`<button class="btn btn-sm sx-end" data-reject="${k}"${dis()}>Reject</button>`);
+      const rej = can() && s.kind !== "cancel" && !cancelled(+t.nonce) ? `<button class="btn btn-sm" data-reject="${k}"${dis()}>Reject</button>` : "";
       const dots = Array.from({ length: need }, (_, d) => `<i class="${d < n ? "on" : ""}"></i>`).join("");
       return `<li class="sx-tx sx-k-${s.kind}">
         <div class="sx-tx-head"><span class="sx-ic">${ICON[s.kind]}</span><span class="sx-tx-what">${s.title}</span><span class="sx-tx-n">#${esc(t.nonce)}</span></div>
         ${subsOf(s)}${s.more || ""}${s.kind === "danger" ? `<p class="sx-warn">This can change how the Safe works. Only sign if you know why.</p>` : ""}
         <div class="sx-tx-sigs"><span class="sx-dots">${dots}</span>${n} of ${need} signed${marks.length ? ` · ${marks.join(" · ")}` : ""}</div>
-        ${btns.length ? `<div class="sx-row">${btns.join(" ")}</div>` : ""}
+        ${btns.length || rej ? `<div class="sx-row">${rej}<span class="sx-row sx-end">${btns.join(" ")}</span></div>` : ""}
         <details class="sx-more"><summary>Details</summary><dl class="sx-dl">
           <dt>To</dt><dd>${address(t.to, { link: CHAINS[chain].scan, size: "sm", chain })}</dd>
           ${BigInt(t.value || 0) ? `<dt>${nat(chain)}</dt><dd>${esc(E.fmt(BigInt(t.value), 18))}</dd>` : ""}
@@ -1675,7 +1675,7 @@ export function safe(main: HTMLElement) {
         a.calls, chain, safeAddr, ctx().addr, paintAll), calls = x.subs!;
       return `<div class="sx-tx wc-ask"><div class="sx-tx-head">${icon(a.dapp)}<span class="sx-tx-what"><b>${esc(a.dapp.name)}</b> asks for ${plural(a.calls.length, "action")}${a.calls.length > 1 ? ", run as one" : ""}</span></div>
       <ol class="sx-subs">${calls.map((s) => `<li>${s.title}</li>`).join("")}</ol>${x.more || ""}
-      <div class="sx-row">${wedgieOwns() ? `<button class="btn btn-sm btn-green" data-wcsign="${k}"${dis(!key)}>Sign with wedgie</button> ` : ""}${isOwner(account) ? `<button class="btn btn-sm" data-wcwallet="${k}"${dis()}>Sign with wallet</button> ` : ""}<button class="btn btn-sm sx-end" data-wcno="${k}"${dis()}>Reject</button></div></div>`;
+      <div class="sx-row"><button class="btn btn-sm" data-wcno="${k}"${dis()}>Reject</button><span class="sx-row sx-end">${isOwner(account) ? `<button class="btn btn-sm" data-wcwallet="${k}"${dis()}>Sign with wallet</button> ` : ""}${wedgieOwns() ? `<button class="btn btn-sm btn-green" data-wcsign="${k}"${dis(!key)}>Sign with wedgie</button>` : ""}</span></div></div>`;
     }).join("");
     const run = (a: (typeof asks)[0], who: "wedgie" | "wallet") => job(async () => {
       try {
