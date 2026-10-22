@@ -223,7 +223,8 @@ def screen(title="", what="", bar=True, sub=""):
         import small
         return small.busy(d, title, what)
     logo(d)
-    lines = [l for l in ui.wrap(title, ui.COLS_BIG) if l][:2]
+    v, _, rest = title.partition(" ")       # "Installing" over "Safe Signer": never break inside the name
+    lines = [v, rest] if len(title) > ui.COLS_BIG and 0 < len(rest) <= ui.COLS_BIG else [l for l in ui.wrap(title, ui.COLS_BIG) if l][:2]
     for i, l in enumerate(lines):
         d.center_text(l[:ui.COLS_BIG], (30 if len(lines) == 1 else 16) + i * 24, ui.INK, 2)
     if sub:
