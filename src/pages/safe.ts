@@ -527,6 +527,8 @@ export function safe(main: HTMLElement) {
   // No wedgie here: the way back to get one (same as /connect without one).
   const HOME = `<a class="btn btn-green" href="/">Back to wedgie.dev</a>`;
   function paintWedgie() {
+    // the wedgie whose key we read was unplugged: read the next one's (another wedgie = another list)
+    if (wedgie && wedgie !== DRIVE && !present(wedgie)) { wedgie = null; key = null; }
     const ws = Drive.inApp() ? (driveState === "here" ? [DRIVE] : []) : W.wedgies().filter((w) => w.state === "ready");
     const app = ws.filter((w) => w.running === "safe");
     // Only what needs a hand from you shows here. Connecting, reading the key: just the spinner (paintSpin), and
@@ -585,8 +587,12 @@ export function safe(main: HTMLElement) {
         const l = await ask(w, (r) => r.request({ type: "safe_list" }, 5000));
         onWedgie = l.type === "safe_list" && Array.isArray(l.safes) ? l.safes : null;
       } catch { onWedgie = null; }
+      if (!eqA(before, signer)) {      // another wedgie than last time: not its list, nor its open Safe
+        rows = []; lastFind = 0;
+        if (safeAddr && !wedgieOwns()) go("/safe");
+        else if (listing) findAgain = true;
+      }
       paintAll();
-      if (!eqA(before, signer)) { rows = []; lastFind = 0; }    // another wedgie than last time: not its list
       const news = (onWedgie || []).some((k) => !rows.some((r) => `${r.chain}:${r.addr.toLowerCase()}` === k.toLowerCase()));
       if (safeAddr) { checkDeployed(); if (info && wedgieOwns()) remember(chain, safeAddr); }
       else if (!listing && (news || Date.now() - lastFind > 60_000)) findSafes();
@@ -677,6 +683,7 @@ export function safe(main: HTMLElement) {
     if (!signer && !account) return;
     if (listing) { findAgain = true; return; }    // a wallet or wedgie arrived mid-check: once more after
     listing = true; listPct = 8; lastFind = Date.now(); paintList();
+    const me = signer;
     // the bar: asking Safe's API on every chain is the first 70%, reading each Safe from its chain the rest
     let asked = 0, read = 0, nAsk = IDS.length * (signers.length + (account ? 1 : 0)), nRead = 0;
     const tick = () => {
@@ -710,6 +717,7 @@ export function safe(main: HTMLElement) {
     }));
     for (const k of signer ? remembered() : []) { const [ck, a] = k.split(":"); if (KEYS[ck]) add(KEYS[ck], a, "wedgie"); }
     for (const k of onWedgie || []) { const [c, a] = k.split(":"); if (CHAINS[+c] && E.isAddress(a)) add(+c, a, "wedgie"); }
+    if (me !== signer) { listing = false; findAgain = false; return findSafes(); }   // another wedgie mid-check
     const list = [...found.values()];
     nRead = list.length;
     for (let i = 0; i < list.length; i += 4)      // a few at a time: a burst gets rate-limited
@@ -720,6 +728,7 @@ export function safe(main: HTMLElement) {
       if (r.wedgie) remember(r.chain, r.addr);   // seen once, listed in this browser even when Safe's API isn't answering
       r.wallet = !!account && r.info.owners.some((o) => eqA(o, account));
     }
+    if (me !== signer) { listing = false; findAgain = false; return findSafes(); }
     // a Safe the chain couldn't be read for stays listed (as its sources said): never hidden by a busy RPC
     rows = list.filter((r) => (!r.info && !r.gone) || r.wedgie || r.wallet)
       .sort((a, b) => +b.wedgie - +a.wedgie || +!!CHAINS[a.chain].test - +!!CHAINS[b.chain].test || a.chain - b.chain);
