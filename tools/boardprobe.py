@@ -54,7 +54,10 @@ class W:
                 except ValueError:
                     continue
                 if r.get("id") == self.id and r.get("type") == "list":    # 0.3.56+: its question checks the list
-                    self.send_list()
+                    try:
+                        self.send_list()
+                    except (serial.SerialException, OSError):
+                        return {"type": "lost"}
                     continue
                 if r.get("id") == self.id:
                     return r
