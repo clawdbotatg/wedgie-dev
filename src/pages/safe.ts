@@ -1024,6 +1024,23 @@ export function safe(main: HTMLElement) {
     paintAll();
   }
 
+  // Money that comes in shows without a reload: every 8 s (tab in view) one cheap read (the same Multicall3 as
+  // load); anything changed, or a minute gone, or the tab back in view: a quiet load (tokens, queue, history).
+  let ticks = 0;
+  async function recheck(full = false) {
+    if (!safeAddr || !info || opening || busy || asking || document.hidden) return;
+    const c = chain, a = safeAddr, was = info;
+    if (!full && ++ticks % 8) {
+      const i = await readSafe(c, a).catch(() => null);
+      if (!i || c !== chain || a !== safeAddr || info !== was) return;
+      if (i.balance === was.balance && i.usdc === was.usdc && i.nonce === was.nonce && i.threshold === was.threshold && i.owners.join() === was.owners.join()) return;
+    }
+    ticks = 0;
+    load(true);
+  }
+  setInterval(() => recheck(), 8000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) recheck(true); });
+
   /** Every token it holds, with dollars (src/safe/assets.ts). */
   async function loadAssets(c: number, a: string, i: Info) {
     const got = await readAssets(c, a, CHAINS[c].native, i.balance, CHAINS[c].usdc ? { address: CHAINS[c].usdc!, balance: i.usdc } : null, (m, p) => rpc(c, m, p));
