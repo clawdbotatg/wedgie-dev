@@ -935,7 +935,7 @@ export function safe(main: HTMLElement) {
     const spin = `<span class="sx-spin sx-spin-h sx-spin-dark" id="s-hspin" hidden aria-label="Loading"></span>`;
     if (sub === "settings") h += `<div class="sx-total sx-total-sm">Settings${spin}</div><div class="sx-sub">${esc(who)}</div>`;
     else {
-      h += `<div class="sx-total">${worthOf ? esc(worthOf) : ""}${spin}&#8203;</div><div class="sx-sub">${i ? esc(who) : "Opening the Safe"}</div>`;
+      h += `<div class="sx-total">${worthOf ? esc(worthOf) + spin : spin.replace("sx-spin-dark", "sx-spin-dark sx-spin-solo")}&#8203;</div><div class="sx-sub">${i ? esc(who) : "Opening the Safe"}</div>`;
       if (i) h += `<div class="sx-actions">
         ${can() ? `<button class="sx-act" id="a-send"${dis()}><span>↑</span>Send</button>` : ""}
         <button class="sx-act" id="a-receive"><span>↓</span>Receive</button>
