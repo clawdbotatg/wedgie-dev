@@ -46,9 +46,9 @@ export function emu(main: HTMLElement) {
     <div class="emu-status" id="emu-status">Starting…</div>
     <div class="emu-bar"><div id="emu-bar-fill"></div></div>
     <div class="row emu-actions">
-      <button class="btn btn-sm btn-green" id="emu-shot">Screenshot</button>
-      <button class="btn btn-sm" id="emu-power">Replug</button>
-      <button class="btn btn-sm btn-red" id="emu-wipe">Wipe</button>
+      <button class="btn btn-sm btn-grey" id="emu-shot">Screenshot</button>
+      <button class="btn btn-sm btn-grey" id="emu-power">Replug</button>
+      <button class="btn btn-sm btn-grey" id="emu-wipe">Wipe</button>
     </div>
   </section>`;
   const $ = (id: string) => document.getElementById(id)!;
