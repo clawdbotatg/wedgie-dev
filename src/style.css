@@ -768,6 +768,10 @@ body.dock-running #s-msg { display: none; }
 .sx-hero .sx-pill:hover { color: rgba(255,255,255,.8); }
 .sx-hero .sx-pill.sx-on { background: #fff; color: var(--ink); }
 .sx-hero .sx-pill.sx-on .sx-chain-img { opacity: 1; }
+/* Settings' lighter card: the off pills need more white to still read as pills */
+.sx-hero-set .sx-pill:not(.sx-on) { background: rgba(255,255,255,.12); color: rgba(255,255,255,.72); }
+.sx-hero-set .sx-pill:not(.sx-on) .sx-chain-img { opacity: .7; }
+.sx-hero-set .sx-pill:not(.sx-on):hover { color: #fff; }
 .sx-total { font-size: clamp(42px, 9vw, 64px); font-weight: 900; letter-spacing: -.03em; line-height: 1; margin: 22px 0 6px; font-variant-numeric: tabular-nums; }
 .sx-total-sm { font-size: 34px; }
 .sx-sub { color: rgba(255,255,255,.7); font-weight: 700; font-size: 15px; }
