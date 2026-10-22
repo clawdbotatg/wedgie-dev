@@ -37,9 +37,11 @@ setInterval(() => {
   if (chipDirty) { chipDirty = false; kv("trustm", JSON.parse(JSON.stringify(chipState))).catch(() => {}); }
 }, 500);
 
+// fresh: a wiped flash, as a reflash leaves a real one. The board's ID (its flash chip's) and its secure
+// chip, keys and all, stay: they're hardware.
 async function load(fresh = false) {
   if (!rom) rom = new Uint8Array(await (await fetch("/emu/bootrom-b1.bin")).arrayBuffer());
-  let uid: Uint8Array | undefined = fresh ? undefined : await kv("uid").catch(() => undefined);
+  let uid: Uint8Array | undefined = await kv("uid").catch(() => undefined);
   if (!uid) { uid = crypto.getRandomValues(new Uint8Array(8)); await kv("uid", uid).catch(() => {}); }
   id = [...uid].map((b) => b.toString(16).padStart(2, "0")).join("");
   const saved: Uint8Array | undefined = fresh ? undefined : await kv("flash").catch(() => undefined);
@@ -47,7 +49,7 @@ async function load(fresh = false) {
   // Pico with only MicroPython on it, which /emu then sets up over USB (slow).
   flash = saved?.length === FLASH_BYTES ? saved : await newFlash();
   if (!saved) await kv("flash", flash.slice()).catch(() => {});
-  chipState = (fresh ? undefined : await kv("trustm").catch(() => undefined)) || newTrustM();
+  chipState = (await kv("trustm").catch(() => undefined)) || newTrustM();
   chipDirty = true;
   const tm = trustM(chipState, () => chip?.ms ?? 0, () => { chipDirty = true; });
   chip = boot({
@@ -147,7 +149,7 @@ scope.onmessage = async (e) => {
       owner = null;
       if (chip?.connected) ch.postMessage({ t: "usb", id, up: false });
       chip = null;
-      await kv("flash", undefined, true); await kv("uid", undefined, true); await kv("trustm", undefined, true);
+      await kv("flash", undefined, true);
       await load(true); go(); stat();
     }
   } catch (err) {

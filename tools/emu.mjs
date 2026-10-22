@@ -13,7 +13,7 @@
 //   curl -s localhost:4190/click -d '{"tab":1,"js":"document.querySelector(\"...\")"}'   a real click
 //   curl -s localhost:4190/shot?tab=1 > page.png                a tab's screenshot
 //   curl -s localhost:4190/text?tab=1                          a tab's visible text
-//   curl -s localhost:4190/wipe -d '{}'                         a brand-new wedgie (new ID, new chip)
+//   curl -s localhost:4190/wipe -d '{}'                         its flash back to new (ID and chip keys stay)
 // Its flash and chip live in the browser profile (node_modules/.cache/emu-profile): it's the same wedgie
 // next time, with what you installed. The firmware's questions time out after 60 s of the chip's time.
 import { chromium } from "playwright-core";

@@ -134,7 +134,7 @@ export function emu(main: HTMLElement) {
 
     $("emu-power").onclick = () => worker.postMessage({ t: "power" });
     $("emu-wipe").onclick = () => {
-      if (!confirm("Wipe this virtual wedgie? Its apps, saves and keys go, and it gets a new ID.")) return;
+      if (!confirm("Wipe its flash? Apps and saves go, the firmware goes back to new. Its ID and its chip's keys stay, like a real one.")) return;
       try { localStorage.removeItem(READY); } catch {}
       st.id = "";
       worker.postMessage({ t: "wipe" });

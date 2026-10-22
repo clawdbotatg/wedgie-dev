@@ -27,7 +27,7 @@ curl -s "localhost:4190/text?tab=1"
 curl -s localhost:4190/click -d '{"tab":1,"js":"document.querySelector(\"#d-shelf [data-mod=buttons] button.cart\")"}'
 curl -s localhost:4190/eval -d '{"tab":1,"js":"location.href"}'
 curl -s "localhost:4190/shot?tab=1" > page.png
-curl -s localhost:4190/wipe -d '{}'                  # a new wedgie: new ID, new chip, keys gone
+curl -s localhost:4190/wipe -d '{}'                  # flash back to new; ID and chip keys stay
 ```
 
 The same calls exist in the page: `window.wedgie.press(k, ms)`, `.hold(k, down)`, `.screen()`,
@@ -46,7 +46,8 @@ The same calls exist in the page: `window.wedgie.press(k, ms)`, `.hold(k, down)`
 - Every press lasts at least 120 ms of the chip's time, so quick presses never get lost.
 - The chip check never passes: the virtual Trust M's certificate isn't Infineon's, on purpose.
 - Its flash and chip live in that browser (IndexedDB; tools/emu.mjs: `node_modules/.cache/emu-profile`).
-  Wipe loses its keys, and any Safe they own.
+  Wipe erases the flash only (apps, saves); its ID and chip keys stay, like reflashing a real one.
+  Clearing the browser's site data loses them, and any Safe they own.
 - No RSA or AES on the virtual Trust M.
 - A new one starts from `public/emu/wedgie-fs.img.gz` (firmware + Welcome), remade by `tools/sign.mjs`
   (`node tools/emuimage.mjs`). Older is fine: wedgie.dev updates it like any wedgie.
