@@ -8,7 +8,7 @@
 // An order's token (its proof you made it) stays in this browser and in the link we show; the server keeps
 // only its hash. api/order.ts is the other side.
 import { ITEMS, MAX_EACH, MAX_BOXES, SHIPS, ABROAD_NOTE, STATES, COUNTRIES, PAY_CHAINS, SHOP_ENS, cartLines, cartCents, nameOf, type Cart, type Item, type ShipTo } from "../shop/catalog";
-import qrcode from "qrcode-generator";
+import { addressQr } from "../safe/qr";
 import { WHY, STAR, wire } from "../shop/why";
 import { seal, SEAL_KEY } from "../shop/seal";
 import { transferData } from "../safe/eth";
@@ -321,9 +321,6 @@ function status(id: string, box: HTMLElement, say: (s: string, bad?: boolean) =>
     // checking: a chain didn't answer, so got may be short. No amount, QR or pay button till it's read.
     if (v.pay === "usdc" && c && !v.checking && (v.status === "new" || v.status === "expired" && got)) {
       // EIP-681: a phone wallet that scans it opens a USDC transfer with the amount filled in.
-      const q = qrcode(0, "M");
-      q.addData(`ethereum:${c.usdc}@${v.chain}/transfer?address=${v.payTo}&uint256=${owe}`);
-      q.make();
       const named = (v.payTo || "").toLowerCase() === SHOP_ENS.address.toLowerCase();
       h += got ? `<p class="order-pay-now">Got ${usdc(got.toString())}. Send <b>${usdc(owe.toString())} USDC</b> more on ${esc(c.name)}</p>
         <p class="fine">To the same address. <button class="btn btn-sm" data-copy="${usdc(owe.toString())}">Copy amount</button></p>`
@@ -334,7 +331,7 @@ function status(id: string, box: HTMLElement, say: (s: string, bad?: boolean) =>
           <code class="safe-addr">${esc(v.payTo || "")}</code>
           <p><button class="btn btn-sm" data-copy="${esc(v.payTo || "")}">Copy address</button>
           <a class="btn btn-sm" href="${c.scan}/address/${esc(v.payTo || "")}" target="_blank" rel="noopener">See it on ${esc(c.name)}</a></p></div>
-        <div class="order-qr">${q.createSvgTag({ cellSize: 5, margin: 2, scalable: true })}</div>
+        <div class="order-qr">${addressQr(`ethereum:${c.usdc}@${v.chain}/transfer?address=${v.payTo}&uint256=${owe}`, v.payTo || "", 5)}</div>
         <p class="fine">Or scan with your phone's wallet: it fills everything in. We see the payment on our own.</p>
         <p><button class="btn btn-green" id="o-send"${busy ? " disabled" : ""}>Pay with this browser's wallet</button></p>`
         + (got == null ? `<p class="fine">Stuck? Paste the transaction: <input id="o-tx" placeholder="0x… transaction hash" size="40" spellcheck="false"> <button class="btn btn-sm" id="o-check">Check</button></p>` : "");
