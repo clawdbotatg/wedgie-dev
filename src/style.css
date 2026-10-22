@@ -88,7 +88,7 @@ html.ready #app { opacity: 1; }
 .idtag.big { font-size: 26px; padding: 6px 16px; }
 /* a virtual wedgie (wedgie.dev/emu): next to its ID, wherever it's listed */
 .vtag { display: inline-block; margin-left: 8px; vertical-align: middle; font-weight: 900; font-size: 13px; letter-spacing: .08em; text-transform: uppercase;
-  color: #fff; background: #7a4fd6; padding: 4px 10px; border-radius: 999px; text-decoration: none; }
+  color: #fff; background: #2b2c2e; padding: 4px 10px; border-radius: 999px; text-decoration: none; }
 .vtag[hidden] { display: none; }
 .kicker { display: inline-block; font-weight: 900; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--mint-d); margin-bottom: 10px; }
 
