@@ -288,8 +288,9 @@ class LCD(framebuf.FrameBuffer):
         x0, y0, x1, y1 = max(0, x), max(0, y), min(240, x + w), min(240, y + h)
         if x0 >= x1 or y0 >= y1:
             return
-        if _on_show:
-            _on_show()
+        h = _on_show                    # once: a job can clear it between the check and the call
+        if h:
+            h()
         global _busy
         _busy = True
         try:
@@ -298,8 +299,9 @@ class LCD(framebuf.FrameBuffer):
             _busy = False
 
     def _push(self, x0, y0, x1, y1):
-        if _on_frame:
-            _on_frame(self, x0, y0, x1, y1)
+        h = _on_frame                   # (same)
+        if h:
+            h(self, x0, y0, x1, y1)
         if _mark:
             for i in range(4):
                 self.rect(i, i, 240 - 2 * i, 240 - 2 * i, RED)

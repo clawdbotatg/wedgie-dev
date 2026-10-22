@@ -80,8 +80,9 @@ class LCD(framebuf.FrameBuffer):
 
     def show_rect(self, x, y, w, h):
         """The whole screen goes out (1 KB, ~2 ms): no boxes to keep track of."""
-        if L._on_show:
-            L._on_show()
+        h = L._on_show                  # once: a job can clear it between the check and the call
+        if h:
+            h()
         L._busy = True
         try:
             c = bytearray(2)

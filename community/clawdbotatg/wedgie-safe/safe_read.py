@@ -351,6 +351,13 @@ def describe(tx):
         return u or ("Swap", [("via Uniswap", INK)] +
                      ([("pay", MUTED), ("%s %s" % (amount(tx["value"], 18), coin(tx)), INK, BIG)] if tx["value"] else []) +
                      [("can't read it", RED, BIG), ("can't check what you get", RED)])
+    why = None
+    if tx.get("clear") and not ur:      # an ERC-7730 descriptor came with it (safe_7730: proven, or ignored)
+        import safe_7730
+        c = safe_7730.read(tx, tx["clear"])
+        if isinstance(c, tuple):
+            return c
+        why = c
     if to in ROUTERS:
         far = _lifi_to(data, safe) if to == LIFI else None     # a Uniswap call _uniswap couldn't read: can't tell
         return ("Bridge" if far else "Swap"), out + [("via " + ROUTERS[to], INK)] + \
@@ -369,7 +376,7 @@ def describe(tx):
             return "Send", out + [("%d of token" % n, INK)] + _addr_lines("", to, RED)[1:] + _who(_aarg(data, 0), safe)
         r = _aarg(data, 0)
         return "Fee" if r == RELAY else "Send", out + [("%s %s" % (amount(n, tok[1]), tok[0]), INK, BIG)] + _who(r, safe)
-    return "Unknown", out + [("can't read this", RED, BIG)] + _addr_lines("on", to, RED)
+    return "Unknown", out + [("can't read this", RED, BIG)] + _addr_lines("on", to, RED) + ([(why[:28], RED)] if why else [])
 
 
 def batch(tx):
@@ -388,7 +395,7 @@ def batch(tx):
         dl = int.from_bytes(b[i + 53:i + 85], "big")
         if b[i] > 1 or i + 85 + dl > len(b):
             raise ValueError("bad batch")
-        out.append({"chainId": tx["chainId"], "safe": tx["safe"], "operation": b[i],
+        out.append({"chainId": tx["chainId"], "safe": tx["safe"], "operation": b[i], "clear": tx.get("clear"),
                     "to": hx(b[i + 1:i + 21]), "value": int.from_bytes(b[i + 21:i + 53], "big"),
                     "data": b[i + 85:i + 85 + dl]})
         i += 85 + dl

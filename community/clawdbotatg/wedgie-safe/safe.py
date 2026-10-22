@@ -36,7 +36,7 @@ import save
 import ui
 from ui import WHITE, INK, MUTED, GREEN_D, RED
 
-FW = "safe-23"
+FW = "safe-24"
 RP_ID = b"wedgie.dev"
 FIELDS = '"origin":"https://wedgie.dev"'
 ASK_MS = 120000
@@ -181,10 +181,52 @@ def on_data(mid, m):
     W.send({"id": mid, "type": "safe_data", "have": have})
 
 
+# Clear signing (safe_7730.py): the host sends a bundle of ERC-7730 wire-format structures ahead of a tx, in
+# safe_clear pieces; the next safe_sign uses it and drops it. The bundle proves itself (a Merkle proof per
+# structure to a root built into this app), so a host can only leave things out, never make them up.
+clear = []              # the bundle, in pieces (bytes)
+clear_have = 0
+CLEAR_MAX = 6000        # bytes: a descriptor (the spec's minimum is 4 KB), its proof, a few tokens
+
+
+def clear_tag():
+    """Which clear-signing data this app trusts (wedgie.dev/clear/<tag>/), for hello: the host sends only that."""
+    try:
+        import safe_roots
+        return safe_roots.TAG
+    except ImportError:
+        return None
+
+
+def on_clear(mid, m):
+    """{"type":"safe_clear","at":<bytes so far>,"hex":"..."}: a piece of the next tx's clear-signing bundle."""
+    global clear, clear_have
+    at, h = m.get("at"), str(m.get("hex") or "")
+    if at == 0:
+        clear, clear_have = [], 0
+    if at != clear_have or len(h) % 2 or len(h) > CHUNK or clear_have + len(h) // 2 > CLEAR_MAX:
+        clear, clear_have = [], 0
+        W.send({"id": mid, "type": "error", "error": "bad clear piece (a bundle is up to %d bytes)" % CLEAR_MAX})
+        return
+    try:
+        b = binascii.unhexlify(h)
+    except Exception:
+        clear, clear_have = [], 0
+        W.send({"id": mid, "type": "error", "error": "bad clear piece"})
+        return
+    h = m = None
+    clear.append(b)
+    clear_have += len(b)
+    W.send({"id": mid, "type": "safe_clear", "have": clear_have})
+
+
 def parse(t):
-    """The fields, checked and normalized. Raises ValueError on anything off. data "@" = the pieces sent ahead."""
-    global pieces, have, room
+    """The fields, checked and normalized. Raises ValueError on anything off. data "@" = the pieces sent ahead.
+    A clear-signing bundle sent ahead comes along as tx["clear"] (and is used up)."""
+    global pieces, have, room, clear, clear_have
     room = None
+    cb = b"".join(clear) if clear else None
+    clear, clear_have = [], 0
     data = t.get("data") or "0x"
     if data == "@":
         gc.collect()
@@ -201,6 +243,7 @@ def parse(t):
           "refundReceiver": addr(t.get("refundReceiver") or "0x" + "0" * 40), "nonce": num(t["nonce"])}
     if tx["operation"] > 1:
         raise ValueError("bad operation")
+    tx["clear"] = cb
     return tx
 
 
@@ -459,7 +502,8 @@ def confirm(tx):
     finally:
         del acts
         del sys.modules["safe_read"]
-        sys.modules.pop("safe_ur", None)    # loaded only for a Uniswap swap
+        for m in ("safe_ur", "safe_7730", "safe_wire"):     # loaded only for a Uniswap swap, a descriptor
+            sys.modules.pop(m, None)
         gc.collect()
     # A page that doesn't fit goes on over more pages: every line is seen before the press (wedgie-dev 10-15:
     # an unknown token's recipient fell off the bottom).
@@ -576,6 +620,8 @@ def handle(m):
         dirty = True
     elif t == "safe_data":
         on_data(mid, m)
+    elif t == "safe_clear":
+        on_clear(mid, m)
     elif t == "safe_remove":
         on_remove(mid, m.get("tx"), m.get("totp"))
         dirty = True
@@ -590,7 +636,8 @@ def handle(m):
         W.send({"id": mid, "type": "ok", "safes": n})
     elif t == "hello":
         W.send(W.hello(mid, running="safe", app=FW, safe=key if state == "ok" else None, signer=signer if state == "ok" else None,
-                       safe_state=state, safe_chunk=CHUNK))
+                       safe_state=state, safe_chunk=CHUNK,
+                       safe_clear=clear_tag()))
     else:                               # hello's cousins, shots, jobs, open: the slot's
         import slot
         slot.handle(m)
@@ -652,7 +699,8 @@ def run():
     except Exception as e:              # the address is for the screen; signing works without it
         sys.print_exception(e)
     W.send(W.hello(None, type="ready", running="safe", app=FW, safe=key if state == "ok" else None,
-                   signer=signer if state == "ok" else None, safe_state=state, safe_chunk=CHUNK))
+                   signer=signer if state == "ok" else None, safe_state=state, safe_chunk=CHUNK,
+                   safe_clear=clear_tag()))
     while True:
         for k in keys.pressed():
             if k == "A" and state == "lock":
