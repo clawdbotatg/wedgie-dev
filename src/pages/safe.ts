@@ -27,7 +27,7 @@ import { describe, type Ctx, type Said } from "../safe/describe";
 import { explain, callsOf } from "../safe/explain";
 import { readAssets, tokenMeta, knownMeta, usd, type Asset } from "../safe/assets";
 import { canScan, scan } from "../safe/scan";
-import qrcode from "qrcode-generator";
+import { addressQr } from "../safe/qr";
 
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 const short = (a: string) => a.slice(0, 6) + "…" + a.slice(-4);
@@ -1513,12 +1513,11 @@ export function safe(main: HTMLElement) {
     box.hidden = !(sheet === "receive" && safeAddr);
     if (box.hidden || box.dataset.for === `${chain}:${safeAddr}`) return;
     box.dataset.for = `${chain}:${safeAddr}`;
-    const q = qrcode(0, "M"); q.addData(safeAddr); q.make();
     box.innerHTML = `<h2>Receive</h2>
-      <div class="sx-qr">${q.createSvgTag({ cellSize: 6, margin: 2, scalable: true })}</div>
+      <div class="sx-qr">${addressQr(safeAddr, safeAddr)}</div>
       <p class="sx-recv-addr">${esc(safeAddr)}</p>
       <p><button class="btn btn-green sx-wide" id="r-copy">Copy address</button></p>
-      <p class="sx-warn-soft">Only on <b>${esc(CHAINS[chain].name)}</b>. Money sent on another chain lands on a Safe that may not exist there.</p>`;
+      <p class="sx-warn-soft">Only on <b>${esc(CHAINS[chain].name)}</b>. On another chain it may be lost.</p>`;
     $("r-copy").onclick = () => navigator.clipboard.writeText(safeAddr).then(() => { $("r-copy").textContent = "Copied"; setTimeout(() => { const b = document.getElementById("r-copy"); if (b) b.textContent = "Copy address"; }, 1500); });
   }
 
