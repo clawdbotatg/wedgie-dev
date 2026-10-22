@@ -91,7 +91,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     <div class="wd-grid">
       <div class="wd-dev"><div class="wd-3d"></div><p class="fine wd-hint" id="d-hint"></p></div>
       <div class="wd-main">
-        <div class="wd-head"><span class="light" id="d-light"></span><span class="idtag big">${esc(id)}</span></div>
+        <div class="wd-head"><span class="light" id="d-light"></span><span class="idtag big">${esc(id)}</span><a class="vtag" id="d-virtual" href="/emu" target="_blank" hidden title="Not hardware: a virtual wedgie running in a wedgie.dev/emu tab">virtual</a></div>
         <div class="wd-missing card" id="d-missing" hidden></div>
         <div id="d-body">
           <div class="card wd-sec">
@@ -322,6 +322,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     const x = w!;
     w3?.setColor("base", baseColor(x.chip?.type));
     $("#d-light").className = `light ${F.overall(x, m)}`;
+    $("#d-virtual").hidden = !x.virtual;
     $("#d-hint").textContent = mirrorOn && wedgie() && link ? "Its real screen. Click its buttons (or press arrows, Enter, A, B, X, Y) to press the real ones." : "";
     const mb = $<HTMLButtonElement>('[data-act="mirror"]');
     if (mb) mb.textContent = mirrorOn ? "Stop showing its screen" : "Show its screen here";

@@ -7,6 +7,7 @@
 // Worker -> page: {t:"frame", buf} {t:"stat", speed, usb, owner, id} {t:"error", error}
 // Channel "wedgie-emu" (both ways, every tab): see port.ts.
 import { boot, flashFromUf2, FLASH_BYTES, type Chip } from "./sim";
+import { trustM, newTrustM, type TrustMState } from "./trustm";
 
 const scope = self as unknown as { postMessage(m: unknown, transfer?: Transferable[]): void; onmessage: ((e: MessageEvent) => void) | null };
 const ch = new BroadcastChannel("wedgie-emu");
@@ -28,10 +29,12 @@ async function kv(key: string, val?: unknown, del = false): Promise<any> {
     r.onerror = () => rej(r.error);
   });
 }
-let flash: Uint8Array, dirty = 0;
-// Saved once the flash has been quiet for a second (an install writes for a while).
+let flash: Uint8Array, dirty = 0, chipState: TrustMState, chipDirty = false;
+// Saved once the flash has been quiet for a second (an install writes for a while); the secure chip's
+// keys and objects as soon as they change.
 setInterval(() => {
   if (dirty && performance.now() - dirty > 1000) { dirty = 0; kv("flash", flash.slice()).catch(() => {}); }
+  if (chipDirty) { chipDirty = false; kv("trustm", JSON.parse(JSON.stringify(chipState))).catch(() => {}); }
 }, 500);
 
 async function load(fresh = false) {
@@ -44,8 +47,11 @@ async function load(fresh = false) {
   // Pico with only MicroPython on it, which /emu then sets up over USB (slow).
   flash = saved?.length === FLASH_BYTES ? saved : await newFlash();
   if (!saved) await kv("flash", flash.slice()).catch(() => {});
+  chipState = (fresh ? undefined : await kv("trustm").catch(() => undefined)) || newTrustM();
+  chipDirty = true;
+  const tm = trustM(chipState, () => chip?.ms ?? 0, () => { chipDirty = true; });
   chip = boot({
-    rom, flash, uid,
+    rom, flash, uid, i2c: tm,
     onData: (b) => { if (owner) ch.postMessage({ t: "rx", id, to: owner, data: b }); },
     onUsb: (up) => { if (!up) owner = null; ch.postMessage({ t: "usb", id, up }); stat(); },
     onFrame: () => { frameDue = true; },
@@ -126,7 +132,7 @@ scope.onmessage = async (e) => {
       owner = null;
       if (chip?.connected) ch.postMessage({ t: "usb", id, up: false });
       chip = null;
-      await kv("flash", undefined, true); await kv("uid", undefined, true);
+      await kv("flash", undefined, true); await kv("uid", undefined, true); await kv("trustm", undefined, true);
       await load(true); go(); stat();
     }
   } catch (err) {

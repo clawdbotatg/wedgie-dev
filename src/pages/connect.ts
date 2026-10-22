@@ -80,7 +80,7 @@ function list(main: HTMLElement, go: (path: string) => void) {
           el.className = "wrow";
           el.dataset.key = String(w.key);
           el.innerHTML = `<div class="wrow-dev"></div>
-            <div class="wrow-body"><div class="wrow-head"><span class="light"></span><span class="idtag"></span></div>
+            <div class="wrow-body"><div class="wrow-head"><span class="light"></span><span class="idtag"></span><span class="vtag" hidden>virtual</span></div>
             <dl class="facts"><dt>Hardware</dt><dd data-f="hw"></dd><dt>Firmware</dt><dd data-f="fw"></dd><dt>Software</dt><dd data-f="pl"></dd></dl></div>
             <span class="btn btn-green wrow-go">Configure ›</span>`;
           el.addEventListener("click", (e) => { if (e.metaKey || e.ctrlKey || e.shiftKey || !el!.dataset.id) return; e.preventDefault(); go(el!.getAttribute("href")!); });
@@ -94,6 +94,7 @@ function list(main: HTMLElement, go: (path: string) => void) {
         (el as any)._w3d.then((x: any) => { x?.setScreen(screenFor(w)); x?.setColor("base", baseColor(w.chip?.type)); });
         el.querySelector(".idtag")!.innerHTML = w.state === "identifying" ? "finding…" : w.state === "error" ? "can't talk" : esc(w.short);
         el.querySelector(".light")!.className = `light ${F.overall(w, manifest)}`;
+        el.querySelector<HTMLElement>(".vtag")!.hidden = !w.virtual;
         el.querySelector('[data-f="hw"]')!.innerHTML = hw.html;
         el.querySelector('[data-f="fw"]')!.innerHTML = fw.html;
         el.querySelector('[data-f="pl"]')!.innerHTML = pl.html;

@@ -125,18 +125,23 @@ export function boot(o: ChipOpts) {
     lcd.dirty = true;
   }
 
-  // ---- I2C0 (GP4/GP5): the Trust M's bus. No device: every address NACKs, like a board without the chip.
+  // ---- I2C0 (GP4/GP5): the Trust M's bus (o.i2c: trustm.ts). No device: every address NACKs, like a
+  // board without the chip, and the lines read low (no pull-ups). Each byte takes its time at 400 kHz.
   function bus() {
     const i2c = mcu.i2c[0];
-    let dev: I2CDevice | null = null;
-    i2c.onStart = () => i2c.completeStart();
+    let dev: I2CDevice | null = null, then: () => void = () => {};
+    const alarm = clock.createAlarm(() => then());
+    const later = (f: () => void) => { then = f; alarm.schedule(22500); };     // 9 bits at 400 kHz
+    if (o.i2c) { mcu.gpio[4].setInputValue(true); mcu.gpio[5].setInputValue(true); }
+    i2c.onStart = () => later(() => i2c.completeStart());
     i2c.onConnect = (addr: number, mode: number) => {
       dev = o.i2c && o.i2c.addr === addr ? o.i2c : null;
-      i2c.completeConnect(!!dev && dev.connect(mode === 1));
+      const ack = !!dev && dev.connect(mode === 1);
+      later(() => i2c.completeConnect(ack));
     };
-    i2c.onWriteByte = (b: number) => i2c.completeWrite(!!dev && dev.write(b));
-    i2c.onReadByte = () => i2c.completeRead(dev ? dev.read() : 0xff);
-    i2c.onStop = () => { dev?.stop(); dev = null; i2c.completeStop(); };
+    i2c.onWriteByte = (b: number) => { const ack = !!dev && dev.write(b); later(() => i2c.completeWrite(ack)); };
+    i2c.onReadByte = () => { const v = dev ? dev.read() : 0xff; later(() => i2c.completeRead(v)); };
+    i2c.onStop = () => { dev?.stop(); dev = null; later(() => i2c.completeStop()); };
   }
 
   // The flash chip's Read Unique ID (0x4B, 4 dummy bytes, then 8 ID bytes), one byte in and out of the

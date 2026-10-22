@@ -20,6 +20,8 @@ export function hardware(w: W.Wedgie): Fact {
   const board = esc(w.board || "board");
   const p = w.proof;
   if (p?.state === "checking") return { html: `${board} · checking the chip…`, tone: "wait" };
+  // a virtual wedgie (wedgie.dev/emu): its chip works but can't trace to Infineon, by design
+  if (w.virtual && p?.state === "done") return { html: `${board} · ${chipName(w) ? "virtual " + esc(chipName(w)) : "no chip"} <span class="fine">not hardware</span>`, tone: "warn" };
   if (p?.state === "done") return p.pass ? { html: `${board} · ${esc(chipName(w))} <b class="good">✓ working</b>`, tone: "ok" }
     : { html: `${board} · <b class="bad">${chipName(w) ? esc(chipName(w)) + " failed" : "no chip"}</b>`, tone: "bad" };
   return { html: `${board}${chipName(w) ? " · " + esc(chipName(w)) : ""}`, tone: w.kind === "wallet" ? "ok" : "warn" };
