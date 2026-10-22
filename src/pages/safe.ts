@@ -1289,7 +1289,7 @@ export function safe(main: HTMLElement) {
     const th = $("ow-th") as HTMLSelectElement, keep = +th.value || i.threshold;
     th.innerHTML = threshOpts(i.owners.length + 1, Math.min(keep, i.owners.length + 1));
     $("ow-of").textContent = `of ${i.owners.length + 1} owners`;
-    $("ow-btns").innerHTML = `${wedgieOwns() ? `<button class="btn btn-green" id="ow-wedgie"${dis()}>Sign with wedgie</button> ` : ""}${isOwner(account) ? `<button class="btn" id="ow-wallet"${dis()}>Sign with wallet</button>` : ""}`;
+    $("ow-btns").innerHTML = `${isOwner(account) ? `<button class="btn" id="ow-wallet"${dis()}>Sign with wallet</button>` : ""}${wedgieOwns() ? `<button class="btn btn-green sx-end" id="ow-wedgie"${dis()}>Sign with wedgie</button>` : ""}`;   // primary on the right
     $("ow-wedgie")?.addEventListener("click", () => job(() => addOwner("wedgie")));
     $("ow-wallet")?.addEventListener("click", () => job(() => addOwner("wallet")));
   }
@@ -1337,7 +1337,7 @@ export function safe(main: HTMLElement) {
         <div class="sx-tx-head"><span class="sx-ic">${ICON[s.kind]}</span><span class="sx-tx-what">${s.title}</span><span class="sx-tx-n">#${esc(t.nonce)}</span></div>
         ${t.wc ? `<p class="fine">From ${esc(t.wc.dapp.name)}: it gets the result when this runs.</p>` : ""}${subsOf(s)}${s.more || ""}${s.kind === "danger" ? `<p class="sx-warn">This can change how the Safe works. Only sign if you know why.</p>` : ""}
         <div class="sx-tx-sigs"><span class="sx-dots">${dots}</span>${n} of ${need} signed${marks.length ? ` · ${marks.join(" · ")}` : ""}</div>
-        ${btns.length || rej ? `<div class="sx-row">${rej}<span class="sx-row sx-end">${btns.join(" ")}</span></div>` : ""}
+        ${btns.length || rej ? `<div class="sx-row">${rej}<span class="sx-row sx-end">${[...btns.filter((b) => !/btn-green/.test(b)), ...btns.filter((b) => /btn-green/.test(b))].join(" ")}</span></div>` : ""}
         <details class="sx-more"><summary>Details</summary><dl class="sx-dl">
           <dt>To</dt><dd>${address(t.to, { link: CHAINS[chain].scan, size: "sm", chain })}</dd>
           ${BigInt(t.value || 0) ? `<dt>${nat(chain)}</dt><dd>${esc(E.fmt(BigInt(t.value), 18))}</dd>` : ""}
@@ -1639,7 +1639,7 @@ export function safe(main: HTMLElement) {
     sendToken = null;
     sel.innerHTML = sendList().map((a) => `<option value="${a.token || ""}"${(a.token || "") === keep ? " selected" : ""}>${esc(a.symbol)}</option>`).join("");
     paintTok();
-    $("n-btns").innerHTML = `${wedgieOwns() ? `<button class="btn btn-green" id="n-wedgie"${dis()}>Sign with wedgie</button> ` : ""}${isOwner(account) ? `<button class="btn" id="n-wallet"${dis()}>Sign with wallet</button>` : ""}`;
+    $("n-btns").innerHTML = `${isOwner(account) ? `<button class="btn" id="n-wallet"${dis()}>Sign with wallet</button>` : ""}${wedgieOwns() ? `<button class="btn btn-green sx-end" id="n-wedgie"${dis()}>Sign with wedgie</button>` : ""}`;   // primary on the right
     $("n-wedgie")?.addEventListener("click", () => job(() => newTx("wedgie")));
     $("n-wallet")?.addEventListener("click", () => job(() => newTx("wallet")));
     review();
