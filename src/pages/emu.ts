@@ -3,8 +3,8 @@
 // it with the real ones and talk to it over its USB serial, the same bytes a real one gets (chip/port.ts).
 // First visit: a Pico with only MicroPython, set up by the same install the bench does (installCore +
 // Welcome), then unplugged and plugged back in. Its flash stays in this browser.
-// Below the 3D: the screen at 2x and a button per key, for a person or an agent driving the page
-// (window.wedgie: press, hold, screen).
+// One 3D wedgie: click its buttons. An agent driving the page uses window.wedgie (press, hold, screen: the
+// exact pixels the firmware sent).
 import "./emu.css";
 import { Repl } from "../serial/repl";
 import { installCore, useApp, firmwareManifest } from "../serial/install";
@@ -25,38 +25,20 @@ export function emu(main: HTMLElement) {
     <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
     <h1>Virtual wedgie</h1>
     <p class="emu-sub">A real wedgie's chip and firmware, running in this tab. Keep it open: wedgie.dev in your other tabs sees it plugged in.</p>
-    <div class="emu-grid">
-      <div class="emu-stage recess" id="emu-3d"></div>
-      <div class="emu-side card">
-        <canvas id="emu-screen" width="240" height="240" role="img" aria-label="the wedgie's screen"></canvas>
-        <div class="emu-pad" role="group" aria-label="wedgie buttons">
-          <div class="emu-joy">
-            <button class="ek" data-k="up" aria-label="up">▲</button>
-            <button class="ek" data-k="left" aria-label="left">◀</button>
-            <button class="ek ek-press" data-k="press" aria-label="press joystick">●</button>
-            <button class="ek" data-k="right" aria-label="right">▶</button>
-            <button class="ek" data-k="down" aria-label="down">▼</button>
-          </div>
-          <div class="emu-abxy">
-            <button class="ek ek-a" data-k="A" aria-label="A">A</button>
-            <button class="ek ek-b" data-k="B" aria-label="B">B</button>
-            <button class="ek ek-x" data-k="X" aria-label="X">X</button>
-            <button class="ek ek-y" data-k="Y" aria-label="Y">Y</button>
-          </div>
-        </div>
-        <p class="emu-keys fine">Keys: arrows or WASD · Space press · J K L ; = A B X Y</p>
-        <div class="emu-status" id="emu-status">Starting…</div>
-        <div class="emu-bar"><div id="emu-bar-fill"></div></div>
-        <div class="row emu-actions">
-          <button class="btn btn-sm" id="emu-power">Unplug + replug</button>
-          <button class="btn btn-sm btn-red" id="emu-wipe">Wipe</button>
-          <a class="btn btn-sm btn-green" href="/connect" target="_blank" rel="noopener">wedgie.dev ↗</a>
-        </div>
-      </div>
+    <div class="emu-stage recess" id="emu-3d"></div>
+    <p class="emu-keys fine">Click its buttons, or keys: arrows or WASD · Space presses the stick · J K L ; = A B X Y</p>
+    <div class="emu-status" id="emu-status">Starting…</div>
+    <div class="emu-bar"><div id="emu-bar-fill"></div></div>
+    <div class="row emu-actions">
+      <button class="btn btn-sm" id="emu-power">Unplug + replug</button>
+      <button class="btn btn-sm btn-red" id="emu-wipe">Wipe</button>
+      <a class="btn btn-sm btn-green" href="/connect" target="_blank" rel="noopener">wedgie.dev ↗</a>
     </div>
   </section>`;
   const $ = (id: string) => document.getElementById(id)!;
-  const screen = $("emu-screen") as HTMLCanvasElement;
+  // the screen as the firmware drew it, 240x240 (the 3D case shows it; window.wedgie.screen() reads it)
+  const screen = document.createElement("canvas");
+  screen.width = screen.height = 240;
   const g = screen.getContext("2d")!;
   g.fillStyle = "#000"; g.fillRect(0, 0, 240, 240);
   const img = g.createImageData(240, 240);
@@ -123,16 +105,6 @@ export function emu(main: HTMLElement) {
     function send(k: string, down: boolean) {
       worker.postMessage({ t: "key", k, down });
       w3d?.keyVisual(k, down);
-      document.querySelector(`.ek[data-k="${k}"]`)?.classList.toggle("down", down);
-    }
-    for (const b of document.querySelectorAll<HTMLButtonElement>(".ek")) {
-      const k = b.dataset.k!;
-      b.addEventListener("pointerdown", (e) => { e.preventDefault(); b.setPointerCapture(e.pointerId); hold(k, true, "p" + e.pointerId); });
-      const up = (e: PointerEvent) => hold(k, false, "p" + e.pointerId);
-      b.addEventListener("pointerup", up);
-      b.addEventListener("pointercancel", up);
-      b.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") e.stopPropagation(); });
-      b.addEventListener("click", (e) => { if (e.detail === 0) { hold(k, true, "kb"); hold(k, false, "kb"); } });   // Enter/Space on the focused button
     }
     const kbd = new Set<string>();
     addEventListener("keydown", (e) => {

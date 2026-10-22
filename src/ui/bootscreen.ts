@@ -68,7 +68,8 @@ function draw(title: string, what: string, p: number, sub = "") {
   g.fillStyle = P.INK; g.font = "16px Silkscreen, monospace";
   const words = title.split(/\s+/), lines = [""];
   for (const w of words) { if (lines[lines.length - 1] && (lines[lines.length - 1] + " " + w).length > 15) lines.push(""); lines[lines.length - 1] = (lines[lines.length - 1] + " " + w).trim(); }
-  const ls = lines.filter(Boolean).slice(0, 2);
+  const [v, ...r] = title.split(" "), rest = r.join(" ");      // loader.screen: "Installing" over "Safe Signer"
+  const ls = title.length > 15 && rest && rest.length <= 15 ? [v, rest] : lines.filter(Boolean).slice(0, 2);
   ls.forEach((s, i) => g.fillText(s, 120, (ls.length === 1 ? 30 : 16) + i * 24));
   if (sub) { g.fillStyle = P.MUTED; g.font = "8px Silkscreen, monospace"; g.fillText(sub.slice(0, 28), 120, ls.length === 1 ? 52 : 62); }
   if (what) { g.fillStyle = P.MUTED; g.font = "8px Silkscreen, monospace"; g.fillText(what.slice(0, 28), 120, 214); }

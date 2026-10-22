@@ -90,16 +90,31 @@ function loop() {
   if (!chip) return;
   const now = performance.now();
   const ahead = chip.ms - chip0 - (now - wall0);
-  if (ahead > 0) { setTimeout(loop, Math.min(20, ahead)); frame(); return; }
+  if (ahead > 0) { releaseDue(); setTimeout(loop, Math.min(20, ahead)); frame(); return; }
   if (ahead < -100) { wall0 = now; chip0 = chip.ms; }
   const c = chip.ms;
   chip.run(8);
+  releaseDue();
   sChip += chip.ms - c;
   if (now - sWall > 1000) { speed = sChip / (now - sWall); sWall = now; sChip = 0; stat(); }
   frame();
   tick.port2.postMessage(0);
 }
 function go() { wall0 = sWall = performance.now(); chip0 = chip!.ms; sChip = 0; loop(); }
+
+// ---- keys: every press lasts at least MIN_PRESS of the chip's own time. A down and its up can land in
+// the same gap between run slices (a quick click); the firmware polls every ~20 ms and would miss it.
+const MIN_PRESS = 120;
+const downAt = new Map<string, number>(), upDue = new Map<string, number>();
+function key(k: string, down: boolean) {
+  if (!chip) return;
+  if (down) { upDue.delete(k); downAt.set(k, chip.ms); chip.key(k, true); return; }
+  const due = (downAt.get(k) ?? 0) + MIN_PRESS;
+  if (chip.ms >= due) chip.key(k, false); else upDue.set(k, due);
+}
+function releaseDue() {
+  for (const [k, due] of upDue) if (chip && chip.ms >= due) { upDue.delete(k); chip.key(k, false); }
+}
 
 // ---- the USB serial port, for any wedgie.dev tab ---------------------------------------------------
 // A tab opens it holding a Web Lock named for its session; the lock goes when the tab does (closed,
@@ -126,7 +141,7 @@ scope.onmessage = async (e) => {
   const m = e.data;
   try {
     if (m.t === "boot") { await load(); go(); ch.postMessage({ t: "here", id, usb: chip!.connected }); stat(); }
-    else if (m.t === "key") chip?.key(m.k, m.down);
+    else if (m.t === "key") key(m.k, m.down);
     else if (m.t === "power") { owner = null; chip?.powerCycle(); }
     else if (m.t === "wipe") {
       owner = null;

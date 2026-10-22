@@ -1,28 +1,11 @@
-/* /emu: the 3D wedgie left, its screen at 2x and its buttons right; stacked on a phone. */
+/* /emu: one 3D wedgie, as big as fits; its status and buttons under it. */
 .emu { padding: 20px 0 40px; }
 .emu h1 { margin: 0 0 4px; }
 .emu-sub { margin: 0 0 18px; color: var(--muted); }
-.emu-grid { display: grid; grid-template-columns: minmax(0, 1fr) 520px; gap: 20px; align-items: start; }
-.emu-stage { border-radius: 30px; padding: 20px; min-height: 360px; display: flex; align-items: center; }
-.emu-side { display: flex; flex-direction: column; gap: 14px; align-items: center; }
-#emu-screen { width: 480px; height: 480px; max-width: 100%; aspect-ratio: 1; image-rendering: pixelated; border-radius: 10px; background: #000;
-  box-shadow: 0 0 0 10px #1c1c1e; }
-.emu-pad { display: flex; gap: 40px; align-items: center; justify-content: center; }
-.emu-joy { display: grid; grid-template-columns: repeat(3, 56px); grid-template-rows: repeat(3, 56px); gap: 6px; }
-.emu-joy [data-k="up"] { grid-area: 1 / 2; } .emu-joy [data-k="left"] { grid-area: 2 / 1; } .emu-joy [data-k="press"] { grid-area: 2 / 2; }
-.emu-joy [data-k="right"] { grid-area: 2 / 3; } .emu-joy [data-k="down"] { grid-area: 3 / 2; }
-.emu-abxy { display: grid; grid-template-rows: repeat(4, 50px); gap: 8px; }
-.ek { -webkit-appearance: none; appearance: none; border: 0; font: inherit; font-weight: 900; font-size: 20px; border-radius: 14px; cursor: pointer;
-  color: #fff; background: var(--grey-fill); min-width: 56px; touch-action: none; user-select: none; -webkit-user-select: none;
-  box-shadow: inset 0 2px 0 rgba(255,255,255,.25), 0 3px 0 #3a3b3d; }
-.ek.ek-a { background: var(--green-fill); box-shadow: inset 0 2px 0 rgba(255,255,255,.3), 0 3px 0 #0f6e28; }
-.ek.ek-y { background: var(--red-fill); box-shadow: inset 0 2px 0 rgba(255,255,255,.3), 0 3px 0 #8a1714; }
-.ek.ek-press { border-radius: 50%; }
-.ek.down { transform: translateY(3px); box-shadow: none; filter: brightness(1.25); }
-.emu-abxy .ek { min-width: 110px; }
-.emu-keys { margin: 0; }
+.emu-stage { border-radius: 30px; padding: 20px; min-height: 360px; display: flex; align-items: center; justify-content: center; }
+.emu-stage .w3d-holder { max-width: 1000px; }
+.emu-keys { text-align: center; margin: 14px 0 6px; }
 .emu-status { font-weight: 800; text-align: center; }
-.emu-bar { width: 100%; height: 10px; border-radius: 5px; background: #dcdcd7; overflow: hidden; }
+.emu-bar { max-width: 480px; margin: 8px auto; height: 10px; border-radius: 5px; background: #dcdcd7; overflow: hidden; }
 .emu-bar > div { height: 100%; width: 0; background: var(--green-fill); transition: width .3s; }
-.emu-actions { justify-content: center; }
-@media (max-width: 1000px) { .emu-grid { grid-template-columns: 1fr; } }
+.emu-actions { justify-content: center; margin-top: 10px; }
