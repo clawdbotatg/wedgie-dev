@@ -738,7 +738,7 @@ body.dock-running #s-msg { display: none; }
 /* one Safe: the dark top card */
 .sx-hero { width: 100%; box-sizing: border-box; padding: 20px 24px 24px; border-radius: 28px; background: #161716; color: #fff; text-align: left;
   box-shadow: 0 24px 40px -24px rgba(0,0,0,.6); }
-.sx-hero-set { background: #2c2d2c; }
+.sx-hero-set { background: #4a4c4a; }
 .sx-hero a { color: inherit; }
 .sx-hero .fine { color: rgba(255,255,255,.65); }
 .sx-hero-id { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
