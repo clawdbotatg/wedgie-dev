@@ -757,8 +757,11 @@ body.dock-running #s-msg { display: none; }
 .sx-hero-id .addr-lg .addr-copy svg { width: 20px; height: 20px; }
 .sx-hero-id .addr-lg { gap: 12px; min-width: 0; }
 .sx-chains { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 0; }
-.sx-hero .sx-pill { background: rgba(255,255,255,.12); color: #fff; }
-.sx-hero .sx-pill.sx-on { background: rgba(255,255,255,.24); }
+.sx-hero .sx-pill { background: rgba(255,255,255,.06); color: rgba(255,255,255,.45); }
+.sx-hero .sx-pill .sx-chain-img { opacity: .45; }
+.sx-hero .sx-pill:hover { color: rgba(255,255,255,.8); }
+.sx-hero .sx-pill.sx-on { background: #fff; color: var(--ink); }
+.sx-hero .sx-pill.sx-on .sx-chain-img { opacity: 1; }
 .sx-total { font-size: clamp(42px, 9vw, 64px); font-weight: 900; letter-spacing: -.03em; line-height: 1; margin: 22px 0 6px; font-variant-numeric: tabular-nums; }
 .sx-total-sm { font-size: 34px; }
 .sx-sub { color: rgba(255,255,255,.7); font-weight: 700; font-size: 15px; }
