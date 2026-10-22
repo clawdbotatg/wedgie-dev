@@ -74,8 +74,13 @@ const DATA_MAX = 8000;      // wedgie-safe safe_data pieces: up to this many byt
 // Safe's service goes through /api/safe (our key: without one Safe allows 5,000 reads a month per IP, and one person's
 // page used that up, 10-21), at most 3 at a time (the key: 5 a second). A local preview has no /api: straight there.
 const SAFE = "https://api.safe.global/tx-service/";
-const via = (url: string) => url.startsWith(SAFE) && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname)
-  ? `${location.origin}/api/safe?u=${encodeURIComponent(url.slice(SAFE.length))}` : url;
+const via = (url: string) => {
+  const fresh = url.endsWith("?fresh"), u = fresh ? url.slice(0, -6) : url;
+  return u.startsWith(SAFE) && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname)
+    ? `${location.origin}/api/safe?u=${encodeURIComponent(u.slice(SAFE.length))}${fresh ? "&fresh=1" : ""}` : u;
+};
+/** Our daily share of Safe's service is used (/api/safe's 429): the rest comes from the chain till tomorrow. */
+const REST = "Safe's service is resting till tomorrow.";
 let safeBusy = 0;
 const safeWait: (() => void)[] = [];
 async function safeFetch(url: string, init?: RequestInit) {
@@ -649,7 +654,11 @@ export function safe(main: HTMLElement) {
   };
 
   // ---- /safe: every Safe the wedgie (and the wallet) owns, on every chain ----
-  async function findSafes() {
+  // Each address's Safes per chain, as Safe's service said, kept a day: the list opens without asking it 14 chains ×
+  // each address again (its free plan is 50K reads a month: /api/safe). Refresh asks again.
+  const OWNED = "wedgie.safe.owned", DAY = 86_400_000;
+  const owned = (): Record<string, { at: number; safes: string[] }> => { try { return JSON.parse(localStorage.getItem(OWNED) || "{}"); } catch { return {}; } };
+  async function findSafes(fresh = false) {
     if (!signer && !account) return;
     if (listing) { findAgain = true; return; }    // a wallet or wedgie arrived mid-check: once more after
     listing = true; listPct = 8; lastFind = Date.now(); paintList();
@@ -666,9 +675,16 @@ export function safe(main: HTMLElement) {
     };
     // Safe's API, asked for six chains at once, sometimes says 429 or fails: try again before giving up on a chain
     const of = async (c: number, a: string) => {
+      const k = `${c}:${a.toLowerCase()}`, had = owned()[k];
+      if (!fresh && had && Date.now() - had.at < DAY) return had.safes;
       for (let i = 0; ; i++) {
-        try { return (await get(`${api(c)}/owners/${E.checksum(a)}/safes/`)).safes as string[]; } catch (e: any) {
-          if (e.status === 404 || e.status === 400 || i >= 3) return [];
+        try {
+          const safes = (await get(`${api(c)}/owners/${E.checksum(a)}/safes/${fresh ? "?fresh" : ""}`)).safes as string[];
+          try { const all = owned(); all[k] = { at: Date.now(), safes }; localStorage.setItem(OWNED, JSON.stringify(all)); } catch {}
+          return safes;
+        } catch (e: any) {
+          if (e.status === 404 || e.status === 400) return [];
+          if (e.status === 429 || i >= 3) return had?.safes || [];     // 429: our daily share of Safe's service is used
           await sleep(700 * 2 ** i);
         }
       }
@@ -752,7 +768,7 @@ export function safe(main: HTMLElement) {
     box.innerHTML = h;
     if (typed) { const el = $("l-addr") as HTMLInputElement; el.value = typed; el.dispatchEvent(new Event("input")); }
     $("l-new").onclick = () => openSheet("create");
-    $("l-refresh").onclick = () => findSafes();
+    $("l-refresh").onclick = () => findSafes(true);
     $("l-wallet")?.addEventListener("click", () => { showWallet = !showWallet; paintList(); });
     $("l-open").onclick = () => {
       const el = $("l-addr") as HTMLInputElement;
@@ -987,7 +1003,7 @@ export function safe(main: HTMLElement) {
       const j = await within(get(`${api(c)}/safes/${a}/all-transactions/?executed=true&queued=false&limit=25`));
       if (c === chain && a === safeAddr) { activity = j.results || []; activityErr = ""; }
     } catch (e: any) {
-      if (c === chain && a === safeAddr) { activity = activity || []; activityErr = e.status === 404 ? "" : "Couldn't load it just now."; }
+      if (c === chain && a === safeAddr) { activity = activity || []; activityErr = e.status === 404 ? "" : e.status === 429 ? REST : "Couldn't load it just now."; }
     }
     if (c === chain && a === safeAddr) paintActivity();
   }
@@ -1065,10 +1081,11 @@ export function safe(main: HTMLElement) {
       all.set(h, m);
     };
     const missed: string[] = [];
+    let rest = false;
     await Promise.all([
       within(get(`${api(c)}/safes/${a}/multisig-transactions/?executed=false&nonce__gte=${nonce}&ordering=nonce&limit=20`))
         .then((j) => (j.results || []).forEach((t: any) => add(t, t.confirmations || [], true)))
-        .catch((e: any) => { if (e.status !== 404) missed.push("Safe's service"); }),   // 404: a Safe made seconds ago
+        .catch((e: any) => { if (e.status === 429) rest = true; else if (e.status !== 404) missed.push("Safe's service"); }),   // 404: a Safe made seconds ago
       useIW(c) ? within(fetch(`${IWQ}?chainId=${c}&safe=${a}`).then((r) => r.json()))
         .then((j) => { if (j.error) throw new Error(j.error); (j.txs || []).forEach((t: any) => add({ ...t.tx, hash: t.hash }, t.sigs)); })
         .catch(() => missed.push("Instant Wallet")) : null,
@@ -1076,7 +1093,7 @@ export function safe(main: HTMLElement) {
     const mine = localQ(c, a);
     for (const [h, t] of Object.entries(mine)) if (+t.nonce < nonce) delete mine[h]; else add(t, t.confirmations);
     try { localStorage.setItem(qKey(c, a), JSON.stringify(mine)); } catch {}
-    queueNote = missed.length ? `${missed.join(" and ")} didn't answer just now.` : "";
+    queueNote = [rest ? REST : "", missed.length ? `${missed.join(" and ")} didn't answer just now.` : ""].filter(Boolean).join(" ");
     return [...all.values()].sort((x, y) => +x.nonce - +y.nonce);
   }
 
