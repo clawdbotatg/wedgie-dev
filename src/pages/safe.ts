@@ -652,8 +652,10 @@ export function safe(main: HTMLElement) {
 
   async function checkDeployed() {
     if (!signer || !safeAddr) return;
-    const c = chain;
-    try { deployed[c] = await hasCode(c, ownedBy()[0] || signer); } catch { deployed[c] = undefined; }
+    const c = chain, a = ownedBy()[0] || signer;
+    // "no code" is read twice, a few seconds apart: just after Make it, the node can be a block behind and say no.
+    // That showed "Set up your wedgie" for one already set up; its button then found it there and did nothing (Austin, 10-22)
+    try { deployed[c] = await hasCode(c, a) || (await sleep(4000), await hasCode(c, a)); } catch { deployed[c] = undefined; }
     paintWedgie();
   }
 
