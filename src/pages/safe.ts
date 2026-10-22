@@ -526,8 +526,10 @@ export function safe(main: HTMLElement) {
   function paintSpin() {
     const on = wedgieWait || listing || opening || (!!safeAddr && !!info && !assets && !assetsErr);
     const big = on && !safeAddr && !signer && !rows.length;
-    const el = $("s-spin");
-    el.hidden = !on || big;
+    // on the list: after its heading instead
+    const inList = document.getElementById("l-spin");
+    if (inList) inList.hidden = !on || big || $("s-list").hidden;
+    $("s-spin").hidden = !on || big || !!(inList && !$("s-list").hidden);
     $("s-first").hidden = !big;
   }
   // No wedgie here: the way back to get one (same as /connect without one).
@@ -759,10 +761,9 @@ export function safe(main: HTMLElement) {
   };
 
   function paintList() {
-    paintSpin();
     const box = $("s-list");
     box.hidden = !!safeAddr || !signer;
-    if (box.hidden) return;
+    if (box.hidden) { paintSpin(); return; }
     // one card per address: the same Safe on several chains is one Safe, its worth all of them together
     const groups = (list: Row[]) => {
       const by = new Map<string, Row[]>();
@@ -785,7 +786,7 @@ export function safe(main: HTMLElement) {
     // most money first (a Safe that couldn't be priced yet: after the ones that could)
     const sum = (g: Row[]) => g.reduce((n, r) => n + (r.info ? worthUsd(r.chain, r.info) ?? 0 : 0), 0);
     const all = groups(rows).sort((x, y) => sum(y) - sum(x)), mine = all.filter((g) => g.some((r) => r.wedgie)), theirs = all.filter((g) => !g.some((r) => r.wedgie));
-    let h = `<div class="sx-head"><h1>Your wedgie's Safes</h1><button class="btn btn-green" id="l-new"${dis()}>＋ New Safe</button></div>`;
+    let h = `<div class="sx-head"><h1>Your wedgie's Safes<span class="sx-spin sx-spin-h" id="l-spin" hidden></span></h1><button class="btn btn-green" id="l-new"${dis()}>＋ New Safe</button></div>`;
     h += mine.length ? `<ul class="sx-safes">${mine.map(card).join("")}</ul>`
       : listing ? ``
       : `<div class="sx-card sx-empty"><p><b>No Safes yet.</b></p><p class="fine">Make one, or add your wedgie to a Safe you have.</p></div>`;
@@ -796,6 +797,7 @@ export function safe(main: HTMLElement) {
       <p class="sx-row">${addressInput("l-addr", "0x… or ENS name of a Safe")} <select id="l-chain">${chainOpts(newChain)}</select> <button class="btn btn-sm" id="l-open">Open</button></p></details>
       <p class="sx-foot"><button class="btn btn-sm" id="l-refresh"${dis(listing)}>Refresh</button></p>`;
     box.innerHTML = h;
+    paintSpin();
     if (typed) { const el = $("l-addr") as HTMLInputElement; el.value = typed; el.dispatchEvent(new Event("input")); }
     $("l-new").onclick = () => openSheet("create");
     $("l-refresh").onclick = () => findSafes(true);
