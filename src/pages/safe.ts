@@ -870,11 +870,13 @@ export function safe(main: HTMLElement) {
     for (const a of ownerInputs()) if (!owners.some((o) => eqA(o, a))) owners.push(a);
     const th = +($("c-th") as HTMLSelectElement).value;
     account = await wallet(c);
-    const r = await send(c, E.MULTICALL3, E.newSafeData(key!.x, key!.y, owners, th, BigInt(Date.now())), say);
+    const data = E.newSafeData(key!.x, key!.y, owners, th, BigInt(Date.now()));
+    const r = await send(c, E.MULTICALL3, data, say);
     const log = (r.logs || []).find((l: any) => eqA(l.address, E.SAFE_FACTORY) && l.topics[0] === E.PROXY_CREATION);
     if (!log) throw new Error("It ran, but no new Safe showed up in it: " + r.transactionHash);
     deployed[c] = true;
     const a = E.checksum("0x" + log.topics[1].slice(26));
+    try { saveRecipe(a, await recipeIn(c, E.SAFE_FACTORY, data, a)); } catch {}   // to copy it to other chains at once
     remember(c, a);
     await tellWedgie(c, a);
     $("s-create").innerHTML = "";
@@ -1070,17 +1072,38 @@ export function safe(main: HTMLElement) {
     try { const r = await recipeOf(c, a); if (c === chain && a === safeAddr) { recipe = r; paintChains(); } } catch {}
   }
 
-  /** How the Safe was made: its creation transaction (from Safe's API), the factory call found in it and checked. */
-  async function recipeOf(c: number, a: string): Promise<E.Recipe> {
-    let cr: any;
-    try { cr = await get(`${api(c)}/safes/${a}/creation/`); }
-    catch (e: any) { throw new Error(e.status === 404 ? "Safe's API hasn't seen this Safe yet. Try again in a minute." : msgOf(e)); }
-    const tx = await rpc(c, "eth_getTransactionByHash", [cr.transactionHash]) as any;
-    const ret = E.bytes(await view(c, cr.factoryAddress, E.selector("proxyCreationCode()")));
+  // How each Safe was made, saved in this browser (the same on every chain): one made or read here copies at once,
+  // without waiting for Safe's API to index it.
+  const RECIPES = "wedgie.safe.recipe";
+  const savedRecipe = (a: string): E.Recipe | null => {
+    try { const r = JSON.parse(localStorage.getItem(RECIPES) || "{}")[a.toLowerCase()]; return r ? { ...r, salt: BigInt(r.salt) } : null; } catch { return null; }
+  };
+  const saveRecipe = (a: string, r: E.Recipe) => {
+    try { const all = JSON.parse(localStorage.getItem(RECIPES) || "{}"); all[a.toLowerCase()] = { ...r, salt: String(r.salt) }; localStorage.setItem(RECIPES, JSON.stringify(all)); } catch {}
+  };
+  /** The factory call that made `a`, found in a transaction's input and checked against the address. */
+  async function recipeIn(c: number, factory: string, input: string, a: string) {
+    const ret = E.bytes(await view(c, factory, E.selector("proxyCreationCode()")));
     const at = Number(BigInt(E.hex(ret.slice(0, 32)))), n = Number(BigInt(E.hex(ret.slice(at, at + 32))));
-    const r = tx?.input && E.findRecipe(tx.input, a, cr.factoryAddress, E.hex(ret.slice(at + 32, at + 32 + n)));
+    const r = input && E.findRecipe(input, a, factory, E.hex(ret.slice(at + 32, at + 32 + n)));
     if (!r) throw new Error("Couldn't find how this Safe was made, so it can't be copied to another chain.");
     return r;
+  }
+  /** How the Safe was made: saved here, else its creation transaction from Safe's API (this chain, then any other it's on). */
+  async function recipeOf(c: number, a: string): Promise<E.Recipe> {
+    const kept = savedRecipe(a);
+    if (kept) return kept;
+    let err: any = null;
+    for (const t of [c, ...IDS.filter((t) => t !== c && copies[t])]) {
+      try {
+        const cr = await get(`${api(t)}/safes/${a}/creation/`);
+        const tx = await rpc(t, "eth_getTransactionByHash", [cr.transactionHash]) as any;
+        const r = await recipeIn(t, cr.factoryAddress, tx?.input, a);
+        saveRecipe(a, r);
+        return r;
+      } catch (e: any) { err ||= e; }
+    }
+    throw new Error(err?.status === 404 ? "Safe's API hasn't seen this Safe yet. Try again in a minute." : msgOf(err));
   }
 
   async function copyTo(t: number) {
