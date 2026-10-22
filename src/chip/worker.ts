@@ -42,7 +42,14 @@ setInterval(() => {
 async function load(fresh = false) {
   if (!rom) rom = new Uint8Array(await (await fetch("/emu/bootrom-b1.bin")).arrayBuffer());
   let uid: Uint8Array | undefined = await kv("uid").catch(() => undefined);
-  if (!uid) { uid = crypto.getRandomValues(new Uint8Array(8)); await kv("uid", uid).catch(() => {}); }
+  // Its ID (the last 6 hex digits) is EEE + 3 digits: E for emulator, so it reads as virtual. Made once,
+  // kept for good (a wipe keeps it, like a real board's). One from before this gets its EEE now, once.
+  if (!uid || !isEee(uid)) {
+    uid = uid || crypto.getRandomValues(new Uint8Array(8));
+    const n = (uid[5] * 256 + uid[6]) % 1000, d = [Math.floor(n / 100), Math.floor(n / 10) % 10, n % 10];
+    uid[5] = 0xee; uid[6] = 0xe0 | d[0]; uid[7] = (d[1] << 4) | d[2];
+    await kv("uid", uid).catch(() => {});
+  }
   id = [...uid].map((b) => b.toString(16).padStart(2, "0")).join("");
   const saved: Uint8Array | undefined = fresh ? undefined : await kv("flash").catch(() => undefined);
   // New: a wedgie as the bench leaves one (firmware + Welcome, tools/emuimage.mjs); without that image, a
@@ -61,6 +68,8 @@ async function load(fresh = false) {
     onFlash: () => { dirty = performance.now(); },
   });
 }
+
+const isEee = (u: Uint8Array) => u[5] === 0xee && u[6] >> 4 === 0xe && (u[6] & 15) < 10 && u[7] >> 4 < 10 && (u[7] & 15) < 10;
 
 async function newFlash() {
   const img = flashFromUf2(new Uint8Array(await (await fetch("/mp/RPI_PICO.uf2")).arrayBuffer()));
