@@ -76,22 +76,23 @@ const DATA_MAX = 8000;      // wedgie-safe safe_data pieces: up to this many byt
 // Safe's service goes through /api/safe (our key: without one Safe allows 5,000 reads a month per IP, and one person's
 // page used that up, 10-21), at most 3 at a time (the key: 5 a second). A local preview has no /api: straight there.
 const SAFE = "https://api.safe.global/tx-service/";
-const via = (url: string) => {
+// q: more for /api/safe (&v=<version> keeps an answer for everyone till the version changes, &fresh=1 asks Safe again)
+const via = (url: string, q = "") => {
   const fresh = url.endsWith("?fresh"), u = fresh ? url.slice(0, -6) : url;
   return u.startsWith(SAFE) && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname)
-    ? `${location.origin}/api/safe?u=${encodeURIComponent(u.slice(SAFE.length))}${fresh ? "&fresh=1" : ""}` : u;
+    ? `${location.origin}/api/safe?u=${encodeURIComponent(u.slice(SAFE.length))}${fresh ? "&fresh=1" : ""}${q}` : u;
 };
 /** Our daily share of Safe's service is used (/api/safe's 429): the rest comes from the chain till tomorrow. */
 const REST = "Safe's service is resting till tomorrow.";
 let safeBusy = 0;
 const safeWait: (() => void)[] = [];
-async function safeFetch(url: string, init?: RequestInit) {
+async function safeFetch(url: string, init?: RequestInit, q = "") {
   if (safeBusy >= 3) await new Promise<void>((r) => safeWait.push(r));
   safeBusy++;
-  try { return await fetch(via(url), init); } finally { safeBusy--; safeWait.shift()?.(); }
+  try { return await fetch(via(url, q), init); } finally { safeBusy--; safeWait.shift()?.(); }
 }
-async function get(url: string) {
-  const r = await safeFetch(url);
+async function get(url: string, q = "") {
+  const r = await safeFetch(url, undefined, q);
   if (!r.ok) throw Object.assign(new Error(`Safe's API: ${r.status} ${(await r.text()).slice(0, 200)}`), { status: r.status });
   return r.json();
 }
@@ -1044,7 +1045,8 @@ export function safe(main: HTMLElement) {
   }
 
   /** The Safe from the chain (the truth), its queue from Safe's API. */
-  async function load(quiet = false, bg = false) {   // bg: the background check (recheck), Safe's service from svcKept
+  async function load(quiet = false, bg = false, refresh = false) {   // bg: the background check (recheck); svcGet
+    const fresh = refresh || (quiet && !bg);    // Refresh, or a quiet load just after a sign: Safe's newest
     if (!quiet) say("Opening the Safe.");
     const c = chain, a = safeAddr;
     opening = true; paintSpin();
@@ -1065,9 +1067,9 @@ export function safe(main: HTMLElement) {
       paintAll();             // the Safe from the chain now; its queue, tokens and history as the sources answer
       if (!quiet) checkCopies(c, a);
       loadAssets(c, a, i).catch(() => { if (c === chain && a === safeAddr) { assetsErr = true; paintSpin(); } });
-      loadActivity(c, a, bg);
+      loadActivity(c, a, { bg, fresh });
       readAddons(c, a).then((x) => { if (c === chain && a === safeAddr) { addons = x; paintSafe(); paintAddons(); } }, () => {});
-      const q = await readQueue(c, a, i.nonce, bg);
+      const q = await readQueue(c, a, i.nonce, { bg, fresh });
       if (c !== chain || a !== safeAddr) return;
       queue = q; queueOf = `${c}:${a}`;
       takeAsks();
@@ -1105,23 +1107,25 @@ export function safe(main: HTMLElement) {
   }
 
 
-  // The background check (each minute, the tab back in view) asks Safe's service again only when the Safe changed (its
-  // number, its coins) or 5 minutes passed: an open tab was ~120 calls an hour, and the site has 1,500 a day (/api/safe)
-  const SVC_QUIET_MS = 5 * 60_000;
+  // Safe's service, light (the site has 1,500 calls a day, /api/safe): the background check (each minute, the tab back
+  // in view) asks again only when the Safe changed on chain (its number, its coins) or keepMs passed. The history goes
+  // with that version (v), so /api/safe keeps it for everyone till it changes; the queue, 2 min (a proposal in
+  // Safe{Wallet} changes nothing on chain). fresh: Refresh, or just after a sign: past every keep.
   const svcKept = new Map<string, { at: number; j: any }>();
-  async function svcGet(url: string, bg: boolean) {
-    const k = `${url}|${info?.nonce}|${info?.balance}|${info?.usdc}`, hit = svcKept.get(k);
-    if (bg && hit && Date.now() - hit.at < SVC_QUIET_MS) return hit.j;
-    const j = await within(get(url));
+  const version = () => info ? `${info.nonce}.${info.balance}.${info.usdc}` : "";
+  async function svcGet(url: string, o: { bg: boolean; fresh: boolean; keepMs: number; v?: boolean }) {
+    const k = `${url}|${version()}`, hit = svcKept.get(k);
+    if (o.bg && !o.fresh && hit && Date.now() - hit.at < o.keepMs) return hit.j;
+    const j = await within(get(o.fresh ? url + "?fresh" : url, o.v && version() ? `&v=${version()}` : ""));
     if (svcKept.size > 50) svcKept.clear();
     svcKept.set(k, { at: Date.now(), j });
     return j;
   }
 
   /** What happened: Safe's API (its executed transactions, and money that came in). */
-  async function loadActivity(c: number, a: string, bg = false) {
+  async function loadActivity(c: number, a: string, o = { bg: false, fresh: false }) {
     try {
-      const j = await svcGet(`${api(c)}/safes/${a}/all-transactions/?executed=true&queued=false&limit=25`, bg);
+      const j = await svcGet(`${api(c)}/safes/${a}/all-transactions/?executed=true&queued=false&limit=25`, { ...o, keepMs: 30 * 60_000, v: true });
       if (c === chain && a === safeAddr) { activity = j.results || []; activityErr = ""; }
     } catch (e: any) {
       if (c === chain && a === safeAddr) { activity = activity || []; activityErr = e.status === 404 ? "" : e.status === 429 ? REST : "Couldn't load it just now."; }
@@ -1214,7 +1218,7 @@ export function safe(main: HTMLElement) {
   const TX_FIELDS = ["to", "value", "data", "operation", "safeTxGas", "baseGas", "gasPrice", "gasToken", "refundReceiver", "nonce"] as const;
   const txOf = (t: any): E.SafeTx => Object.fromEntries(TX_FIELDS.map((k) => [k, k === "data" ? t.data || "0x" : t[k]])) as any;
 
-  async function readQueue(c: number, a: string, nonce: number, bg = false): Promise<any[]> {
+  async function readQueue(c: number, a: string, nonce: number, o = { bg: false, fresh: false }): Promise<any[]> {
     const all = new Map<string, any>(), dropped = new Set<string>();
     const add = (t: any, sigs: { owner: string; signature: string | null }[], fromSafe = false) => {
       if (+t.nonce < nonce) return;
@@ -1229,7 +1233,7 @@ export function safe(main: HTMLElement) {
     const missed: string[] = [];
     let rest = false;
     await Promise.all([
-      svcGet(`${api(c)}/safes/${a}/multisig-transactions/?executed=false&nonce__gte=${nonce}&ordering=nonce&limit=20`, bg)
+      svcGet(`${api(c)}/safes/${a}/multisig-transactions/?executed=false&nonce__gte=${nonce}&ordering=nonce&limit=20`, { ...o, keepMs: 2 * 60_000 })
         .then((j) => (j.results || []).forEach((t: any) => add(t, t.confirmations || [], true)))
         .catch((e: any) => { if (e.status === 429) rest = true; else if (e.status !== 404) missed.push("Safe's service"); }),   // 404: a Safe made seconds ago
       useIW(c) ? within(fetch(`${IWQ}?chainId=${c}&safe=${a}`).then((r) => r.json()))
@@ -1412,7 +1416,7 @@ export function safe(main: HTMLElement) {
       ${items ? `<ul class="sx-txs">${items}</ul>` : `<p class="fine">Nothing waiting.</p>`}
       ${queueNote ? `<p class="fine">${esc(queueNote)}</p>` : ""}
       <p class="sx-foot"><button class="btn btn-sm" id="s-refresh"${dis()}>Refresh</button></p>`;
-    $("s-refresh").onclick = () => job(() => load());
+    $("s-refresh").onclick = () => job(() => load(false, false, true));
     document.getElementById("s-execall")?.addEventListener("click", () => job(async () => {
       running = run[0]; runningAll = run; paintDock();
       try { await executeAll(run); } finally { running = null; runningAll = []; }
@@ -1654,7 +1658,7 @@ export function safe(main: HTMLElement) {
   async function settle(n: number) {
     for (let i = 0; i < 20; i++) {
       say("It ran. Updating the Safe.", 75 + 20 * (1 - 0.8 ** i));
-      await load(true);
+      await load(true, true);      // as the background check: Safe's service again once the nonce moves (a new version)
       if (info && info.nonce > n && !queue.some((x) => +x.nonce <= n)) return;
       await sleep(2000);
     }
