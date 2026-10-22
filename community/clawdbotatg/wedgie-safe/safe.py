@@ -25,6 +25,10 @@
 #   in, newest first, so any computer can list them. {"type":"safe_note","chainId":8453,"safe":"0x.."} adds
 #   one (a host that made or opened it); signing for a Safe adds it too. Just a list of addresses: a host
 #   checks on chain that the wedgie really is an owner before it shows one.
+#   {"type":"safe_remove","tx":{..the fields, "dataHash":"0x.." instead of data..},"totp":<hour>} -> safe_sig with
+#   "deleteHash": the wedgie works out the Safe tx hash, shows "Remove #n?", and on A signs Safe's DeleteRequest
+#   (EIP-712, what Safe's Transaction Service asks a proposer to sign) for it. Hosts drop it from their list; it
+#   can still run (only a tx at its nonce stops it), and the screen says so.
 import sys, select, json, time, gc, binascii, hashlib
 import lcd as L
 import wedgie as W
@@ -32,7 +36,7 @@ import save
 import ui
 from ui import WHITE, INK, MUTED, GREEN_D, RED
 
-FW = "safe-22"
+FW = "safe-23"
 RP_ID = b"wedgie.dev"
 FIELDS = '"origin":"https://wedgie.dev"'
 ASK_MS = 120000
@@ -40,6 +44,11 @@ SETTLE = 600        # ms a page is up before a press can answer it
 
 DOMAIN_TYPEHASH = binascii.unhexlify("47e79534a245952e8b16893a336b85a3d9ea9fa8c573f3d803afb92a79469218")
 SAFE_TX_TYPEHASH = binascii.unhexlify("bb8310d486368db6bd6f849402fdd73ad53d316b5a4b2644ad6efe0f941286d8")
+# Safe's Transaction Service's delete message: EIP712Domain(name,version,chainId,verifyingContract), DeleteRequest
+NAMED_DOMAIN_TYPEHASH = binascii.unhexlify("8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffacaa9a75d522b39400f")
+DELETE_TYPEHASH = binascii.unhexlify("ea0e2920ae94ffdb9d98b7bbb85bc34fe4df5ccca3a98a2e3bfec8b64919fc08")
+STS_NAME = binascii.unhexlify("8f99caf1d944cedaf6deae4902281b08b040f5928da79e5d758da2e7bc8ab237")      # "Safe Transaction Service"
+STS_VERSION = binascii.unhexlify("e6bbd6277e1bf288eed5e8d1780f9a50b239e86b153736bceebccf4ea79d90b3")   # "1.0"
 
 CHAINS = {1: "Ethereum", 10: "Optimism", 56: "BNB Chain", 100: "Gnosis", 137: "Polygon", 146: "Sonic", 999: "HyperEVM",
           4663: "Robinhood", 5042: "Arc", 8453: "Base", 9745: "Plasma", 42161: "Arbitrum", 42220: "Celo",
@@ -199,10 +208,18 @@ def safe_tx_hash(tx):
     """EIP-712, as Safe 1.3+ computes getTransactionHash."""
     from safe_keccak import keccak256 as k
     domain = k(DOMAIN_TYPEHASH + word(tx["chainId"]) + aword(tx["safe"]))
-    st = k(b"".join((SAFE_TX_TYPEHASH, aword(tx["to"]), word(tx["value"]), k(tx["data"]),
+    dh = tx["dataHash"] if "dataHash" in tx else k(tx["data"])
+    st = k(b"".join((SAFE_TX_TYPEHASH, aword(tx["to"]), word(tx["value"]), dh,
                      word(tx["operation"]), word(tx["safeTxGas"]), word(tx["baseGas"]), word(tx["gasPrice"]),
                      aword(tx["gasToken"]), aword(tx["refundReceiver"]), word(tx["nonce"]))))
     return k(b"\x19\x01" + domain + st)
+
+
+def delete_hash(chain, safe, h, totp):
+    """Safe's DeleteRequest(safeTxHash, totp) for this Safe, EIP-712."""
+    from safe_keccak import keccak256 as k
+    domain = k(NAMED_DOMAIN_TYPEHASH + STS_NAME + STS_VERSION + word(chain) + aword(safe))
+    return k(b"\x19\x01" + domain + k(DELETE_TYPEHASH + h + word(totp)))
 
 
 BIG = "big"         # a line kind: big text (the amount, the limit)
@@ -499,6 +516,44 @@ def on_sign(mid, t):
             "r": "0x%064x" % r, "s": "0x%064x" % s, "authenticatorData": hx(auth), "clientDataFields": FIELDS})
 
 
+def on_remove(mid, t, totp):
+    """Sign Safe's delete request for one queued tx. The hash is worked out here from its fields; the screen says
+    which one (its number) and that it can still run."""
+    global note
+    if state != "ok":
+        W.send({"id": mid, "type": "error", "error": "no key ready"})
+        return
+    try:
+        t = dict(t or {})
+        dh = unhex(t.get("dataHash") or "")
+        if len(dh) != 32:
+            raise ValueError("dataHash")
+        t["data"] = "0x"
+        tx = parse(t)
+        tx["dataHash"] = dh
+        totp = num(totp)
+    except Exception as e:
+        W.send({"id": mid, "type": "error", "error": "bad tx: %s" % e})
+        return
+    h = safe_tx_hash(tx)
+    k = L.Keys(physical=True)
+    k.pressed()
+    foot = "%s %s" % (CHAINS.get(tx["chainId"], "chain %d" % tx["chainId"]), short(tx["safe"]))
+    if not _screen("Remove it?", [("#%d" % tx["nonce"], INK, BIG), GAP, ("Off the list. It can", INK),
+                                  ("still run till another", INK), ("tx takes #%d." % tx["nonce"], INK)],
+                   "remove", k, foot, tx["safe"]):
+        note = "said no"
+        W.send({"id": mid, "type": "refused", "safeTxHash": hx(h)})
+        return
+    ui.progress("Signing", "in the chip", False)
+    dg = delete_hash(tx["chainId"], tx["safe"], h, totp)
+    auth, w = webauthn_digest(dg)
+    r, s = sign(w)
+    note = "removed #%d" % tx["nonce"]
+    W.send({"id": mid, "type": "safe_sig", "safeTxHash": hx(h), "deleteHash": hx(dg), "x": key["x"], "y": key["y"],
+            "r": "0x%064x" % r, "s": "0x%064x" % s, "authenticatorData": hx(auth), "clientDataFields": FIELDS})
+
+
 def keep_safe(chain, safe):
     """Remember a Safe (newest first, at most SAFES_MAX). Writes the flash only for a new one."""
     k = "%d:%s" % (chain, safe.lower())
@@ -521,6 +576,9 @@ def handle(m):
         dirty = True
     elif t == "safe_data":
         on_data(mid, m)
+    elif t == "safe_remove":
+        on_remove(mid, m.get("tx"), m.get("totp"))
+        dirty = True
     elif t == "safe_list":
         W.send({"id": mid, "type": "safe_list", "safes": save.load("safes", [])})
     elif t == "safe_note":

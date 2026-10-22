@@ -1154,7 +1154,8 @@ export function safe(main: HTMLElement) {
 
   // ---- the queue: Safe's API + Instant Wallet's queue + this browser, merged by safeTxHash ----
   let queueOf = "";                     // whose queue is in `queue` (chain:safe), once read
-  const removed = new Set<string>();    // safeTxHashes taken off everywhere, this visit
+  const hKey = (c: number, a: string) => `wedgie.safe.hidden.${c}:${a.toLowerCase()}`;   // removed here: safeTxHash → nonce
+  const hiddenQ = (c: number, a: string): Record<string, number> => { try { return JSON.parse(localStorage.getItem(hKey(c, a)) || "{}"); } catch { return {}; } };
   const qKey = (c: number, a: string) => `wedgie.safe.q.${c}:${a.toLowerCase()}`;
   const localQ = (c: number, a: string): Record<string, any> => { try { return JSON.parse(localStorage.getItem(qKey(c, a)) || "{}"); } catch { return {}; } };
   const useIW = (c: number) => !CHAINS[c].test;
@@ -1162,7 +1163,7 @@ export function safe(main: HTMLElement) {
   const txOf = (t: any): E.SafeTx => Object.fromEntries(TX_FIELDS.map((k) => [k, k === "data" ? t.data || "0x" : t[k]])) as any;
 
   async function readQueue(c: number, a: string, nonce: number): Promise<any[]> {
-    const all = new Map<string, any>();
+    const all = new Map<string, any>(), dropped = new Set<string>();
     const add = (t: any, sigs: { owner: string; signature: string | null }[], fromSafe = false) => {
       if (+t.nonce < nonce) return;
       const h = String(t.safeTxHash || t.hash).toLowerCase();
@@ -1180,7 +1181,7 @@ export function safe(main: HTMLElement) {
         .then((j) => (j.results || []).forEach((t: any) => add(t, t.confirmations || [], true)))
         .catch((e: any) => { if (e.status === 429) rest = true; else if (e.status !== 404) missed.push("Safe's service"); }),   // 404: a Safe made seconds ago
       useIW(c) ? within(fetch(`${IWQ}?chainId=${c}&safe=${a}`).then((r) => r.json()))
-        .then((j) => { if (j.error) throw new Error(j.error); (j.txs || []).forEach((t: any) => add({ ...t.tx, hash: t.hash }, t.sigs)); })
+        .then((j) => { if (j.error) throw new Error(j.error); (j.txs || []).forEach((t: any) => add({ ...t.tx, hash: t.hash }, t.sigs)); (j.dropped || []).forEach((h: string) => dropped.add(h.toLowerCase())); })
         .catch(() => missed.push("Instant Wallet")) : null,
     ]);
     const mine = localQ(c, a);
@@ -1188,7 +1189,12 @@ export function safe(main: HTMLElement) {
       if (+t.nonce >= nonce) { add(t, t.confirmations); if (t.wc) all.get(h)!.wc = t.wc; }
       else if (t.wc) tellApp(c, a, h, t.wc);      // its number is used: the app hears how, then it goes
       else delete mine[h];
-    for (const h of removed) all.delete(h);       // a cached read can still have one just removed
+    // removed: by an owner's signed delete (Instant Wallet's list, for every page) or in this browser. Safe's service
+    // can still have it (it deletes only for the wallet that proposed it): hidden here all the same
+    const hid = hiddenQ(c, a);
+    for (const [h, n] of Object.entries(hid)) if (+n < nonce) delete hid[h]; else dropped.add(h);
+    try { localStorage.setItem(hKey(c, a), JSON.stringify(hid)); } catch {}
+    for (const h of dropped) all.delete(h);
     try { localStorage.setItem(qKey(c, a), JSON.stringify(mine)); } catch {}
     queueNote = [rest ? REST : "", missed.length ? `${missed.join(" and ")} didn't answer just now.` : ""].filter(Boolean).join(" ");
     return [...all.values()].sort((x, y) => +x.nonce - +y.nonce);
@@ -1332,9 +1338,8 @@ export function safe(main: HTMLElement) {
         : n < need && (btns.push(`<button class="btn btn-sm${green ? " btn-green" : ""}" data-wsign="${k}"${dis()}>Sign with wallet</button>`), green = false);
       if (n >= need) btns.push(first ? `<button class="btn btn-sm ${run.length > 1 ? "btn-grey" : "btn-green"}" data-exec="${k}"${dis()}>Execute</button>` : `<span class="fine">runs after #${i.nonce}</span>`);
       const rej = t.wc && !n ? `<button class="btn btn-sm btn-grey" data-wcno="${k}"${dis()}>Reject</button>`      // only here: nothing to cancel
-        // Remove (red) far left, then Reject (Austin). Remove only where it can work: Safe's service deletes only for
-        // the wallet that proposed it (a wedgie can't sign that)
-        : (account && isOwner(account) && (!t.inSafe || (t.proposer && eqA(t.proposer, account))) ? `<button class="btn btn-sm btn-red" data-remove="${k}"${dis()}>Remove</button> ` : "")
+        // Remove (red) far left, then Reject (Austin). Any owner here can remove (removeQueued says where it's gone from)
+        : (can() ? `<button class="btn btn-sm btn-red" data-remove="${k}"${dis()}>Remove</button> ` : "")
         + (can() && s.kind !== "cancel" && !cancelled(+t.nonce) ? `<button class="btn btn-sm btn-grey" data-reject="${k}"${dis()}>Reject</button>` : "");
       const dots = Array.from({ length: need }, (_, d) => `<i class="${d < n ? "on" : ""}"></i>`).join("");
       return `<li class="sx-tx sx-k-${s.kind}">
@@ -1378,39 +1383,65 @@ export function safe(main: HTMLElement) {
   }
 
   /**
-   * Off the queue with no transaction on chain: the next one takes its nonce. One wallet signature (a message, no
-   * gas: Safe's own DeleteRequest) takes it out of Safe's service (only the one who proposed it may there),
-   * Instant Wallet's queue (any owner) and this browser. Its signatures still exist, so a fully signed one can
-   * still be run by whoever has them: Reject is the sure way.
+   * Off the list with no transaction on chain: the next one takes its nonce. One signature (a message, no gas: Safe's
+   * own DeleteRequest), by a wallet owner or the wedgie (safe_remove, a press on it). Safe's service deletes it only
+   * for the wallet that proposed it; Instant Wallet's queue takes any owner's and lists it as dropped, so every
+   * wedgie.dev page hides it. Its signatures still exist: it can run till another tx takes its number.
    */
   async function removeQueued(t: any) {
-    const need = t.confirmationsRequired ?? info!.threshold;
-    if ((t.confirmations || []).length >= need && !await askYes(`#${t.nonce} is fully signed. Anyone with its signatures can still run it. To stop it for sure, use Reject.`, "Remove anyway")) return;
-    const from = account = await wallet(chain);
-    if (!isOwner(from)) throw new Error(`This wallet (${short(from)}) isn't an owner of this Safe.`);
-    const c = chain, a = safeAddr, h = String(t.safeTxHash).toLowerCase();
-    say("Sign the remove in your wallet. It's a message, not a transaction: no gas.");
-    const signature = E.ecdsa(await eth().request({ method: "eth_signTypedData_v4", params: [from, JSON.stringify(E.deleteTypedData(c, a, h))] }));
+    const c = chain, a = safeAddr, h = String(t.safeTxHash).toLowerCase(), n = +t.nonce;
+    const real = !t.inSafe || (!!account && isOwner(account) && !!t.proposer && eqA(t.proposer, account));   // gone from Safe's service too
+    if (!real && !await askYes(`Remove #${n}? It's hidden on wedgie.dev, but Safe{Wallet} still shows it, and it can still run until another transaction takes #${n}. Only Reject stops it for sure.`, "Remove"))
+      return;
+    if (real && (t.confirmations || []).length >= (t.confirmationsRequired ?? info!.threshold)
+      && !await askYes(`#${n} is fully signed. Anyone with its signatures can still run it until another transaction takes #${n}. Only Reject stops it for sure.`, "Remove anyway"))
+      return;
+    const useWallet = !!account && isOwner(account) && (real || !wedgieOwns());
+    let signature: string;
+    if (useWallet) {
+      const from = account = await wallet(chain);
+      say("Sign the remove in your wallet. It's a message, not a transaction: no gas.");
+      signature = E.ecdsa(await eth().request({ method: "eth_signTypedData_v4", params: [from, JSON.stringify(E.deleteTypedData(c, a, h))] }));
+    } else signature = await wedgieRemove(t);
     const kept: string[] = [];
     const toSafe = async () => {
-      if (!t.inSafe) return;
-      if (t.proposer && !eqA(t.proposer, from)) { kept.push(`Safe's service keeps it: only ${short(t.proposer)}, who proposed it, can remove it there.`); return; }
+      if (!t.inSafe || !useWallet || !real) return;
       const r = await safeFetch(`${SAFE}${CHAINS[c].key}/api/v2/multisig-transactions/${h}/`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ safeTxHash: h, signature }) });
       if (!r.ok && r.status !== 404) kept.push(`Safe's service said no: ${r.status} ${(await r.text()).slice(0, 200)}`);
     };
     const toIW = async () => {
       if (!useIW(c)) return;
-      const r = await fetch(IWQ, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chainId: c, safe: a, hash: h, signature }) });
+      const r = await fetch(IWQ, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chainId: c, safe: a, hash: h, nonce: String(n), signature }) });
       if (!r.ok) kept.push(`Instant Wallet said no: ${(await r.json().catch(() => ({}))).error || r.status}`);
     };
     await Promise.all([within(toSafe()).catch(() => kept.push("Safe's service didn't answer.")), within(toIW()).catch(() => kept.push("Instant Wallet didn't answer."))]);
-    const mine = localQ(c, a);
+    const mine = localQ(c, a), hid = hiddenQ(c, a);
     delete mine[h];
-    try { localStorage.setItem(qKey(c, a), JSON.stringify(mine)); } catch {}
-    if (!kept.length) removed.add(h);
+    hid[h] = n;                       // hidden in this browser either way
+    try { localStorage.setItem(qKey(c, a), JSON.stringify(mine)); localStorage.setItem(hKey(c, a), JSON.stringify(hid)); } catch {}
     if (t.wc) await wcStart().then((m) => m.answerError(t.wc.topic, t.wc.id, "Removed on wedgie.dev")).catch(() => {});
     await load(true);
-    say(kept.length ? `Not removed everywhere. ${kept.join(" ")}` : `Removed #${t.nonce}. The next transaction takes its number.`, !!kept.length);
+    say(kept.length ? `Removed here, but ${kept.join(" ")} Other pages may still show it.` : `Removed #${n}. Your next transaction takes #${n}.`, !!kept.length);
+  }
+  /** The wedgie signs Safe's DeleteRequest for t (safe-23+): it works out the hash, shows "Remove #n?", waits for A. */
+  async function wedgieRemove(t: any) {
+    if (!wedgie || !key) throw new Error(noWedgie());
+    const slots = ownedBy();
+    if (!slots.length) throw new Error("Your wedgie isn't an owner of this Safe.");
+    const totp = Math.floor(Date.now() / 3600_000);
+    const tx = { chainId: chain, safe: safeAddr, to: t.to, value: String(t.value), dataHash: E.hex(E.keccak256(E.bytes(t.data || "0x"))), operation: +t.operation,
+      safeTxGas: String(t.safeTxGas), baseGas: String(t.baseGas), gasPrice: String(t.gasPrice), gasToken: t.gasToken || Z,
+      refundReceiver: t.refundReceiver || Z, nonce: +t.nonce };
+    asking = true; paintAll();
+    say(`Look at the wedgie: it asks to remove #${t.nonce}. Press the green button (red says no).`);
+    try {
+      const g = await ask(wedgie, (r) => r.request({ type: "safe_remove", tx, totp }, 200000));
+      if (g.type === "refused") throw new Error("The wedgie said no.");
+      if (g.type !== "safe_sig") throw new Error(/unknown|safe_remove/i.test(String(g.error || "")) || !g.type
+        ? "Your wedgie's Safe Signer is too old to remove: update it (its page, Software)." : g.error || "The wedgie didn't sign.");
+      if (String(g.safeTxHash).toLowerCase() !== String(t.safeTxHash).toLowerCase()) throw new Error("The wedgie signed for a different transaction: not sent.");
+      return E.safeSignature(slots[0], g as E.WedgieSig);
+    } finally { asking = false; }
   }
   /** Stuck to the bottom of the screen while a transaction is ready to run (Austin): its Execute, then its progress. */
   let running: any = null;

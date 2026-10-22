@@ -143,9 +143,9 @@ const cases = [
 ];
 /** Send one safe_sign, press k once a second (the app drops presses made before its question is up) until
  *  it answers; the answer and how long it took in chip time. */
-function ask(t, k) {
+function ask(t, k, msg = { type: "safe_sign", tx: t }) {
   const rid = ++id, t0 = h.chip.ms;
-  h.chip.write(JSON.stringify({ id: rid, type: "safe_sign", tx: t }) + "\n");
+  h.chip.write(JSON.stringify({ id: rid, ...msg }) + "\n");
   let got = null;
   const re = new RegExp(`\\{[^\\n]*"id": ${rid}[,}][^\\n]*\\n`);
   for (let s = 0; s < 240 && !got; s++) {
@@ -180,6 +180,17 @@ if (hi?.safe_chunk) {     // a transaction over the 6 KB line: its data in safe_
     if (size > (hi.safe_max || 8000)) { check(!okp && !crash(all.slice(before)), `a ${size} B transaction: refused as too big, no crash`); continue; }
     check(okp && chipStep && !crash(all.slice(before)), `a ${size} B transaction in ${Math.ceil(size * 2 / hi.safe_chunk)} safe_data pieces, then signed, ${secs} s: answered ${got ? got.type + (got.error ? " (" + got.error.slice(0, 40) + ")" : "") : "nothing"} · ${r?.ram} B free`);
   }
+}
+if (hi?.app && hi.app >= "safe-23") {     // safe_remove: the delete request for a queued tx (its data as a hash)
+  const { data, ...rest } = cases[0][1], before = all.length;
+  const rm = { ...rest, dataHash: E.hex(E.keccak256(E.bytes(data || "0x"))) };
+  const { got, secs } = ask(null, "A", { type: "safe_remove", tx: rm, totp: 497960 });
+  const r = ram("safe_remove");
+  const chipStep = got?.type === "safe_sig" || /trustm|ATECC608/.test(got?.error || "");
+  check(chipStep && !crash(all.slice(before)), `safe_remove: "Remove it?" #${rm.nonce}, A, ${secs} s: answered ${got ? got.type + (got.error ? " (" + got.error.slice(0, 40) + ")" : "") : "nothing"} · ${r?.ram} B free`);
+  const no = ask(null, "Y", { type: "safe_remove", tx: rm, totp: 497960 });
+  check(no.got?.type === "refused" && no.got.safeTxHash === E.safeTxHash(rm.chainId, rm.safe, { ...rm, data: data || "0x" }),
+    `safe_remove Y: refused, with the Safe tx hash it worked out (${no.got?.safeTxHash?.slice(0, 10)}…)`);
 }
 { // and a no
   const before = all.length;

@@ -27,7 +27,7 @@ cb2cd953508b9be62f720c17f44bc08e7934802b441a5b8af8932d1751d45290  logo.bin
 f8404e021a509bab89a4ed947def97d5d6ad4910cad9af9970feb76dc7bb0fc0  optiga.mpy
 ba422f72ca334b9681bf77e6cbb972bc6b0733d410d05cfe772c00529354ae2f  p256.mpy
 9858dc942ff0577fbe2c921e0fd1c01cea9f57e4d9452e21cb7f9c285b8fba8e  power.mpy
-2f9bc28e3c5bce296eb220cc2c83adefb1e42b2df9e67a10703cefd4b892299e  safe.py
+fe37ad5793dca01d8458a3326bc9aafbe1980c45328752df0b6c54dc94f55174  safe.py
 ebb05bac073a564d54741c5ff029132e66ca2001260c080fb9c171481901304e  safe_addr.py
 44e2ec64f5e7c9acd8c50a293ffa16d19f45deaf2201d88bc7dc4c3a5996bb1e  safe_blockie.py
 f5465cbfa72b6ea201d7993d09d0c4c163cf40fa1313f7938204bc32c12c94f5  safe_keccak.py
@@ -57,4 +57,4 @@ e20d454f74229b3aaa09a15829cbb6b85aa50c6b3bf229287b9cdbff73bee90d  wedgiedrive.mp
 @app  {"mod":"safe","name":"Safe Signer","entry":"run","usb":true,"files":["safe.py","safe_read.py","safe_ur.py","safe_keccak.py","safe_addr.py","safe_blockie.py","safe_key.py"]}
 @app  {"mod":"secret","name":"Secrets","entry":"run","usb":true,"files":["secret.py","secret_box.py"]}
 @app  {"mod":"welcome","name":"Welcome","entry":"run","files":["welcome.py"]}
-@serial  10
+@serial  11
