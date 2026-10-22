@@ -365,10 +365,25 @@ export function safe(main: HTMLElement) {
   async function job(fn: () => Promise<unknown>) {
     if (busy) return;
     busy = true; paintAll();
-    try { await fn(); } catch (e) { fail(e); } finally { busy = false; paintAll(); }
+    try {
+      // the saved copy is up: read the chain first, so nothing signs off an old nonce
+      if (stale && safeAddr) { say("Reading the Safe from the chain."); await load(true); if (stale) throw new Error(`Can't read the Safe from ${CHAINS[chain].name} right now. Try again in a minute.`); say(""); }
+      await fn();
+    } catch (e) { fail(e); } finally { busy = false; paintAll(); }
   }
-  // stale: the Safe on screen is the saved copy (viewCache) till the chain answers: nothing signs off an old nonce
-  const dis = (extra = false) => (busy || asking || stale || extra ? " disabled" : "");
+  // a button that's off says why on hover. stale (the saved copy on screen) doesn't turn them off: job reads first
+  const dis = (extra = false) => {
+    const why = busy ? "Wait: something is running." : asking ? "Answer your wedgie first." : "";
+    return why ? ` disabled title="${why}"` : extra ? " disabled" : "";
+  };
+  /** Why the wedgie can't sign right now, in plain words (the wedgie buttons stay on and say this when pressed). */
+  const noWedgie = () => {
+    if (Drive.inApp()) return driveState === "here" ? "Reading your wedgie. Try again in a second." : "Plug in your wedgie.";
+    const ws = W.wedgies().filter((w) => w.state === "ready");
+    if (!ws.length) return "Plug in your wedgie and press Connect.";
+    if (!ws.some((w) => w.running === "safe")) return "Your wedgie isn't running Safe Signer.";
+    return noKey ? "Press green on your wedgie to make its key." : "Reading your wedgie. Try again in a second.";
+  };
 
   // ---- plain words for a transaction (src/safe/describe.ts) ----
   const asked = new Set<string>();     // token contracts whose metadata is being fetched
@@ -439,7 +454,7 @@ export function safe(main: HTMLElement) {
     try { const all = JSON.parse(localStorage.getItem(SEEN) || "{}"); all[a.toLowerCase()] = IDS.filter((t) => on[t]); localStorage.setItem(SEEN, JSON.stringify(all)); } catch {}
   };
   // Each Safe as last seen (owners, balances, tokens, its other chains), saved: opening it shows that at once, then
-  // the chain's answer replaces it. Buttons wait for the fresh one (stale). Never the queue (always read fresh), never
+  // the chain's answer replaces it. A button pressed before that reads the chain first (job). Never the queue (always read fresh), never
   // the history (big: a full localStorage would stop every other save on the page). The last 20 Safes.
   const VIEW = "wedgie.safe.view";
   let stale = false;
@@ -1030,7 +1045,7 @@ export function safe(main: HTMLElement) {
   async function recheck(full = false) {
     if (!safeAddr || !info || opening || busy || asking || document.hidden) return;
     const c = chain, a = safeAddr, was = info;
-    if (!full && ++ticks % 8) {
+    if (!full && !stale && ++ticks % 8) {      // the saved copy: a full load, only that clears it
       const i = await readSafe(c, a).catch(() => null);
       if (!i || c !== chain || a !== safeAddr || info !== was) return;
       if (i.balance === was.balance && i.usdc === was.usdc && i.nonce === was.nonce && i.threshold === was.threshold && i.owners.join() === was.owners.join()) return;
@@ -1251,7 +1266,7 @@ export function safe(main: HTMLElement) {
     const th = $("ow-th") as HTMLSelectElement, keep = +th.value || i.threshold;
     th.innerHTML = threshOpts(i.owners.length + 1, Math.min(keep, i.owners.length + 1));
     $("ow-of").textContent = `of ${i.owners.length + 1} owners`;
-    $("ow-btns").innerHTML = `${wedgieOwns() ? `<button class="btn btn-green" id="ow-wedgie"${dis(!key)}>Sign with wedgie</button> ` : ""}${isOwner(account) ? `<button class="btn" id="ow-wallet"${dis()}>Sign with wallet</button>` : ""}`;
+    $("ow-btns").innerHTML = `${wedgieOwns() ? `<button class="btn btn-green" id="ow-wedgie"${dis()}>Sign with wedgie</button> ` : ""}${isOwner(account) ? `<button class="btn" id="ow-wallet"${dis()}>Sign with wallet</button>` : ""}`;
     $("ow-wedgie")?.addEventListener("click", () => job(() => addOwner("wedgie")));
     $("ow-wallet")?.addEventListener("click", () => job(() => addOwner("wallet")));
   }
@@ -1281,7 +1296,7 @@ export function safe(main: HTMLElement) {
       const n = (t.confirmations || []).length, need = t.confirmationsRequired ?? i.threshold, first = +t.nonce === i.nonce, s = said(t);
       const btns: string[] = [], marks: string[] = [];
       if (wedgieOwns()) ownedBy().every((o) => signed(t, o)) ? marks.push("wedgie ✓")
-        : btns.push(`<button class="btn btn-sm btn-green" data-sign="${k}"${dis(!key)}>Sign with wedgie</button>`);
+        : btns.push(`<button class="btn btn-sm btn-green" data-sign="${k}"${dis()}>Sign with wedgie</button>`);
       if (account && isOwner(account)) signed(t, account) ? marks.push("wallet ✓")
         : n < need && btns.push(`<button class="btn btn-sm" data-wsign="${k}"${dis()}>Sign with wallet</button>`);
       if (n >= need) btns.push(first ? `<button class="btn btn-sm btn-green" data-exec="${k}"${dis()}>Execute</button>` : `<span class="fine">runs after #${i.nonce}</span>`);
@@ -1424,7 +1439,7 @@ export function safe(main: HTMLElement) {
    * One signature per owner slot it has here: Instant Wallet's two slots take the same press.
    */
   async function wedgieSig(t: E.SafeTx) {
-    if (!wedgie || !key) throw new Error("No wedgie running the Safe Signer.");
+    if (!wedgie || !key) throw new Error(noWedgie());
     const slots = ownedBy();
     if (!slots.length) throw new Error("Your wedgie isn't an owner of this Safe.");
     for (const a of slots) if (!(await hasCode(chain, a))) { deployed[chain] = false; throw new Error(`The wedgie's signer contract isn't on ${CHAINS[chain].name} yet: Deploy it (above) first. Safe checks its signatures through it.`); }
@@ -1559,7 +1574,7 @@ export function safe(main: HTMLElement) {
     sendToken = null;
     sel.innerHTML = sendList().map((a) => `<option value="${a.token || ""}"${(a.token || "") === keep ? " selected" : ""}>${esc(a.symbol)}</option>`).join("");
     paintTok();
-    $("n-btns").innerHTML = `${wedgieOwns() ? `<button class="btn btn-green" id="n-wedgie"${dis(!key)}>Sign with wedgie</button> ` : ""}${isOwner(account) ? `<button class="btn" id="n-wallet"${dis()}>Sign with wallet</button>` : ""}`;
+    $("n-btns").innerHTML = `${wedgieOwns() ? `<button class="btn btn-green" id="n-wedgie"${dis()}>Sign with wedgie</button> ` : ""}${isOwner(account) ? `<button class="btn" id="n-wallet"${dis()}>Sign with wallet</button>` : ""}`;
     $("n-wedgie")?.addEventListener("click", () => job(() => newTx("wedgie")));
     $("n-wallet")?.addEventListener("click", () => job(() => newTx("wallet")));
     review();
@@ -1715,7 +1730,7 @@ export function safe(main: HTMLElement) {
         a.calls, chain, safeAddr, ctx().addr, paintAll), calls = x.subs!;
       return `<div class="sx-tx wc-ask"><div class="sx-tx-head">${icon(a.dapp)}<span class="sx-tx-what"><b>${esc(a.dapp.name)}</b> asks for ${plural(a.calls.length, "action")}${a.calls.length > 1 ? ", run as one" : ""}</span></div>
       <ol class="sx-subs">${calls.map((s) => `<li>${s.title}</li>`).join("")}</ol>${x.more || ""}
-      <div class="sx-row"><button class="btn btn-sm" data-wcno="${k}"${dis()}>Reject</button><span class="sx-row sx-end">${isOwner(account) ? `<button class="btn btn-sm" data-wcwallet="${k}"${dis()}>Sign with wallet</button> ` : ""}${wedgieOwns() ? `<button class="btn btn-sm btn-green" data-wcsign="${k}"${dis(!key)}>Sign with wedgie</button>` : ""}</span></div></div>`;
+      <div class="sx-row"><button class="btn btn-sm" data-wcno="${k}"${dis()}>Reject</button><span class="sx-row sx-end">${isOwner(account) ? `<button class="btn btn-sm" data-wcwallet="${k}"${dis()}>Sign with wallet</button> ` : ""}${wedgieOwns() ? `<button class="btn btn-sm btn-green" data-wcsign="${k}"${dis()}>Sign with wedgie</button>` : ""}</span></div></div>`;
     }).join("");
     const run = (a: (typeof asks)[0], who: "wedgie" | "wallet") => job(async () => {
       let hash: string | null;
