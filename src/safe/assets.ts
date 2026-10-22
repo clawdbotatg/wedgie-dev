@@ -40,13 +40,17 @@ export async function readAssets(chain: number, safe: string, native: { symbol: 
   const metas = await Promise.all(held.map((h) => tokenMeta(chain, h.token, rpc)));
   let px: { eth: number | null; tokens: Record<string, number>; logos?: Record<string, string> } = { eth: null, tokens: {} };
   try { px = await rpc("wedgie_prices", held.slice(0, 25).map((h) => h.token)); } catch {}
+  // a logo found by wedgie_prices is kept with the token's metadata, for good
+  let got = false;
+  held.forEach((h, i) => { const l = px.logos?.[h.token.toLowerCase()]; if (metas[i] && !metas[i]!.logo && l) { metas[i]!.logo = l; got = true; } });
+  if (got) saveMeta();
   const out: Asset[] = [{ token: null, ...native, decimals: 18, balance: eth, price: px.eth, usd: px.eth === null ? null : Number(eth) / 1e18 * px.eth }];
   held.forEach((h, i) => {
     const m = metas[i];
     if (!m) return;
     const p = px.tokens[h.token.toLowerCase()] ?? null;
     out.push({ token: h.token, symbol: m.symbol, name: m.name, decimals: m.decimals, balance: h.balance, price: p,
-      logo: p === null ? null : m.logo || px.logos?.[h.token.toLowerCase()] || null,   // no price = maybe spam: no picture it chose
+      logo: p === null ? null : m.logo || null,   // no price = maybe spam: no picture it chose
       usd: p === null ? null : Number(h.balance) / 10 ** m.decimals * p });
   });
   return out.sort((a, b) => (b.usd ?? -1) - (a.usd ?? -1) || (a.token === null ? -1 : b.token === null ? 1 : 0));

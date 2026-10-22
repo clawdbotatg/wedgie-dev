@@ -20,6 +20,7 @@ const TEST = new Set([84532, 11155111]);
 // Kept while this function instance is warm: a price for a minute, a token's name and decimals for good (they never
 // change). Fewer Alchemy calls, and a page that asks again gets its answer at once.
 const PRICED = new Map<string, { at: number; v: any }>(), META = new Map<string, any>();
+const LOGOS = new Map<string, string>();   // chain:token -> logo url, kept for good (a logo almost never changes)
 const PRICE_MS = 60_000;
 
 /** Dollar prices: the chain's coin and up to 25 tokens on one chain. A test chain's coins are worth nothing. */
@@ -45,17 +46,20 @@ async function pricesNow(chain: number, host: string, tokens: unknown[]) {
   out.eth = num(e?.data?.[0]);
   for (const p of t?.data || []) { const v = num(p); if (v && p.address) out.tokens[String(p.address).toLowerCase()] = v; }
   // DexScreener: each token's most liquid pair, all in one request (30 max)
-  if (DEX[chain] && list.length) {
-    const pairs: any[] = await fetch(`https://api.dexscreener.com/tokens/v1/${DEX[chain]}/${list.join(",")}`)
+  // only the tokens still missing a price or a logo
+  const all = list.map((x) => x.toLowerCase()), ask = all.filter((a) => !out.tokens[a] || !LOGOS.has(chain + ":" + a));
+  if (DEX[chain] && ask.length) {
+    const pairs: any[] = await fetch(`https://api.dexscreener.com/tokens/v1/${DEX[chain]}/${ask.join(",")}`)
       .then((r) => (r.ok ? r.json() : [])).catch(() => []);
-    for (const a of list.map((x) => x.toLowerCase())) {
+    for (const a of ask) {
       const mine = (Array.isArray(pairs) ? pairs : []).filter((p) => String(p?.baseToken?.address).toLowerCase() === a)
         .sort((x, y) => (y?.liquidity?.usd ?? 0) - (x?.liquidity?.usd ?? 0));
       const img = mine.find((p) => p?.info?.imageUrl)?.info.imageUrl, v = Number(mine[0]?.priceUsd);
-      if (typeof img === "string" && img.startsWith("https://")) out.logos[a] = img;
+      if (typeof img === "string" && img.startsWith("https://")) { if (LOGOS.size > 5000) LOGOS.clear(); LOGOS.set(chain + ":" + a, img); }
       if (!out.tokens[a] && v > 0) out.tokens[a] = v;
     }
   }
+  for (const a of all) { const l = LOGOS.get(chain + ":" + a); if (l) out.logos[a] = l; }
   return out;
 }
 
