@@ -323,6 +323,17 @@ export function safe(main: HTMLElement) {
   let activity: any[] | null = null, activityErr = "";
   let addons: Addons | null = null;               // its modules and guards (null: not read yet)
   const ethPx: Record<number, number | null> = {};   // the native coin's dollar price per chain, for the list's totals
+  // Each Safe's full dollars per chain (every token, as its page counts them), saved with the coin and USDC balances it
+  // was read at: the card shows the same number as the Safe's page. Balances changed since: coin + USDC till read again.
+  const FULL = "wedgie.safe.usd";
+  let fullUsd: Record<string, { usd: number; b: string; u: string }> = {};
+  try { fullUsd = JSON.parse(localStorage.getItem(FULL) || "{}"); } catch {}
+  const fk = (c: number, a: string) => `${c}:${a.toLowerCase()}`;
+  const setFull = (c: number, a: string, i: Info, usd: number) => {
+    fullUsd[fk(c, a)] = { usd, b: String(i.balance), u: String(i.usdc) };
+    try { localStorage.setItem(FULL, JSON.stringify(fullUsd)); } catch {}
+  };
+  const priced = new Set<string>();     // read in full on this visit
   // a sheet over the page (a bottom sheet on a phone): one at a time
   let sheet: "" | "create" | "send" | "receive" | "connect" = "", sendToken: string | null = null;
 
@@ -772,11 +783,29 @@ export function safe(main: HTMLElement) {
     }));
     paintList();
     if (key) saveLast();
+    if (fresh) priced.clear();
+    await priceRows();
     if (findAgain) { findAgain = false; findSafes(); }
   }
 
   /** A Safe's dollars on one chain (native coin + USDC), null with no price yet; a test chain's coins: none. */
-  const worthUsd = (c: number, i: Info) => CHAINS[c].test ? 0 : ethPx[c] ? Number(i.balance) / 1e18 * ethPx[c]! + Number(i.usdc || 0n) / 1e6 : null;
+  const worthUsd = (c: number, i: Info, a: string) => {
+    if (CHAINS[c].test) return 0;
+    const f = fullUsd[fk(c, a)];
+    if (f && f.b === String(i.balance) && f.u === String(i.usdc)) return f.usd;
+    return ethPx[c] ? Number(i.balance) / 1e18 * ethPx[c]! + Number(i.usdc || 0n) / 1e6 : null;
+  };
+  /** Every token on each card, a few Safes at a time (wallet Safes only once shown), then repaint. */
+  async function priceRows() {
+    const todo = rows.filter((r) => r.info && !CHAINS[r.chain].test && (r.wedgie || showWallet) && !priced.has(fk(r.chain, r.addr)));
+    todo.forEach((r) => priced.add(fk(r.chain, r.addr)));
+    for (let i = 0; i < todo.length; i += 4) {
+      await Promise.all(todo.slice(i, i + 4).map(async (r) => {
+        try { const n = await worthOn(r.chain, r.addr, r.info!); if (n !== null) setFull(r.chain, r.addr, r.info!, n); } catch { priced.delete(fk(r.chain, r.addr)); }
+      }));
+      if (!safeAddr) paintList();
+    }
+  }
   /** A Safe's worth for its card: dollars when the coin's price is known, else its coin and USDC. */
   const worth = (c: number, i: Info) => {
     const p = ethPx[c];
@@ -795,10 +824,10 @@ export function safe(main: HTMLElement) {
       return [...by.values()];
     };
     const card = (g: Row[]) => {
-      const read = g.filter((r) => r.info), $s = read.map((r) => worthUsd(r.chain, r.info!));
+      const read = g.filter((r) => r.info), $s = read.map((r) => worthUsd(r.chain, r.info!, r.addr));
       const n = $s.every((x) => x !== null) ? $s.reduce((a, x) => a! + x!, 0)! : null;
       // opens on the chain with the most in it
-      const top = read.slice().sort((x, y) => (worthUsd(y.chain, y.info!) ?? 0) - (worthUsd(x.chain, x.info!) ?? 0))[0] || g[0], i = top.info;
+      const top = read.slice().sort((x, y) => (worthUsd(y.chain, y.info!, y.addr) ?? 0) - (worthUsd(x.chain, x.info!, x.addr) ?? 0))[0] || g[0], i = top.info;
       const chains = IDS.filter((t) => g.some((r) => r.chain === t));
       return `<li><a class="safe-row sx-safe${g.some((r) => r.wedgie) ? " sx-mine" : ""}" data-nav href="${route(top.chain, top.addr)}">
         <span class="sx-safe-top">${i && isIW(i.owners) ? iwMark : ""}${address(top.addr, { chain: top.chain })}</span>
@@ -808,7 +837,7 @@ export function safe(main: HTMLElement) {
         <span class="sx-chains sx-chains-sm">${chains.map((t) => `<span class="sx-pill${CHAINS[t].test ? " sx-test" : ""}" title="${esc(CHAINS[t].name)}">${chainLogo(t)}</span>`).join("")}</span></a></li>`;
     };
     // most money first (a Safe that couldn't be priced yet: after the ones that could)
-    const sum = (g: Row[]) => g.reduce((n, r) => n + (r.info ? worthUsd(r.chain, r.info) ?? 0 : 0), 0);
+    const sum = (g: Row[]) => g.reduce((n, r) => n + (r.info ? worthUsd(r.chain, r.info, r.addr) ?? 0 : 0), 0);
     const all = groups(rows).sort((x, y) => sum(y) - sum(x)), mine = all.filter((g) => g.some((r) => r.wedgie)), theirs = all.filter((g) => !g.some((r) => r.wedgie));
     let h = `<div class="sx-head"><h1>Your wedgie's Safes<span class="sx-spin sx-spin-h" id="l-spin" hidden></span></h1><button class="btn btn-green" id="l-new"${dis()}>＋ New Safe</button></div>`;
     h += mine.length ? `<ul class="sx-safes">${mine.map(card).join("")}</ul>`
@@ -825,7 +854,7 @@ export function safe(main: HTMLElement) {
     if (typed) { const el = $("l-addr") as HTMLInputElement; el.value = typed; el.dispatchEvent(new Event("input")); }
     $("l-new").onclick = () => openSheet("create");
     $("l-refresh").onclick = () => findSafes(true);
-    $("l-wallet")?.addEventListener("click", () => { showWallet = !showWallet; paintList(); });
+    $("l-wallet")?.addEventListener("click", () => { showWallet = !showWallet; paintList(); if (showWallet) priceRows(); });
     $("l-open").onclick = () => {
       const el = $("l-addr") as HTMLInputElement;
       el.value = el.value.trim().replace(/^\w+:/, "");    // a pasted "base:0x…"
@@ -1071,6 +1100,7 @@ export function safe(main: HTMLElement) {
   /** Every token it holds, with dollars (src/safe/assets.ts). */
   async function loadAssets(c: number, a: string, i: Info) {
     const got = await readAssets(c, a, CHAINS[c].native, i.balance, CHAINS[c].usdc ? { address: CHAINS[c].usdc!, balance: i.usdc } : null, (m, p) => rpc(c, m, p));
+    if (got[0].price !== null && !CHAINS[c].test) setFull(c, a, i, got.reduce((n, x) => n + (x.usd || 0), 0));
     if (c === chain && a === safeAddr) { assets = got; paintSafe(); paintAssets(); paintNew(); saveView(c, a); }
   }
 
@@ -1122,7 +1152,7 @@ export function safe(main: HTMLElement) {
         const i = await readSafe(t, a).catch((e) => { if (e?.gone) return null; throw e; });
         if (c !== chain || a !== safeAddr) return;
         copies[t] = !!i;
-        if (i) { worths[t] = await worthOn(t, a, i); paintSafe(); }
+        if (i) { worths[t] = await worthOn(t, a, i); if (worths[t] !== null) setFull(t, a, i, worths[t]!); paintSafe(); }
       } catch {}
     }));
     if (c === chain && a === safeAddr) { looked = true; checked = true; copies[c] = true; saveSeen(a, copies); saveView(c, a); paintSafe(); paintChains(); }
