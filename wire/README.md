@@ -9,10 +9,48 @@ https://github.com/ZKNoxHQ/eth-universal-signer/blob/7730-wire-format-implementa
 
 ## Status
 
-- **Not used yet.** Not in `firmware/`, not on any wedgie. One file plus tests.
-- When Safe Signer gets clear signing, it goes into that app (as `safe_wire.py`), or into the firmware if
-  several apps need it.
-- Built only the parts of the spec that shouldn't change. The rest waits for the spec to settle.
+- **Used by Safe Signer safe-24** (clawdbotatg/wedgie-safe): `safe_wire.py` is a copy of `wire.py` (keep them the
+  same), `safe_7730.py` turns a descriptor into the screen. **Not on the shelf yet** (10-22): the gate's "install
+  over Buttons" check fails with it, on an old firmware race the bigger shelf entry exposes in the simulator:
+  `slot._to_job` (USB timer) runs `power.stop()`, which sets `lcd._on_frame = None` while `lcd._push` is between
+  `if _on_frame:` and the call (TypeError; the install still finishes). Fix in firmware: read `_on_frame` (and
+  `_on_show`) into a local once. Until then, install safe-24 from GitHub by hand (its page) or `wedgie.py install`.
+- **The data** wedgie.dev serves: `release.py` builds `public/clear/<tag>/` from the registry and a token list,
+  every structure with a Merkle proof (algorithm 4) to two roots built into the app (`safe_roots.py`). See below.
+- **Tests:** `tools/test_clear.py` runs the app's reader on the registry's own test transactions (1,510 on chains
+  the app does: 1,367 show exactly what the registry expects, 125 differ on purpose, 18 explained in the test);
+  `tools/safechip.mjs` signs four of them on a virtual RP2040.
+
+## Make a release (new registry data)
+
+```
+git clone --depth 1 https://github.com/ethereum/clear-signing-erc7730-registry /tmp/reg
+uv run -q -p 3.13 --with clearsig --with eth-account --with pycryptodome --with cryptography \
+    python3 wire/release.py /tmp/reg public/clear ../wedgie-safe/safe_roots.py
+uv run -q -p 3.13 --with clearsig --with eth-account --with pycryptodome --with cryptography \
+    python3 tools/test_clear.py /tmp/reg ../wedgie-safe
+```
+
+Then commit `safe_roots.py` in wedgie-safe (a new app version: the roots changed), re-pin it here
+(`community.mjs add`), sign, commit `public/clear/<new tag>` with it. Keep the old tag's folder until wedgies have
+updated: an app only reads its own tag's data. Descriptors are compiled from clearsig's merge of a file's
+`includes`, the same JSON an auditor hashes; an attestation counts only if its EAS signature recovers to an auditor
+in `AUDITORS` and its data is that hash.
+
+## What building it taught us (for Bacca and the WG)
+
+1. **P-256 isn't an allowed algorithm**, and secp256k1 in pure Python is ~2 s a check. Algorithm 4 (a Merkle root
+   in the signer, as PQ1) needs no curve at all, and the root rides in the signed app. The catch: new data = new app.
+2. **Merging `includes`:** our first converter replaced arrays; the spec merges `fields` by path. What an auditor
+   hashes (ERC-8176) is the merged JSON, so the spec should define the merge for converters too.
+3. **Literal constants have no type.** A `"value": "USDC"` field arrived as BYTES and showed as hex.
+4. **Visibility on BYTES:** LI.FI's `ifNotIn: [0]` on a `bytes` field. The spec says "exact bytes"; the registry's
+   runners treat empty as 0. We follow the runners (zero matches zero), only for hiding and mustMatch.
+5. **`amount` has no threshold** in the wire format; ERC-7730 v2's `amount` does.
+6. **Unknown enum values:** the wire spec says the field MUST fail; two registry tests expect the raw number.
+7. **No names to show:** no source for NFT collection names or address names, so "#1001 of 0x.." and addresses.
+8. **Audit coverage is thin:** 760 of 6,736 descriptor deployments on our chains are attested (Cyfrin only; 11 of
+   its attestations were dropped for re-review, Aave v3 among them).
 
 ## What it does
 

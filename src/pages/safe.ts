@@ -28,6 +28,7 @@ import { describe, type Ctx, type Said } from "../safe/describe";
 import { explain, callsOf } from "../safe/explain";
 import { readAssets, tokenMeta, knownMeta, usd, type Asset } from "../safe/assets";
 import { canScan, scan } from "../safe/scan";
+import * as Clear from "../safe/clear";
 import { addressQr } from "../safe/qr";
 
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
@@ -303,6 +304,7 @@ export function safe(main: HTMLElement) {
     look(); setInterval(look, 1500);
   }
   let chunk = 0;          // hex chars per safe_data piece (its hello's safe_chunk), 0: this app can't take pieces
+  let clearTag = "";      // the clear-signing data its app trusts (its hello's safe_clear), "": none (an older app)
   let onWedgie: string[] | null = null;   // the wedgie's own list ("8453:0x.."), null: its app keeps none
   let account = "", busy = false;
   // the view: null = the list; else one Safe
@@ -603,6 +605,7 @@ export function safe(main: HTMLElement) {
       noKey = false;
       const before = signer;
       key = h.safe; signer = E.signerAddress(key!.x, key!.y); signers = E.signerAddresses(key!.x, key!.y); chunk = +h.safe_chunk || 0;
+      clearTag = typeof h.safe_clear === "string" ? h.safe_clear : "";
       // newer apps work out the address themselves and show it: the two must agree
       if (h.signer && !eqA(h.signer, signer)) { key = null; signer = ""; signers = []; throw new Error(`The wedgie says its address is ${h.signer}, this page works out ${E.signerAddress(h.safe.x, h.safe.y)}. Not using it: tell us.`); }
       const om = oldSaved.match(/^(\w+):(0x[0-9a-fA-F]{40})$/);
@@ -1538,8 +1541,14 @@ export function safe(main: HTMLElement) {
         : "This transaction is too big for the wedgie to read in one go: update the Safe Signer app on it (its page, Software).");
     asking = true; paintAll();
     say("Look at the wedgie: check what it shows, then press the green button to sign (red says no).");
+    // what the registry says about it (ERC-7730), sent ahead: the wedgie checks it against its own roots
+    const cb = clearTag && chunk ? await Clear.bundle(clearTag, chain, t).catch(() => null) : null;
     try {
       const g = await ask(wedgie, async (r) => {
+        for (let o = 0; cb && o < cb.length; o += chunk) {
+          const a = await r.request({ type: "safe_clear", at: o / 2, hex: cb.slice(o, o + chunk) }, 20000);
+          if (a.type !== "safe_clear") break;           // it can still sign; it just can't read the call
+        }
         if (!big) return r.request({ type: "safe_sign", tx }, 200000);
         say("Sending the transaction to the wedgie in pieces.");
         const hex = tx.data.slice(2);

@@ -1,5 +1,10 @@
 # Plan: clear signing with ERC-7730 descriptors
 
+**Status 2026-10-22: built and shipped** (Safe Signer safe-24). What was built differs from the plan below in two
+ways: it builds on `wire/` (an earlier session's reader and converter, spec v 29.09.26-1), and there's no descriptor
+key: every structure carries a Merkle proof (algorithm 4) to roots built into the app. How it works, how to make a
+release, and the spec gaps: `wire/README.md`.
+
 Goal: the Safe Signer shows any contract call in plain words without new code per app. It does this by
 reading the ERC-7730 descriptors in [ethereum/clear-signing-erc7730-registry](https://github.com/ethereum/clear-signing-erc7730-registry).
 Adding a protocol should mean adding a descriptor, not an app update.

@@ -1,0 +1,15 @@
+{
+ "tag": "d64f4d45",
+ "registry": "2c2ddeb976d8e72fc4a42336cecbd49356a78a96",
+ "issued": 1792648199,
+ "roots": {
+  "a": "d688cc30a3161804e59abdb417ddbb1291215b338d7d3d08925e358514fc97b0",
+  "b": "d8a350ec7791ab1bcc23b591e7d11a56eee946abab6531c6772dd49a06e13898"
+ },
+ "audited": 760,
+ "notAudited": 5976,
+ "tokens": 1621,
+ "auditors": [
+  "Cyfrin"
+ ]
+}

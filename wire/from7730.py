@@ -237,8 +237,12 @@ class Ctx:
     def value(self, path=None, const=None, base=(), fam=None):
         """A wire value from an ERC-7730 path (relative to base, the group's steps) or a constant."""
         if path is None:
-            c = _const(self.ref(const), fam)
-            return [fam or (5 if len(c) == 20 else 7), len(c), [2, c]]
+            x = self.ref(const)
+            c = _const(x, fam)
+            if fam is None:             # a literal: its own type (a text constant is a STRING, not BYTES)
+                fam = (6 if isinstance(x, bool) else 1 if isinstance(x, int) or isinstance(x, str) and x.isdigit()
+                       else 8 if isinstance(x, str) and not x.startswith("0x") else 5 if len(c) == 20 else 7)
+            return [fam, len(c), [2, c]]
         path = self.ref(path)
         if not isinstance(path, str):
             return self.value(const=path, fam=fam)
@@ -403,8 +407,11 @@ def test_key():
     return _key
 
 
-def convert(path, issued=None):
-    doc = load(path)
+def convert(path, issued=None, doc=None, seal=None):
+    """doc: the file already merged with its includes (release.py passes clearsig's merge, what auditors hash).
+    seal: body -> stored bytes (default: signed with the test key)."""
+    doc = doc if doc is not None else load(path)
+    seal = seal or (lambda body: sign(body, issued=issued))
     meta = doc.get("metadata") or {}
     info = meta.get("info") or {}
     deps = doc["context"]["contract"]["deployments"]
@@ -423,7 +430,7 @@ def convert(path, issued=None):
             body = [VERSION, int(d["chainId"]), a, sel, intent or key.split("(")[0], meta.get("owner"),
                     info.get("legalName"), info.get("url"), meta.get("contractName") or doc["context"].get("$id"),
                     _date(info.get("deploymentDate")), fs, ext]
-            out.append((int(d["chainId"]), a, sel, sign(body, issued=issued)))
+            out.append((int(d["chainId"]), a, sel, seal(body)))
     return out
 
 
