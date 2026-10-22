@@ -10,7 +10,7 @@ TOKENS = {
     (1, "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"): ("USDC", 6),
     (1, "0xdac17f958d2ee523a2206206994597c13d831ec7"): ("USDT", 6),
     (1, "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"): ("WETH", 18),
-    (1, "0x2260fac5e5542a773aa44fbcfed7c193bc2c599"): ("WBTC", 8),
+    (1, "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599"): ("WBTC", 8),
     (1, "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf"): ("cbBTC", 8),
     (1, "0x6b175474e89094c44da98b954eedeac495271d0f"): ("DAI", 18),
     (8453, "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"): ("USDC", 6),
@@ -291,7 +291,11 @@ def describe(tx):
         return "Danger", [("can take all", RED, BIG)] + _addr_lines("", to, RED)[1:]
     if not data:
         return "Fee" if to == RELAY else "Send", out + [("%s %s" % (amount(tx["value"], 18), coin(tx)), INK, BIG)] + _who(to, safe)
-    if tx["value"] and to not in ROUTERS:
+    ur = sel in ("3593564c", "24856bc3")   # execute(commands, inputs[, deadline]): maybe Uniswap's Universal Router
+    if ur:
+        import safe_ur
+        ur = to in safe_ur.UR.get(tx["chainId"], ())
+    if tx["value"] and to not in ROUTERS and not ur:
         out.append(("+ %s %s" % (amount(tx["value"], 18), coin(tx)), RED))
     n1, n2 = lambda: int.from_bytes(_arg(data, 1), "big"), lambda: int.from_bytes(_arg(data, 2), "big")
     if to == safe and sel == "0d582f13" and len(data) == 68:
@@ -339,6 +343,14 @@ def describe(tx):
             u = None
         if u:
             return u[0], out + u[1]
+    if ur:
+        try:
+            u = safe_ur.read(tx)
+        except Exception:
+            u = None
+        return u or ("Swap", [("via Uniswap", INK)] +
+                     ([("pay", MUTED), ("%s %s" % (amount(tx["value"], 18), coin(tx)), INK, BIG)] if tx["value"] else []) +
+                     [("can't read it", RED, BIG), ("can't check what you get", RED)])
     if to in ROUTERS:
         far = _lifi_to(data, safe) if to == LIFI else None     # a Uniswap call _uniswap couldn't read: can't tell
         return ("Bridge" if far else "Swap"), out + [("via " + ROUTERS[to], INK)] + \

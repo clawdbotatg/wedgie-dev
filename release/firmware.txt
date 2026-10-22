@@ -27,12 +27,13 @@ cb2cd953508b9be62f720c17f44bc08e7934802b441a5b8af8932d1751d45290  logo.bin
 f8404e021a509bab89a4ed947def97d5d6ad4910cad9af9970feb76dc7bb0fc0  optiga.mpy
 ba422f72ca334b9681bf77e6cbb972bc6b0733d410d05cfe772c00529354ae2f  p256.mpy
 9858dc942ff0577fbe2c921e0fd1c01cea9f57e4d9452e21cb7f9c285b8fba8e  power.mpy
-e814b4f5c01719986f86f189c9feda17a854b3f510b43ffff838383093768943  safe.py
+2f9bc28e3c5bce296eb220cc2c83adefb1e42b2df9e67a10703cefd4b892299e  safe.py
 ebb05bac073a564d54741c5ff029132e66ca2001260c080fb9c171481901304e  safe_addr.py
 44e2ec64f5e7c9acd8c50a293ffa16d19f45deaf2201d88bc7dc4c3a5996bb1e  safe_blockie.py
 f5465cbfa72b6ea201d7993d09d0c4c163cf40fa1313f7938204bc32c12c94f5  safe_keccak.py
 c94e3e1188f0e7a6fbf8df03066a9b6f63be336d9f81b7279a1cdcfc784e288f  safe_key.py
-697e9a7d1124d387a3083cb472a0517357c5bd0a30b1870dc175f775f9f5ee76  safe_read.py
+f1dc2a5a4033ac6b8e3404aae8506bea952510f1e60a4d1c1794029c4374dcbb  safe_read.py
+ab36705e2b35b1367e90d79731f8960de652328104b752f196f6b4b940243603  safe_ur.py
 3024f60d440b2494fdc24d7dc374e5e435de2d424168fa237c46b9c999c4194a  save.mpy
 ca324e0a4598275f90d016e04322efea2c4c9b47a8602a143ce6524fc57adb95  secret.py
 0dab883dbbf4b484759911880face307a66e1226474a95d47a29bc723972cab1  secret_box.py
@@ -53,7 +54,7 @@ e20d454f74229b3aaa09a15829cbb6b85aa50c6b3bf229287b9cdbff73bee90d  wedgiedrive.mp
 @app  {"mod":"g2048","name":"2048","entry":"run","files":["g2048.py"]}
 @app  {"mod":"grove","name":"Crystal Grove","entry":"run","files":["grove.py"]}
 @app  {"mod":"keypad","name":"Keypad","entry":"run","files":["keypad.py"]}
-@app  {"mod":"safe","name":"Safe Signer","entry":"run","usb":true,"files":["safe.py","safe_read.py","safe_keccak.py","safe_addr.py","safe_blockie.py","safe_key.py"]}
+@app  {"mod":"safe","name":"Safe Signer","entry":"run","usb":true,"files":["safe.py","safe_read.py","safe_ur.py","safe_keccak.py","safe_addr.py","safe_blockie.py","safe_key.py"]}
 @app  {"mod":"secret","name":"Secrets","entry":"run","usb":true,"files":["secret.py","secret_box.py"]}
 @app  {"mod":"welcome","name":"Welcome","entry":"run","files":["welcome.py"]}
-@serial  9
+@serial  10

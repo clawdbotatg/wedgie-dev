@@ -32,7 +32,7 @@ import save
 import ui
 from ui import WHITE, INK, MUTED, GREEN_D, RED
 
-FW = "safe-21"
+FW = "safe-22"
 RP_ID = b"wedgie.dev"
 FIELDS = '"origin":"https://wedgie.dev"'
 ASK_MS = 120000
@@ -114,7 +114,7 @@ def amount(n, dec):
         return str(n)
     w, f = n // 10 ** dec, n % 10 ** dec
     f = ("%0" + str(dec) + "d") % f
-    f = f.rstrip("0")[:6]
+    f = f[:6].rstrip("0")
     return "%d.%s" % (w, f) if f else str(w)
 
 
@@ -442,6 +442,7 @@ def confirm(tx):
     finally:
         del acts
         del sys.modules["safe_read"]
+        sys.modules.pop("safe_ur", None)    # loaded only for a Uniswap swap
         gc.collect()
     # A page that doesn't fit goes on over more pages: every line is seen before the press (wedgie-dev 10-15:
     # an unknown token's recipient fell off the bottom).

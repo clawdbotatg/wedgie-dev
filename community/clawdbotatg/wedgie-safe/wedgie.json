@@ -7,6 +7,7 @@
       "files": [
         "safe.py",
         "safe_read.py",
+        "safe_ur.py",
         "safe_keccak.py",
         "safe_addr.py",
         "safe_blockie.py",
