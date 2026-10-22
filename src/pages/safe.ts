@@ -1015,7 +1015,7 @@ export function safe(main: HTMLElement) {
   }
 
   /** The Safe from the chain (the truth), its queue from Safe's API. */
-  async function load(quiet = false) {
+  async function load(quiet = false, bg = false) {   // bg: the background check (recheck), Safe's service from svcKept
     if (!quiet) say("Opening the Safe.");
     const c = chain, a = safeAddr;
     opening = true; paintSpin();
@@ -1036,9 +1036,9 @@ export function safe(main: HTMLElement) {
       paintAll();             // the Safe from the chain now; its queue, tokens and history as the sources answer
       if (!quiet) checkCopies(c, a);
       loadAssets(c, a, i).catch(() => { if (c === chain && a === safeAddr) { assetsErr = true; paintSpin(); } });
-      loadActivity(c, a);
+      loadActivity(c, a, bg);
       readAddons(c, a).then((x) => { if (c === chain && a === safeAddr) { addons = x; paintSafe(); paintAddons(); } }, () => {});
-      const q = await readQueue(c, a, i.nonce);
+      const q = await readQueue(c, a, i.nonce, bg);
       if (c !== chain || a !== safeAddr) return;
       queue = q; queueOf = `${c}:${a}`;
       takeAsks();
@@ -1063,7 +1063,7 @@ export function safe(main: HTMLElement) {
       if (i.balance === was.balance && i.usdc === was.usdc && i.nonce === was.nonce && i.threshold === was.threshold && i.owners.join() === was.owners.join()) return;
     }
     ticks = 0;
-    load(true);
+    load(true, true);
   }
   setInterval(() => recheck(), 8000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) recheck(true); });
@@ -1075,10 +1075,23 @@ export function safe(main: HTMLElement) {
   }
 
 
+  // The background check (each minute, the tab back in view) asks Safe's service again only when the Safe changed (its
+  // number, its coins) or 5 minutes passed: an open tab was ~120 calls an hour, and the site has 1,500 a day (/api/safe)
+  const SVC_QUIET_MS = 5 * 60_000;
+  const svcKept = new Map<string, { at: number; j: any }>();
+  async function svcGet(url: string, bg: boolean) {
+    const k = `${url}|${info?.nonce}|${info?.balance}|${info?.usdc}`, hit = svcKept.get(k);
+    if (bg && hit && Date.now() - hit.at < SVC_QUIET_MS) return hit.j;
+    const j = await within(get(url));
+    if (svcKept.size > 50) svcKept.clear();
+    svcKept.set(k, { at: Date.now(), j });
+    return j;
+  }
+
   /** What happened: Safe's API (its executed transactions, and money that came in). */
-  async function loadActivity(c: number, a: string) {
+  async function loadActivity(c: number, a: string, bg = false) {
     try {
-      const j = await within(get(`${api(c)}/safes/${a}/all-transactions/?executed=true&queued=false&limit=25`));
+      const j = await svcGet(`${api(c)}/safes/${a}/all-transactions/?executed=true&queued=false&limit=25`, bg);
       if (c === chain && a === safeAddr) { activity = j.results || []; activityErr = ""; }
     } catch (e: any) {
       if (c === chain && a === safeAddr) { activity = activity || []; activityErr = e.status === 404 ? "" : e.status === 429 ? REST : "Couldn't load it just now."; }
@@ -1171,7 +1184,7 @@ export function safe(main: HTMLElement) {
   const TX_FIELDS = ["to", "value", "data", "operation", "safeTxGas", "baseGas", "gasPrice", "gasToken", "refundReceiver", "nonce"] as const;
   const txOf = (t: any): E.SafeTx => Object.fromEntries(TX_FIELDS.map((k) => [k, k === "data" ? t.data || "0x" : t[k]])) as any;
 
-  async function readQueue(c: number, a: string, nonce: number): Promise<any[]> {
+  async function readQueue(c: number, a: string, nonce: number, bg = false): Promise<any[]> {
     const all = new Map<string, any>(), dropped = new Set<string>();
     const add = (t: any, sigs: { owner: string; signature: string | null }[], fromSafe = false) => {
       if (+t.nonce < nonce) return;
@@ -1186,7 +1199,7 @@ export function safe(main: HTMLElement) {
     const missed: string[] = [];
     let rest = false;
     await Promise.all([
-      within(get(`${api(c)}/safes/${a}/multisig-transactions/?executed=false&nonce__gte=${nonce}&ordering=nonce&limit=20`))
+      svcGet(`${api(c)}/safes/${a}/multisig-transactions/?executed=false&nonce__gte=${nonce}&ordering=nonce&limit=20`, bg)
         .then((j) => (j.results || []).forEach((t: any) => add(t, t.confirmations || [], true)))
         .catch((e: any) => { if (e.status === 429) rest = true; else if (e.status !== 404) missed.push("Safe's service"); }),   // 404: a Safe made seconds ago
       useIW(c) ? within(fetch(`${IWQ}?chainId=${c}&safe=${a}`).then((r) => r.json()))
