@@ -75,7 +75,9 @@ function mount() {
       h(RainbowKitProvider, { theme: lightTheme({ accentColor: "#2e9e4f" }), modalSize: "compact", children: h(Bridge) }))));
 }
 
-/** Watch the connected wallet's provider (null: none). Restores the last session. */
+/** Watch the connected wallet's provider (null: none, e.g. the wallet ended it on the phone). */
+export const watch = (cb: (p: any | null) => void) => { onChange = cb; };
+/** watch(), and restore the last session. */
 export async function start(cb: (p: any | null) => void) {
   onChange = cb;
   mount();

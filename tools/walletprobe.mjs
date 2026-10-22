@@ -10,7 +10,9 @@ const ctx = await b.newContext({ viewport: { width: 1100, height: 900 } });
 await ctx.addInitScript(() => {
   const me = "0x34aA3F359A9D614239015126635CE7732c18fDF3";
   // a Rainbow-like wallet that never answers eth_accounts quickly (a restore that hangs)
-  const eth = { isRainbow: true, isMetaMask: true, on() {}, removeListener() {}, async request({ method }) {
+  const ls = {};
+  window.__emit = (ev, v) => (ls[ev] || []).forEach((f) => f(v));      // the wallet's side: accountsChanged, disconnect
+  const eth = { isRainbow: true, isMetaMask: true, on(ev, f) { (ls[ev] ||= []).push(f); }, removeListener(ev, f) { ls[ev] = (ls[ev] || []).filter((x) => x !== f); }, async request({ method }) {
     if (method === "eth_accounts") return new Promise(() => {});
     if (method === "eth_requestAccounts") return [me];
     if (method === "eth_chainId") return "0x1";
@@ -43,6 +45,13 @@ check(on, "picked Rainbow: connected (Disconnect shows)");
 if (on) {
   await p.click("#w-off");
   check(await p.waitForSelector("#w-go", { timeout: 2000 }).then(() => true, () => false), "Disconnect lets go at once, though the wallet never answers");
+  // connect again, then the wallet ends it on its side (a phone's Disconnect): the page lets go too
+  await p.click("#w-go");
+  await p.locator('[role="dialog"] button', { hasText: "Rainbow" }).first().click({ timeout: 5000 }).catch(() => {});
+  if (await p.waitForSelector("#w-off", { timeout: 8000 }).then(() => true, () => false)) {
+    await p.evaluate(() => window.__emit("disconnect", { code: 4900 }));   // WalletConnect sends just this (session_delete)
+    check(await p.waitForSelector("#w-go", { timeout: 3000 }).then(() => true, () => false), "the wallet disconnects on its side: the page shows Connect wallet");
+  } else check(false, "connected again");
 }
 await b.close();
 process.exit(bad ? 1 : 0);

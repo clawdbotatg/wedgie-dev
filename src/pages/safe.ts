@@ -631,7 +631,7 @@ export function safe(main: HTMLElement) {
       <button class="btn btn-sm" id="w-off">Disconnect</button>`;
     $("w-go")?.addEventListener("click", () => job(async () => {
       account = await wallet(safeAddr ? chain : newChain);
-      if (!listened.has(wcp)) { listened.add(wcp); wcp.on?.("accountsChanged", onAccounts); }   // a switch in the wallet shows here
+      (await rainbow()).watch(onWallet); hear(wcp);
       try { localStorage.removeItem(OFF); } catch {}
       if (!safeAddr) findSafes();
     }));
@@ -647,10 +647,25 @@ export function safe(main: HTMLElement) {
       rainbow().then((r) => r.disconnect()).catch(() => {});
     });
   }
+  // the wallet's side: an account switch shows here, and ending it there (WalletConnect: Disconnect on the phone)
+  // ends it here, whichever way it connected (Austin, 10-21: it stayed connected on the site)
   const listened = new WeakSet<object>();
+  const hear = (p: any) => {
+    if (!p || listened.has(p)) return;
+    listened.add(p);
+    p.on?.("accountsChanged", onAccounts);
+    p.on?.("disconnect", () => { if (wcp === p) onWallet(null); });
+  };
+  const onWallet = async (p: any | null) => {
+    if (!p) { if (wcp) { wcp = null; try { localStorage.removeItem(WCP); } catch {} } return onAccounts([]); }
+    wcp = p; hear(p);
+    onAccounts(await p.request({ method: "eth_accounts" }));
+  };
   const onAccounts = (a: string[]) => {
     if (localStorage.getItem(OFF)) return;
-    account = a[0] ? E.checksum(a[0]) : ""; paintAll(); if (!safeAddr) findSafes();
+    account = a[0] ? E.checksum(a[0]) : "";
+    if (!account) { showWallet = false; rows = rows.filter((r) => r.wedgie).map((r) => ({ ...r, wallet: false })); }
+    paintAll(); if (!safeAddr && account) findSafes();
   };
 
   // ---- /safe: every Safe the wedgie (and the wallet) owns, on every chain ----
@@ -1637,12 +1652,7 @@ export function safe(main: HTMLElement) {
   W.onChange(paintWedgie);
   if (W.armed()) W.start();
   if (localStorage.getItem(WCP) && !localStorage.getItem(OFF))      // the wallet from last time, back on its own
-    rainbow().then((r) => r.start(async (p) => {
-      wcp = p;
-      if (!p) return onAccounts([]);
-      p.on?.("accountsChanged", onAccounts);
-      onAccounts(await p.request({ method: "eth_accounts" }));
-    }), () => {});
+    rainbow().then((r) => r.start(onWallet), () => {});
   loadLast();
   show();
 }
