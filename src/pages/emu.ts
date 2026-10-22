@@ -42,15 +42,19 @@ async function shotFolder(): Promise<FileSystemDirectoryHandle | null> {
 export function emu(main: HTMLElement) {
   main.innerHTML = `
   <section class="emu">
-    <div class="emu-stage" id="emu-stage"><b class="emu-tag">Virtual</b><div id="emu-3d"></div></div>
-    <div class="emu-status" id="emu-status">Starting…</div>
-    <div class="emu-bar"><div id="emu-bar-fill"></div></div>
+    <b class="emu-tag">Virtual wedgie</b>
+    <div id="emu-3d"></div>
+    <div class="emu-note" id="emu-note"></div>
+    <div class="emu-bar" hidden><div id="emu-bar-fill"></div></div>
     <div class="row emu-actions">
-      <button class="btn btn-sm btn-grey" id="emu-shot">Screenshot</button>
-      <button class="btn btn-sm btn-grey" id="emu-power">Replug</button>
-      <button class="btn btn-sm btn-grey" id="emu-wipe">Wipe</button>
+      <button class="btn btn-sm" id="emu-shot">Screenshot</button>
+      <button class="btn btn-sm" id="emu-power">Replug</button>
+      <button class="btn btn-sm" id="emu-wipe">Wipe</button>
     </div>
+    <b class="emu-id" id="emu-id"></b>
+    <div id="emu-status" hidden>Starting…</div>
   </section>`;
+  document.body.classList.add("emu-page");   // the whole page dark, no site header or footer (emu.css)
   const $ = (id: string) => document.getElementById(id)!;
   // the screen as the firmware drew it, 240x240 (the 3D case shows it; window.wedgie.screen() reads it)
   const screen = document.createElement("canvas");
@@ -70,7 +74,10 @@ export function emu(main: HTMLElement) {
   const status = () => {
     const short = st.id.slice(-6).toUpperCase();
     const usb = !st.usb ? "USB: not up" : st.owner ? "USB: in use by a tab" : "USB: plugged in";
+    // the full line stays in #emu-status (hidden) for agents and tools/emu.mjs; people see the ID, and a note when there is one
     $("emu-status").textContent = st.setup || note || `${short ? "ID " + short + " · " : ""}${Math.round(st.speed * 100)}% of real speed · ${usb}`;
+    $("emu-id").textContent = short;
+    $("emu-note").textContent = st.setup || note;
     ($("emu-bar-fill") as HTMLElement).style.width = st.setup ? `${Math.round(8 + 92 * st.p)}%` : "0";
     $("emu-bar-fill").parentElement!.hidden = !st.setup;
   };
