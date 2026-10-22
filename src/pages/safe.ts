@@ -906,7 +906,7 @@ export function safe(main: HTMLElement) {
       + (signer ? wedgieOwns() ? " · your wedgie is one" : " · your wedgie isn't one" : "");
     let h = `<div class="sx-hero-top">${sub === "settings" ? `<a class="sx-back" data-nav href="${home}">← Back</a>` : `<a class="sx-back" data-nav href="/safe">← Safes</a>`}
       ${sub === "home" ? `<a class="sx-gear" id="a-settings" data-nav href="${home}/settings">Settings</a>` : ""}</div>
-      <div class="sx-hero-id">${address(safeAddr, { size: "lg", chain })}${g !== null ? `<span class="sx-grand"><b>${esc(usd(g))}</b> on all chains</span>` : ""}</div>
+      <div class="sx-hero-id">${address(safeAddr, { size: "lg", long: true, chain })}${g !== null ? `<span class="sx-grand"><b>${esc(usd(g))}</b> on all chains</span>` : ""}</div>
       <div class="sx-chains">${on.map((t) => t === chain ? `<span class="sx-pill sx-on">${chainLogo(t)}${esc(c.name)}</span>`
         : `<a class="sx-pill" data-nav href="${route(t, safeAddr)}${sub === "settings" ? "/settings" : ""}">${chainLogo(t)}${esc(CHAINS[t].name)}</a>`).join("")}</div>`;
     if (sub === "settings") h += `<div class="sx-total sx-total-sm">Settings</div><div class="sx-sub">${esc(who)}</div>`;

@@ -112,10 +112,11 @@ const shortA = (a: string) => a.slice(0, 6) + "…" + a.slice(-4);
 const COPY = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>`;
 const CHECK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12.75 11.25 15 15 9.75"/><circle cx="12" cy="12" r="9"/></svg>`;
 
-/** An address: avatar, ENS name (when it has one) over the short address, copy. link = the explorer's base. */
+/** An address: avatar, ENS name (when it has one) over the short address, copy. link = the explorer's base.
+ *  long = the whole address, its first 6 and last 4 in bold (the part people check). */
 export function address(a: string, o: { link?: string; size?: "sm" | "lg"; long?: boolean; chain?: number } = {}) {
   if (!E.isAddress(a)) return `<span class="addr bad">${esc(a)}</span>`;
-  const cs = E.checksum(a), k = known.get(key(cs, o.chain)), shown = o.long ? cs : shortA(cs);
+  const cs = E.checksum(a), k = known.get(key(cs, o.chain)), shown = o.long ? `<b>${cs.slice(0, 6)}</b>${cs.slice(6, -4)}<b>${cs.slice(-4)}</b>` : shortA(cs);
   const txt = o.link ? `<a href="${esc(o.link)}/address/${cs}" target="_blank" rel="noopener">${shown}</a>` : shown;
   return `<span class="addr${o.size ? " addr-" + o.size : ""}" data-addr="${cs}"${o.chain ? ` data-chain="${o.chain}"` : ""}><img class="addr-av" src="${k?.avatar || blo(cs as `0x${string}`)}" alt="">`
     + `<span class="addr-txt"><b class="addr-ens"${k ? "" : " hidden"}>${esc(k?.name || "")}</b>`

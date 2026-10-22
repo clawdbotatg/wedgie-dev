@@ -745,6 +745,13 @@ body.dock-running #s-msg { display: none; }
 .sx-gear { padding: 6px 14px; border-radius: 999px; background: rgba(255,255,255,.12); }
 .sx-hero .addr-ens { color: #fff; }
 .sx-hero .addr-hex { color: rgba(255,255,255,.75); }
+/* the Safe's own address: the whole thing, big, its first 6 and last 4 bright */
+.sx-hero-id .addr-lg .addr-av { width: 52px; height: 52px; }
+.sx-hero-id .addr-lg .addr-ens { font-size: 24px; }
+.sx-hero-id .addr-lg .addr-hex { font-size: 20px; letter-spacing: .02em; color: rgba(255,255,255,.78); }
+.sx-hero-id .addr-lg .addr-hex b { color: #fff; font-weight: 800; }
+.sx-hero-id .addr-lg .addr-copy svg { width: 20px; height: 20px; }
+.sx-hero-id .addr-lg { gap: 12px; min-width: 0; }
 .sx-chains { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 0; }
 .sx-hero .sx-pill { background: rgba(255,255,255,.12); color: #fff; }
 .sx-hero .sx-pill.sx-on { background: var(--mint); }
@@ -819,6 +826,8 @@ body.sx-sheet-open #s-msg { display: none; }
   .sx-sheet-card { width: 100%; max-height: 92vh; border-radius: 28px 28px 0 0; padding-bottom: calc(22px + env(safe-area-inset-bottom)); }
   .sx-hero { padding: 18px 18px 20px; border-radius: 24px; }
   .sx-grand { margin-left: 0; flex-basis: 100%; }
+  .sx-hero-id .addr-lg .addr-av { width: 40px; height: 40px; }
+  .sx-hero-id .addr-lg .addr-hex { font-size: 16px; letter-spacing: 0; }
   .sx-card, .sx-banner { padding: 18px 16px; border-radius: 20px; }
   .sx-safes { grid-template-columns: 1fr; }
 }
