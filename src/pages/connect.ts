@@ -100,6 +100,7 @@ function list(main: HTMLElement, go: (path: string) => void) {
       }
     }
     actions.innerHTML = `<button class="btn ${ws.length ? "" : "btn-green"}" id="connect">${ws.length ? "Connect another" : "Connect a wedgie"}</button>` +
+      (ws.length ? "" : `<div class="reset-tip"><p class="fine">Can't find your wedgie? It may need a reset.</p><a class="btn" href="/reset">Reset a wedgie</a></div>`) +
       ("usb" in navigator ? `<p class="fine unplug-tip">A brand-new Pico doesn't show up? <a href="#" id="pick-new">Pick it</a> (it's called RP2 Boot or RP2350 Boot).</p>` : "") +
       `<div class="crash"><p class="crash-q">Did your wedgie crash?</p><button class="btn btn-lg btn-red" id="report">Send a bug report</button></div>`;
     document.getElementById("connect")!.onclick = () => W.connectNew().catch(() => {});
