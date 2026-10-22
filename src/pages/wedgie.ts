@@ -131,8 +131,8 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
             <div class="status recess" id="d-tstatus" hidden></div>
             <textarea class="recess editor" spellcheck="false"></textarea>
             <div class="row">
-              <button class="btn btn-sm btn-green" data-act="run">Run on it</button>
               <button class="btn btn-sm" data-act="stop">Stop</button>
+              <button class="btn btn-sm" data-act="run">Run on it</button>
               <input id="d-appname" class="recess name" placeholder="app name" maxlength="12" value="My app">
               <button class="btn btn-sm" data-act="saveapp">Make it its app</button>
             </div>

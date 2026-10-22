@@ -60,7 +60,7 @@ export function code(main: HTMLElement) {
         </div>
         <div class="code-side">
           <div class="row">
-            <button class="btn btn-green btn-sm" id="c-open"${canPick ? "" : " hidden"}>Open a folder</button>
+            <button class="btn btn-sm" id="c-open"${canPick ? "" : " hidden"}>Open a folder</button>
             <button class="btn btn-sm" id="c-reopen" hidden></button>
             <label class="btn btn-sm file-btn"${canPick ? " hidden" : ""}>Open a folder<input type="file" id="c-dirin" webkitdirectory hidden></label>
           </div>
