@@ -4,6 +4,7 @@
 // keep painting with innerHTML. ENS is read with viem through ENS's Universal Resolver on Ethereum, so names
 // served by a gateway (CCIP-read: *.base.eth, *.wedgie.eth on Base) and a chain's own primary names work.
 //   address(a, opts)       an address, anywhere one is shown (opts.chain: look up its name for that chain first)
+//   face(a, chain)         just its picture
 //   addressInput(id, ph)   an input that takes 0x… or an ENS name; addressOf(input) = the address it means
 import { blo } from "blo";
 import type { PublicClient } from "viem";
@@ -123,6 +124,12 @@ export function address(a: string, o: { link?: string; size?: "sm" | "lg"; long?
     + `<span class="addr-row"><span class="addr-hex" title="${cs}">${txt}</span><button class="addr-copy" type="button" data-copy="${cs}" aria-label="Copy address">${COPY}</button></span></span></span>`;
 }
 
+/** Just the round picture (the ENS avatar, else the blockie): owners stacked on a button. */
+export function face(a: string, chain?: number) {
+  const cs = E.checksum(a), k = known.get(key(cs, chain));
+  return `<img class="addr-av" data-face="${cs}"${chain ? ` data-chain="${chain}"` : ""} src="${k?.avatar || blo(cs as `0x${string}`)}" alt="">`;
+}
+
 /** An address input: 0x… or an ENS name. Its avatar on the right, the ENS name (or the address a name means) on the left. */
 export function addressInput(id: string, placeholder = "0x… or ENS name") {
   return `<span class="addr-in"><span class="addr-pre" hidden></span><input id="${esc(id)}" placeholder="${esc(placeholder)}" spellcheck="false" autocomplete="off" autocapitalize="off"><img class="addr-in-av" alt="" hidden></span>`;
@@ -183,6 +190,13 @@ function fill(root: ParentNode) {
       b.textContent = n; b.hidden = false;
       const av = await ensAvatar(n);
       if (av) el.querySelector<HTMLImageElement>(".addr-av")!.src = av;
+    });
+  });
+  root.querySelectorAll<HTMLImageElement>("img[data-face]:not([data-looked])").forEach((img) => {
+    img.dataset.looked = "1";
+    ensName(img.dataset.face!, +(img.dataset.chain || 0) || undefined).then(async (n) => {
+      const av = n && await ensAvatar(n);
+      if (av) img.src = av;
     });
   });
   root.querySelectorAll<HTMLInputElement>(".addr-in input").forEach(wire);

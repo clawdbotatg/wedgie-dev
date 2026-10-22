@@ -23,7 +23,7 @@ import { askYes } from "../ui/askyes";
 import * as W from "../serial/wedgies";
 import * as Drive from "../serial/drive";
 import * as E from "../safe/eth";
-import { address, addressInput, addressOf, watch } from "../safe/address";
+import { address, addressInput, addressOf, face, watch } from "../safe/address";
 import { describe, type Ctx, type Said } from "../safe/describe";
 import { explain, callsOf } from "../safe/explain";
 import { readAssets, tokenMeta, knownMeta, usd, type Asset } from "../safe/assets";
@@ -922,7 +922,7 @@ export function safe(main: HTMLElement) {
     const who = !i ? "" : `${i.threshold} of ${plural(i.owners.length, "owner")}`
       + (signer ? wedgieOwns() ? " · your wedgie is one" : " · your wedgie isn't one" : "");
     let h = `<div class="sx-hero-top">${sub === "settings" ? `<a class="sx-back" data-nav href="${home}">← Back</a>` : `<a class="sx-back" data-nav href="/safe">← Safes</a>`}
-      ${sub === "home" ? `<a class="sx-gear" id="a-settings" data-nav href="${home}/settings">Settings</a>` : ""}</div>
+      ${sub === "home" ? `<a class="sx-gear" id="a-settings" data-nav href="${home}/settings">${i ? `<span class="sx-faces">${i.owners.map((o) => face(o, chain)).join("")}</span>` : ""}Settings</a>` : ""}</div>
       <div class="sx-hero-id">${address(safeAddr, { size: "lg", long: true, chain })}${g !== null ? `<span class="sx-grand"><b>${esc(usd(g))}</b> on all chains</span>` : ""}</div>
       <div class="sx-chains">${on.map((t) => t === chain ? `<span class="sx-pill sx-on">${chainLogo(t)}${esc(c.name)}</span>`
         : `<a class="sx-pill" data-nav href="${route(t, safeAddr)}${sub === "settings" ? "/settings" : ""}">${chainLogo(t)}${esc(CHAINS[t].name)}</a>`).join("")}</div>`;
