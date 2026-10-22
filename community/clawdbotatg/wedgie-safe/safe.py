@@ -34,9 +34,9 @@ import lcd as L
 import wedgie as W
 import save
 import ui
-from ui import WHITE, INK, MUTED, GREEN_D, RED
+from ui import WHITE, INK, MUTED, GREY, GREEN_D, RED
 
-FW = "safe-24"
+FW = "safe-25"
 RP_ID = b"wedgie.dev"
 FIELDS = '"origin":"https://wedgie.dev"'
 ASK_MS = 120000
@@ -268,6 +268,7 @@ def delete_hash(chain, safe, h, totp):
 BIG = "big"         # a line kind: big text (the amount, the limit)
 ADDR = "addr"       # a line kind: an address in full, with its blockie (safe_blockie) beside it
 GAP = ("", INK, "gap")  # a line: 6 px of space
+ROOM = 94           # px of lines a page has, under the Safe card and the title
 
 
 def _h(line, big=False):
@@ -446,20 +447,44 @@ def draw_home():
     d.show()
 
 
+def _checksum(a):
+    """EIP-55: the mixed-case spelling wedgie.dev/safe and every wallet show."""
+    from safe_keccak import keccak256
+    h = a[2:].lower()
+    kh = binascii.hexlify(keccak256(h.encode())).decode()
+    return "0x" + "".join(c.upper() if int(kh[i], 16) >= 8 else c for i, c in enumerate(h))
+
+
+def _card(safe):
+    """Which Safe, as wedgie.dev/safe shows it: a dark rounded card, its blockie, its address with the first 6
+    and last 4 in white."""
+    import safe_blockie
+    r = 8
+    for y in range(46):                 # rounded corners: each row inset by the circle's edge
+        e = min(y, 45 - y)
+        i = int(r - (r * r - (r - e - 0.5) ** 2) ** 0.5 + 0.5) if e < r else 0
+        d.hline(2 + i, 2 + y, 236 - 2 * i, INK)
+    safe_blockie.draw(d, safe, 9, 5, 5)
+    a = _checksum(safe)
+    for i in range(3):
+        s, x, y = a[i * 14:i * 14 + 14], 60, 7 + i * 13
+        for j, ch in enumerate(s):
+            n = i * 14 + j
+            d.text(ch, x + 8 * j, y, WHITE if n < 6 or n >= 38 else GREY)
+
+
 def _screen(head, lines, yes, k, foot="", safe=None):
-    """One page of the question: the action big, its lines, which Safe small at the bottom. True on a
-    real A, False on Y or no answer."""
+    """One page of the question: which Safe in a card at the top, the action big, its lines, the chain small
+    at the bottom. True on a real A, False on Y or no answer."""
     d.fill(WHITE)
-    ui.band(d)
-    ui.title(d, head, 42, 1, RED if any(l[1] == RED and len(l) > 2 for l in lines) else INK)   # a big red line: a red page
-    y = _draw(lines, 68, 166, sum(_h(l, True) for l in lines) <= 98)    # the big blockie wherever it fits
-    if safe:                            # which Safe: its blockie (bigger when there's room), chain, address
-        import safe_blockie
-        c = 3 if y <= 156 else 2
-        safe_blockie.draw(d, safe, 8, 182 - 8 * c, c, MUTED)
-        d.text(foot[:25], 16 + 8 * c, 170, MUTED)
-    elif foot:
-        d.center_text(foot[:ui.COLS_SMALL], 170, MUTED)
+    if safe:
+        _card(safe)
+    else:
+        ui.band(d)
+    ui.title(d, head, 54, 1, RED if any(l[1] == RED and len(l) > 2 for l in lines) else INK)   # a big red line: a red page
+    _draw(lines, 76, 170, sum(_h(l, True) for l in lines) <= ROOM)    # the big blockie wherever it fits
+    if foot:
+        d.center_text(foot[:ui.COLS_SMALL], 172, MUTED)
     ui.buttons(d, yes, "no")
     d.show()
     k.pressed()                         # a press made before this page was up doesn't answer it
@@ -472,8 +497,9 @@ def _screen(head, lines, yes, k, foot="", safe=None):
     return False
 
 
-def _fit(lines, room=98):
-    """The lines in parts that each fit a page (_screen draws 68..166)."""
+def _fit(lines, room=None):
+    """The lines in parts that each fit a page (_screen draws 76..170)."""
+    room = room or ROOM
     parts, part, h = [], [], 0
     for l in lines:
         if part and h + _h(l) > room:
@@ -489,7 +515,7 @@ def confirm(tx):
     k = L.Keys(physical=True)
     k.pressed()
     sf = tx["safe"]
-    foot = "%s %s" % (CHAINS.get(tx["chainId"], "chain %d" % tx["chainId"]), short(tx["safe"]))
+    foot = CHAINS.get(tx["chainId"], "chain %d" % tx["chainId"])
     import safe_read
     acts = None
     try:
@@ -582,7 +608,7 @@ def on_remove(mid, t, totp):
     h = safe_tx_hash(tx)
     k = L.Keys(physical=True)
     k.pressed()
-    foot = "%s %s" % (CHAINS.get(tx["chainId"], "chain %d" % tx["chainId"]), short(tx["safe"]))
+    foot = CHAINS.get(tx["chainId"], "chain %d" % tx["chainId"])
     if not _screen("Remove it?", [("#%d" % tx["nonce"], INK, BIG), GAP, ("Off the list. It can", INK),
                                   ("still run till another", INK), ("tx takes #%d." % tx["nonce"], INK)],
                    "remove", k, foot, tx["safe"]):
