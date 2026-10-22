@@ -158,7 +158,9 @@ async function send(chain: number, to: string, data: string, say: (s: string, pc
   const hash = await eth().request({ method: "eth_sendTransaction", params: [{ from, to, data, value }] });
   for (let i = 0; i < 160; i++) {
     say("Sent. Waiting for it to land in a block.", 20 + 50 * (1 - 0.85 ** i));
-    const r = await eth().request({ method: "eth_getTransactionReceipt", params: [hash] });
+    // our own RPC: a wallet over WalletConnect often never answers this (Austin, 10-21: stuck on "Sent" forever)
+    const r = await rpc(chain, "eth_getTransactionReceipt", [hash]).catch(() => null)
+      || await within(eth().request({ method: "eth_getTransactionReceipt", params: [hash] }), 3000).catch(() => null);
     if (r) { if (r.status !== "0x1") throw new Error(`It failed on chain: ${CHAINS[chain].scan}/tx/${hash}`); return r; }
     await sleep(1500);
   }
