@@ -1315,14 +1315,18 @@ export function safe(main: HTMLElement) {
     const i = info!;
     const signed = (t: any, a: string) => !!a && (t.confirmations || []).some((c: any) => eqA(c.owner, a));
     const cancelled = (n: number) => queue.some((x) => +x.nonce === n && said(x).kind === "cancel");
+    // one green button on the page (Austin): the bottom bar's Execute when one is ready, else the first Sign with wedgie
+    let green = !readyNext();
     const items = queue.map((t, k) => {
       const n = (t.confirmations || []).length, need = t.confirmationsRequired ?? i.threshold, first = +t.nonce === i.nonce, s = said(t);
       const btns: string[] = [], marks: string[] = [];
-      if (wedgieOwns()) ownedBy().every((o) => signed(t, o)) ? marks.push("wedgie ✓")
-        : btns.push(`<button class="btn btn-sm btn-green" data-sign="${k}"${dis()}>Sign with wedgie</button>`);
+      if (wedgieOwns()) {
+        if (ownedBy().every((o) => signed(t, o))) marks.push("wedgie ✓");
+        else { btns.push(`<button class="btn btn-sm${green ? " btn-green" : ""}" data-sign="${k}"${dis()}>Sign with wedgie</button>`); green = false; }
+      }
       if (account && isOwner(account)) signed(t, account) ? marks.push("wallet ✓")
-        : n < need && btns.push(`<button class="btn btn-sm" data-wsign="${k}"${dis()}>Sign with wallet</button>`);
-      if (n >= need) btns.push(first ? `<button class="btn btn-sm btn-green" data-exec="${k}"${dis()}>Execute</button>` : `<span class="fine">runs after #${i.nonce}</span>`);
+        : n < need && (btns.push(`<button class="btn btn-sm${green ? " btn-green" : ""}" data-wsign="${k}"${dis()}>Sign with wallet</button>`), green = false);
+      if (n >= need) btns.push(first ? `<button class="btn btn-sm" data-exec="${k}"${dis()}>Execute</button>` : `<span class="fine">runs after #${i.nonce}</span>`);
       const rej = t.wc && !n ? `<button class="btn btn-sm" data-wcno="${k}"${dis()}>Reject</button>`      // only here: nothing to cancel
         : (can() && s.kind !== "cancel" && !cancelled(+t.nonce) ? `<button class="btn btn-sm" data-reject="${k}"${dis()}>Reject</button> ` : "")
         + (account && isOwner(account) ? `<button class="btn btn-sm" data-remove="${k}"${dis()}>Remove</button>` : "");
@@ -1340,7 +1344,7 @@ export function safe(main: HTMLElement) {
           <dt>Hash</dt><dd><code>${esc(String(t.safeTxHash).slice(0, 10))}…${esc(String(t.safeTxHash).slice(-8))}</code></dd></dl></details></li>`;
     }).join("");
     const ready = /data-exec/.test(items), run = readyRun();
-    box.innerHTML = `<h3 class="sx-row">${ready ? "Ready: press Execute" : "Waiting"}${queue.length ? ` <span class="sx-count">${queue.length}</span>` : ""}${run.length > 1 ? `<button class="btn btn-sm btn-green sx-end" id="s-execall"${dis()}>Execute all ${run.length}</button>` : ""}</h3>
+    box.innerHTML = `<h3 class="sx-row">${ready ? "Ready: press Execute" : "Waiting"}${queue.length ? ` <span class="sx-count">${queue.length}</span>` : ""}${run.length > 1 ? `<button class="btn btn-sm sx-end" id="s-execall"${dis()}>Execute all ${run.length}</button>` : ""}</h3>
       ${items ? `<ul class="sx-txs">${items}</ul>` : `<p class="fine">Nothing waiting.</p>`}
       ${queueNote ? `<p class="fine">${esc(queueNote)}</p>` : ""}
       <p class="sx-foot"><button class="btn btn-sm" id="s-refresh"${dis()}>Refresh</button></p>`;
@@ -1404,10 +1408,10 @@ export function safe(main: HTMLElement) {
   /** Stuck to the bottom of the screen while a transaction is ready to run (Austin): its Execute, then its progress. */
   let running: any = null;
   let runningAll: any[] = [];
+  const readyNext = () => { const i = info; return i ? queue.find((t) => +t.nonce === i.nonce && (t.confirmations || []).length >= (t.confirmationsRequired ?? i.threshold)) : undefined; };
   function paintDock() {
-    const i = info, k = i ? queue.findIndex((t) => +t.nonce === i.nonce && (t.confirmations || []).length >= (t.confirmationsRequired ?? i.threshold)) : -1;
-    const t = running || (k >= 0 ? queue[k] : null);
-    const all = running ? runningAll : [];
+    const t = running || readyNext() || null;
+    const all = running ? runningAll : t && info ? readyRun() : [];
     const dock = $("s-dock");
     dock.hidden = !(safeAddr && t && sub === "home");
     document.body.classList.toggle("has-dock", !dock.hidden);
@@ -1415,11 +1419,16 @@ export function safe(main: HTMLElement) {
     document.body.classList.toggle("in-app", Drive.inApp());
     if (dock.hidden) return;
     $("s-dock-tx").innerHTML = all.length > 1
-      ? `<span class="safe-dock-what"><b>#${esc(all[0].nonce)}–#${esc(all.at(-1).nonce)}</b> ${all.length} transactions, in one go</span>`
+      ? `<span class="safe-dock-what"><b>#${esc(all[0].nonce)}–#${esc(all.at(-1).nonce)}</b> ${all.length} transactions, in one go</span>
+        ${running ? "" : `<button class="btn btn-green" id="s-dock-all"${dis()}>Execute all ${all.length}</button>`}`
       : `<span class="safe-dock-what"><b>#${esc(t.nonce)}</b> ${said(t).title}</span>
         ${running ? "" : `<button class="btn btn-green" id="s-dock-go"${dis()}>Execute</button>`}`;
     $("s-dock-msg").hidden = !running;
     $("s-dock-go")?.addEventListener("click", () => job(async () => { running = t; paintDock(); try { await execute(t); } finally { running = null; } }));
+    $("s-dock-all")?.addEventListener("click", () => job(async () => {
+      running = all[0]; runningAll = all; paintDock();
+      try { await executeAll(all); } finally { running = null; runningAll = []; }
+    }));
   }
 
   // ---- Assets: every token, biggest first; ones with no price folded away ----

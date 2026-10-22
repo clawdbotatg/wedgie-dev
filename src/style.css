@@ -236,7 +236,7 @@ html, body { overflow-x: clip; }
   transition: transform .08s, background .3s; }
 .connect-btn:active { transform: translateY(2px); }
 .connect-btn .led { width: 10px; height: 10px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #9a9b9d, #5a5b5d); box-shadow: inset 0 1px 1px rgba(0,0,0,.4); }
-.connect-btn.on { background: var(--green-fill); box-shadow: inset 0 2px 0 rgba(255,255,255,.35), inset 0 -3px 0 rgba(0,0,0,.18), 0 2px 0 #0f6e28, 0 8px 18px -8px rgba(22,140,52,.7); }
+.connect-btn.on { background: var(--grey-fill); box-shadow: inset 0 2px 0 rgba(255,255,255,.25), inset 0 -3px 0 rgba(0,0,0,.25), 0 2px 0 #3a3b3d, 0 8px 18px -8px rgba(0,0,0,.5); }
 .connect-btn.on .led { background: radial-gradient(circle at 35% 35%, #d8ffe2, #7dff9f); box-shadow: 0 0 8px #b6ffc8; }
 .connect-btn.ask { background: var(--green-fill); box-shadow: inset 0 2px 0 rgba(255,255,255,.35), inset 0 -3px 0 rgba(0,0,0,.18), 0 2px 0 #0f6e28, 0 8px 18px -8px rgba(22,140,52,.7); }
 .connect-btn.ask .led { background: radial-gradient(circle at 35% 35%, #d8ffe2, #7dff9f); box-shadow: 0 0 8px #b6ffc8; animation: blink 1.2s steps(2, jump-none) infinite; }
@@ -754,14 +754,14 @@ body.dock-running #s-msg { display: none; }
 .sx-hero-id .addr-lg { gap: 12px; min-width: 0; }
 .sx-chains { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 0; }
 .sx-hero .sx-pill { background: rgba(255,255,255,.12); color: #fff; }
-.sx-hero .sx-pill.sx-on { background: var(--mint); }
+.sx-hero .sx-pill.sx-on { background: rgba(255,255,255,.24); }
 .sx-total { font-size: clamp(42px, 9vw, 64px); font-weight: 900; letter-spacing: -.03em; line-height: 1; margin: 22px 0 6px; font-variant-numeric: tabular-nums; }
 .sx-total-sm { font-size: 34px; }
 .sx-sub { color: rgba(255,255,255,.7); font-weight: 700; font-size: 15px; }
 .sx-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 10px; margin-top: 22px; }
 .sx-act { -webkit-appearance: none; appearance: none; border: 0; font: inherit; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px;
   padding: 14px 6px; border-radius: 20px; background: rgba(255,255,255,.1); color: #fff; font-weight: 800; font-size: 15px; }
-.sx-act span { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--mint); font-size: 20px; line-height: 1; }
+.sx-act span { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,.16); font-size: 20px; line-height: 1; }
 .sx-act:hover:not(:disabled) { background: rgba(255,255,255,.16); }
 .sx-act:disabled { opacity: .5; cursor: not-allowed; }
 /* rows: owners, chains, apps */
