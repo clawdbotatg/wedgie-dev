@@ -2,17 +2,18 @@
 // (SAFE_API_KEY, developer.safe.global, Austin's ethereum.org Google). The free plan: 50K a month, 5 a second; the
 // next is €199 a month. Without a key Safe allows 5,000 a month per IP, and one person's page used that up (10-21).
 // So it's spent carefully:
-//   - a daily cap (DAY_CAP, under 50K/30) and a per-IP one (IP_CAP): past either, 429 and the page carries on
+//   - a daily cap (DAY_CAP, under 50K/30): past it, 429 and the page carries on. No per-IP cap (Austin, 10-22:
+//     the busiest user is him; one open tab used 300 in a few hours)
 //     from the chain and Instant Wallet's queue
 //   - answers kept: in memory while warm, and the slow-changing ones (a person's Safes, a Safe's creation) in the
 //     database for everyone. &fresh=1 (the page's Refresh) asks Safe again
 //   - GET ?usage=1: today's count and the last 7 days
 // GET = a read; POST = a proposal or a signature, DELETE = removing a queued one (its proposer's signed request),
 // passed on as is (counted, never capped). Never log a body here.
-import { env, json, oops, crossSite, db, ipOf } from "./_shop.js";
+import { env, json, oops, crossSite, db } from "./_shop.js";
 
 const BASE = "https://api.safe.global/tx-service/";
-const DAY_CAP = 1500, IP_CAP = 300;
+const DAY_CAP = 1500;
 // <chain>/api/v1/<safes|owners|multisig-transactions>/..., nothing else
 const PATH = /^[a-z0-9-]+\/api\/v1\/(safes|owners|multisig-transactions)\/[\w\-./?=&,]*$/;
 // how long an answer is kept: a person's Safes a day (Refresh asks again), a Safe's creation for good, the rest briefly
@@ -26,16 +27,15 @@ const headers = () => ({ "Content-Type": "application/json", ...(env("SAFE_API_K
 const path = (req: Request) => { const u = new URL(req.url).searchParams.get("u") || ""; return PATH.test(u) && !u.includes("..") ? u : ""; };
 const today = () => new Date().toISOString().slice(0, 10);
 
-/** One more call to Safe: false when today's share (ours, or this IP's) is used. The database down: allowed. */
+/** One more call to Safe: false when today's share is used. The database down: allowed. */
 async function spend(req: Request, capped: boolean) {
   if (!env("SHOP_DATABASE_URL")) return true;
   try {
-    const sql = await db(), ip = await ipOf(req), d = today();
-    const rows = await sql`insert into counts (day, k, n) values (${d}, 'safe_api', 1), (${d}, ${"safe_ip:" + ip}, 1)
-      on conflict (day, k) do update set n = counts.n + 1 returning k, n`;
-    if (Math.random() < 0.01) await sql`delete from counts where k like 'safe_ip:%' and day < current_date - 2`;
-    const n = (k: string) => rows.find((r: any) => r.k === k)?.n || 0;
-    return !capped || (n("safe_api") <= DAY_CAP && n("safe_ip:" + ip) <= IP_CAP);
+    const sql = await db();
+    const [row] = await sql`insert into counts (day, k, n) values (${today()}, 'safe_api', 1)
+      on conflict (day, k) do update set n = counts.n + 1 returning n`;
+    if (Math.random() < 0.01) await sql`delete from counts where k like 'safe_ip:%'`;   // the old per-IP counts
+    return !capped || row.n <= DAY_CAP;
   } catch { return true; }
 }
 
@@ -45,7 +45,7 @@ export async function GET(req: Request) {
   if (q.get("usage")) {
     const sql = await db();
     const rows = await sql`select day::text, n from counts where k = 'safe_api' order by day desc limit 7`;
-    return json({ cap: DAY_CAP, ipCap: IP_CAP, days: rows });
+    return json({ cap: DAY_CAP, days: rows });
   }
   const p = path(req);
   if (!p) return oops("Not allowed.", 403);
