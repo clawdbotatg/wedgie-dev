@@ -602,6 +602,8 @@ body.test-mode .top, body.test-mode .foot { display: none; }
 .safe-id-wallet .btn-wallet { height: 46px; padding: 0 22px; font-size: 16px; }
 .top #s-me { margin-left: auto; }
 @media (max-width: 640px) { .top #s-me .safe-id-tag, .top #s-me .addr-copy { display: none; } .top #s-me { padding: 0 12px; } }
+#s-me { position: relative; }
+.copy-warn { position: absolute; top: calc(100% + 8px); right: 0; width: 240px; padding: 10px 14px; border-radius: 14px; background: #ffd84d; color: #3a2a00; font-size: 14px; font-weight: 800; line-height: 1.3; box-shadow: 0 6px 16px -8px rgba(0,0,0,.4); z-index: 30; }
 .top #s-me .addr-hex { white-space: nowrap; word-break: normal; }
 @media (max-width: 520px) { .top #s-me .addr-txt { display: none; } .top #s-me { padding: 0 8px; } }   /* a phone: just its picture */
 .safe-id-tag { font-size: 13px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }

@@ -210,5 +210,12 @@ document.addEventListener("click", (e) => {
   navigator.clipboard.writeText(b.dataset.copy!).then(() => {
     b.innerHTML = CHECK;
     setTimeout(() => { b.innerHTML = COPY; }, 800);
+    // data-copy-warn on a holder: a yellow note under it after the copy (the wedgie's own address: no funds)
+    const h = b.closest<HTMLElement>("[data-copy-warn]");
+    if (!h || h.querySelector(".copy-warn")) return;
+    const n = document.createElement("div");
+    n.className = "copy-warn"; n.textContent = h.dataset.copyWarn!;
+    h.append(n);
+    setTimeout(() => n.remove(), 5000);
   }, () => {});
 }, true);

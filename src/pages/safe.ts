@@ -256,7 +256,7 @@ async function readAddons(c: number, safe: string): Promise<Addons> {
 export function safe(main: HTMLElement) {
   main.innerHTML = `
   <section class="test-page safe-page">
-    <div class="safe-ids" id="s-ids"><div class="safe-id" id="s-me" hidden></div><div class="safe-id safe-id-wallet" id="s-wallet" hidden></div></div>
+    <div class="safe-ids" id="s-ids"><div class="safe-id" id="s-me" data-copy-warn="Don't send tokens here! Only for adding to a Safe." hidden></div><div class="safe-id safe-id-wallet" id="s-wallet" hidden></div></div>
     <div class="sx-spin" id="s-spin" hidden aria-label="Loading"></div>
     <div class="sx-first" id="s-first" hidden><div class="sx-spin sx-spin-big"></div></div>
     <div class="sx-banner" id="s-wedgie" hidden></div>
