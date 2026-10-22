@@ -1,7 +1,8 @@
 // /api/rpc?chain=<id>: /safe's chain reads, through the shop's Alchemy key (never a public RPC; the key never
 // reaches the browser). One JSON-RPC call per POST, read methods only (READ). Never log a body here.
-// wedgie_prices [token addresses]: {eth, tokens: {address: usd}} from Alchemy's prices API (mainnets only); eth is
-// the chain's own coin (ETH, POL, …).
+// wedgie_prices [token addresses]: {eth, tokens: {address: usd}, logos: {address: url}} from Alchemy's prices API
+// (mainnets only); eth is the chain's own coin (ETH, POL, …). DexScreener fills the long tail, as in Instant Wallet:
+// a price Alchemy doesn't have, and a logo (Alchemy has none for most small tokens).
 import { env, json, oops, crossSite, db, ipOf } from "./_shop.js";
 
 export const HOSTS: Record<number, string> = { 1: "eth-mainnet", 8453: "base-mainnet", 10: "opt-mainnet", 42161: "arb-mainnet",
@@ -9,6 +10,9 @@ export const HOSTS: Record<number, string> = { 1: "eth-mainnet", 8453: "base-mai
   146: "sonic-mainnet", 5042: "arc-mainnet", 4663: "robinhood-mainnet", 84532: "base-sepolia", 11155111: "eth-sepolia" };
 // each chain's own coin, as Alchemy's prices API names it (ETH if not here; Arc's coin is USDC: a dollar)
 const COIN: Record<number, string> = { 137: "POL", 43114: "AVAX", 56: "BNB", 100: "XDAI", 42220: "CELO", 146: "S", 5042: "USDC" };
+// DexScreener's name for each chain
+const DEX: Record<number, string> = { 1: "ethereum", 8453: "base", 10: "optimism", 42161: "arbitrum", 137: "polygon",
+  43114: "avalanche", 56: "bsc", 100: "gnosischain", 42220: "celo", 146: "sonic" };
 const READ = new Set(["eth_call", "eth_getCode", "eth_getBalance", "eth_getTransactionReceipt", "eth_getTransactionByHash",
   "eth_blockNumber", "eth_chainId", "eth_getBlockByNumber", "eth_getStorageAt", "alchemy_getTokenBalances", "alchemy_getTokenMetadata"]);
 const TEST = new Set([84532, 11155111]);
@@ -28,7 +32,7 @@ async function prices(chain: number, host: string, tokens: unknown[]) {
   return v;
 }
 async function pricesNow(chain: number, host: string, tokens: unknown[]) {
-  const out: { eth: number | null; tokens: Record<string, number> } = { eth: null, tokens: {} };
+  const out: { eth: number | null; tokens: Record<string, number>; logos: Record<string, string> } = { eth: null, tokens: {}, logos: {} };
   if (TEST.has(chain)) return out;
   const list = tokens.filter((a): a is string => typeof a === "string" && /^0x[0-9a-fA-F]{40}$/.test(a)).slice(0, 25);
   const base = `https://api.g.alchemy.com/prices/v1/${key()}/tokens`;
@@ -40,6 +44,18 @@ async function pricesNow(chain: number, host: string, tokens: unknown[]) {
   ]);
   out.eth = num(e?.data?.[0]);
   for (const p of t?.data || []) { const v = num(p); if (v && p.address) out.tokens[String(p.address).toLowerCase()] = v; }
+  // DexScreener: each token's most liquid pair, all in one request (30 max)
+  if (DEX[chain] && list.length) {
+    const pairs: any[] = await fetch(`https://api.dexscreener.com/tokens/v1/${DEX[chain]}/${list.join(",")}`)
+      .then((r) => (r.ok ? r.json() : [])).catch(() => []);
+    for (const a of list.map((x) => x.toLowerCase())) {
+      const mine = (Array.isArray(pairs) ? pairs : []).filter((p) => String(p?.baseToken?.address).toLowerCase() === a)
+        .sort((x, y) => (y?.liquidity?.usd ?? 0) - (x?.liquidity?.usd ?? 0));
+      const img = mine.find((p) => p?.info?.imageUrl)?.info.imageUrl, v = Number(mine[0]?.priceUsd);
+      if (typeof img === "string" && img.startsWith("https://")) out.logos[a] = img;
+      if (!out.tokens[a] && v > 0) out.tokens[a] = v;
+    }
+  }
   return out;
 }
 
