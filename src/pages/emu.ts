@@ -21,17 +21,12 @@ const MIN_HOLD = 250;                   // ms: a click is a real press, long eno
 export function emu(main: HTMLElement) {
   main.innerHTML = `
   <section class="emu">
-    <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
-    <h1>Virtual wedgie</h1>
-    <p class="emu-sub">A real wedgie's chip and firmware, running in this tab. Keep it open: wedgie.dev in your other tabs sees it plugged in.</p>
-    <div class="emu-stage recess" id="emu-3d"></div>
-    <p class="emu-keys fine">Click its buttons, or keys: arrows or WASD · Space presses the stick · J K L ; = A B X Y</p>
+    <div class="emu-stage" id="emu-stage"><b class="emu-tag">Virtual</b><div id="emu-3d"></div></div>
     <div class="emu-status" id="emu-status">Starting…</div>
     <div class="emu-bar"><div id="emu-bar-fill"></div></div>
     <div class="row emu-actions">
-      <button class="btn btn-sm" id="emu-power">Unplug + replug</button>
+      <button class="btn btn-sm" id="emu-power">Replug</button>
       <button class="btn btn-sm btn-red" id="emu-wipe">Wipe</button>
-      <a class="btn btn-sm btn-green" href="/connect" target="_blank" rel="noopener">wedgie.dev ↗</a>
     </div>
   </section>`;
   const $ = (id: string) => document.getElementById(id)!;
