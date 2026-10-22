@@ -282,7 +282,7 @@ export function secret(main: HTMLElement) {
     look(); setInterval(look, 1500);
   }
   W.onChange(paintMe);
-  if (W.armed()) W.start();
+  W.start();
   paintAll();
   poll();
 }

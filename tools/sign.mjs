@@ -40,3 +40,5 @@ if (run.status !== 0 || !r || !s || !verify("sha256", Buffer.from(text), { key: 
 writeFileSync(join(root, "release/firmware.txt"), text);
 writeFileSync(join(root, "release/firmware.sig"), `${r} ${s}${k ? " " + k : ""}\n`);
 console.log(`signed ${text.split("\n").length - 2} files, ${text.split("\n")[1]}`);
+// the virtual wedgie's starting flash, from what was just signed (tools/emuimage.mjs)
+spawnSync("node", [join(root, "tools/emuimage.mjs")], { cwd: root, stdio: "inherit" });

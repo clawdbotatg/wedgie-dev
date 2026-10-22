@@ -196,6 +196,10 @@
     {
       "source": "/privacy",
       "destination": "/index.html"
+    },
+    {
+      "source": "/emu",
+      "destination": "/index.html"
     }
   ],
   "trailingSlash": false

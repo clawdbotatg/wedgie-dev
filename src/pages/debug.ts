@@ -58,6 +58,6 @@ export function debug(main: HTMLElement) {
   }
 
   W.onChange(paint);
-  if (W.armed()) W.start();
+  W.start();
   paint();
 }

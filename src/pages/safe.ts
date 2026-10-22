@@ -1926,7 +1926,7 @@ export function safe(main: HTMLElement) {
   }
 
   W.onChange(paintWedgie);
-  if (W.armed()) W.start();
+  W.start();          // serial ports only once armed (start waits for it); virtual wedgies right away
   if (localStorage.getItem(WCP) && !localStorage.getItem(OFF))      // the wallet from last time, back on its own
     rainbow().then((r) => r.start(onWallet), () => {});
   else (window.requestIdleCallback ?? setTimeout)(() => rainbow().catch(() => {}));

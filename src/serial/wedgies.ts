@@ -8,6 +8,7 @@
 // whatever it was running.
 import { Repl } from "./repl";
 import { checkChip, type ChipCheck } from "./chipcheck";
+import * as V from "../chip/port";
 
 export const RPI_VID = 0x2e8a;
 
@@ -35,6 +36,7 @@ export type Wedgie = {
   error?: string;
   readyAt?: number;      // when identify last finished (the update bench: "it came back after its restart")
   log: string;
+  virtual?: boolean;     // a virtual wedgie (wedgie.dev/emu), not hardware
 };
 
 type Listener = () => void;
@@ -78,7 +80,7 @@ export const shortId = (uid: string) => uid.slice(-6).toUpperCase();
 function add(port: SerialPort) {
   const have = list.find((w) => w.port === port && w.state !== "gone");
   if (have) { if (have.state === "error") identify(have); return have; }   // back after a drop: try again
-  const w: Wedgie = { key: nextKey++, port, state: "identifying", log: "" };
+  const w: Wedgie = { key: nextKey++, port, state: "identifying", log: "", ...(V.isVirtual(port) ? { virtual: true } : {}) };
   list.push(w);
   emit();
   identify(w);
@@ -302,10 +304,16 @@ export async function connectNew() {
 
 /** Count plugged-in wedgies without talking to them (the header's Connect button, on any page).
  *  Only ports this site was granted once are visible; opening none of them interrupts nothing. */
+// Virtual wedgies (wedgie.dev/emu, chip/port.ts) count too, armed or not: looking at them asks nothing.
 export function watchCount(cb: (n: number) => void) {
-  if (!supported()) { cb(0); return; }
-  if (!armedNow) cb(0);
-  whenArmed(() => watchPorts(cb));
+  let real = 0;
+  const virt = () => V.virtualPorts().length;
+  const both = (n = real) => { real = n; cb(real + virt()); };
+  V.start();
+  V.onVirtual(() => both(), () => both());
+  if (!supported()) { both(0); return; }
+  if (!armedNow) both(0);
+  whenArmed(() => watchPorts(both));
 }
 function watchPorts(cb: (n: number) => void) {
   const count = async () => cb((await navigator.serial.getPorts()).filter((p) => p.getInfo().usbVendorId === RPI_VID && (p as any).connected !== false).length);
@@ -315,7 +323,15 @@ function watchPorts(cb: (n: number) => void) {
   navigator.serial.addEventListener("disconnect", () => setTimeout(count, 300));
 }
 
+let virtualOn = false;
 export function start() {
+  if (!virtualOn) {
+    virtualOn = true;
+    V.start();
+    for (const p of V.virtualPorts()) add(p as unknown as SerialPort);
+    V.onVirtual((p) => setTimeout(() => { if (p.connected) add(p as unknown as SerialPort); }, 1200),   // let it boot, as a plugged-in one
+      (p) => { for (const w of list) if (w.port === (p as unknown)) w.state = "gone"; emit(); });
+  }
   if (supported()) whenArmed(startPorts);
 }
 async function startPorts() {

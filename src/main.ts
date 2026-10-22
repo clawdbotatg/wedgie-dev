@@ -20,6 +20,7 @@ import { secret } from "./pages/secret";
 import { order, session } from "./pages/order";
 import "./ui/report";             // from the start: it keeps the page's errors for a bug report
 import { legal } from "./pages/legal";
+import { emu } from "./pages/emu";
 
 const path = location.pathname.replace(/\/+$/, "");
 const onConnect = path === "/connect" || path.startsWith("/connect/");   // the list, or one wedgie (/connect/<ID>)
@@ -37,10 +38,11 @@ const onSafe = path === "/safe" || path.startsWith("/safe/");   // the list, or 
 const onSecret = path === "/secret";
 const onOrder = path === "/order" || path.startsWith("/order/") || path === "/orders" || path === "/signin";   // buy, one order (/order/<id>), yours, sign in
 const onLegal = path === "/terms" || path === "/privacy";
+const onEmu = path === "/emu";
 // Each page its own tab title (the first path part; /order/<id> is an order, /safe/<x> a Safe).
 const TITLES: Record<string, string> = { connect: "Connect", assemble: "Assemble", test: "Test", update: "Update", prepare: "Prepare", reset: "Reset", build: "Build",
   code: "Code", debug: "Debug", safe: "Safe", secret: "Secret chat", order: "Order", orders: "Your orders", signin: "Sign in",
-  terms: "Terms", privacy: "Privacy" };
+  terms: "Terms", privacy: "Privacy", emu: "Virtual wedgie" };
 const title = TITLES[path.split("/")[1] || ""];
 if (title) document.title = `${title} · wedgie.dev`;
 const signedIn = !!session();
@@ -105,5 +107,5 @@ const top = document.getElementById("top")!;
 // Ready when the page's first screen is really there: on the home page that includes the hero wedgie
 // (its files are in the loader's byte count, and it has drawn a frame). Other 3D waits for the page.
 if (onFormat || onUpdate || onPrepare || onReset) document.body.classList.add("test-mode");
-const up = onFormat ? (format(top), Promise.resolve()) : onUpdate ? (update(top), Promise.resolve()) : onPrepare ? (prepare(top), Promise.resolve()) : onReset ? (reset(top), Promise.resolve()) : onConnect ? (connect(top), Promise.resolve()) : onAssemble3d ? (assemble3d(top), Promise.resolve()) : onAssemble ? (assemble(top), Promise.resolve()) : onBuild ? (build(top), Promise.resolve()) : onCode ? (code(top), Promise.resolve()) : onDebug ? (debug(top), Promise.resolve()) : onSafe ? (safe(top), Promise.resolve()) : onSecret ? (secret(top), Promise.resolve()) : onOrder ? (order(top), Promise.resolve()) : onLegal ? (legal(top, path.slice(1) as "terms" | "privacy"), Promise.resolve()) : home(top);
+const up = onFormat ? (format(top), Promise.resolve()) : onUpdate ? (update(top), Promise.resolve()) : onPrepare ? (prepare(top), Promise.resolve()) : onReset ? (reset(top), Promise.resolve()) : onConnect ? (connect(top), Promise.resolve()) : onAssemble3d ? (assemble3d(top), Promise.resolve()) : onAssemble ? (assemble(top), Promise.resolve()) : onBuild ? (build(top), Promise.resolve()) : onCode ? (code(top), Promise.resolve()) : onDebug ? (debug(top), Promise.resolve()) : onSafe ? (safe(top), Promise.resolve()) : onSecret ? (secret(top), Promise.resolve()) : onOrder ? (order(top), Promise.resolve()) : onLegal ? (legal(top, path.slice(1) as "terms" | "privacy"), Promise.resolve()) : onEmu ? (emu(top), Promise.resolve()) : home(top);
 up.then(() => (window as any).__wedgieReady?.(), () => (window as any).__wedgieReady?.());
