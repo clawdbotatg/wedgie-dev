@@ -108,8 +108,30 @@ const accountOf = (k: Kit, topic: string) => {
   return { chainId: +c, safe: addr || "" };
 };
 
+// Every answer is saved before it's sent. WalletKit keeps a request until an answer reaches the app and
+// replays it on the next page load, so an answer lost on the way (relay dropped mid-sign) brought the
+// same swap back to sign and run again. A replayed request now just gets its saved answer again.
+const SENT = "wedgie.wc.sent";
+type Response = { result: unknown } | { error: { code: number; message: string } };
+const sent = (): Record<string, Response & { at: number }> => { try { return JSON.parse(localStorage.getItem(SENT) || "{}"); } catch { return {}; } };
+function save(topic: string, id: number, r: Response) {
+  const all = { ...sent(), [`${topic}:${id}`]: { ...r, at: Date.now() } };
+  const keep = Object.entries(all).sort((x, y) => y[1].at - x[1].at).slice(0, 100);
+  try { localStorage.setItem(SENT, JSON.stringify(Object.fromEntries(keep))); } catch {}
+}
+async function respond(topic: string, id: number, r: Response) {
+  save(topic, id, r);
+  const k = await kit!;
+  for (let i = 0; ; i++) {
+    try { return await k.respondSessionRequest({ topic, response: { id, jsonrpc: "2.0", ...r } as any }); }
+    catch (e) { if (i >= 2 || !k.getPendingSessionRequests().some((x) => x.id === id)) throw e; await new Promise((ok) => setTimeout(ok, 2000)); }
+  }
+}
+
 async function onRequest(k: Kit, e: WalletKitTypes.SessionRequest) {
   const { topic, id } = e, { method, params } = e.params.request, p = params as any[];
+  const old = sent()[`${topic}:${id}`];
+  if (old) return respond(topic, id, "error" in old ? { error: old.error } : { result: old.result });
   const { chainId, safe } = accountOf(k, topic);
   switch (method) {
     case "wallet_getCapabilities":
@@ -139,10 +161,10 @@ async function onRequest(k: Kit, e: WalletKitTypes.SessionRequest) {
 }
 
 async function answer(topic: string, id: number, result: unknown) {
-  await (await kit!).respondSessionRequest({ topic, response: { id, jsonrpc: "2.0", result } });
+  await respond(topic, id, { result });
 }
 export async function answerError(topic: string, id: number, message = "Rejected", code = 4001) {
-  await (await kit!).respondSessionRequest({ topic, response: { id, jsonrpc: "2.0", error: { code, message } } });
+  await respond(topic, id, { error: { code, message } });
 }
 /** The calls ran: hash = the transaction that executed the Safe tx. */
 export async function answerDone(a: Ask, hash: string) {
