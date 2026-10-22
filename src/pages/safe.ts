@@ -1399,19 +1399,27 @@ export function safe(main: HTMLElement) {
   }
   /** Stuck to the bottom of the screen while a transaction is ready to run (Austin): its Execute, then its progress. */
   let running: any = null;
+  let runningAll: any[] = [];
   function paintDock() {
     const i = info, k = i ? queue.findIndex((t) => +t.nonce === i.nonce && (t.confirmations || []).length >= (t.confirmationsRequired ?? i.threshold)) : -1;
     const t = running || (k >= 0 ? queue[k] : null);
+    const all = running ? runningAll : i ? readyRun() : [];
     const dock = $("s-dock");
     dock.hidden = !(safeAddr && t && sub === "home");
     document.body.classList.toggle("has-dock", !dock.hidden);
     document.body.classList.toggle("dock-running", !dock.hidden && !!running);   // the dock shows the progress: no second bar
     document.body.classList.toggle("in-app", Drive.inApp());
     if (dock.hidden) return;
-    $("s-dock-tx").innerHTML = `<span class="safe-dock-what"><b>#${esc(t.nonce)}</b> ${said(t).title}</span>
-      ${running ? "" : `<button class="btn btn-green" id="s-dock-go"${dis()}>Execute</button>`}`;
+    $("s-dock-tx").innerHTML = all.length > 1
+      ? `<span class="safe-dock-what"><b>#${esc(all[0].nonce)}–#${esc(all.at(-1).nonce)}</b> ${all.length} transactions, in one go</span>
+        ${running ? "" : `<button class="btn btn-green" id="s-dock-go"${dis()}>Execute all</button>`}`
+      : `<span class="safe-dock-what"><b>#${esc(t.nonce)}</b> ${said(t).title}</span>
+        ${running ? "" : `<button class="btn btn-green" id="s-dock-go"${dis()}>Execute</button>`}`;
     $("s-dock-msg").hidden = !running;
-    $("s-dock-go")?.addEventListener("click", () => job(async () => { running = t; paintDock(); try { await execute(t); } finally { running = null; } }));
+    $("s-dock-go")?.addEventListener("click", () => job(async () => {
+      running = t; runningAll = all.length > 1 ? all : []; paintDock();
+      try { await (all.length > 1 ? executeAll(all) : execute(t)); } finally { running = null; runningAll = []; }
+    }));
   }
 
   // ---- Assets: every token, biggest first; ones with no price folded away ----
@@ -1548,6 +1556,29 @@ export function safe(main: HTMLElement) {
   }
 
   /** Every owner's signature from Safe's API, packed; a browser wallet sends it (and pays the gas). */
+  /**
+   * The signed ones in a row from the Safe's nonce, the first ready one at each number. Only ones with every
+   * signature in hand: an on-chain approval with no approveHash counts only when its owner sends the tx itself.
+   */
+  function readyRun() {
+    const i = info!, run: any[] = [];
+    for (let n = i.nonce; ; n++) {
+      const t = queue.find((x) => +x.nonce === n && (x.confirmations || []).length >= (x.confirmationsRequired ?? i.threshold)
+        && x.confirmations.every((c: any) => c.signature));
+      if (!t) return run;
+      run.push(t);
+    }
+  }
+  /** Several in one wallet transaction: Multicall3 calls execTransaction for each, in order. One fails: none run. */
+  async function executeAll(run: any[]) {
+    if (+run[0].nonce !== info!.nonce) throw new Error(`#${info!.nonce} runs first: a Safe runs its transactions in order.`);
+    say("Getting it ready.", 2);
+    const calls = run.map((t) => ({ to: safeAddr, allowFailure: false, data: E.execData(t, E.packSignatures(t.confirmations)) }));
+    const rc = await send(chain, E.MULTICALL3, E.aggregate3(calls), say);
+    for (const t of run) if (t.wc) await tellApp(chain, safeAddr, String(t.safeTxHash).toLowerCase(), t.wc, rc.transactionHash).catch(() => {});
+    await settle(+run.at(-1).nonce);
+    say(`Done: all ${run.length} ran.`);
+  }
   async function execute(t: any) {
     if (+t.nonce !== info!.nonce) throw new Error(`#${info!.nonce} runs first: a Safe runs its transactions in order.`);
     say("Getting it ready.", 2);
