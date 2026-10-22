@@ -1276,9 +1276,10 @@ export function safe(main: HTMLElement) {
   function paintAssets() {
     paintSpin();
     const box = $("s-assets");
-    box.hidden = !(safeAddr && info && sub === "home" && (assets || assetsErr));
+    // zero balances aren't shown (ETH and USDC are always read, to send from); nothing held = no card
+    const list = (assets || (info ? [{ token: null, ...CHAINS[chain].native, decimals: 18, balance: info.balance, usd: null, price: null } as Asset] : [])).filter((a) => a.balance > 0n);
+    box.hidden = !(safeAddr && info && sub === "home" && (assets || assetsErr) && list.length);
     if (box.hidden) return;
-    const list = assets || [{ token: null, ...CHAINS[chain].native, decimals: 18, balance: info!.balance, usd: null, price: null } as Asset];
     const row = (a: Asset) => `<li><button class="sx-asset" type="button" data-tok="${a.token || ""}"${can() ? "" : " disabled"}>${assetInner(a)}</button></li>`;
     const priced = list.filter((a) => a.token === null || a.price !== null), other = list.filter((a) => a.token !== null && a.price === null);
     const open = !!document.querySelector("#s-other[open]");

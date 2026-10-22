@@ -27,7 +27,7 @@ export const knownMeta = (chain: number, token: string) => meta[`${chain}:${toke
 // Arc's coin is USDC, and this token is the same money again: never a second row
 const TWIN: Record<number, string> = { 5042: "0x3600000000000000000000000000000000000000" };
 
-/** native: the chain's coin. usdc: the chain's USDC (always listed, and known even without Alchemy). */
+/** native: the chain's coin. usdc: the chain's USDC (always read, even at 0, and known without Alchemy; the Assets card hides zeros). */
 export async function readAssets(chain: number, safe: string, native: { symbol: string; name: string; logo: string }, eth: bigint, usdc: { address: string; balance: bigint | null } | null, rpc: Rpc): Promise<Asset[]> {
   if (usdc) meta[`${chain}:${usdc.address.toLowerCase()}`] = { symbol: "USDC", name: "USD Coin", decimals: 6, logo: "/img/tokens/usdc.png" };
   let held: { token: string; balance: bigint }[] = usdc && usdc.balance !== null ? [{ token: usdc.address, balance: usdc.balance }] : [];
