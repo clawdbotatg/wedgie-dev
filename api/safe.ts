@@ -7,7 +7,8 @@
 //   - answers kept: in memory while warm, and the slow-changing ones (a person's Safes, a Safe's creation) in the
 //     database for everyone. &fresh=1 (the page's Refresh) asks Safe again
 //   - GET ?usage=1: today's count and the last 7 days
-// GET = a read; POST = a proposal or a signature, passed on as is (counted, never capped). Never log a body here.
+// GET = a read; POST = a proposal or a signature, DELETE = removing a queued one (its proposer's signed request),
+// passed on as is (counted, never capped). Never log a body here.
 import { env, json, oops, crossSite, db, ipOf } from "./_shop.js";
 
 const BASE = "https://api.safe.global/tx-service/";
@@ -86,4 +87,18 @@ export async function POST(req: Request) {
   const safe = p.match(/safes\/(0x[0-9a-fA-F]{40})/)?.[1]?.toLowerCase();
   for (const k of HIT.keys()) if (k.includes("multisig-transactions") && (!safe || k.toLowerCase().includes(safe))) HIT.delete(k);
   return pass(r.status, await r.text());
+}
+
+/** Remove a queued transaction: <chain>/api/v2/multisig-transactions/<safeTxHash>/, body { safeTxHash, signature }. */
+export async function DELETE(req: Request) {
+  if (crossSite(req)) return oops("Not from wedgie.dev.", 403);
+  const u = new URL(req.url).searchParams.get("u") || "";
+  if (!/^[a-z0-9-]+\/api\/v2\/multisig-transactions\/0x[0-9a-fA-F]{64}\/$/.test(u)) return oops("Not allowed.", 403);
+  const text = await req.text();
+  if (text.length > 2000) return oops("Too big.", 413);
+  await spend(req, false);
+  const r = await fetch(BASE + u, { method: "DELETE", headers: headers(), body: text, signal: AbortSignal.timeout(15000) }).catch(() => null);
+  if (!r) return oops("Safe's service didn't answer.", 502);
+  for (const k of HIT.keys()) if (k.includes("multisig-transactions")) HIT.delete(k);
+  return pass(r.status, r.status === 204 ? "{}" : await r.text());
 }

@@ -238,6 +238,19 @@ export function typedData(chainId: number, safe: string, t: SafeTx) {
       gasPrice: s(t.gasPrice), gasToken: t.gasToken, refundReceiver: t.refundReceiver, nonce: s(t.nonce) },
   };
 }
+/** Safe's Transaction Service's DeleteRequest: its proposer's wallet signs this (no gas) to take a queued tx off.
+ *  totp = the hour; the service takes this hour's or the last. Instant Wallet's queue takes the same signature. */
+export function deleteTypedData(chainId: number, safe: string, safeTxHash: string) {
+  return {
+    types: {
+      EIP712Domain: [{ name: "name", type: "string" }, { name: "version", type: "string" }, { name: "chainId", type: "uint256" }, { name: "verifyingContract", type: "address" }],
+      DeleteRequest: [{ name: "safeTxHash", type: "bytes32" }, { name: "totp", type: "uint256" }],
+    },
+    primaryType: "DeleteRequest",
+    domain: { name: "Safe Transaction Service", version: "1.0", chainId, verifyingContract: safe },
+    message: { safeTxHash, totp: String(Math.floor(Date.now() / 3600_000)) },
+  };
+}
 /** Safe wants v = 27/28; a few wallets answer 0/1. */
 export function ecdsa(sig: string) {
   const b = bytes(sig);

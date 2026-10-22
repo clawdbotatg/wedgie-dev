@@ -6,7 +6,7 @@
 //   /safe                    every Safe the wedgie owns on every chain, as cards (Safe's API, plus the ones made
 //                            or opened in this browser), the wallet's Safes it could join, New Safe (a sheet)
 //   /safe/<chain>:<address>  one Safe: its balance in dollars, Send / Receive / Connect app (sheets), apps'
-//                            requests, Waiting (sign, execute, reject), Assets (every token), Activity
+//                            requests, Waiting (sign, execute, reject, remove), Assets (every token), Activity
 //   /safe/<…>/settings       owners, threshold, add the wedgie or an owner, other chains, Safe{Wallet}
 //   - the chain is read through /api/rpc (Alchemy): owners, threshold, balances, tokens, prices
 //   - the queue (Safe's Transaction Service, through /api/safe with our key): sign on the wedgie or the
@@ -1135,6 +1135,7 @@ export function safe(main: HTMLElement) {
   }
 
   // ---- the queue: Safe's API + Instant Wallet's queue + this browser, merged by safeTxHash ----
+  const removed = new Set<string>();    // safeTxHashes taken off everywhere, this visit
   const qKey = (c: number, a: string) => `wedgie.safe.q.${c}:${a.toLowerCase()}`;
   const localQ = (c: number, a: string): Record<string, any> => { try { return JSON.parse(localStorage.getItem(qKey(c, a)) || "{}"); } catch { return {}; } };
   const useIW = (c: number) => !CHAINS[c].test;
@@ -1148,6 +1149,7 @@ export function safe(main: HTMLElement) {
       const h = String(t.safeTxHash || t.hash).toLowerCase();
       const m = all.get(h) || { ...txOf(t), safeTxHash: t.safeTxHash || t.hash, confirmations: [], confirmationsRequired: t.confirmationsRequired, dataDecoded: t.dataDecoded };
       m.inSafe ||= fromSafe;
+      if (fromSafe && t.proposer) m.proposer = t.proposer;
       if (t.dataDecoded) m.dataDecoded = t.dataDecoded;
       for (const s of sigs) if (!m.confirmations.some((x: any) => eqA(x.owner, s.owner))) m.confirmations.push(s);
       all.set(h, m);
@@ -1164,6 +1166,7 @@ export function safe(main: HTMLElement) {
     ]);
     const mine = localQ(c, a);
     for (const [h, t] of Object.entries(mine)) if (+t.nonce < nonce) delete mine[h]; else add(t, t.confirmations);
+    for (const h of removed) all.delete(h);       // a cached read can still have one just removed
     try { localStorage.setItem(qKey(c, a), JSON.stringify(mine)); } catch {}
     queueNote = [rest ? REST : "", missed.length ? `${missed.join(" and ")} didn't answer just now.` : ""].filter(Boolean).join(" ");
     return [...all.values()].sort((x, y) => +x.nonce - +y.nonce);
@@ -1282,7 +1285,8 @@ export function safe(main: HTMLElement) {
       if (account && isOwner(account)) signed(t, account) ? marks.push("wallet ✓")
         : n < need && btns.push(`<button class="btn btn-sm" data-wsign="${k}"${dis()}>Sign with wallet</button>`);
       if (n >= need) btns.push(first ? `<button class="btn btn-sm btn-green" data-exec="${k}"${dis()}>Execute</button>` : `<span class="fine">runs after #${i.nonce}</span>`);
-      const rej = can() && s.kind !== "cancel" && !cancelled(+t.nonce) ? `<button class="btn btn-sm" data-reject="${k}"${dis()}>Reject</button>` : "";
+      const rej = (can() && s.kind !== "cancel" && !cancelled(+t.nonce) ? `<button class="btn btn-sm" data-reject="${k}"${dis()}>Reject</button> ` : "")
+        + (account && isOwner(account) ? `<button class="btn btn-sm" data-remove="${k}"${dis()}>Remove</button>` : "");
       const dots = Array.from({ length: need }, (_, d) => `<i class="${d < n ? "on" : ""}"></i>`).join("");
       return `<li class="sx-tx sx-k-${s.kind}">
         <div class="sx-tx-head"><span class="sx-ic">${ICON[s.kind]}</span><span class="sx-tx-what">${s.title}</span><span class="sx-tx-n">#${esc(t.nonce)}</span></div>
@@ -1310,7 +1314,43 @@ export function safe(main: HTMLElement) {
       // a Safe can't delete a queued one: an empty one at the same nonce runs instead, and the first can never run
       job(() => propose(safeTx(safeAddr, "0", "0x", +t.nonce), by(), `cancel #${t.nonce}`));
     });
+    box.querySelectorAll<HTMLButtonElement>("[data-remove]").forEach((b) => b.onclick = () => job(() => removeQueued(queue[+b.dataset.remove!])));
     paintDock();
+  }
+
+  /**
+   * Off the queue with no transaction on chain: the next one takes its nonce. One wallet signature (a message, no
+   * gas: Safe's own DeleteRequest) takes it out of Safe's service (only the one who proposed it may there),
+   * Instant Wallet's queue (any owner) and this browser. Its signatures still exist, so a fully signed one can
+   * still be run by whoever has them: Reject is the sure way.
+   */
+  async function removeQueued(t: any) {
+    const need = t.confirmationsRequired ?? info!.threshold;
+    if ((t.confirmations || []).length >= need && !confirm(`#${t.nonce} has all its signatures, so anyone who has them could still run it. Reject is the sure way. Remove it anyway?`)) return;
+    const from = account = await wallet(chain);
+    if (!isOwner(from)) throw new Error(`This wallet (${short(from)}) isn't an owner of this Safe.`);
+    const c = chain, a = safeAddr, h = String(t.safeTxHash).toLowerCase();
+    say("Sign the remove in your wallet. It's a message, not a transaction: no gas.");
+    const signature = E.ecdsa(await eth().request({ method: "eth_signTypedData_v4", params: [from, JSON.stringify(E.deleteTypedData(c, a, h))] }));
+    const kept: string[] = [];
+    const toSafe = async () => {
+      if (!t.inSafe) return;
+      if (t.proposer && !eqA(t.proposer, from)) { kept.push(`Safe's service keeps it: only ${short(t.proposer)}, who proposed it, can remove it there.`); return; }
+      const r = await safeFetch(`${SAFE}${CHAINS[c].key}/api/v2/multisig-transactions/${h}/`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ safeTxHash: h, signature }) });
+      if (!r.ok && r.status !== 404) kept.push(`Safe's service said no: ${r.status} ${(await r.text()).slice(0, 200)}`);
+    };
+    const toIW = async () => {
+      if (!useIW(c)) return;
+      const r = await fetch(IWQ, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chainId: c, safe: a, hash: h, signature }) });
+      if (!r.ok) kept.push(`Instant Wallet said no: ${(await r.json().catch(() => ({}))).error || r.status}`);
+    };
+    await Promise.all([within(toSafe()).catch(() => kept.push("Safe's service didn't answer.")), within(toIW()).catch(() => kept.push("Instant Wallet didn't answer."))]);
+    const mine = localQ(c, a);
+    delete mine[h];
+    try { localStorage.setItem(qKey(c, a), JSON.stringify(mine)); } catch {}
+    if (!kept.length) removed.add(h);
+    await load(true);
+    say(kept.length ? `Not removed everywhere. ${kept.join(" ")}` : `Removed #${t.nonce}. The next transaction takes its number.`, !!kept.length);
   }
   /** Stuck to the bottom of the screen while a transaction is ready to run (Austin): its Execute, then its progress. */
   let running: any = null;
@@ -1608,7 +1648,7 @@ export function safe(main: HTMLElement) {
     if (wcm) return wcm;
     const m = await import("../safe/walletconnect");
     await m.start({
-      onAsk: (a) => { asks.push(a); if (sheet === "connect") closeSheet(); paintAll(); if (!eqA(a.safe, safeAddr)) say(`${a.dapp.name} is waiting for Safe ${short(a.safe)}: open it to sign.`); },
+      onAsk: (a) => { if (asks.some((x) => x.id === a.id && x.topic === a.topic)) return; asks.push(a); if (sheet === "connect") closeSheet(); paintAll(); if (!eqA(a.safe, safeAddr)) say(`${a.dapp.name} is waiting for Safe ${short(a.safe)}: open it to sign.`); },
       onChange: () => { m.sessions().then((l) => { wcSessions = l; paintApps(); }); },
       onError: (msg) => say(msg, true),
       receipt: (c, h) => rpc(c, "eth_getTransactionReceipt", [h]).then((x: any) => x),
@@ -1678,19 +1718,22 @@ export function safe(main: HTMLElement) {
       <div class="sx-row"><button class="btn btn-sm" data-wcno="${k}"${dis()}>Reject</button><span class="sx-row sx-end">${isOwner(account) ? `<button class="btn btn-sm" data-wcwallet="${k}"${dis()}>Sign with wallet</button> ` : ""}${wedgieOwns() ? `<button class="btn btn-sm btn-green" data-wcsign="${k}"${dis(!key)}>Sign with wedgie</button>` : ""}</span></div></div>`;
     }).join("");
     const run = (a: (typeof asks)[0], who: "wedgie" | "wallet") => job(async () => {
+      let hash: string | null;
       try {
         if (!account) account = await wallet(chain);       // it sends the Safe tx and pays the gas
         const t = a.calls.length === 1 ? safeTx(a.calls[0].to, a.calls[0].value.toString(), a.calls[0].data)
           : { ...safeTx(E.MULTISEND_CALL_ONLY, "0", E.multiSendData(a.calls)), operation: 1 };
-        const hash = await propose(t, who, `${a.dapp.name}: ${plural(a.calls.length, "call")}`, true);
-        asks = asks.filter((x) => x !== a);
-        if (hash) await wcm!.answerDone(a, hash);
-        else await wcm!.answerError(a.topic, a.id, "It's in the Safe's queue: more owners have to sign before it runs.");
+        hash = await propose(t, who, `${a.dapp.name}: ${plural(a.calls.length, "call")}`, true);
       } catch (e: any) {
         asks = asks.filter((x) => x !== a);
         await wcm!.answerError(a.topic, a.id, e?.message || "Rejected").catch(() => {});
         throw e;
       }
+      // it ran (or is queued): a lost answer must never turn into "rejected", and never into a second run
+      asks = asks.filter((x) => x !== a);
+      await (hash ? wcm!.answerDone(a, hash)
+        : wcm!.answerError(a.topic, a.id, "It's in the Safe's queue: more owners have to sign before it runs."))
+        .catch(() => say(`Done here, but ${a.dapp.name} didn't hear back. Reload this page to tell it again.`, true));
     });
     box.querySelectorAll<HTMLButtonElement>("[data-wcsign]").forEach((b) => b.onclick = () => run(here[+b.dataset.wcsign!], "wedgie"));
     box.querySelectorAll<HTMLButtonElement>("[data-wcwallet]").forEach((b) => b.onclick = () => run(here[+b.dataset.wcwallet!], "wallet"));
