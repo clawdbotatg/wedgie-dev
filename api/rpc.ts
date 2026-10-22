@@ -20,7 +20,9 @@ const TEST = new Set([84532, 11155111]);
 // Kept while this function instance is warm: a price for a minute, a token's name and decimals for good (they never
 // change). Fewer Alchemy calls, and a page that asks again gets its answer at once.
 const PRICED = new Map<string, { at: number; v: any }>(), META = new Map<string, any>();
-const LOGOS = new Map<string, string>();   // chain:token -> logo url, kept for good (a logo almost never changes)
+const LOGOS = new Map<string, { at: number; v: string }>();   // chain:token -> logo url, kept 2 days (logos rarely change)
+const LOGO_MS = 2 * 86_400_000;
+const logo = (k: string) => { const l = LOGOS.get(k); return l && Date.now() - l.at < LOGO_MS ? l.v : null; };
 const PRICE_MS = 60_000;
 
 /** Dollar prices: the chain's coin and up to 25 tokens on one chain. A test chain's coins are worth nothing. */
@@ -47,7 +49,7 @@ async function pricesNow(chain: number, host: string, tokens: unknown[]) {
   for (const p of t?.data || []) { const v = num(p); if (v && p.address) out.tokens[String(p.address).toLowerCase()] = v; }
   // DexScreener: each token's most liquid pair, all in one request (30 max)
   // only the tokens still missing a price or a logo
-  const all = list.map((x) => x.toLowerCase()), ask = all.filter((a) => !out.tokens[a] || !LOGOS.has(chain + ":" + a));
+  const all = list.map((x) => x.toLowerCase()), ask = all.filter((a) => !out.tokens[a] || !logo(chain + ":" + a));
   if (DEX[chain] && ask.length) {
     const pairs: any[] = await fetch(`https://api.dexscreener.com/tokens/v1/${DEX[chain]}/${ask.join(",")}`)
       .then((r) => (r.ok ? r.json() : [])).catch(() => []);
@@ -55,11 +57,11 @@ async function pricesNow(chain: number, host: string, tokens: unknown[]) {
       const mine = (Array.isArray(pairs) ? pairs : []).filter((p) => String(p?.baseToken?.address).toLowerCase() === a)
         .sort((x, y) => (y?.liquidity?.usd ?? 0) - (x?.liquidity?.usd ?? 0));
       const img = mine.find((p) => p?.info?.imageUrl)?.info.imageUrl, v = Number(mine[0]?.priceUsd);
-      if (typeof img === "string" && img.startsWith("https://")) { if (LOGOS.size > 5000) LOGOS.clear(); LOGOS.set(chain + ":" + a, img); }
+      if (typeof img === "string" && img.startsWith("https://")) { if (LOGOS.size > 5000) LOGOS.clear(); LOGOS.set(chain + ":" + a, { at: Date.now(), v: img }); }
       if (!out.tokens[a] && v > 0) out.tokens[a] = v;
     }
   }
-  for (const a of all) { const l = LOGOS.get(chain + ":" + a); if (l) out.logos[a] = l; }
+  for (const a of all) { const l = logo(chain + ":" + a); if (l) out.logos[a] = l; }
   return out;
 }
 

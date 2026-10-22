@@ -5,7 +5,7 @@ export type Asset = { token: string | null; symbol: string; name: string; decima
 type Rpc = (method: string, params: unknown[]) => Promise<any>;
 
 const META = "wedgie.safe.tokens";       // token metadata, per chain:address: it never changes
-let meta: Record<string, { symbol: string; name: string; decimals: number; logo?: string | null }> = {};
+let meta: Record<string, { symbol: string; name: string; decimals: number; logo?: string | null; logoAt?: number }> = {};
 try { meta = JSON.parse(localStorage.getItem(META) || "{}"); } catch {}
 const saveMeta = () => { try { localStorage.setItem(META, JSON.stringify(meta)); } catch {} };
 
@@ -40,9 +40,13 @@ export async function readAssets(chain: number, safe: string, native: { symbol: 
   const metas = await Promise.all(held.map((h) => tokenMeta(chain, h.token, rpc)));
   let px: { eth: number | null; tokens: Record<string, number>; logos?: Record<string, string> } = { eth: null, tokens: {} };
   try { px = await rpc("wedgie_prices", held.slice(0, 25).map((h) => h.token)); } catch {}
-  // a logo found by wedgie_prices is kept with the token's metadata, for good
+  // a logo found by wedgie_prices is kept with the token's metadata for 2 days (logoAt; Alchemy's have none)
   let got = false;
-  held.forEach((h, i) => { const l = px.logos?.[h.token.toLowerCase()]; if (metas[i] && !metas[i]!.logo && l) { metas[i]!.logo = l; got = true; } });
+  held.forEach((h, i) => {
+    const m = metas[i], l = px.logos?.[h.token.toLowerCase()];
+    if (m?.logoAt && Date.now() - m.logoAt > 2 * 86_400_000) { m.logo = null; delete m.logoAt; got = true; }
+    if (m && !m.logo && l) { m.logo = l; m.logoAt = Date.now(); got = true; }
+  });
   if (got) saveMeta();
   const out: Asset[] = [{ token: null, ...native, decimals: 18, balance: eth, price: px.eth, usd: px.eth === null ? null : Number(eth) / 1e18 * px.eth }];
   held.forEach((h, i) => {
