@@ -847,6 +847,8 @@ body.sx-sheet-open #s-msg { display: none; }
 .sx-tokbtn { flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border: 0; border-radius: 999px; background: #f4f4f1;
   font: inherit; font-size: 17px; color: var(--ink); cursor: pointer; }
 .sx-tokbtn:hover { background: #ebebe6; }
+.sx-tok-on { position: relative; flex-shrink: 0; display: inline-flex; }
+.sx-tok-on .sx-chain-img { position: absolute; right: -3px; bottom: -3px; width: 18px; height: 18px; margin: 0; box-shadow: 0 0 0 2px #fff; background: #fff; }
 .sx-tokbtn .sx-tok { width: 30px; height: 30px; font-size: 14px; }
 .sx-caret { font-size: 12px; opacity: .6; }
 .sx-toklist { position: absolute; z-index: 5; top: calc(100% + 6px); left: 0; right: 0; max-height: 320px; overflow-y: auto; margin: 0; padding: 6px;

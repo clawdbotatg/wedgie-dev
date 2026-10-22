@@ -415,8 +415,8 @@ export function safe(main: HTMLElement) {
     return `<span class="sx-tok" style="--h:${h}">${esc(sym.slice(0, 1).toUpperCase())}</span>`;
   };
   const can = () => wedgieOwns() || isOwner(account);    // someone here can sign for this Safe
-  /** A token as a row: its logo, symbol and name, its dollars and amount (Assets, and Send's picker). */
-  const assetInner = (a: Asset) => `${tokenBadge(a.symbol, a.logo)}
+  /** A token as a row: its logo (this chain's in the corner), symbol and name, its dollars and amount (Assets, and Send's picker). */
+  const assetInner = (a: Asset) => `<span class="sx-tok-on">${tokenBadge(a.symbol, a.logo)}${chainLogo(chain)}</span>
       <span class="sx-asset-name"><b>${esc(a.symbol)}</b><span class="fine">${esc(a.name)}</span></span>
       <span class="sx-asset-amt">${a.usd !== null ? `<b>${esc(usd(a.usd))}</b><span class="fine">${esc(E.fmt(a.balance, a.decimals, 4))} ${esc(a.symbol)}</span>` : `<b>${esc(E.fmt(a.balance, a.decimals, 4))}</b>`}</span>`;
 
