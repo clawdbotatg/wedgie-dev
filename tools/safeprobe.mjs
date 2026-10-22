@@ -239,10 +239,12 @@ check(await page.isHidden("#s-sheet") && await page.isVisible("#s-apps [data-wco
 const wa = E.checksum(E.hex(crypto.randomBytes(20))), wb = E.checksum(E.hex(crypto.randomBytes(20)));
 const sent = wcAsk("wallet_sendCalls", [{ version: "2.0.0", chainId: "0x2105", from: mine, atomicRequired: true,
   calls: [{ to: wa, value: "0x5af3107a4000" }, { to: wb, value: "0xb5e620f48000", data: "0x" }] }]);
-await wait(() => document.querySelector("[data-wcsign]"), null, 30000, "the app's 2 calls shown");
+await wait(() => [...document.querySelectorAll("#s-queue .sx-tx")].some((li) => /From /.test(li.textContent) && li.querySelector("[data-sign]")), null, 30000, "the app's 2 calls in Waiting, unsigned");
 if (out) await page.screenshot({ path: `${out}/safe-1b-wc.png`, fullPage: true });
 const asked0 = await asks();
-await page.click("[data-wcsign]");
+await page.click("#s-queue [data-sign]");
+await wait(() => document.querySelector("#s-queue [data-exec]"), null, 60000, "signed: Execute");
+await page.click("#s-queue [data-exec]");
 const res = await sent;
 const last = await page.evaluate(() => window.__ports[0]._st.appAsks.filter((m) => m.type === "safe_sign").at(-1).tx);
 check(await asks() === asked0 + 1 && eq(last.to, E.MULTISEND_CALL_ONLY) && last.operation === 1, "WalletConnect: one wedgie signature, a MultiSendCallOnly batch");
