@@ -942,6 +942,7 @@ export function safe(main: HTMLElement) {
         ${can() ? `<button class="sx-act" id="a-connect"${dis()}><span>⇄</span>Connect app</button>` : ""}</div>`;
     }
     box.innerHTML = h;
+    box.classList.toggle("sx-hero-set", sub === "settings");   // Settings: a lighter gray, so it reads as a level down
     paintSpin();
     $("a-send")?.addEventListener("click", () => openSheet("send"));
     $("a-receive")?.addEventListener("click", () => openSheet("receive"));
