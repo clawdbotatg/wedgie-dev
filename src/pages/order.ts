@@ -42,7 +42,7 @@ export function order(main: HTMLElement) {
   const path = location.pathname.replace(/\/+$/, "");
   const id = /^\/order\/([0-9a-f]{12})$/.exec(path)?.[1], all = path === "/orders", signin = path === "/signin";
   main.innerHTML = `
-  <section class="test-page safe-page order-page">
+  <section class="test-page safe-page order-page${signin ? " signin-page" : ""}">
     <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
     <h1>${signin ? "Sign in" : all ? "Your orders" : id ? "Your order" : "Order"}</h1>
     <div id="o-body" class="order-stack"></div>
@@ -85,7 +85,8 @@ function signIn(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
   function ask() {
     box.innerHTML = `<div class="safe-box recess"><form class="order-fields" id="o-find">
         <label class="wide">Email <input name="email" type="email" autocomplete="email" maxlength="100" required value="${esc(lastEmail())}"></label></form>
-      <p><button class="btn btn-green" id="o-go">Sign in</button></p></div>`;
+      <button class="btn btn-green" id="o-go">Email me a link</button></div>
+      <p class="fine signin-note">No password. We email you a link.</p>`;
     const f = box.querySelector<HTMLFormElement>("#o-find")!, go = box.querySelector<HTMLButtonElement>("#o-go")!;
     const email = f.querySelector<HTMLInputElement>("[name=email]")!;
     if (!email.value) email.focus();
@@ -104,10 +105,11 @@ function signIn(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
     f.onsubmit = (e) => { e.preventDefault(); send(); };
   }
   function sent(e: string) {
-    box.innerHTML = `<div class="safe-box recess order-sent"><h2>Check your email</h2><p><b>${esc(e)}</b></p>
+    box.innerHTML = `<div class="safe-box recess order-sent"><p class="signin-mail" aria-hidden="true">✉️</p>
+      <h2>Check your email</h2><p class="signin-to">${esc(e)}</p>
       <p>Tap the link in it. This page signs in by itself.</p>
-      <p class="fine">Nothing there? Check spam.</p>
-      <p><button class="btn btn-sm" id="o-again">Use a different email</button></p></div>`;
+      <p class="fine">Nothing there? Check spam.</p></div>
+      <p><button class="btn btn-sm" id="o-again">Use a different email</button></p>`;
     box.querySelector<HTMLButtonElement>("#o-again")!.onclick = () => { clearInterval(t); ask(); };
     const t = setInterval(() => { if (session()) { clearInterval(t); location.replace("/orders"); } }, 1000);
     addEventListener("storage", (ev) => { if (ev.key === SESSION && session()) location.replace("/orders"); });

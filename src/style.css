@@ -253,11 +253,12 @@ html, body { overflow-x: clip; }
 .orders-btn .n { font-family: var(--mono); font-size: 14px; background: rgba(0,0,0,.08); border-radius: 999px; padding: 1px 8px; }
 .orders-btn ~ #s-me { margin-left: 0; }
 .signin-btn { padding: 0 18px; }
-.orders-who { margin: 0; text-align: center; }
+.orders-who { margin: 0 !important; }
 @media (max-width: 560px) { .orders-btn .lbl { display: none; } .orders-btn { padding: 0 13px; } }
 @media (max-width: 480px) { .top:has(.orders-btn) .brand .tag { display: none; } }
 .orders-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; text-decoration: none; color: inherit; }
 .orders-row .o-st { text-align: right; white-space: nowrap; }
+.orders-row:hover { filter: brightness(1.03); }
 .orders-row.st-paid .o-st, .orders-row.st-shipped .o-st { color: var(--mint-d); }
 .orders-row.st-expired, .orders-row.st-canceled { opacity: .6; }
 /* an order's steps (src/shop/steps.ts): pixel sprites, grey till done, the newest one bounces */
@@ -852,6 +853,22 @@ body.sx-sheet-open #s-msg { display: none; }
 #s-create .safe-owner .addr-in, #s-owner .addr-in, #s-new .addr-in { width: 100%; }
 /* /order */
 .order-stack { width: 100%; display: flex; flex-direction: column; gap: 16px; }
+.safe-box { width: 100%; box-sizing: border-box; padding: 22px 24px; text-align: left; }
+.safe-box > :first-child { margin-top: 0; }
+.safe-box > :last-child { margin-bottom: 0; }
+@media (max-width: 560px) { .safe-box { padding: 18px; } }
+/* /signin: one narrow card in the middle */
+.signin-page { max-width: 460px; align-items: center; text-align: center; padding-top: 24px; }
+.signin-page .order-stack { gap: 12px; }
+.signin-page .safe-box { padding: 28px; text-align: center; }
+.signin-page .order-fields { grid-template-columns: 1fr; text-align: left; }
+.signin-page .order-fields input { font-size: 18px; padding: 14px 16px; border-radius: 14px; }
+.signin-page .btn-green { width: 100%; height: 58px; margin-top: 8px; }
+.signin-page .signin-note { margin: 4px 0 0; }
+.signin-mail { font-size: 56px; line-height: 1; margin: 0 0 12px !important; }
+.signin-page .order-sent h2 { margin: 0 0 10px; }
+.signin-to { display: inline-block; max-width: 100%; box-sizing: border-box; padding: 8px 16px; border-radius: 999px; background: var(--card); font-weight: 800; word-break: break-all; margin: 4px 0 14px !important; }
+.signin-page .order-sent .btn { margin-top: 10px; }
 .order-line { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 8px 0; }
 .order-line + .order-line { border-top: 1px solid rgba(0,0,0,.08); }
 .order-pay-now { font-size: 22px; }
