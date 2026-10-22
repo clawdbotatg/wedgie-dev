@@ -1339,12 +1339,16 @@ export function safe(main: HTMLElement) {
           ${+t.operation === 1 ? `<dt>Kind</dt><dd>delegate call</dd>` : ""}
           <dt>Hash</dt><dd><code>${esc(String(t.safeTxHash).slice(0, 10))}…${esc(String(t.safeTxHash).slice(-8))}</code></dd></dl></details></li>`;
     }).join("");
-    const ready = /data-exec/.test(items);
-    box.innerHTML = `<h3>${ready ? "Ready: press Execute" : "Waiting"}${queue.length ? ` <span class="sx-count">${queue.length}</span>` : ""}</h3>
+    const ready = /data-exec/.test(items), run = readyRun();
+    box.innerHTML = `<h3 class="sx-row">${ready ? "Ready: press Execute" : "Waiting"}${queue.length ? ` <span class="sx-count">${queue.length}</span>` : ""}${run.length > 1 ? `<button class="btn btn-sm btn-green sx-end" id="s-execall"${dis()}>Execute all ${run.length}</button>` : ""}</h3>
       ${items ? `<ul class="sx-txs">${items}</ul>` : `<p class="fine">Nothing waiting.</p>`}
       ${queueNote ? `<p class="fine">${esc(queueNote)}</p>` : ""}
       <p class="sx-foot"><button class="btn btn-sm" id="s-refresh"${dis()}>Refresh</button></p>`;
     $("s-refresh").onclick = () => job(() => load());
+    document.getElementById("s-execall")?.addEventListener("click", () => job(async () => {
+      running = run[0]; runningAll = run; paintDock();
+      try { await executeAll(run); } finally { running = null; runningAll = []; }
+    }));
     box.querySelectorAll<HTMLButtonElement>("[data-sign]").forEach((b) => b.onclick = () => job(() => signQueued(queue[+b.dataset.sign!], "wedgie")));
     box.querySelectorAll<HTMLButtonElement>("[data-wsign]").forEach((b) => b.onclick = () => job(() => signQueued(queue[+b.dataset.wsign!], "wallet")));
     box.querySelectorAll<HTMLButtonElement>("[data-exec]").forEach((b) => b.onclick = () => job(async () => { running = queue[+b.dataset.exec!]; paintDock(); try { await execute(running); } finally { running = null; } }));
@@ -1403,7 +1407,7 @@ export function safe(main: HTMLElement) {
   function paintDock() {
     const i = info, k = i ? queue.findIndex((t) => +t.nonce === i.nonce && (t.confirmations || []).length >= (t.confirmationsRequired ?? i.threshold)) : -1;
     const t = running || (k >= 0 ? queue[k] : null);
-    const all = running ? runningAll : i ? readyRun() : [];
+    const all = running ? runningAll : [];
     const dock = $("s-dock");
     dock.hidden = !(safeAddr && t && sub === "home");
     document.body.classList.toggle("has-dock", !dock.hidden);
@@ -1411,15 +1415,11 @@ export function safe(main: HTMLElement) {
     document.body.classList.toggle("in-app", Drive.inApp());
     if (dock.hidden) return;
     $("s-dock-tx").innerHTML = all.length > 1
-      ? `<span class="safe-dock-what"><b>#${esc(all[0].nonce)}–#${esc(all.at(-1).nonce)}</b> ${all.length} transactions, in one go</span>
-        ${running ? "" : `<button class="btn btn-green" id="s-dock-go"${dis()}>Execute all</button>`}`
+      ? `<span class="safe-dock-what"><b>#${esc(all[0].nonce)}–#${esc(all.at(-1).nonce)}</b> ${all.length} transactions, in one go</span>`
       : `<span class="safe-dock-what"><b>#${esc(t.nonce)}</b> ${said(t).title}</span>
         ${running ? "" : `<button class="btn btn-green" id="s-dock-go"${dis()}>Execute</button>`}`;
     $("s-dock-msg").hidden = !running;
-    $("s-dock-go")?.addEventListener("click", () => job(async () => {
-      running = t; runningAll = all.length > 1 ? all : []; paintDock();
-      try { await (all.length > 1 ? executeAll(all) : execute(t)); } finally { running = null; runningAll = []; }
-    }));
+    $("s-dock-go")?.addEventListener("click", () => job(async () => { running = t; paintDock(); try { await execute(t); } finally { running = null; } }));
   }
 
   // ---- Assets: every token, biggest first; ones with no price folded away ----
