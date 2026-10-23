@@ -176,6 +176,20 @@ type Row = { chain: number; addr: string; wedgie: boolean; wallet: boolean; info
 const KEYS = Object.fromEntries(IDS.map((id) => [CHAINS[id].key, id]));
 const route = (chain: number, a: string) => `/safe/${CHAINS[chain].key}:${a}`;
 
+/** The wedgie's Safes as /safe last listed them, for the top bar (main.ts). Only what this browser saved: never a
+ * chain or Safe's API (Austin, 10-22). Dollars as the card showed them; null: no price, or a test chain. */
+export function savedSafes(): { addr: string; chain: number; href: string; usd: number | null }[] {
+  try {
+    const l = JSON.parse(localStorage.getItem("wedgie.safe.last") || "null"), full = JSON.parse(localStorage.getItem("wedgie.safe.usd") || "{}");
+    return (Array.isArray(l?.rows) ? l.rows : []).filter((r: any) => CHAINS[r.chain] && r.info && !r.gone).map((r: any) => {
+      const f = full[`${r.chain}:${r.addr.toLowerCase()}`], px = l.px?.[r.chain];
+      const usd = CHAINS[r.chain].test ? null : f && f.b === String(r.info.balance) && f.u === String(r.info.usdc) ? f.usd
+        : px ? Number(r.info.balance) / 1e18 * px + Number(r.info.usdc || 0) / 1e6 : null;
+      return { addr: r.addr, chain: r.chain, href: route(r.chain, r.addr), usd };
+    });
+  } catch { return []; }
+}
+
 /** Owners, threshold, nonce, balances: from the chain, not Safe's API (which can lag a block or more). One read
  * (Multicall3): a page with many Safes on many chains stays under /api/rpc's limit. */
 async function readSafe(c: number, a: string): Promise<Info> {
@@ -333,6 +347,7 @@ export function safe(main: HTMLElement) {
   const setFull = (c: number, a: string, i: Info, usd: number) => {
     fullUsd[fk(c, a)] = { usd, b: String(i.balance), u: String(i.usdc) };
     try { localStorage.setItem(FULL, JSON.stringify(fullUsd)); } catch {}
+    dispatchEvent(new Event("wedgie-safes"));     // the top bar's Safes (main.ts)
   };
   const priced = new Set<string>();     // read in full on this visit
   // a sheet over the page (a bottom sheet on a phone): one at a time
@@ -452,6 +467,7 @@ export function safe(main: HTMLElement) {
       localStorage.setItem(LAST, JSON.stringify({ x: key?.x, y: key?.y, px: ethPx, rows: rows.filter((r) => r.wedgie && r.info).map((r) => ({ ...r, wallet: false,
         info: { ...r.info, balance: String(r.info!.balance), usdc: r.info!.usdc === null ? null : String(r.info!.usdc) } })) }));
     } catch {}
+    dispatchEvent(new Event("wedgie-safes"));
   };
   const loadLast = () => {
     try {
