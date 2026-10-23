@@ -8,7 +8,9 @@
 //   - answers kept for everyone (in memory while warm, and in the database): one call per Safe, however many look.
 //     A Safe's history comes with &v=<its nonce, coins> from the chain: kept till that changes (or 30 min).
 //     The queue: 100 s. &fresh=1 (Refresh, after a sign) asks Safe again
-//   - GET ?usage=1: today's count and the last 7 days
+//   - GET ?usage=1: today's count and the last 7 days, and how the page's chain reads compared (PUT)
+// PUT {what, chain, safe, diffs}: the page asked Safe's API and the chain the same thing (history, creation, ran);
+// counted per day as matched or not, the last CMP_KEEP mismatches kept (Safe addresses only, which are public).
 // GET = a read; POST = a proposal or a signature, DELETE = removing a queued one (its proposer's signed request),
 // passed on as is (counted, never capped). Never log a body here.
 import { env, json, oops, crossSite, db } from "./_shop.js";
@@ -46,7 +48,9 @@ export async function GET(req: Request) {
   if (q.get("usage")) {
     const sql = await db();
     const rows = await sql`select day::text, n from counts where k = 'safe_api' order by day desc limit 7`;
-    return json({ cap: DAY_CAP, days: rows });
+    const cmp = await sql`select day::text, k, n from counts where k like 'safe_cmp:%' order by day desc, k limit 60`;
+    const diffs = await sql`select what, chain, safe, diffs, at from safe_cmp order by n desc limit 20`.catch(() => []);
+    return json({ cap: DAY_CAP, days: rows, cmp, diffs });
   }
   const p = path(req);
   if (!p) return oops("Not allowed.", 403);
@@ -104,4 +108,27 @@ export async function DELETE(req: Request) {
   if (!r) return oops("Safe's service didn't answer.", 502);
   for (const k of HIT.keys()) if (k.includes("multisig-transactions")) HIT.delete(k);
   return pass(r.status, r.status === 204 ? "{}" : await r.text());
+}
+
+const CMP_KEEP = 500;
+export async function PUT(req: Request) {
+  if (crossSite(req)) return oops("Not from wedgie.dev.", 403);
+  const text = await req.text();
+  if (text.length > 8000) return oops("Too big.", 413);
+  let b: any;
+  try { b = JSON.parse(text); } catch { return oops("Bad request."); }
+  const what = ["history", "creation", "ran"].includes(b?.what) ? b.what : "";
+  const safe = /^0x[0-9a-fA-F]{40}$/.test(b?.safe) ? b.safe.toLowerCase() : "", chain = Number(b?.chain) | 0;
+  if (!what || !safe || !chain || !Array.isArray(b.diffs)) return oops("Bad request.");
+  const diffs = b.diffs.slice(0, 20).map((d: unknown) => String(d).slice(0, 200));
+  try {
+    const sql = await db();
+    await sql`insert into counts (day, k, n) values (${today()}, ${`safe_cmp:${what}:${diffs.length ? "diff" : "same"}`}, 1)
+      on conflict (day, k) do update set n = counts.n + 1`;
+    if (diffs.length) {
+      await sql`insert into safe_cmp (what, chain, safe, diffs) values (${what}, ${chain}, ${safe}, ${diffs.join("\n")})`;
+      if (Math.random() < 0.05) await sql`delete from safe_cmp where n < (select max(n) from safe_cmp) - ${CMP_KEEP}`;
+    }
+  } catch {}
+  return json({ ok: true });
 }

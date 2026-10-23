@@ -1,4 +1,4 @@
-// /api/rpc?chain=<id>: /safe's chain reads, through the shop's Alchemy key (never a public RPC; the key never
+// /api/rpc?chain=<id>: /safe's chain reads (eth_getLogs: a Safe's history, src/safe/history.ts), through the shop's Alchemy key (never a public RPC; the key never
 // reaches the browser). One JSON-RPC call per POST, read methods only (READ). Never log a body here.
 // wedgie_prices [token addresses]: {eth, tokens: {address: usd}, logos: {address: url}} from Alchemy's prices API
 // (mainnets only); eth is the chain's own coin (ETH, POL, …). DexScreener fills the long tail, as in Instant Wallet:
@@ -15,7 +15,7 @@ const COIN: Record<number, string> = { 137: "POL", 43114: "AVAX", 56: "BNB", 100
 const DEX: Record<number, string> = { 1: "ethereum", 8453: "base", 10: "optimism", 42161: "arbitrum", 137: "polygon",
   43114: "avalanche", 56: "bsc", 100: "gnosischain", 42220: "celo", 146: "sonic" };
 const READ = new Set(["eth_call", "eth_getCode", "eth_getBalance", "eth_getTransactionReceipt", "eth_getTransactionByHash",
-  "eth_blockNumber", "eth_chainId", "eth_getBlockByNumber", "eth_getStorageAt", "alchemy_getTokenBalances", "alchemy_getTokenMetadata"]);
+  "eth_blockNumber", "eth_chainId", "eth_getBlockByNumber", "eth_getStorageAt", "eth_getLogs", "alchemy_getTokenBalances", "alchemy_getTokenMetadata"]);
 const TEST = new Set([84532, 11155111]);
 
 // Kept while this function instance is warm: a price for a minute, a token's name and decimals for good (they never

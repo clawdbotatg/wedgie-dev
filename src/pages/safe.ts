@@ -30,6 +30,7 @@ import { readAssets, tokenMeta, knownMeta, usd, type Asset } from "../safe/asset
 import { canScan, scan } from "../safe/scan";
 import * as Clear from "../safe/clear";
 import { addressQr } from "../safe/qr";
+import * as Hist from "../safe/history";
 
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 const short = (a: string) => a.slice(0, 6) + "…" + a.slice(-4);
@@ -124,6 +125,36 @@ async function rpc(chain: number, method: string, params: unknown[]): Promise<an
     }
   }
 }
+const rpcOf = (chain: number) => (method: string, params: unknown[]) => rpc(chain, method, params);
+
+// History, how a Safe was made, and "did it run" come from Safe's API or the chain (src/safe/history.ts). COMPARE: both
+// asked, Safe's shown when it answers, the chain's when it doesn't, and whether they matched goes to /api/safe (PUT,
+// once per Safe and thing per page) so we know when the chain alone is enough. Then: the chain first, Safe's API only
+// when it fails (we get 1,500 Safe calls a day).
+const COMPARE = true;
+const compared = new Set<string>();
+function report(what: string, c: number, a: string, diffs: string[]) {
+  const k = `${what}:${c}:${a.toLowerCase()}`;
+  if (compared.has(k)) return;
+  compared.add(k);
+  const real = diffs.filter((d) => !d.startsWith("("));
+  if (real.length) console.warn(`/safe ${what} on ${CHAINS[c].name}: Safe's API and the chain differ`, real);
+  if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) return;
+  fetch("/api/safe", { method: "PUT", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ what, chain: c, safe: a, diffs: real.slice(0, 20) }) }).catch(() => {});
+}
+/** Safe's answer and the chain's, both asked: Safe's if it has one (diffs reported), else the chain's, else Safe's error. */
+async function either<T>(what: string, c: number, a: string, svc: () => Promise<T>, chain: () => Promise<T>, diff: (s: T, h: T) => string[]): Promise<T> {
+  if (!COMPARE) { try { return await within(chain(), 20_000); } catch { return svc(); } }
+  const [s, h] = await Promise.allSettled([svc(), within(chain(), 20_000)]);
+  if (s.status === "fulfilled") {
+    report(what, c, a, h.status === "fulfilled" ? diff(s.value, h.value) : [`chain: ${msgOf(h.reason)}`]);
+    return s.value;
+  }
+  if (h.status === "fulfilled") return h.value;
+  throw s.reason;
+}
+
 const view = (chain: number, to: string, data: string) => rpc(chain, "eth_call", [{ to, data }, "latest"]);
 const hasCode = async (chain: number, a: string) => (await rpc(chain, "eth_getCode", [a, "latest"])).length > 2;
 
@@ -1150,8 +1181,10 @@ export function safe(main: HTMLElement) {
   /** What happened: Safe's API (its executed transactions, and money that came in). */
   async function loadActivity(c: number, a: string, o = { bg: false, fresh: false }) {
     try {
-      const j = await svcGet(`${api(c)}/safes/${a}/all-transactions/?executed=true&queued=false&limit=25`, { ...o, keepMs: 30 * 60_000, v: true });
-      if (c === chain && a === safeAddr) { activity = j.results || []; activityErr = ""; }
+      const list = await either("history", c, a,
+        () => svcGet(`${api(c)}/safes/${a}/all-transactions/?executed=true&queued=false&limit=25`, { ...o, keepMs: 30 * 60_000, v: true }).then((j) => (j.results || []) as any[]),
+        () => Hist.chainHistory(rpcOf(c), c, a, CHAINS[c].usdc), (sv, h) => Hist.diffHistory(c, sv, h, a, CHAINS[c].usdc));
+      if (c === chain && a === safeAddr) { activity = list; activityErr = ""; }
     } catch (e: any) {
       if (c === chain && a === safeAddr) { activity = activity || []; activityErr = e.status === 404 ? "" : e.status === 429 ? REST : "Couldn't load it just now."; }
     }
@@ -1212,7 +1245,9 @@ export function safe(main: HTMLElement) {
     let err: any = null;
     for (const t of [c, ...IDS.filter((t) => t !== c && copies[t])]) {
       try {
-        const cr = await get(`${api(t)}/safes/${a}/creation/`);
+        const cr = await either("creation", t, a, () => get(`${api(t)}/safes/${a}/creation/`) as Promise<{ transactionHash: string; factoryAddress: string }>,
+          () => Hist.chainCreation(rpcOf(t), a), (sv, h) => ["transactionHash", "factoryAddress"].filter((f) => String((sv as any)[f]).toLowerCase() !== String((h as any)[f]).toLowerCase())
+            .map((f) => `${f}: safe ${(sv as any)[f]} chain ${(h as any)[f]}`));
         const tx = await rpc(t, "eth_getTransactionByHash", [cr.transactionHash]) as any;
         const r = await recipeIn(t, cr.factoryAddress, tx?.input, a);
         saveRecipe(a, r);
@@ -1289,8 +1324,12 @@ export function safe(main: HTMLElement) {
     try { await tellOnce(c, a, h, wc, ran); } catch {} finally { telling.delete(h); }
   }
   async function tellOnce(c: number, a: string, h: string, wc: any, ran?: string) {
-    const j = ran ? { isExecuted: true, transactionHash: ran } : await get(`${api(c)}/multisig-transactions/${h}/`).catch((e: any) => e.status === 404 ? {} : null);
-    if (!j) return;           // Safe's service didn't answer: next time
+    // the chain is trusted only when it has the run (its logs can trail a block); "it didn't run" needs Safe's API
+    const [sv, onChain] = ran ? [null, null] : await Promise.all([get(`${api(c)}/multisig-transactions/${h}/`).catch((e: any) => e.status === 404 ? {} : null),
+      within(Hist.ranOnChain(rpcOf(c), c, a, h, true), 20_000).catch(() => null)]);
+    if (sv?.isExecuted && onChain) report("ran", c, a, String(sv.transactionHash).toLowerCase() === onChain.transactionHash.toLowerCase() ? [] : [`safe ${sv.transactionHash} chain ${onChain.transactionHash}`]);
+    const j = ran ? { isExecuted: true, transactionHash: ran } : sv?.isExecuted ? sv : onChain ? { isExecuted: true, transactionHash: onChain.transactionHash } : sv;
+    if (!j) return;           // neither answered: next time
     const m = await wcStart();
     await (j.isExecuted && j.transactionHash ? m.answerDone(wc, j.transactionHash) : m.answerError(wc.topic, wc.id, "It didn't run: another transaction took its number."));
     const mine = localQ(c, a);
