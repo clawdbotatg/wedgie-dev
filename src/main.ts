@@ -72,7 +72,7 @@ app.innerHTML = `
 </footer>
 `;
 
-// Green "Allow wedgie connection" (LED blinking) until this site can see a plugged-in wedgie: a tap opens the browser's
+// Dark grey "Allow wedgie connection" (LED off) until this site can see a plugged-in wedgie: a tap opens the browser's
 // device picker right here; pick one and you land on /connect. Then green with how many, linking there. Grey "Connect" where the
 // browser has no Web Serial (/connect explains). Live as you plug and unplug. A browser that never
 // tapped it here keeps asking without looking at a single port (wedgies.ts: armed).

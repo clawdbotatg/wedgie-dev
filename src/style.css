@@ -241,7 +241,8 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 22px; }
 .w3d-holder, .w3d { max-width: 100%; }
 html, body { overflow-x: clip; }
 
-/* the one button top right: green "Allow wedgie connection" (blinking LED) until a wedgie is seen, then green with the count; grey without Web Serial. */
+/* the one button top right: dark grey "Allow wedgie connection" (LED off) until a wedgie is seen (the browser can't see an unallowed
+   one, so no wedgie in sight = a quiet secondary button), then grey with a lit LED and the count; grey without Web Serial. */
 .connect-btn { display: inline-flex; align-items: center; gap: 9px; white-space: nowrap; flex-shrink: 0; height: 46px; padding: 0 20px 0 16px; border-radius: 999px; text-decoration: none;
   font-weight: 900; font-size: 16px; color: #fff; background: var(--grey-fill); text-shadow: 0 1px 0 rgba(0,0,0,.25);
   box-shadow: inset 0 2px 0 rgba(255,255,255,.25), inset 0 -3px 0 rgba(0,0,0,.25), 0 2px 0 #3a3b3d, 0 8px 18px -8px rgba(0,0,0,.5);
@@ -250,13 +251,11 @@ html, body { overflow-x: clip; }
 .connect-btn .led { width: 10px; height: 10px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #9a9b9d, #5a5b5d); box-shadow: inset 0 1px 1px rgba(0,0,0,.4); }
 .connect-btn.on { background: var(--grey-fill); box-shadow: inset 0 2px 0 rgba(255,255,255,.25), inset 0 -3px 0 rgba(0,0,0,.25), 0 2px 0 #3a3b3d, 0 8px 18px -8px rgba(0,0,0,.5); }
 .connect-btn.on .led { background: radial-gradient(circle at 35% 35%, #d8ffe2, #7dff9f); box-shadow: 0 0 8px #b6ffc8; }
-.connect-btn.ask { background: var(--green-fill); box-shadow: inset 0 2px 0 rgba(255,255,255,.35), inset 0 -3px 0 rgba(0,0,0,.18), 0 2px 0 #0f6e28, 0 8px 18px -8px rgba(22,140,52,.7); }
-.connect-btn.ask .led { background: radial-gradient(circle at 35% 35%, #d8ffe2, #7dff9f); box-shadow: 0 0 8px #b6ffc8; animation: blink 1.2s steps(2, jump-none) infinite; }
+.connect-btn.ask { background: linear-gradient(#5a5b5d, #2f3032); box-shadow: inset 0 2px 0 rgba(255,255,255,.18), inset 0 -3px 0 rgba(0,0,0,.3), 0 2px 0 #1e1f20, 0 8px 18px -8px rgba(0,0,0,.5); }
 @keyframes blink { 50% { opacity: .35; } }
 /* on /connect itself the rows' Configure is the thing to tap: the header goes grey, LED still lit */
 .connect-btn.here.on { background: var(--grey-fill); box-shadow: inset 0 2px 0 rgba(255,255,255,.25), inset 0 -3px 0 rgba(0,0,0,.25), 0 2px 0 #3a3b3d, 0 8px 18px -8px rgba(0,0,0,.5); }
 @media (max-width: 480px) { .connect-btn .long { display: none; } }
-@media (prefers-reduced-motion: reduce) { .connect-btn.ask .led { animation: none; } }
 .connect-btn .n:empty { display: none; }
 /* Orders: beside Connect once this browser has made an order (main.ts). White, so Connect stays the loud one. */
 .orders-btn { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; flex-shrink: 0; height: 46px; padding: 0 18px 0 14px; border-radius: 999px; text-decoration: none;

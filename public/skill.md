@@ -79,7 +79,7 @@ newest is always here).
    A **WEDGIE** drive appears.
 2. Open **Open wedgie** on the drive (Mac), **Open wedgie (Windows)**, or go to https://wedgie.dev/connect in Chrome
    or Edge.
-3. Click the green **Allow wedgie connection** (top right) and pick it.
+3. Click **Allow wedgie connection** (top right) and pick it.
 4. **Update the firmware** if the page says so. Always. Press green on the wedgie.
 5. Pick an app from the shelf. The wedgie asks **Install ...?** on its screen: press green.
 6. For a Safe signer: install **Safe Signer**, then go to https://wedgie.dev/safe (safe.md). Its first screen must
