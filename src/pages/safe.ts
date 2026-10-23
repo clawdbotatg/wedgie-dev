@@ -1888,11 +1888,14 @@ export function safe(main: HTMLElement) {
     if (!document.getElementById("wc-uri")) {     // built once per Safe: keep a pasted link across repaints
       box.innerHTML = `<h2>Connect an app</h2>
         <p class="fine">In the app (Uniswap, Aave, …) pick WalletConnect. Its requests come here, and your wedgie signs them.</p>
-        ${canScan() ? `<p><button class="btn btn-green sx-wide" id="wc-scan">Scan its code</button></p><div class="sx-cam" id="wc-cam" hidden></div>` : ""}
+        ${canScan() ? `<p><button class="btn btn-grey sx-wide" id="wc-scan">Scan its code</button></p><div class="sx-cam" id="wc-cam" hidden></div>` : ""}
         <p class="sx-label">Or paste its link</p>
         <p class="sx-row wc-pair"><input id="wc-uri" class="sx-mono" placeholder="wc:…" spellcheck="false" autocomplete="off"> <button class="btn btn-sm" id="wc-go">Connect</button></p>
 `;
-      $("wc-go").onclick = () => job(async () => { const el = $("wc-uri") as HTMLInputElement; await pairWith(el.value); el.value = ""; });
+      const uri = $("wc-uri") as HTMLInputElement, go = $("wc-go");
+      const ready = () => go.classList.toggle("btn-green", /^wc:[0-9a-f]+@2\?.*symKey=[0-9a-f]+/i.test(uri.value.trim()));   // green once it's a real link
+      uri.oninput = ready;
+      go.onclick = () => job(async () => { await pairWith(uri.value); uri.value = ""; ready(); });
       $("wc-scan")?.addEventListener("click", () => {
         if (scanning) return stopScan();
         const cam = $("wc-cam"); cam.hidden = false;
