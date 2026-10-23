@@ -100,3 +100,9 @@ export function setKey(root: Element, key: string, state: "down" | "done" | "" )
     if (state === "") el.classList.remove("done");
   });
 }
+
+// Screen-space push (y down) -> "right", "down right", ... : 8 equal slices, diagonals hold two keys.
+export function dir8(dx: number, dy: number) {
+  const s = (Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) + 8) % 8;
+  return ["right", "down right", "down", "down left", "left", "up left", "up", "up right"][s];
+}

@@ -5,6 +5,7 @@
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { toCreasedNormals } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { dir8 } from "./device";
 
 type Part = { name: string; verts: number; tris: number; lo: number[]; hi: number[]; pos: number; idx: number; wide: boolean };
 type Geo = { parts: Part[]; glass: { cx: number; cy: number; w: number; h: number; z: number } };
@@ -280,18 +281,17 @@ export async function mountWedgie3D(el: HTMLElement, opts: Wedgie3DOptions = {})
     const [tx, ty] = px(top), [ex, ey] = px(edge);
     const dx = e.clientX - r.left - tx, dy = e.clientY - r.top - ty;
     if (Math.hypot(dx, dy) < Math.hypot(ex - tx, ey - ty) * 0.35) return "press";
-    return Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
+    return dir8(dx, dy);
   }
+  const leaning = new Set<string>();   // joystick ways held now (two on a diagonal)
   function visual(k: string, down: boolean) {
     if (KEYS.includes(k)) pressed.set(k, down);
     else {
+      if (down) leaning.add(k); else leaning.delete(k);
       const lean = 0.18;          // more and the cap's flange swings up through the lid
-      joyPiv.rotation.set(0, 0, 0);
-      if (down) {
-        if (k === "up") joyPiv.rotation.y = lean; if (k === "down") joyPiv.rotation.y = -lean;
-        if (k === "left") joyPiv.rotation.x = -lean; if (k === "right") joyPiv.rotation.x = lean;
-        if (k === "press") joyPiv.position.z = 2.05 - 0.6; else joyPiv.position.z = 2.05;
-      } else joyPiv.position.z = 2.05;
+      const on = (w: string) => (leaning.has(w) ? 1 : 0);
+      joyPiv.rotation.set((on("right") - on("left")) * lean, (on("up") - on("down")) * lean, 0);
+      joyPiv.position.z = leaning.has("press") ? 2.05 - 0.6 : 2.05;
     }
   }
   const set = (k: string, down: boolean) => { visual(k, down); opts.onKey?.(k, down); };
@@ -308,7 +308,7 @@ export async function mountWedgie3D(el: HTMLElement, opts: Wedgie3DOptions = {})
     if (!k) return;
     e.preventDefault();
     cv.setPointerCapture(e.pointerId);
-    if (JOY.has(k)) { sticks.set(e.pointerId, { x: e.clientX, y: e.clientY, dir: null }); cv.style.cursor = "grabbing"; return; }
+    if (JOY.has(k.split(" ")[0])) { sticks.set(e.pointerId, { x: e.clientX, y: e.clientY, dir: null }); cv.style.cursor = "grabbing"; return; }
     pointers.set(e.pointerId, k);
     set(k, true);
   });
@@ -316,7 +316,7 @@ export async function mountWedgie3D(el: HTMLElement, opts: Wedgie3DOptions = {})
     const st = sticks.get(e.pointerId);
     if (st) {
       sticks.delete(e.pointerId);
-      if (st.dir) set(st.dir, false);
+      if (st.dir) for (const k of st.dir.split(" ")) set(k, false);
       else { set("press", true); setTimeout(() => set("press", false), 140); }     // a click: push it in
       return;
     }
@@ -328,11 +328,16 @@ export async function mountWedgie3D(el: HTMLElement, opts: Wedgie3DOptions = {})
     const st = sticks.get(e.pointerId);
     if (st) {
       const dx = e.clientX - st.x, dy = e.clientY - st.y;
-      const dir = Math.hypot(dx, dy) < 10 ? st.dir : Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
-      if (dir !== st.dir) { if (st.dir) set(st.dir, false); if (dir) set(dir, true); st.dir = dir; }
+      const dir = Math.hypot(dx, dy) < 10 ? st.dir : dir8(dx, dy);
+      if (dir !== st.dir) {
+        const was = st.dir ? st.dir.split(" ") : [], now = dir ? dir.split(" ") : [];
+        for (const k of was) if (!now.includes(k)) set(k, false);
+        for (const k of now) if (!was.includes(k)) set(k, true);
+        st.dir = dir;
+      }
       return;
     }
-    if (e.pointerType === "mouse") cv.style.cursor = hit(e) ? (JOY.has(hit(e)!) ? "grab" : "pointer") : "default";
+    if (e.pointerType === "mouse") cv.style.cursor = hit(e) ? (JOY.has(hit(e)!.split(" ")[0]) ? "grab" : "pointer") : "default";
   });
   const KEYMAP: Record<string, string> = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", Enter: "press", " ": "press",
     a: "A", b: "B", x: "X", y: "Y", A: "A", B: "B", X: "X", Y: "Y" };

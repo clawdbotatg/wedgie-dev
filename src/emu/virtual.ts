@@ -1,7 +1,7 @@
 // The page half of the virtual wedgie: the plastic device (deviceSvg) with a live 240x240 canvas on
 // its screen, clickable/touchable buttons, keyboard while focused, and the Worker that runs the
 // firmware. Loaded only by mountVirtualWedgie() (index.ts).
-import { deviceSvg, setKey } from "../ui/device";
+import { deviceSvg, setKey, dir8 } from "../ui/device";
 import type { VirtualWedgie, VirtualWedgieOptions, FrameInfo, ExtraApp } from "./index";
 
 // Same order and layout as runtime.ts (see KEY_SLOTS there).
@@ -160,8 +160,9 @@ export async function mount(el: HTMLElement, opts: VirtualWedgieOptions): Promis
     Atomics.store(serialCtl, 0, h);
   }
 
-  // ---- pointer: buttons, and the joystick as a zone (centre = press, else the nearest direction)
-  const pointers = new Map<number, string>();   // pointer id -> key it holds
+  // ---- pointer: buttons, and the joystick as a zone (centre = press, else one of 8 ways: a diagonal
+  // holds both its directions, like the real stick)
+  const pointers = new Map<number, string>();   // pointer id -> the key(s) it holds, space-separated
   const joyPointers = new Set<number>();        // pointers that went down on the joystick and steer it
   function svgPoint(e: PointerEvent) {
     const m = svg.getScreenCTM();
@@ -173,13 +174,16 @@ export async function mount(el: HTMLElement, opts: VirtualWedgieOptions): Promis
     const { x, y } = svgPoint(e);
     const dx = x - JOY.cx, dy = y - JOY.cy;
     if (Math.hypot(dx, dy) < JOY.press) return "press";
-    return Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : dy > 0 ? "down" : "up";
+    return dir8(dx, dy);
   }
   function setPointer(id: number, key: string | null) {
-    const was = pointers.get(id);
+    const was = pointers.get(id) ?? null;
     if (was === key) return;
-    if (was) { pointers.delete(id); if (![...pointers.values()].includes(was)) hold(was, false); }
-    if (key) { pointers.set(id, key); hold(key, true); }
+    const before = was ? was.split(" ") : [], after = key ? key.split(" ") : [];
+    if (key) pointers.set(id, key); else pointers.delete(id);
+    const others = [...pointers].flatMap(([p, v]) => (p === id ? [] : v.split(" ")));
+    for (const k of before) if (!after.includes(k) && !others.includes(k)) hold(k, false);
+    for (const k of after) if (!before.includes(k)) hold(k, true);
   }
   svg.addEventListener("pointerdown", (e) => {
     const t = e.target as Element;
