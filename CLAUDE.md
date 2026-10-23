@@ -62,3 +62,4 @@ Other probes: `ls tools/`.
 
 **Virtual wedgie** (real firmware, fake Trust M, no hardware): `node tools/emu.mjs` and its curl API, or
 wedgie.dev/emu. Test installs, screens, buttons and signing on it before shipping: `docs/EMU.md`.
+The full rig (Austin's browser, the Safe, a dapp over WalletConnect): skill `virtual-wedgie`.
