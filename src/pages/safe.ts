@@ -107,9 +107,18 @@ async function post(url: string, body: unknown) {
 // ---- the chain, read through /api/rpc (the shop's Alchemy key; no wallet needed) ----
 const readUrl = (chain: number) => `${location.origin}/api/rpc?chain=${chain}`;
 let rpcId = 0;
+// /api/rpc down (Vercel or Alchemy): the connected wallet's own RPC, when it's on that chain. Standard reads only
+// (no alchemy_ or wedgie_ methods). For a minute after a failure, that chain's reads go to the wallet first.
+const rpcDown: Record<number, number> = {};
+async function walletRead(chain: number, method: string, params: unknown[]): Promise<{ result: any } | null> {
+  if (!wcp || !method.startsWith("eth_")) return null;
+  try { if (Number(await wcp.request({ method: "eth_chainId" })) !== chain) return null; } catch { return null; }
+  return { result: await wcp.request({ method, params }) };     // a revert throws, as it does from /api/rpc
+}
 /** A burst can be rate-limited (a list of Safes reads several at once): wait and try again. */
 async function rpc(chain: number, method: string, params: unknown[]): Promise<any> {
   for (let i = 0; ; i++) {
+    if (Date.now() - (rpcDown[chain] || 0) < 60_000) { const w = await walletRead(chain, method, params); if (w) return w.result; }
     try {
       const res = await fetch(readUrl(chain), { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jsonrpc: "2.0", id: ++rpcId, method, params }) });
@@ -121,6 +130,11 @@ async function rpc(chain: number, method: string, params: unknown[]): Promise<an
     } catch (e: any) {
       // TypeError: the fetch itself failed. ~80 s of tries: /api/rpc's limit is per minute
       if (i >= 8 || !(e.again || e instanceof TypeError)) throw e;
+      if (!rpcDown[chain] || Date.now() - rpcDown[chain] >= 60_000) {
+        rpcDown[chain] = Date.now();
+        const w = await walletRead(chain, method, params);
+        if (w) return w.result;
+      }
       await sleep(Math.min(600 * 2 ** i, 20_000));
     }
   }
@@ -457,12 +471,12 @@ export function safe(main: HTMLElement) {
   const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
   const chainOpts = (at: number) => IDS.map((id) => [id, CHAINS[id]] as const).map(([id, c]) => `<option value="${id}"${+id === at ? " selected" : ""}>${esc(c.name)}${c.test ? " (test)" : ""}</option>`).join("");
   /** Run one thing at a time; buttons say so while it runs. */
-  async function job(fn: () => Promise<unknown>) {
+  async function job(fn: () => Promise<unknown>, reads = true) {     // reads false: fn signs nothing (Connect wallet)
     if (busy) return;
     busy = true; paintAll();
     try {
       // the saved copy is up: read the chain first, so nothing signs off an old nonce
-      if (stale && safeAddr) { say("Reading the Safe from the chain."); await load(true); if (stale) throw new Error(`Can't read the Safe from ${CHAINS[chain].name} right now. Try again in a minute.`); say(""); }
+      if (reads && stale && safeAddr) { say("Reading the Safe from the chain."); await load(true); if (stale) throw new Error(`Can't read the Safe from ${CHAINS[chain].name} right now. Try again in a minute.`); say(""); }
       await fn();
     } catch (e) { fail(e); } finally { busy = false; paintAll(); }
   }
@@ -774,7 +788,8 @@ export function safe(main: HTMLElement) {
       (await rainbow()).watch(onWallet); hear(wcp);
       try { localStorage.removeItem(OFF); } catch {}
       if (!safeAddr) findSafes();
-    }));
+      else if (stale) load(true);      // the chain couldn't be read (/api/rpc down): the wallet's RPC can now
+    }, false));
     $("w-off")?.addEventListener("click", async () => {
       account = ""; showWallet = false;
       try { localStorage.setItem(OFF, "1"); localStorage.removeItem(WCP); } catch {}
@@ -800,6 +815,7 @@ export function safe(main: HTMLElement) {
     if (!p) { if (wcp) { wcp = null; try { localStorage.removeItem(WCP); } catch {} } return onAccounts([]); }
     wcp = p; hear(p);
     onAccounts(await p.request({ method: "eth_accounts" }));
+    if (linkWait && linkWait.c === chain && eqA(linkWait.a, safeAddr)) { const w = linkWait; linkWait = null; takeLink(w.c, w.a, w.code); }
   };
   const onAccounts = (a: string[]) => {
     if (localStorage.getItem(OFF)) return;
@@ -1479,6 +1495,7 @@ export function safe(main: HTMLElement) {
   // once the Safe itself says it's an owner's (checkNSignatures, one at a time, eth_call).
   const txLink = (t: any) => location.origin + route(chain, safeAddr) + TX_LINK + btoa(JSON.stringify({ t: txOf(t),
     s: (t.confirmations || []).filter((x: any) => x.signature).map((x: any) => [x.owner, x.signature]) })).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  let linkWait: { c: number; a: string; code: string } | null = null;
   async function takeLink(c: number, a: string, code: string) {
     let t: E.SafeTx, sigs: { owner: string; signature: string }[];
     try {
@@ -1488,10 +1505,16 @@ export function safe(main: HTMLElement) {
       if (!E.isAddress(t.to)) throw 0;
     } catch { return say("That link is broken: ask for it again.", true); }
     const h = E.safeTxHash(c, a, t), data = E.safeTxData(c, a, t);
-    const ok = await Promise.all(sigs.map((s) => view(c, a, E.call("checkNSignatures(bytes32,bytes,bytes,uint256)",
-      [E.bytes(h), E.dynBytes(data), E.dynBytes(E.packSignatures([s])), E.word(1)])).then(() => true, () => false)));
-    const good = sigs.filter((_, k) => ok[k]);
+    say("Checking the link's signatures.");
+    // true: the Safe took it; false: it reverted (not an owner's); null: no answer (the chain can't be read now)
+    const ok = await Promise.all(sigs.map((s) => within(view(c, a, E.call("checkNSignatures(bytes32,bytes,bytes,uint256)",
+      [E.bytes(h), E.dynBytes(data), E.dynBytes(E.packSignatures([s])), E.word(1)])), 15_000).then(() => true, (e: any) => /revert|GS0\d\d/i.test(msgOf(e)) ? false : null)));
     if (c !== chain || a !== safeAddr) return;
+    if (ok.includes(null)) {     // checked again once a wallet connects (its RPC reads the chain)
+      linkWait = { c, a, code };
+      return say(wcp ? "Can't read the chain to check the link right now. Try it again in a minute." : "Can't read the chain to check the link right now. Connect your wallet: it checks through that.", true);
+    }
+    const good = sigs.filter((_, k) => ok[k]);
     const mine = localQ(c, a), m = mine[h.toLowerCase()] || { ...t, safeTxHash: h, confirmations: [] };
     for (const s of good) if (!m.confirmations.some((x: any) => eqA(x.owner, s.owner))) m.confirmations.push(s);
     mine[h.toLowerCase()] = m;

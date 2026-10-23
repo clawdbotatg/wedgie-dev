@@ -9,7 +9,7 @@
 //   2. Change the threshold to 2: proposed by the wedgie (A on it), run at once (1 of 2 was enough)
 //   3. New transaction, 0.001 ETH, signed with the wedgie: into the queue; Sign with wallet; Execute.
 //      Then a 6 KB contract call: the wedgie gets it in safe_data pieces. Then Reject: a Cancel at the same nonce runs
-//      Then Safe's service AND Instant Wallet down: the wedgie signs, Copy link, this browser's copy wiped (nothing
+//      Then Safe's service, Instant Wallet AND /api/rpc down (reads through the wallet): the wedgie signs, Copy link, this browser's copy wiped (nothing
 //      waiting), the link opened: back in the queue, its signature checked on chain; the wallet signs; Execute
 //   4. back to the list: the Safe is the wedgie's now. Make a new Safe: wallet + wedgie, 2 of 2, one
 //      transaction, then its page; the list has both
@@ -114,8 +114,9 @@ await ctx.addInitScript((me) => {
 }, me);
 // the page's reads for Base (/api/rpc?chain=8453) = the fork
 // ... and like the real one, it rate-limits a burst: the first reads of the list get 429 (the page must retry, not drop the Safe)
-let busyFor = 4;
+let busyFor = 4, rpcDown = false;      // rpcDown: step 3c2, /api/rpc down too (the wallet's RPC reads instead)
 await ctx.route(/\/api\/rpc\?chain=8453$/, async (r) => {
+  if (rpcDown) return r.fulfill({ status: 502, headers: { "access-control-allow-origin": "*" }, body: "down" });
   if (/"wedgie_prices"/.test(r.request().postData())) return r.fulfill({ contentType: "application/json", body: JSON.stringify({ jsonrpc: "2.0", id: 1, result: { eth: 2000, tokens: {} } }) });
   if (busyFor > 0 && /eth_getCode|eth_call/.test(r.request().postData())) { busyFor--; return r.fulfill({ status: 429, headers: { "access-control-allow-origin": "*" }, body: "rate limited" }); }
   r.fulfill({ headers: { "access-control-allow-origin": "*" }, contentType: "application/json", body: await rpcRaw(r.request().postData()) });
@@ -351,15 +352,16 @@ await page.click("[data-exec]");
 await says(/Done: it ran/, "executed with Safe's service down");
 check(BigInt(await rpc("eth_getBalance", [to2, "latest"])) === 2n * 10n ** 15n, "on chain: 0.002 ETH sent with Safe's service down (Instant Wallet's queue)");
 
-// 3c2: both down: the queue lives only in the link (Copy link), opened in a browser that has nothing waiting
-iwDown = true;
+// 3c2: all down but the chain: the queue lives only in the link (Copy link), opened in a browser that has nothing
+// waiting; the page reads the chain through the wallet
+iwDown = true; rpcDown = true;
 await ctx.grantPermissions(["clipboard-read", "clipboard-write"], { origin: base });
 const toLink = E.checksum(E.hex(crypto.randomBytes(20)));
 await page.click("#a-send");
 await page.fill("#n-to", toLink);
 await page.fill("#n-amt", "0.003");
 await page.click("#n-wedgie");
-await says(/Saved in this browser only/, "queued with both down: this browser only");
+await says(/In the queue with the wedgie's signature|Saved in this browser only/, "queued with all down");
 await page.click("[data-link]");
 await says(/Link copied/, "Copy link");
 const link = await page.evaluate(() => navigator.clipboard.readText());
@@ -370,15 +372,16 @@ await connectWallet();
 await page.waitForTimeout(3000);
 check(!/0\.003 ETH/.test(await page.textContent("#s-queue").catch(() => "")), "this browser's copy wiped, both down: nothing waiting");
 await page.goto(link);
-await says(/Added to Waiting\.$/, "the link opened: added, its signature checked on chain");
+await says(/Connect your wallet: it checks through that/, "the link, /api/rpc down and no wallet yet: asks for the wallet");
 await connectWallet();
+await says(/Added to Waiting\.$/, "the wallet connected: the link's signature checked on chain through it, added");
 await wait(() => /wedgie ✓/.test(document.querySelector("#s-queue")?.textContent || "") && document.querySelector("[data-wsign]"), null, 30000, "from the link: wedgie ✓, Sign with wallet");
 await page.click("[data-wsign]");
 await says(/That's enough: press Execute/, "wallet signed from the link");
 await page.click("[data-exec]");
 await says(/Done: it ran/, "executed with no server");
-check(BigInt(await rpc("eth_getBalance", [toLink, "latest"])) === 3n * 10n ** 15n, "on chain: 0.003 ETH sent with Safe's service and Instant Wallet down (the link)");
-safeDown = false; iwDown = false;
+check(BigInt(await rpc("eth_getBalance", [toLink, "latest"])) === 3n * 10n ** 15n, "on chain: 0.003 ETH sent with Safe's service, Instant Wallet and /api/rpc down (the link, reads through the wallet)");
+safeDown = false; iwDown = false; rpcDown = false;
 
 // 3d: Reject: the wedgie proposes 0.003 ETH, then rejects it: an empty one at the same nonce; the wallet signs
 // that, it runs, and the first one is gone for good
