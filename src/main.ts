@@ -86,30 +86,6 @@ btn.addEventListener("click", (e) => {
   if (onConnect) connectNew().catch(() => {});
   else allow().then(() => { location.href = "/connect"; }, () => {});
 });
-// In the iPhone app there's no serial port: the button follows the WEDGIE drive instead (serial/drive.ts), and a
-// tap opens the app's drive panel (pick the drive, see it).
-if (Drive.inApp()) {
-  btn.addEventListener("click", (e) => { e.preventDefault(); e.stopImmediatePropagation(); Drive.panel(); }, true);
-  const look = async () => {
-    const s = await Drive.status().catch(() => "away");
-    btn.classList.toggle("on", s === "here");
-    btn.classList.toggle("ask", s === "unpicked");
-    setPlugged(s === "here");
-    lbl.innerHTML = s === "here" ? "Connected" : s === "unpicked" ? "Find wedgie" : "Connect";
-    btn.setAttribute("aria-label", s === "here" ? "wedgie connected" : "Connect a wedgie");
-  };
-  look(); setInterval(look, 1500);
-} else watchCount((n) => {
-  seen = n;
-  setPlugged(n > 0);
-  const ask = !n && supported();
-  btn.classList.toggle("on", n > 0);
-  btn.classList.toggle("ask", ask);
-  lbl.innerHTML = ask ? `Allow <span class="long">wedgie </span>connection` : n ? "Connected" : "Connect";
-  btn.querySelector(".n")!.textContent = n ? String(n) : "";
-  btn.setAttribute("aria-label", n ? `${n} wedgie${n > 1 ? "s" : ""} connected` : ask ? "Allow wedgie connection" : "Connect a wedgie");
-});
-
 // The wedgie's Safes, beside Connected: one tap to a Safe. Only while a wedgie is plugged in, only what /safe
 // saved in this browser (savedSafes: no chain or API reads here). The last wedgie /safe read, not checked against this one.
 let plugged = false;
@@ -135,6 +111,30 @@ const fit = () => {
 new ResizeObserver(fit).observe(bar);
 new MutationObserver(fit).observe(bar, { childList: true, subtree: true, characterData: true });
 const setPlugged = (on: boolean) => { if (on !== plugged) { plugged = on; paintSafes(); } };
+
+// In the iPhone app there's no serial port: the button follows the WEDGIE drive instead (serial/drive.ts), and a
+// tap opens the app's drive panel (pick the drive, see it).
+if (Drive.inApp()) {
+  btn.addEventListener("click", (e) => { e.preventDefault(); e.stopImmediatePropagation(); Drive.panel(); }, true);
+  const look = async () => {
+    const s = await Drive.status().catch(() => "away");
+    btn.classList.toggle("on", s === "here");
+    btn.classList.toggle("ask", s === "unpicked");
+    setPlugged(s === "here");
+    lbl.innerHTML = s === "here" ? "Connected" : s === "unpicked" ? "Find wedgie" : "Connect";
+    btn.setAttribute("aria-label", s === "here" ? "wedgie connected" : "Connect a wedgie");
+  };
+  look(); setInterval(look, 1500);
+} else watchCount((n) => {
+  seen = n;
+  setPlugged(n > 0);
+  const ask = !n && supported();
+  btn.classList.toggle("on", n > 0);
+  btn.classList.toggle("ask", ask);
+  lbl.innerHTML = ask ? `Allow <span class="long">wedgie </span>connection` : n ? "Connected" : "Connect";
+  btn.querySelector(".n")!.textContent = n ? String(n) : "";
+  btn.setAttribute("aria-label", n ? `${n} wedgie${n > 1 ? "s" : ""} connected` : ask ? "Allow wedgie connection" : "Connect a wedgie");
+});
 
 const top = document.getElementById("top")!;
 // Ready when the page's first screen is really there: on the home page that includes the hero wedgie
