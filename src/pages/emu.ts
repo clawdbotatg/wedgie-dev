@@ -83,8 +83,9 @@ export function emu(main: HTMLElement) {
   };
 
   // One virtual wedgie per browser: its flash is one board. A second /virtual tab says so.
+  // One virtual wedgie per browser (its flash is one board): a second tab says so and runs nothing.
   navigator.locks.request("wedgie-emu-run", { ifAvailable: true }, (lock) => {
-    if (!lock) { $("emu-status").textContent = "It's already running in another tab. Close that one to run it here."; return; }
+    if (!lock) { note = "There's already one open in another tab."; status(); return; }
     return new Promise<void>(() => run());
   });
 
