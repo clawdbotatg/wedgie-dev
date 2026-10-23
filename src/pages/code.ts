@@ -83,6 +83,16 @@ export function code(main: HTMLElement) {
       </div>
     </div>
 
+    <div class="card code-fast">
+      <h3>Two emulators</h3>
+      <p class="fine">The one above is for writing: fast, it reruns on every save. The virtual wedgie is for checking: the real firmware on a virtual RP2040, with a real wedgie's memory and a secure chip.</p>
+      <ul>
+        <li><b>Here (step 2):</b> open a folder or a repo, play it, edit saves. No memory limit, so a memory bug won't show here.</li>
+        <li><b>The virtual wedgie:</b> real RAM, real questions, real installs. wedgie.dev in other tabs sees it plugged in. Put your app on it at <a href="https://wedgie.dev/connect" target="_blank" rel="noopener">Connect</a>, under <b>Apps from a GitHub repo</b>.</li>
+      </ul>
+      <div class="row"><button class="btn btn-green" id="c-pop">Pop out a virtual wedgie</button><a class="btn" href="https://wedgie.dev/virtual.md" target="_blank" rel="noopener">How it works</a></div>
+    </div>
+
     <ol class="code-steps">
       <li class="card"><span class="num">3</span><h3>On your wedgie</h3><p>Your AI can put it on with <code>wedgie.py install .</code> (the skill says how). Or push it to GitHub, open your wedgie's page in <a href="/connect">Connect</a>, and add the repo under <b>Apps from a GitHub repo</b>.</p></li>
       <li class="card"><span class="num">4</span><h3>For everyone</h3><p>The shelf: apps anyone can put on their wedgie at <a href="/connect">/connect</a>. Send us your repo (<a href="https://github.com/clawdbotatg/wedgie-dev/issues" target="_blank" rel="noopener">an issue</a>); we read it, sign it, and it's on. Start from <a href="https://github.com/${STARTER}" target="_blank" rel="noopener">${STARTER}</a> so yours is ready.</p></li>
@@ -92,18 +102,18 @@ export function code(main: HTMLElement) {
       <h3>Fast graphics, the short version</h3>
       <p class="fine">Measured on a real wedgie. A full screen push takes about 25 ms, a whole frame at 40 fps, so:</p>
       <ul>
-        <li><b>Push by DMA.</b> <code>lcd.show_start()</code> sends the frame while the next one's game logic runs; <code>lcd.show_wait()</code> before drawing again.</li>
         <li><b>Push less.</b> <code>lcd.show(y0, y1)</code> sends only those rows (24 rows: 2.4 ms), <code>lcd.show_rect(x, y, w, h)</code> only that box.</li>
-        <li><b>Sprites are framebufs.</b> A 16x16 blit is 0.17 ms; 4-bit through a palette is 0.33 ms and a quarter of the RAM.</li>
+        <li><b>Sprites are 4-bit framebufs</b> drawn through a palette: a 16x16 blit is 0.33 ms. The screen has 16 colors.</li>
         <li><b>Viper for pixel loops.</b> Plain Python is 6.8 us a pixel (0.4 s a screen); <code>@micropython.viper</code> is 26x faster.</li>
         <li><b>Nothing new in the loop.</b> A garbage collection costs 8 ms. Reuse lists, build text only when it changes.</li>
+        <li><b>RAM is ~130 KB.</b> Never grow a string with <code>+=</code> in a loop. Check memory on the virtual wedgie, not here.</li>
       </ul>
       <p class="fine">All of it, with numbers and code: <a href="/code.md">code.md</a>.</p>
     </div>
 
     <div class="card code-fast code-look">
       <h3>Look and feel: the built-in kit</h3>
-      <p class="fine">Every wedgie has <code>ui</code>. Use it for everything that isn't your game's own art, so apps look like a wedgie and nobody rebuilds it:</p>
+      <p class="fine">Every wedgie has <code>ui</code>. Use it for everything that isn't your game's own art, so every app looks and works the same. Never draw your own loading bar, question or "loading..." text:</p>
       <div class="look-row">
         <figure><img src="/img/look/page.png" alt="" width="120" height="120"><figcaption><code>ui.page</code> a title, lines, a hint</figcaption></figure>
         <figure><img src="/img/look/ask.png" alt="" width="120" height="120"><figcaption><code>ui.ask</code> yes or no</figcaption></figure>
@@ -112,7 +122,8 @@ export function code(main: HTMLElement) {
       <ul>
         <li><b>One palette.</b> <code>ui.INK</code>, <code>ui.MUTED</code>, <code>ui.GREEN</code> (yes), <code>ui.RED</code> (no), the waistband <code>ui.band</code>.</li>
         <li><b>Buttons mean the same everywhere.</b> Green (A) is yes / go / again, red (Y) is no / back. The case has no letters on it: never put one on the screen, show <code>{g}</code> / <code>{r}</code> (a green / red square) instead.</li>
-        <li><b>Slow things show the boot bar,</b> never a bar of your own.</li>
+        <li><b>Slow things show the boot bar:</b> <code>ui.progress("Loading level 3", "tiles")</code>, never a bar or spinner of your own.</li>
+        <li><b>Questions are <code>ui.ask</code>,</b> pages are <code>ui.page</code>. Few words, big.</li>
       </ul>
       <p class="fine">The details: <a href="/code.md">code.md</a>, "Look and feel".</p>
     </div>
@@ -130,6 +141,11 @@ export function code(main: HTMLElement) {
   </section>`;
   const $ = <T extends HTMLElement = HTMLElement>(s: string) => main.querySelector(s) as T;
   const note = $("#c-note"), outEl = $("#c-out");
+
+  // The virtual wedgie lives on wedgie.dev (this page is on emu.wedgie.dev): its own small window.
+  $("#c-pop").onclick = () => {
+    if (!open("https://wedgie.dev/virtual", "wedgie-virtual", "popup,width=420,height=640")) location.href = "https://wedgie.dev/virtual";
+  };
 
   $("#c-copy").onclick = async () => {
     const text = PROMPT + ($<HTMLInputElement>("#c-idea").value.trim() || "a snake game");
