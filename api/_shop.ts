@@ -62,6 +62,8 @@ export async function db() {
     await sql`create table if not exists stock (id int primary key, n int not null, set_at timestamptz not null default now())`;   // stockLeft
     await sql`create table if not exists counts (day date not null, k text not null, n int not null, primary key (day, k))`;   // api/count.ts: checkout steps, no one in them
     await sql`create table if not exists safe_cache (k text primary key, status int not null, body text not null, at timestamptz not null default now())`;   // api/safe.ts: Safe's answers, shared
+    await sql`create table if not exists safe_owners (chain int not null, safe text not null, owner text not null, at timestamptz not null default now(), primary key (chain, safe, owner))`;   // api/safes.ts: who owns which Safe, read on chain
+    await sql`create index if not exists safe_owners_owner on safe_owners (owner)`;
     await sql`create table if not exists safe_cmp (n bigserial primary key, what text not null, chain int not null, safe text not null, diffs text not null, at timestamptz not null default now())`;   // api/safe.ts PUT: where Safe's API and the chain disagreed
     await sql`alter table orders add column if not exists moving_at timestamptz`;      // shipped: USPS has it moving (omen, admin.ts step); never a place
     await sql`alter table orders add column if not exists delivered_at timestamptz`;   // shipped: USPS delivered it

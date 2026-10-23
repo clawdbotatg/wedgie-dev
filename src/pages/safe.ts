@@ -155,6 +155,30 @@ async function either<T>(what: string, c: number, a: string, svc: () => Promise<
   throw s.reason;
 }
 
+// Our own list of who owns which Safe (api/safes.ts: the owners read on chain there), so a person's Safes are found
+// when Safe's API is down. Each Safe the page reads is sent once a day; the list asks it for the owners' Safes.
+const TOLD = "wedgie.safe.told";
+let toTell: { chain: number; safe: string }[] = [], tellTimer = 0;
+function tellOurs(c: number, a: string) {
+  if (CHAINS[c].test || /^(localhost|127\.0\.0\.1)$/.test(location.hostname)) return;
+  const k = `${c}:${a.toLowerCase()}`;
+  let told: Record<string, number> = {};
+  try { told = JSON.parse(localStorage.getItem(TOLD) || "{}"); } catch {}
+  if (Date.now() - (told[k] || 0) < 86_400_000 || toTell.some((x) => x.chain === c && x.safe.toLowerCase() === a.toLowerCase())) return;
+  toTell.push({ chain: c, safe: a });
+  clearTimeout(tellTimer);
+  tellTimer = window.setTimeout(() => {
+    const go = toTell.splice(0, 20);
+    fetch("/api/safes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ safes: go }) }).then((r) => {
+      if (!r.ok) return;
+      try { const t = JSON.parse(localStorage.getItem(TOLD) || "{}"); for (const x of go) t[`${x.chain}:${x.safe.toLowerCase()}`] = Date.now(); localStorage.setItem(TOLD, JSON.stringify(t)); } catch {}
+    }).catch(() => {});
+  }, 1500);
+}
+/** The Safes our list has for these owners: chain:address → which owner. Nothing if it isn't answering. */
+const ourSafes = (owners: string[]): Promise<{ chain: number; safe: string; owner: string }[]> =>
+  owners.length ? within(fetch(`/api/safes?owners=${owners.join(",")}`).then((r) => r.json())).then((j) => j.safes || []).catch(() => []) : Promise.resolve([]);
+
 const view = (chain: number, to: string, data: string) => rpc(chain, "eth_call", [{ to, data }, "latest"]);
 const hasCode = async (chain: number, a: string) => (await rpc(chain, "eth_getCode", [a, "latest"])).length > 2;
 
@@ -811,10 +835,12 @@ export function safe(main: HTMLElement) {
         }
       }
     };
+    const ours = ourSafes([...signers, ...(account ? [account] : [])]);
     await Promise.all(IDS.map(async (c) => {
       await Promise.all(signers.map(async (a) => { for (const s of await of(c, a)) add(c, s, "wedgie"); asked++; tick(); }));
       if (account) { for (const s of await of(c, account)) add(c, s, "wallet"); asked++; tick(); }
     }));
+    for (const o of await ours) if (CHAINS[o.chain] && E.isAddress(o.safe)) add(o.chain, o.safe, signers.some((a) => eqA(a, o.owner)) ? "wedgie" : "wallet");
     for (const k of signer ? remembered() : []) { const [ck, a] = k.split(":"); if (KEYS[ck]) add(KEYS[ck], a, "wedgie"); }
     for (const k of onWedgie || []) { const [c, a] = k.split(":"); if (CHAINS[+c] && E.isAddress(a)) add(+c, a, "wedgie"); }
     if (me !== signer) { listing = false; findAgain = false; return findSafes(); }   // another wedgie mid-check
@@ -827,6 +853,7 @@ export function safe(main: HTMLElement) {
       r.wedgie = r.info.owners.some(mine);
       if (r.wedgie) remember(r.chain, r.addr);   // seen once, listed in this browser even when Safe's API isn't answering
       r.wallet = !!account && r.info.owners.some((o) => eqA(o, account));
+      if (r.wedgie || r.wallet) tellOurs(r.chain, r.addr);
     }
     if (me !== signer) { listing = false; findAgain = false; return findSafes(); }
     // a Safe the chain couldn't be read for stays listed (as its sources said): never hidden by a busy RPC
@@ -1118,6 +1145,7 @@ export function safe(main: HTMLElement) {
       opening = false;
       if (c !== chain || a !== safeAddr) return;
       info = i; stale = false;
+      tellOurs(c, a);
       if (signer) { if (wedgieOwns()) { remember(c, a); tellWedgie(c, a); } else forget(c, a); }
       if (!quiet) say("");
       paintAll();             // the Safe from the chain now; its queue, tokens and history as the sources answer
