@@ -38,11 +38,12 @@ const onSafe = path === "/safe" || path.startsWith("/safe/");   // the list, or 
 const onSecret = path === "/secret";
 const onOrder = path === "/order" || path.startsWith("/order/") || path === "/orders" || path === "/signin";   // buy, one order (/order/<id>), yours, sign in
 const onLegal = path === "/terms" || path === "/privacy";
-const onEmu = path === "/emu";
+const onEmu = path === "/virtual" || path === "/emu";   // /emu: its old name
+if (path === "/emu") history.replaceState(null, "", "/virtual" + location.search);
 // Each page its own tab title (the first path part; /order/<id> is an order, /safe/<x> a Safe).
 const TITLES: Record<string, string> = { connect: "Connect", assemble: "Assemble", test: "Test", update: "Update", prepare: "Prepare", reset: "Reset", build: "Build",
   code: "Code", debug: "Debug", safe: "Safe", secret: "Secret chat", order: "Order", orders: "Your orders", signin: "Sign in",
-  terms: "Terms", privacy: "Privacy", emu: "Virtual wedgie" };
+  terms: "Terms", privacy: "Privacy", virtual: "Virtual wedgie", emu: "Virtual wedgie" };
 const title = TITLES[path.split("/")[1] || ""];
 if (title) document.title = `${title} · wedgie.dev`;
 const signedIn = !!session();

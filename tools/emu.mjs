@@ -1,4 +1,4 @@
-// A virtual wedgie for any session, no hardware and no one's browser: headless Chromium with /emu (the
+// A virtual wedgie for any session, no hardware and no one's browser: headless Chromium with /virtual (the
 // real firmware on a virtual RP2040 + a software Trust M, src/chip/) in one tab, and wedgie.dev in others,
 // which see it plugged in. Drive it over a small HTTP API on localhost. docs/EMU.md says how to test with it.
 //   node tools/emu.mjs [--local] [--port 4190]      --local: this tree (builds it, serves it with vite preview)
@@ -9,7 +9,7 @@
 //   curl -s localhost:4190/press -d '{"k":"A"}'                 A B X Y up down left right press; "ms" optional
 //   curl -s localhost:4190/hold -d '{"k":"up","down":true}'     hold / let go (diagonals: hold two)
 //   curl -s localhost:4190/open -d '{"url":"/connect"}'         a wedgie.dev tab -> {tab}
-//   curl -s localhost:4190/eval -d '{"tab":1,"js":"document.title"}'      run JS in a tab (0 = /emu)
+//   curl -s localhost:4190/eval -d '{"tab":1,"js":"document.title"}'      run JS in a tab (0 = /virtual)
 //   curl -s localhost:4190/click -d '{"tab":1,"js":"document.querySelector(\"...\")"}'   a real click
 //   curl -s localhost:4190/shot?tab=1 > page.png                a tab's screenshot
 //   curl -s localhost:4190/text?tab=1                          a tab's visible text
@@ -47,7 +47,7 @@ const ctx = await chromium.launchPersistentContext(profile, { executablePath: ex
 const tabs = [ctx.pages()[0] || (await ctx.newPage())];
 const emu = tabs[0];
 emu.on("pageerror", (e) => console.log("emu error:", e.message));
-await emu.goto(base + "/emu?no3d");
+await emu.goto(base + "/virtual?no3d");
 await emu.waitForFunction(() => /% of real/.test(document.getElementById("emu-status")?.textContent || ""), null, { timeout: 120000 });
 const status = () => emu.evaluate(() => document.getElementById("emu-status").textContent);
 

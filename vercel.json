@@ -198,8 +198,15 @@
       "destination": "/index.html"
     },
     {
-      "source": "/emu",
+      "source": "/virtual",
       "destination": "/index.html"
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/emu",
+      "destination": "/virtual",
+      "permanent": true
     }
   ],
   "trailingSlash": false

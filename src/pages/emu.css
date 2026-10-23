@@ -1,4 +1,4 @@
-/* /emu: the whole page dark grey, nothing but the wedgie: "Virtual wedgie" top left, its ID bottom right,
+/* /virtual: the whole page dark grey, nothing but the wedgie: "Virtual wedgie" top left, its ID bottom right,
    Screenshot / Replug / Wipe under it. The site's header and footer are hidden here (body.emu-page). */
 body.emu-page { background: #2b2c2e; }
 body.emu-page .top, body.emu-page .foot { display: none; }

@@ -36,7 +36,7 @@ export type Wedgie = {
   error?: string;
   readyAt?: number;      // when identify last finished (the update bench: "it came back after its restart")
   log: string;
-  virtual?: boolean;     // a virtual wedgie (wedgie.dev/emu), not hardware
+  virtual?: boolean;     // a virtual wedgie (wedgie.dev/virtual), not hardware
 };
 
 type Listener = () => void;
@@ -304,7 +304,7 @@ export async function connectNew() {
 
 /** Count plugged-in wedgies without talking to them (the header's Connect button, on any page).
  *  Only ports this site was granted once are visible; opening none of them interrupts nothing. */
-// Virtual wedgies (wedgie.dev/emu, chip/port.ts) count too, armed or not: looking at them asks nothing.
+// Virtual wedgies (wedgie.dev/virtual, chip/port.ts) count too, armed or not: looking at them asks nothing.
 export function watchCount(cb: (n: number) => void) {
   let real = 0;
   const virt = () => V.virtualPorts().length;

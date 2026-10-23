@@ -1,6 +1,6 @@
 # The virtual wedgie
 
-wedgie.dev/emu runs a wedgie in the browser: the real MicroPython build and firmware on a virtual RP2040
+wedgie.dev/virtual runs a wedgie in the browser: the real MicroPython build and firmware on a virtual RP2040
 (rp2040js), a software Trust M, the screen and all 9 buttons. wedgie.dev in other tabs of the same
 browser sees it plugged in, tagged **virtual**. Code: `src/chip/` (sim.ts the chip, trustm.ts the secure
 chip, worker.ts runs both, port.ts its USB for other tabs), page `src/pages/emu.ts`.
@@ -31,7 +31,7 @@ curl -s localhost:4190/wipe -d '{}'                  # flash back to new; ID and
 ```
 
 The same calls exist in the page: `window.wedgie.press(k, ms)`, `.hold(k, down)`, `.screen()`,
-`.history(n)`. In Austin's own browser (when he hands you his browser bridge), `eval` those on his /emu tab.
+`.history(n)`. In Austin's own browser (when he hands you his browser bridge), `eval` those on his /virtual tab.
 
 ## Install an app
 
@@ -49,6 +49,6 @@ The same calls exist in the page: `window.wedgie.press(k, ms)`, `.hold(k, down)`
   Wipe erases the flash only (apps, saves); its ID and chip keys stay, like reflashing a real one.
   Clearing the browser's site data loses them, and any Safe they own.
 - No RSA or AES on the virtual Trust M.
-- A new one starts from `public/emu/wedgie-fs.img.gz` (firmware + Welcome), remade by `tools/sign.mjs`
+- A new one starts from `public/virtual/wedgie-fs.img.gz` (firmware + Welcome), remade by `tools/sign.mjs`
   (`node tools/emuimage.mjs`). Older is fine: wedgie.dev updates it like any wedgie.
 - `npm run dev` serves the old emu.html test page at /emu; use `--local` (a build) instead.

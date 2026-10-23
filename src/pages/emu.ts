@@ -1,4 +1,4 @@
-// /emu: a virtual wedgie. A real wedgie's chip (RP2040), its MicroPython build and its firmware, running
+// /virtual: a virtual wedgie. A real wedgie's chip (RP2040), its MicroPython build and its firmware, running
 // in this tab (chip/worker.ts), in the 3D case. It's plugged into wedgie.dev: the site's other tabs list
 // it with the real ones and talk to it over its USB serial, the same bytes a real one gets (chip/port.ts).
 // First visit: a Pico with only MicroPython, set up by the same install the bench does (installCore +
@@ -82,7 +82,7 @@ export function emu(main: HTMLElement) {
     $("emu-bar-fill").parentElement!.hidden = !st.setup;
   };
 
-  // One virtual wedgie per browser: its flash is one board. A second /emu tab says so.
+  // One virtual wedgie per browser: its flash is one board. A second /virtual tab says so.
   navigator.locks.request("wedgie-emu-run", { ifAvailable: true }, (lock) => {
     if (!lock) { $("emu-status").textContent = "It's already running in another tab. Close that one to run it here."; return; }
     return new Promise<void>(() => run());

@@ -91,7 +91,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     <div class="wd-grid">
       <div class="wd-dev"><div class="wd-3d"></div><p class="fine wd-hint" id="d-hint"></p></div>
       <div class="wd-main">
-        <div class="wd-head"><span class="light" id="d-light"></span><span class="idtag big">${esc(id)}</span><a class="vtag" id="d-virtual" href="/emu" target="_blank" hidden title="Not hardware: a virtual wedgie running in a wedgie.dev/emu tab">virtual</a></div>
+        <div class="wd-head"><span class="light" id="d-light"></span><span class="idtag big">${esc(id)}</span><a class="vtag" id="d-virtual" href="/virtual" target="_blank" hidden title="Not hardware: a virtual wedgie running in a wedgie.dev/virtual tab">virtual</a></div>
         <div class="wd-missing card" id="d-missing" hidden></div>
         <div id="d-body">
           <div class="card wd-sec">

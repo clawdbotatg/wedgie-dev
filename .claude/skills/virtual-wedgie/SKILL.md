@@ -5,7 +5,7 @@ description: Run and drive a virtual wedgie (real firmware on a virtual RP2040 w
 
 # Virtual wedgie
 
-wedgie.dev/emu runs a whole wedgie in a browser tab: the real MicroPython build and firmware on a virtual
+wedgie.dev/virtual runs a whole wedgie in a browser tab: the real MicroPython build and firmware on a virtual
 RP2040, a software Trust M, the screen and 9 buttons. wedgie.dev tabs in the same browser see it plugged
 in, tagged **virtual**. Its ID is `EEE` + 3 digits. Its flash, ID and chip keys live in that browser's
 storage: Wipe erases only the flash. Code and details: `docs/EMU.md`, `src/chip/`.
@@ -29,14 +29,14 @@ Austin hands you a clawd-browser bridge URL (`http://<host>:8765/k/<token>`). Ke
 request and never write it to a file in git. `curl -s <bridge>/skill` explains the API: POST `/cmd`
 with `{"cmd","args","target"?}`.
 
-Two browsers are connected: **Chrome** (wedgie.dev: /emu and /safe) and **Brave** (the dapp). Find them
+Two browsers are connected: **Chrome** (wedgie.dev: /virtual and /safe) and **Brave** (the dapp). Find them
 with `curl -s <bridge>/status` (the `ua` field: they differ by Chrome version) and pin each `open` with
 `"target": "<id or UA substring>"`. Connection ids change on reconnect; tabs come back after blips.
 
 ### Bring the rig up (windows closed is fine)
 
 ```
-open {url: "https://wedgie.dev/emu"}                                                   target: Chrome
+open {url: "https://wedgie.dev/virtual"}                                                   target: Chrome
 open {url: "https://wedgie.dev/safe/base:0x04247285F468d1fe2aeCE43DD111d69D7fe945cc"}  target: Chrome
 open {url: "https://app.uniswap.org/swap?chain=base&inputCurrency=0x4200000000000000000000000000000000000006&outputCurrency=0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"}   target: Brave
 ```
@@ -61,7 +61,7 @@ dapp for the Safe's balance before pairing again.
    modal's Swap button to be fully opaque, click it. The request lands on /safe under Waiting.
 2. /safe: `eval` `document.querySelector("[data-sign]").click()` (a trusted `click` on "Sign with
    wedgie" has missed before). Wait for "Look at the wedgie".
-3. /emu: save `window.wedgie.screen()`, `wait_for` it to change (the tx takes a few seconds over the
+3. /virtual: save `window.wedgie.screen()`, `wait_for` it to change (the tx takes a few seconds over the
    virtual USB), then read every page: `window.wedgie.screen()` -> png -> Read it. `press("A")` is
    next/sign, `press("Y")` is no. Report what each page says and what's unclear.
 4. /safe then says "Signed. That's enough: press Execute." **Austin presses Execute** (his wallet pays

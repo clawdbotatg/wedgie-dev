@@ -1,5 +1,5 @@
 // A virtual wedgie's USB serial port, for any wedgie.dev tab: the same shape as a Web Serial port, so
-// wedgies.ts, Repl, install and /safe talk to it unchanged. The wedgie itself runs in the /emu tab's
+// wedgies.ts, Repl, install and /safe talk to it unchanged. The wedgie itself runs in the /virtual tab's
 // worker (worker.ts); this end and that one talk over the BroadcastChannel "wedgie-emu":
 //   tab -> emu: {t:"who"} {t:"open", id, from} {t:"close", id, from} {t:"tx", id, from, data}
 //   emu -> tab: {t:"here", id, usb} {t:"usb", id, up} {t:"opened"|"refused", id, to} {t:"rx", id, to, data} {t:"bye", id}
@@ -71,7 +71,7 @@ export class VirtualPort extends EventTarget {
     this.unlock?.(); this.unlock = null;
   }
 
-  /** Unplugged (its USB dropped, or the /emu tab closed). */
+  /** Unplugged (its USB dropped, or the /virtual tab closed). */
   lost() {
     this.connected = false;
     if (this.me) this.end(true);
@@ -105,7 +105,7 @@ export function start() {
     else if (m.t === "rx") sessions.get(m.to)?.feed(m.data);
   });
   ch.postMessage({ t: "who" });
-  // The /emu tab holds this lock while it runs: gone without a word (crashed, killed) = unplugged.
+  // The /virtual tab holds this lock while it runs: gone without a word (crashed, killed) = unplugged.
   setInterval(async () => {
     if (!ports.size || !navigator.locks?.query) return;
     const q = await navigator.locks.query();

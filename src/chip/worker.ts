@@ -1,7 +1,7 @@
 // The virtual wedgie's chip, in a Worker so the page never waits on it (sim.ts). It is also the
 // wedgie's USB end: wedgie.dev tabs reach its serial port over a BroadcastChannel (port.ts), one tab at
 // a time, like a real port. Its flash and board ID are kept in this browser (IndexedDB), so it is the
-// same wedgie, with what was installed on it, every time /emu opens.
+// same wedgie, with what was installed on it, every time /virtual opens.
 //
 // Page -> worker: {t:"boot"} {t:"key", k, down} {t:"power"} {t:"wipe"}
 // Worker -> page: {t:"frame", buf} {t:"stat", speed, usb, owner, id} {t:"error", error}
@@ -40,7 +40,7 @@ setInterval(() => {
 // fresh: a wiped flash, as a reflash leaves a real one. The board's ID (its flash chip's) and its secure
 // chip, keys and all, stay: they're hardware.
 async function load(fresh = false) {
-  if (!rom) rom = new Uint8Array(await (await fetch("/emu/bootrom-b1.bin")).arrayBuffer());
+  if (!rom) rom = new Uint8Array(await (await fetch("/virtual/bootrom-b1.bin")).arrayBuffer());
   let uid: Uint8Array | undefined = await kv("uid").catch(() => undefined);
   // Its ID (the last 6 hex digits) is EEE + 3 digits: E for emulator, so it reads as virtual. Made once,
   // kept for good (a wipe keeps it, like a real board's). One from before this gets its EEE now, once.
@@ -53,7 +53,7 @@ async function load(fresh = false) {
   id = [...uid].map((b) => b.toString(16).padStart(2, "0")).join("");
   const saved: Uint8Array | undefined = fresh ? undefined : await kv("flash").catch(() => undefined);
   // New: a wedgie as the bench leaves one (firmware + Welcome, tools/emuimage.mjs); without that image, a
-  // Pico with only MicroPython on it, which /emu then sets up over USB (slow).
+  // Pico with only MicroPython on it, which /virtual then sets up over USB (slow).
   flash = saved?.length === FLASH_BYTES ? saved : await newFlash();
   if (!saved) await kv("flash", flash.slice()).catch(() => {});
   else bare = !!(await kv("bare").catch(() => false));
@@ -73,7 +73,7 @@ const isEee = (u: Uint8Array) => u[5] === 0xee && u[6] >> 4 === 0xe && (u[6] & 1
 
 async function newFlash() {
   const img = flashFromUf2(new Uint8Array(await (await fetch("/mp/RPI_PICO.uf2")).arrayBuffer()));
-  const r = await fetch("/emu/wedgie-fs.img.gz").catch(() => null);
+  const r = await fetch("/virtual/wedgie-fs.img.gz").catch(() => null);
   bare = !r?.ok;
   await kv("bare", bare).catch(() => {});
   if (r?.ok) {
