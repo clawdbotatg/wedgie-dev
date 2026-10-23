@@ -177,7 +177,8 @@ const KEYS = Object.fromEntries(IDS.map((id) => [CHAINS[id].key, id]));
 const route = (chain: number, a: string) => `/safe/${CHAINS[chain].key}:${a}`;
 
 /** The wedgie's Safes as /safe last listed them, for the top bar (main.ts). Only what this browser saved: never a
- * chain or Safe's API (Austin, 10-22). Dollars as the card showed them; null: no price, or a test chain. */
+ * chain or Safe's API (Austin, 10-22). Dollars as the card showed them; null: no price, or a test chain.
+ * One entry per Safe address, its chains added together. */
 export function savedSafes(): { addr: string; chain: number; href: string; usd: number | null }[] {
   try {
     const l = JSON.parse(localStorage.getItem("wedgie.safe.last") || "null"), full = JSON.parse(localStorage.getItem("wedgie.safe.usd") || "{}");
@@ -186,7 +187,13 @@ export function savedSafes(): { addr: string; chain: number; href: string; usd: 
       const usd = CHAINS[r.chain].test ? null : f && f.b === String(r.info.balance) && f.u === String(r.info.usdc) ? f.usd
         : px ? Number(r.info.balance) / 1e18 * px + Number(r.info.usdc || 0) / 1e6 : null;
       return { addr: r.addr, chain: r.chain, href: route(r.chain, r.addr), usd };
-    });
+    }).sort((a: any, b: any) => (b.usd || 0) - (a.usd || 0)).reduce((out: { addr: string; chain: number; href: string; usd: number | null }[], s: any) => {
+      // one Safe on many chains: one pill, its dollars added up, opening the chain with the most
+      const o = out.find((x) => x.addr.toLowerCase() === s.addr.toLowerCase());
+      if (!o) out.push(s);
+      else if (s.usd !== null) o.usd = (o.usd || 0) + s.usd;
+      return out;
+    }, []);
   } catch { return []; }
 }
 
