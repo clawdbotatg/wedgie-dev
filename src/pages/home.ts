@@ -153,9 +153,33 @@ export function home(main: HTMLElement): Promise<unknown> {
 
   <section id="teaser" class="sec teaser">
     <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
-    <div class="teaser-box">
-      <video playsinline preload="none" poster="/video/teaser.jpg" src="/video/teaser.mp4"></video>
-      <button class="teaser-play" aria-label="Play"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg></button>
+    <div class="teaser-one" id="video-unbox">
+      <div class="sec-head"><span class="kicker">Unboxing</span><h2>You&rsquo;ve got a wedgie.</h2><p>Out of the box, plugged in, saying hello.</p></div>
+      <div class="teaser-box">
+        <video playsinline preload="none" poster="/video/unbox.jpg" src="/video/unbox.mp4"></video>
+        <button class="teaser-play" aria-label="Play"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg></button>
+      </div>
+    </div>
+    <div class="teaser-one" id="video-safe">
+      <div class="sec-head"><span class="kicker">Wallet</span><h2>Deploy, send, and swap.</h2><p>A wedgie deploys a Safe, sends from it, and swaps on a dapp.</p></div>
+      <div class="teaser-box">
+        <video playsinline preload="none" poster="/video/safe.jpg" src="/video/safe.mp4"></video>
+        <button class="teaser-play" aria-label="Play"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg></button>
+      </div>
+    </div>
+    <div class="teaser-one" id="video-virtual">
+      <div class="sec-head"><span class="kicker">No hardware</span><h2>The virtual wedgie.</h2><p>The real firmware, running in your browser.</p></div>
+      <div class="teaser-box">
+        <video playsinline preload="none" poster="/video/virtual.jpg" src="/video/virtual.mp4"></video>
+        <button class="teaser-play" aria-label="Play"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg></button>
+      </div>
+    </div>
+    <div class="teaser-one" id="video-teaser">
+      <div class="sec-head"><span class="kicker">Make one</span><h2>Printing a wedgie.</h2><p>From the printer to your pocket.</p></div>
+      <div class="teaser-box">
+        <video playsinline preload="none" poster="/video/teaser.jpg" src="/video/teaser.mp4"></video>
+        <button class="teaser-play" aria-label="Play"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg></button>
+      </div>
     </div>
   </section>
 `;
@@ -211,13 +235,17 @@ export function home(main: HTMLElement): Promise<unknown> {
   }));
   // The footer's divider moves up, above the video (it's here, in the teaser).
   document.querySelector(".foot > .band")?.remove();
-  // The teaser: a big green play button over it; one tap plays it with sound (autoplay would have to be muted).
-  const teaser = main.querySelector<HTMLVideoElement>(".teaser video")!;
-  main.querySelector<HTMLButtonElement>(".teaser-play")!.onclick = (e) => {
-    (e.currentTarget as HTMLElement).remove();
-    teaser.controls = true;
-    teaser.play();
-  };
+  // The videos: a big green play button over each; one tap plays it with sound (autoplay would have to be muted).
+  // Starting one pauses any other that's playing.
+  const videos = [...main.querySelectorAll<HTMLVideoElement>(".teaser video")];
+  videos.forEach((v) => {
+    v.onplay = () => videos.forEach((o) => { if (o !== v) o.pause(); });
+    v.parentElement!.querySelector<HTMLButtonElement>(".teaser-play")!.onclick = (e) => {
+      (e.currentTarget as HTMLElement).remove();
+      v.controls = true;
+      v.play();
+    };
+  });
   // A virtual wedgie (/virtual) in its own small window: it shows up under Connect here, like a plugged-in one.
   main.querySelector<HTMLButtonElement>("#pop-emu")!.onclick = () => {
     if (!open("/virtual", "wedgie-emu", "popup,width=420,height=640")) location.href = "/virtual";
