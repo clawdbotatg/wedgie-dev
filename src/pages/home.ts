@@ -1,4 +1,4 @@
-// The front page: give yourself a wedgie. Get one, or build one; agents at the bottom.
+// The front page: give yourself a wedgie. Get one, or build one; a virtual one at the bottom.
 import { place3D, pageShown } from "../ui/place3d";
 import { ITEMS, type Item } from "../shop/catalog";
 import { WHY, STAR, wire } from "../shop/why";
@@ -137,15 +137,13 @@ export function home(main: HTMLElement): Promise<unknown> {
       </div>
     </div>
     <div class="sec-head lib-after">
-      <h2>Built by anyone.</h2>
-      <p>Open source. Make one, or have your agent make one. <a href="/code">How</a></p>
+      <h2>Developers, developers, developers.</h2>
+      <p>Anyone can write software for a wedgie. Write it yourself, or have your agent write it. <a href="/code">How</a></p>
     </div>
   </section>
 
   <section id="agents" class="sec agents">
-    <a class="btn btn-lg" href="/skill.md" target="_blank"><span class="bot" aria-hidden="true">🤖</span> skill.md</a>
-    <a class="btn btn-lg" href="/code">Create software</a>
-    <a class="btn btn-lg" href="/safe">Safe</a>
+    <button class="btn btn-lg btn-green" id="pop-emu">Pop out a virtual wedgie</button>
   </section>
 
   <section id="teaser" class="sec teaser">
@@ -208,6 +206,10 @@ export function home(main: HTMLElement): Promise<unknown> {
     (e.currentTarget as HTMLElement).remove();
     teaser.controls = true;
     teaser.play();
+  };
+  // A virtual wedgie (/virtual) in its own small window: it shows up under Connect here, like a plugged-in one.
+  main.querySelector<HTMLButtonElement>("#pop-emu")!.onclick = () => {
+    if (!open("/virtual", "wedgie-emu", "popup,width=420,height=640")) location.href = "/virtual";
   };
   assembly(main.querySelector<HTMLElement>("#assembly")!);
   safeTx(main.querySelector<HTMLElement>(".stx")!);

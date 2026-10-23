@@ -52,6 +52,7 @@ const app = document.getElementById("app")!;
 app.innerHTML = `
 <header class="top">
   <a class="brand" href="/"><img src="/img/sticker.webp" alt="" width="46" height="35"><span class="tag">wedgie.dev</span></a>
+  <a class="skill-link" href="/skill.md" target="_blank">skill.md</a>
   ${signedIn ? `<a class="orders-btn${path === "/orders" ? " here" : ""}" href="/orders" aria-label="Your orders"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z M3 7.5 12 12l9-4.5 M12 12v9" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span class="lbl">Orders</span></a>`
     : `<a class="orders-btn signin-btn" href="/signin">Sign in</a>`}
   <a class="connect-btn${onConnect ? " here" : ""}" id="connect-btn" href="/connect"><span class="led"></span><span class="lbl">Connect</span><b class="n"></b></a>
