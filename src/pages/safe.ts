@@ -125,6 +125,7 @@ async function rpc(chain: number, method: string, params: unknown[]): Promise<an
     }
   }
 }
+const TX_LINK = "#tx=";     // a link to a waiting transaction (txLink)
 const rpcOf = (chain: number) => (method: string, params: unknown[]) => rpc(chain, method, params);
 
 // History, how a Safe was made, and "did it run" come from Safe's API or the chain (src/safe/history.ts). COMPARE: both
@@ -611,6 +612,7 @@ export function safe(main: HTMLElement) {
       paintAll();
       checkDeployed();
       load();                 // not job(): a create that lands here is still a job
+      linkIn();
     } else {
       sub = "home";
       if (location.pathname !== "/safe") history.replaceState(null, "", "/safe");
@@ -621,6 +623,14 @@ export function safe(main: HTMLElement) {
     window.scrollTo(0, 0);
   }
   window.addEventListener("popstate", show);
+  /** A link to a waiting transaction, opened on its Safe's page: into the queue (takeLink). */
+  function linkIn() {
+    if (!safeAddr || !location.hash.startsWith(TX_LINK)) return;
+    const code = location.hash.slice(TX_LINK.length);
+    history.replaceState(null, "", location.pathname);
+    takeLink(chain, safeAddr, code);
+  }
+  window.addEventListener("hashchange", linkIn);
   watch(main, readUrl(1));   // ENS names and avatars on every address, from Ethereum
   main.addEventListener("click", (e) => {        // in-page links: no reload, the wedgie stays read
     const a = (e.target as HTMLElement).closest?.("a[data-nav]") as HTMLAnchorElement | null;
@@ -1464,6 +1474,34 @@ export function safe(main: HTMLElement) {
   }
 
   // ---- the queue: each one in words, who signed, and its one next step ----
+  // ---- a link to a waiting transaction: it and its signatures ride in the link, after the # (no server sees it).
+  // Opened by another owner, it lands in their queue here, with no server needed at all. Each signature counts only
+  // once the Safe itself says it's an owner's (checkNSignatures, one at a time, eth_call).
+  const txLink = (t: any) => location.origin + route(chain, safeAddr) + TX_LINK + btoa(JSON.stringify({ t: txOf(t),
+    s: (t.confirmations || []).filter((x: any) => x.signature).map((x: any) => [x.owner, x.signature]) })).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  async function takeLink(c: number, a: string, code: string) {
+    let t: E.SafeTx, sigs: { owner: string; signature: string }[];
+    try {
+      const j = JSON.parse(atob(code.replace(/-/g, "+").replace(/_/g, "/")));
+      t = txOf(j.t);
+      sigs = (j.s || []).filter((x: any) => Array.isArray(x) && E.isAddress(x[0]) && /^0x[0-9a-fA-F]+$/.test(x[1])).map((x: any) => ({ owner: E.checksum(x[0]), signature: x[1] }));
+      if (!E.isAddress(t.to)) throw 0;
+    } catch { return say("That link is broken: ask for it again.", true); }
+    const h = E.safeTxHash(c, a, t), data = E.safeTxData(c, a, t);
+    const ok = await Promise.all(sigs.map((s) => view(c, a, E.call("checkNSignatures(bytes32,bytes,bytes,uint256)",
+      [E.bytes(h), E.dynBytes(data), E.dynBytes(E.packSignatures([s])), E.word(1)])).then(() => true, () => false)));
+    const good = sigs.filter((_, k) => ok[k]);
+    if (c !== chain || a !== safeAddr) return;
+    const mine = localQ(c, a), m = mine[h.toLowerCase()] || { ...t, safeTxHash: h, confirmations: [] };
+    for (const s of good) if (!m.confirmations.some((x: any) => eqA(x.owner, s.owner))) m.confirmations.push(s);
+    mine[h.toLowerCase()] = m;
+    try { localStorage.setItem(qKey(c, a), JSON.stringify(mine)); } catch {}
+    const hid = hiddenQ(c, a);
+    if (hid[h.toLowerCase()]) { delete hid[h.toLowerCase()]; try { localStorage.setItem(hKey(c, a), JSON.stringify(hid)); } catch {} }
+    say(good.length < sigs.length ? `Added to Waiting. ${sigs.length - good.length} of its signatures didn't check out, so they don't count.` : "Added to Waiting.", good.length < sigs.length);
+    await load(true);
+  }
+
   function paintQueue() {
     const box = $("s-queue");
     box.hidden = !(safeAddr && info && sub === "home" && (queue.length || queueNote));
@@ -1493,7 +1531,7 @@ export function safe(main: HTMLElement) {
       return `<li class="sx-tx sx-k-${s.kind}">
         <div class="sx-tx-head"><span class="sx-ic">${ICON[s.kind]}</span><span class="sx-tx-what">${s.title}</span><span class="sx-tx-n">#${esc(t.nonce)}</span></div>
         ${t.wc ? `<p class="fine">From ${esc(t.wc.dapp.name)}: it gets the result when this runs.</p>` : ""}${subsOf(s)}${s.more || ""}${s.kind === "danger" ? `<p class="sx-warn">This can change how the Safe works. Only sign if you know why.</p>` : ""}
-        <div class="sx-tx-sigs"><span class="sx-dots">${dots}</span>${n} of ${need} signed${marks.length ? ` · ${marks.join(" · ")}` : ""}</div>
+        <div class="sx-tx-sigs"><span class="sx-dots">${dots}</span>${n} of ${need} signed${marks.length ? ` · ${marks.join(" · ")}` : ""}<button class="btn btn-sm btn-grey sx-end" data-link="${k}">Copy link</button></div>
         ${btns.length || rej ? `<div class="sx-row">${rej}<span class="sx-row sx-end">${btns.map((b) => [+/btn-green/.test(b) * 10 + (/data-wsign/.test(b) ? 0 : /data-sign/.test(b) ? 1 : 2), b] as const)
           .sort((x, y) => x[0] - y[0]).map((x) => x[1]).join(" ")}</span></div>` : ""}
         <details class="sx-more"><summary>Details</summary><dl class="sx-dl">
@@ -1526,6 +1564,9 @@ export function safe(main: HTMLElement) {
       await dropAsk(t, "Rejected on wedgie.dev");
       say(`Rejected. ${t.wc.dapp.name} was told no.`);
     }));
+    box.querySelectorAll<HTMLButtonElement>("[data-link]").forEach((b) => b.onclick = () =>
+      navigator.clipboard.writeText(txLink(queue[+b.dataset.link!])).then(() => say("Link copied. Send it to another owner: it opens this transaction for them to sign."),
+        () => say("Couldn't copy the link.", true)));
     box.querySelectorAll<HTMLButtonElement>("[data-remove]").forEach((b) => b.onclick = () => job(() => removeQueued(queue[+b.dataset.remove!])));
     paintDock();
   }

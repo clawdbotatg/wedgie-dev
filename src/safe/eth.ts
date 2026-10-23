@@ -78,13 +78,15 @@ export type SafeTx = {
 const DOMAIN = hex(keccakText("EIP712Domain(uint256 chainId,address verifyingContract)"));
 const SAFE_TX = hex(keccakText("SafeTx(address to,uint256 value,bytes data,uint8 operation,uint256 safeTxGas,uint256 baseGas,uint256 gasPrice,address gasToken,address refundReceiver,uint256 nonce)"));
 
-/** Safe 1.3+'s getTransactionHash. */
-export function safeTxHash(chainId: number, safe: string, t: SafeTx) {
+/** What getTransactionHash hashes (Safe's encodeTransactionData): 0x1901, the domain, the SafeTx. */
+export function safeTxData(chainId: number, safe: string, t: SafeTx) {
   const domain = keccak256(cat(bytes(DOMAIN), word(chainId), aword(safe)));
   const st = keccak256(cat(bytes(SAFE_TX), aword(t.to), word(t.value), keccak256(bytes(t.data || "0x")), word(t.operation),
     word(t.safeTxGas), word(t.baseGas), word(t.gasPrice), aword(t.gasToken), aword(t.refundReceiver), word(t.nonce)));
-  return hex(keccak256(cat(bytes("0x1901"), domain, st)));
+  return cat(bytes("0x1901"), domain, st);
 }
+/** Safe 1.3+'s getTransactionHash. */
+export const safeTxHash = (chainId: number, safe: string, t: SafeTx) => hex(keccak256(safeTxData(chainId, safe, t)));
 
 // Safe's passkey signer (safe-modules passkey v0.2.1), the same address on every chain it's on.
 export const FACTORY = "0x1d31F259eE307358a26dFb23EB365939E8641195";
