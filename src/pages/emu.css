@@ -1,10 +1,10 @@
-/* /virtual: the whole page dark grey, nothing but the wedgie: "Virtual wedgie" top left, its ID bottom right,
+/* /virtual: the whole page dark grey, nothing but the wedgie: "Virtual wedgie" bottom left, its ID bottom right,
    Screenshot / Replug / Wipe under it. The site's header and footer are hidden here (body.emu-page). */
 body.emu-page { background: #2b2c2e; }
 body.emu-page .top, body.emu-page .foot { display: none; }
 .emu { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 16px; box-sizing: border-box; }
 .emu #emu-3d { width: 100%; max-width: 1000px; }
-.emu-tag { position: fixed; top: 20px; left: 26px; font-size: 30px; font-weight: 900; color: #e9e9e6; opacity: .3; pointer-events: none; }
+.emu-tag { position: fixed; bottom: 20px; left: 26px; font-size: 30px; font-weight: 900; color: #e9e9e6; opacity: .3; pointer-events: none; }
 .emu-id { position: fixed; bottom: 20px; right: 26px; font-family: var(--mono); font-size: 22px; letter-spacing: .08em; color: #e9e9e6; opacity: .5; }
 .emu-note { min-height: 1.5em; color: #e9e9e6; font-weight: 800; text-align: center; }
 .emu-bar { width: 100%; max-width: 480px; margin: 8px auto; height: 10px; border-radius: 5px; background: #48494b; overflow: hidden; }
