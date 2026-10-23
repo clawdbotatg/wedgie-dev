@@ -263,14 +263,21 @@ html, body { overflow-x: clip; }
   margin-left: auto; font-weight: 900; font-size: 16px; color: var(--ink); background: var(--shell); box-shadow: var(--shell-shadow); transition: transform .08s; }
 .orders-btn:active { transform: translateY(2px); }
 /* The wedgie's Safes beside Connected (main.ts): blockie + dollars, a tap opens that Safe */
-.top-safes { display: flex; gap: 8px; flex-shrink: 1; min-width: 0; }
+.top-safes { display: flex; gap: 8px; flex-shrink: 0; }
 .top-safes[hidden] { display: none; }
 .top-safe { display: inline-flex; align-items: center; gap: 8px; height: 46px; padding: 0 16px 0 9px; border-radius: 999px; white-space: nowrap; text-decoration: none;
   font-weight: 900; font-size: 16px; color: var(--ink); background: var(--shell); box-shadow: var(--shell-shadow); transition: transform .08s; }
 .top-safe:active { transform: translateY(2px); }
 .top-safe img { width: 28px; height: 28px; border-radius: 50%; }
 .top-safe.more { padding: 0 14px; font-family: var(--mono); font-size: 14px; }
-@media (max-width: 760px) { .top-safe .lbl { display: none; } .top-safe { padding: 0 9px; } }
+/* the bar out of room (main.ts adds .tight): everything up there down to its picture, before anything overlaps */
+.top.tight .skill-link, .top.tight .top-safe .lbl, .top.tight .orders-btn:not(.signin-btn) .lbl,
+.top.tight #s-me .safe-id-tag, .top.tight #s-me .addr-copy, .top.tight #s-me .addr-txt { display: none; }
+.top.tight .top-safe { padding: 0 9px; }
+.top.tight .orders-btn:not(.signin-btn) { padding: 0 13px; }
+.top.tight #s-me { padding: 0 8px; }
+.top.tighter .brand .tag, .top.tighter .connect-btn.on .lbl { display: none; }
+.top.tighter .connect-btn.on { padding: 0 14px; }
 .orders-btn .n { font-family: var(--mono); font-size: 14px; background: rgba(0,0,0,.08); border-radius: 999px; padding: 1px 8px; }
 .signin-btn { padding: 0 18px; }
 .orders-who { margin: 0 !important; }

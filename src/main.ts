@@ -123,6 +123,17 @@ const paintSafes = () => {
 };
 addEventListener("wedgie-safes", paintSafes);
 addEventListener("storage", (e) => { if (e.key?.startsWith("wedgie.safe.")) paintSafes(); });
+// Out of room up top: down to pictures (.tight), before anything overlaps. Measured, not a screen width: how much
+// fits depends on what's there (Safes, Orders, the wedgie's address on /safe).
+const bar = document.querySelector<HTMLElement>("header.top")!;
+const fit = () => {
+  const over = () => bar.scrollWidth > bar.clientWidth || [...bar.children].some((c) => c.scrollWidth > c.clientWidth + 1);
+  bar.classList.remove("tight", "tighter");
+  if (over()) bar.classList.add("tight");
+  if (over()) bar.classList.add("tighter");     // still too wide: the brand's name and "Connected" go too
+};
+new ResizeObserver(fit).observe(bar);
+new MutationObserver(fit).observe(bar, { childList: true, subtree: true, characterData: true });
 const setPlugged = (on: boolean) => { if (on !== plugged) { plugged = on; paintSafes(); } };
 
 const top = document.getElementById("top")!;
