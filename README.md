@@ -21,7 +21,7 @@ wedgie adds its WEDGIE drive, and its serial port disappears and comes back as a
 its ID, not its port, and don't soft-reset it just to restart its app. Details: `firmware/boot.py`.
 - `public/device/probe.py` — board-side test code (screen, buttons, chip, `ident`), pasted into the
   raw REPL; nothing is written to flash.
-- `public/skill.md` — the agent skill file served at wedgie.dev/skill.md.
+- `public/skill.md` — the agent skill index at wedgie.dev/skill.md; it links the other guides in `public/*.md` (usb, build, safe, shop, virtual, security, code, trustm).
 - `/code` (`src/pages/code.ts`) — make apps: the prompt for your AI, and the emulator (open a local folder or a
   GitHub repo, play it, it re-runs when a file changes, saves kept and editable). `public/code.md` is the
   app-building skill at wedgie.dev/code.md (app format, fast graphics with measured numbers).

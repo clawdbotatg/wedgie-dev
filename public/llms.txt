@@ -1,0 +1,21 @@
+# wedgie.dev
+
+> A wedgie is an open-source pocket computer and hardware signer: a Raspberry Pi Pico, a Waveshare Pico-LCD-1.3 screen hat, and a secure chip wedged in between, running MicroPython and the wedgie firmware. MIT. Start with skill.md: it indexes every guide.
+
+## Guides (each a skill file, markdown)
+
+- [skill.md](https://wedgie.dev/skill.md): start here. What a wedgie is, every guide, the apps, every page, Instant Wallet
+- [usb.md](https://wedgie.dev/usb.md): talk to a plugged-in wedgie: wedgie.py, the lock, every USB request
+- [build.md](https://wedgie.dev/build.md): build or fix one: parts, assembly, wiring, pinout, case, troubleshooting
+- [safe.md](https://wedgie.dev/safe.md): a wedgie as a Safe signer, wedgie.dev/safe, clear signing, Instant Wallet
+- [shop.md](https://wedgie.dev/shop.md): buy one: prices, what's in the box, shipping, card or USDC
+- [virtual.md](https://wedgie.dev/virtual.md): the virtual wedgie in a browser tab
+- [security.md](https://wedgie.dev/security.md): is it safe, exactly how, known gaps
+- [code.md](https://wedgie.dev/code.md): make apps and games
+- [trustm.md](https://wedgie.dev/trustm.md): the Trust M secure chip from an app
+- [lore.md](https://wedgie.dev/lore.md): why it's called a wedgie
+
+## Tools
+
+- [wedgie.py](https://wedgie.dev/wedgie.py): one-file CLI for a wedgie on USB
+- [Source](https://github.com/clawdbotatg/wedgie-dev)

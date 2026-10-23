@@ -4,13 +4,14 @@
 #   Open wedgie.app         Mac: opens wedgie.dev/connect in Chrome (or the default browser), underwear icon
 #   Open wedgie (Windows).url  Windows: an internet shortcut to wedgie.dev/connect
 #   README.txt              what this is
-#   SKILL.md                everything about a wedgie, for an AI: public/skill.md + code.md + trustm.md
+#   SKILL.md                everything about a wedgie, for an AI: the frozen tools/drive_SKILL.md (skilldoc.py)
 #   KNOCKA.TXT, KNOCKB.TXT (hidden)  read B, A, B to turn on phone mode (wedgiedrive.py knock); A before B
 #   ANSWER.TXT (hidden)     the wedgie's answers to requests dropped on the drive (inbox.py fills it in RAM)
 #   .VolumeIcon.icns        the underwear as the drive icon on macOS          (hidden)
 #   autorun.inf + wedgie.ico  the underwear as the drive icon on Windows      (hidden)
 #   .fseventsd/no_log, .metadata_never_index  macOS: no event log, no Spotlight on it (hidden; RAM, below)
-# Stored sparse: only the sectors that aren't all zeros.   python3 tools/drive.py [--img out.img]
+# Stored sparse: only the sectors that aren't all zeros.   python3 tools/drive.py [--refresh] [--img out.img]
+# --refresh (at a firmware release): first rewrite tools/drive_SKILL.md from today's public/*.md guides.
 # Needs macOS (osacompile, codesign) and pngquant to build; the output (firmware/drive.bin) is committed.
 import io, struct, subprocess, sys, tempfile
 sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parent))
@@ -38,8 +39,10 @@ to talk to it over USB.
 
 
 def skill():
-    from skilldoc import skill_md      # one source: tools/test_docs.py checks the drive against it
-    return skill_md()
+    from skilldoc import skill_md, drive_md, FROZEN     # tools/test_docs.py checks the drive against drive_md()
+    if "--refresh" in sys.argv:
+        FROZEN.write_bytes(skill_md())
+    return drive_md()
 autorun = b"[autorun]\r\nicon=wedgie.ico\r\nlabel=wedgie\r\n"
 
 src = Image.open(root / "public/img/sticker.webp").convert("RGBA")

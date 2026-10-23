@@ -5,8 +5,9 @@ Push to main = deploy (Vercel).
 
 ## Docs that must stay true
 
-- `public/skill.md`, `code.md`, `trustm.md`: for outside agents, and shipped on every wedgie's drive as SKILL.md.
-  After editing them, run `tools/drive.py`. `tools/test_docs.py` checks them.
+- `public/skill.md` (the index) + `usb.md`, `build.md`, `safe.md`, `shop.md`, `virtual.md`, `security.md`, `code.md`,
+  `trustm.md`: for outside agents (also `public/llms.txt`). Edit any time. The drive carries a frozen copy
+  (`tools/drive_SKILL.md`); at a firmware release `tools/drive.py --refresh`. `tools/test_docs.py` checks them.
 - App rules: `src/apps/appjson.mjs`, `folder_app` in `public/wedgie.py`, `public/code.md`. Keep in step.
 - Style: `docs/STYLE.md`, enforced by `tools/test_style.py`. Apps: `docs/APPS.md`. Memory: `docs/PLAN-MEMORY.md`.
 - Clear signing groundwork (ERC-7730 wire format, not used yet) and its next steps: `wire/README.md`.

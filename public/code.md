@@ -30,6 +30,7 @@ The Trust M secure chip from an app: https://wedgie.dev/trustm.md
        curl -O https://wedgie.dev/wedgie.py        # needs pyserial: pip install pyserial, or run it as
                                                     # uv run --with pyserial python3 wedgie.py ...
        python3 wedgie.py install .                  # this folder's app becomes the app it runs
+       python3 wedgie.py unlock                     # once: shot and press need a green-button yes (0.3.54+)
        python3 wedgie.py shot s.png                 # the real screen as a PNG: READ IT
        python3 wedgie.py press A                    # press a button (A B X Y up down left right press)
        python3 wedgie.py run mygame.py              # run a file once and see its output/traceback
