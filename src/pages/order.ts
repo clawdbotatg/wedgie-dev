@@ -160,7 +160,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
     <div class="safe-box recess" id="o-cart">
       ${(Object.keys(ITEMS) as Item[]).map((k) => `
         <div class="order-line" data-item="${k}">
-          <div><b>${esc(ITEMS[k].name)}</b> <span class="fine price"></span><br><span class="fine">${esc(ITEMS[k].what)}</span></div>
+          <div><b>${esc(ITEMS[k].name)}</b> <span class="fine price"></span><br><span class="fine">${esc(ITEMS[k].what)}</span><br><b class="fine stock"></b></div>
           <div class="qty"><button class="btn btn-sm" data-d="-1" aria-label="fewer">−</button><b class="n"></b><button class="btn btn-sm" data-d="1" aria-label="more">+</button></div>
         </div>`).join("")}
       <p class="order-total"><b id="o-total"></b> <span class="fine">shipped. ${esc(SHIPS)}</span></p>
@@ -197,11 +197,12 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
     <p class="fine"><a href="/signin">Ordered before? Sign in</a></p>`;
 
   let extra = 0;     // cents over list right now (catalog.ts); the server works it out again at checkout
-  let left: number | null = null;     // boxes in stock (api/_shop.ts stockLeft); the server checks again too
+  let left: Record<Item, number> | null = null;     // in stock, each (api/_shop.ts stockLeft); the server checks again too
   const paint = () => {
     box.querySelectorAll<HTMLElement>(".order-line").forEach((l) => {
       const k = l.dataset.item as Item;
       l.querySelector(".n")!.textContent = String(cart[k]);
+      l.querySelector(".stock")!.textContent = left == null ? "" : left[k] ? `${left[k]} in stock` : "Sold out";
       l.querySelector(".price")!.innerHTML = usd(ITEMS[k].cents) + (extra ? ` <span class="surge why-open">+${usd(extra)} surge</span>` : "") + STAR;
     });
     wire(box, extra > 0);
@@ -212,7 +213,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
   };
   box.querySelectorAll<HTMLElement>(".order-line").forEach((l) => l.querySelectorAll<HTMLButtonElement>("button").forEach((b) => (b.onclick = () => {
     const k = l.dataset.item as Item, d = Number(b.dataset.d);
-    if (d > 0 && left != null && cart.wedgie + cart.kit >= left) return say(`Only ${left} left.`, true);
+    if (d > 0 && left != null && cart[k] >= left[k]) return say(left[k] ? `Only ${left[k]} in stock.` : "Sold out.", true);
     if (d > 0 && cart.wedgie + cart.kit >= MAX_BOXES) return say(`Up to ${MAX_BOXES} per order.`, true);
     cart[k] = Math.max(0, Math.min(MAX_EACH, cart[k] + d));
     count("cart");
@@ -240,17 +241,20 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
   const openEl = box.querySelector<HTMLElement>("#o-open")!;
   let shop: { card: boolean; usdc: boolean } = { card: false, usdc: false };
   api().then((r) => {
-    shop = SEAL_KEY && r.left > 0 ? r : { card: false, usdc: false }; extra = r.extra || 0; left = r.left ?? 0;
+    left = { wedgie: r.left?.wedgie || 0, kit: r.left?.kit || 0 };
+    for (const k of Object.keys(cart) as Item[]) if (k in left) cart[k] = Math.min(cart[k], left[k]);   // sold out: not in the cart
+    if (!cart.wedgie && !cart.kit) { if (left.wedgie) cart.wedgie = 1; else if (left.kit) cart.kit = 1; }
+    shop = SEAL_KEY && (left.wedgie || left.kit) ? r : { card: false, usdc: false }; extra = r.extra || 0;
     paint();
     box.querySelectorAll<HTMLOptionElement>("#o-chain option").forEach((o) => { if (!r.chains?.includes(Number(o.value))) o.remove(); });   // only chains the server can read
   }, () => {}).finally(() => {
     card.disabled = !shop.card; crypto.disabled = !shop.usdc;
-    openEl.textContent = shop.card || shop.usdc ? (left! <= 5 ? `Only ${left} left.` : "") : left === 0 ? "Sold out." : "Checkout opens soon.";
+    openEl.textContent = shop.card || shop.usdc ? "" : left && !left.wedgie && !left.kit ? "Sold out." : "Checkout opens soon.";
     openEl.hidden = !openEl.textContent;
   });
 
   const shipTo = (): ShipTo | null => {
-    const v = (n: string) => (box.querySelector<HTMLInputElement>(`[name=${n}]`)!.value || "").trim();
+    const v = (n: string) => (addr.querySelector<HTMLInputElement>(`[name=${n}]`)!.value || "").trim();   // addr: the price alert has an email box too
     const c = country.value, us = c === "US";
     const s: ShipTo = { name: v("name"), line1: v("line1"), line2: v("line2"), city: v("city"), state: v(us ? "state" : "region"), zip: v(us ? "zip" : "postal"),
       country: c, phone: us ? "" : v("phone"), email: v("email") };

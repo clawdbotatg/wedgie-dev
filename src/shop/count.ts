@@ -18,8 +18,8 @@ export const STEPS = [
 const ERRS: [string, RegExp][] = [
   ["fill-name", /^Fill in your name/], ["fill-street", /^Fill in your street/], ["fill-city", /^Fill in your city/],
   ["fill-state", /^Fill in your state/], ["fill-zip", /ZIP/], ["fill-email", /^Fill in your email/],
-  ["pick", /^Pick (at least one|what)/], ["only-left", /^Only \d+ left/], ["max", /^Up to \d+ per order/],
-  ["sold-out", /^Sold out/], ["too-many", /orders waiting to be paid/], ["sealed", /sealed/],
+  ["pick", /^Pick (at least one|what)/], ["only-left", /^Only \d+ .*(left|in stock)/], ["max", /^Up to \d+ per order/],
+  ["sold-out", /sold out|took the last one/i], ["too-many", /orders waiting to be paid/], ["sealed", /sealed/],
   ["closed", /isn't open|didn't answer/], ["no-wallet", /^No wallet/], ["wallet-no", /reject|denied|cancel/i],
   ["not-tx", /transaction hash|already paid for another/], ["renew", /renewed|Try again/],
 ];

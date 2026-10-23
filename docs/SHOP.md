@@ -14,8 +14,8 @@ Named on `/terms`, `/privacy`, the footer, and the pay box (`src/pages/legal.ts`
 
 ## Stock
 
-One count for wedgies and kits (the same parts). Set it on omen: `orders.py stock 40` (`orders.py stock` shows it).
-Each box paid since then, or held by an open quote, takes one; a canceled order gives its boxes back. Never set,
+Wedgies and kits each have their own count. Set them on omen: `orders.py stock wedgie 50`, `orders.py stock kit 50`
+(`orders.py stock 50`: both; `orders.py stock` shows them). /order shows "N in stock" on each line. Each box paid since then, or held by an open quote, takes one; a canceled order gives its boxes back. Never set,
 or 0: the site says Sold out. Up to 3 boxes per order. Unpaid money never holds a box (dust can't lock the stock);
 a card quote holds its box until its Stripe checkout can't be paid (31 min). Shipped orders
 deleted after 30 days come off the count, so their boxes aren't sold twice. A late USDC payment can still land on a

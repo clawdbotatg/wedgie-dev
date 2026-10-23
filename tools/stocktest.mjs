@@ -21,10 +21,10 @@ const ok = (c, m) => { if (!c) { console.error("FAIL:", m); process.exit(1); } c
 let ip = 0;
 const post = (h, body, auth) => h.POST(new Request("http://x/api", { method: "POST", body: JSON.stringify(body),
   headers: { "content-type": "application/json", "x-real-ip": "10.0.0." + ++ip, ...(auth ? { authorization: "Bearer " + "t".repeat(40) } : {}) } }));
-const stock = (n) => post(admin, { stock: n }, true);
+const stock = (n, item) => post(admin, { stock: n, item }, true);
 const buy = async () => (await (await post(order, { cart: { wedgie: 1, kit: 0 }, sealed: "v1." + "a".repeat(60), email: "a@b.co", pay: "usdc", chain: 8453 })).json());
 const expire = (id) => sql`update orders set status = 'expired', created = now() - interval '20 minutes' where id = ${id}`;
-const left = () => shop.stockLeft(sql);
+const left = async () => (await shop.stockLeft(sql)).wedgie;
 
 // 1
 await stock(1);
@@ -46,5 +46,17 @@ ok(await left() === 0, "shipped: its box is gone");
 const g = await admin.GET(new Request("http://x/api/admin", { headers: { authorization: "Bearer " + "t".repeat(40) } }));
 ok(g.status === 200 && (await sql`select 1 from orders where id = ${d.id}`).length === 0, "the 30-day cleanup deleted it");
 ok(await left() === 0, `and the stock still counts it (left ${await left()})`);
+// 3
+await stock(2, "wedgie"); await stock(1, "kit");
+const both = async () => JSON.stringify(await shop.stockLeft(sql));
+ok(await both() === '{"wedgie":2,"kit":1}', "stock wedgie 2, kit 1");
+const k2 = await post(order, { cart: { wedgie: 0, kit: 2 }, sealed: "v1." + "a".repeat(60), email: "a@b.co", pay: "usdc", chain: 8453 });
+ok(k2.status === 409 && (await k2.json()).error === "Only 1 wedgie kit left.", "2 kits from 1: refused");
+await buy();
+ok(await both() === '{"wedgie":1,"kit":1}', "a wedgie takes a wedgie, not a kit");
+ok(JSON.stringify((await (await order.GET(new Request("http://x/api/order"))).json()).left) === '{"wedgie":1,"kit":1}', "GET /api/order shows both");
+await stock(0, "kit");
+const k0 = await post(order, { cart: { wedgie: 0, kit: 1 }, sealed: "v1." + "a".repeat(60), email: "a@b.co", pay: "usdc", chain: 8453 });
+ok(k0.status === 409 && (await k0.json()).error === "Kits are sold out.", "kits sold out, wedgies still on sale");
 console.log("stocktest: all passed");
 process.exit(0);

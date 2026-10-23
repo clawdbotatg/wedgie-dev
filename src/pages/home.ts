@@ -182,14 +182,18 @@ export function home(main: HTMLElement): Promise<unknown> {
     wire(price.parentElement!, extra > 0);
   };
   wire(price.parentElement!);
+  // The Order button says Sold out when the picked one is (api/_shop.ts stockLeft).
+  let left: Record<string, number> | null = null;
+  const sold = () => {
+    const go = main.querySelector<HTMLAnchorElement>("#order-go")!, out = left?.[item] === 0;
+    go.textContent = out ? "Sold out" : "Order"; go.classList.toggle("btn-green", !out); 
+    if (out) { go.removeAttribute("href"); go.setAttribute("aria-disabled", "true"); }
+    else { go.href = item === "kit" ? "/order?item=kit" : "/order"; go.removeAttribute("aria-disabled"); }
+  };
   fetch("/api/order").then((r) => r.json()).then((r) => {
     extra = r.extra || 0; showPrice();
-    if (r.left === 0) {     // sold out (api/_shop.ts stockLeft)
-      const go = main.querySelector<HTMLAnchorElement>("#order-go")!;
-      go.textContent = "Sold out"; go.classList.remove("btn-green"); go.removeAttribute("href"); go.setAttribute("aria-disabled", "true");
-    }
+    left = r.left; sold();
   }, () => {});
-
   main.querySelectorAll<HTMLButtonElement>(".seg button").forEach((b) => (b.onclick = () => {
     main.querySelectorAll<HTMLButtonElement>(".seg button").forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-checked", String(x === b)); });
     const kit = b.dataset.for === "kit";
@@ -197,9 +201,7 @@ export function home(main: HTMLElement): Promise<unknown> {
       ? `Every part and the case in the mail, with <a href="/assemble">assembly instructions</a> (also <a href="/assemble/3d">in 3D</a>). You need a wire stripper, tape, tweezers, and a USB data cable that fits your Pico (USB-C or micro USB, depending on the model).`
       : "One wedgie: pico, screen, chip, and case.";
     item = kit ? "kit" : "wedgie";
-    showPrice();
-    const go = main.querySelector<HTMLAnchorElement>("#order-go")!;
-    if (go.hasAttribute("href")) go.href = kit ? "/order?item=kit" : "/order";
+    showPrice(); sold();
   }));
   // The teaser: a big green play button over it; one tap plays it with sound (autoplay would have to be muted).
   const teaser = main.querySelector<HTMLVideoElement>(".teaser video")!;

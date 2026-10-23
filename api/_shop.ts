@@ -8,7 +8,7 @@
 // Env: SHOP_DATABASE_URL, STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET (card), SHOP_PAY_TO (USDC),
 // SHOP_ADMIN_TOKEN (omen's orders.py), SHOP_RPC_<chainId> (an Alchemy URL: never a public RPC).
 import { neon } from "@neondatabase/serverless";
-import { nameOf, PAY_CHAINS, QUOTE, cartLines, extraAt, type Cart, type Line } from "../src/shop/catalog.js";
+import { ITEMS, nameOf, PAY_CHAINS, QUOTE, cartLines, extraAt, type Cart, type Item, type Line } from "../src/shop/catalog.js";
 
 declare const process: { env: Record<string, string | undefined> };
 export const env = (k: string) => process.env[k] || "";
@@ -112,25 +112,40 @@ export async function extraNow(sql: Awaited<ReturnType<typeof db>>) {
   return extraAt(rows.map((r: any) => ({ at: Date.parse(r.at), n: (r.cart.wedgie || 0) + (r.cart.kit || 0) })), Date.now());
 }
 
-/** How many boxes are left to sell (wedgies and kits from one count: the same parts). The shipping computer sets
- * it (orders.py stock N, admin.ts); each box paid since then, or held by an open quote, takes one; a canceled
- * order gives its boxes back, and so does an expired quote. A card quote holds its box till its Stripe checkout
- * can't be paid any more (CARD_HOLD), even if ending it early failed. Unpaid money never holds a box: a dust
- * send can't lock the stock. Never set: 0, sold out. Can go below 0 when two orders race (order.ts raced backs
- * one out) or when a quote paid in full only after it expired lands on a sold-out shop: orders.py list then
- * says oversold (Austin, 10-15: OK). */
+/** How many of each are left to sell: wedgies and kits each have their own count. The shipping computer sets
+ * them (orders.py stock [wedgie|kit] N, admin.ts; stock row 1 = wedgies, 2 = kits); each one paid since then, or
+ * held by an open quote, takes one; a canceled order gives its boxes back, and so does an expired quote. A card
+ * quote holds its box till its Stripe checkout can't be paid any more (CARD_HOLD), even if ending it early failed.
+ * Unpaid money never holds a box: a dust send can't lock the stock. Never set: 0, sold out. Can go below 0 when
+ * two orders race (order.ts raced backs one out) or when a quote paid in full only after it expired lands on a
+ * sold-out shop: orders.py list then says oversold (Austin, 10-15: OK). */
 export const CARD_HOLD = 31 * 60_000;   // checkout()'s expires_at, plus a minute
-export async function stockLeft(sql: Awaited<ReturnType<typeof db>>): Promise<number> {
-  const [s] = await sql`select n, set_at from stock where id = 1`;
-  if (!s) return 0;
-  const [r] = await sql`select coalesce(sum(coalesce((cart->>'wedgie')::int, 0) + coalesce((cart->>'kit')::int, 0)), 0)::int as used from orders
-    where (status in ('paid', 'shipped') and paid_at >= ${s.set_at})
-    or (status = 'new' and created > now() - ${`${QUOTE / 1000} seconds`}::interval)
-    or (status = 'new' and pay = 'card' and created > now() - ${`${CARD_HOLD / 1000} seconds`}::interval)`;
-  return s.n - r.used;
+export const STOCK_ROW: Record<Item, number> = { wedgie: 1, kit: 2 };
+export type Left = Record<Item, number>;
+export async function stockLeft(sql: Awaited<ReturnType<typeof db>>): Promise<Left> {
+  const left = { wedgie: 0, kit: 0 };
+  for (const k of Object.keys(STOCK_ROW) as Item[]) {
+    const [s] = await sql`select n, set_at from stock where id = ${STOCK_ROW[k]}`;
+    if (!s) continue;
+    const [r] = await sql`select coalesce(sum(coalesce((cart->>${k})::int, 0)), 0)::int as used from orders
+      where (status in ('paid', 'shipped') and paid_at >= ${s.set_at})
+      or (status = 'new' and created > now() - ${`${QUOTE / 1000} seconds`}::interval)
+      or (status = 'new' and pay = 'card' and created > now() - ${`${CARD_HOLD / 1000} seconds`}::interval)`;
+    left[k] = s.n - r.used;
+  }
+  return left;
 }
 export const boxes = (c: Cart) => (c.wedgie || 0) + (c.kit || 0);
-export const soldOut = (left: number) => (left > 0 ? `Only ${left} left.` : "Sold out.");
+/** Why this cart can't be had ("Only 2 kits left.", "Wedgies are sold out."), or "" if it can. */
+export const short = (c: Partial<Cart>, left: Left) => {
+  for (const k of Object.keys(STOCK_ROW) as Item[]) {
+    const n = Math.max(0, left[k]), many = k === "kit" ? "kits" : "wedgies";
+    if ((c[k] || 0) > n) return n ? `Only ${n} ${n === 1 ? ITEMS[k].name : many} left.` : `${many[0].toUpperCase() + many.slice(1)} are sold out.`;
+  }
+  return "";
+};
+/** Below 0 on anything in this cart (all of them with no cart): two orders raced for the last one. */
+export const oversold = (left: Left, c?: Partial<Cart>) => (Object.keys(STOCK_ROW) as Item[]).some((k) => left[k] < 0 && (!c || (c[k] || 0) > 0));
 
 /** Unpaid orders whose quote ran out are 'expired' (the address stays till admin.ts deletes it: a USDC
  * transfer sent in time but seen late still pays it, usdcPaid checks the time; Refresh price quotes it
