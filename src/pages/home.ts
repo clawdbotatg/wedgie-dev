@@ -136,14 +136,19 @@ export function home(main: HTMLElement): Promise<unknown> {
         <div class="lib-cap"><h3></h3><p></p></div>
       </div>
     </div>
-    <div class="sec-head lib-after">
-      <h2>Developers, developers, developers.</h2>
-      <p>Anyone can write software for a wedgie. Write it yourself, or have your agent write it. <a href="/code">How</a></p>
-    </div>
   </section>
 
-  <section id="agents" class="sec agents">
-    <button class="btn btn-lg btn-green" id="pop-emu">Pop out a virtual wedgie</button>
+  <section id="dev" class="sec">
+    <div class="sec-head dev-head">
+      <span class="kicker">Make apps</span>
+      <h2>Developers, developers, developers.</h2>
+      <p>Anyone can write software for a wedgie. Everything is open source.</p>
+    </div>
+    <div class="parts">
+      <div class="card part dev"><div class="num">1</div><h3>Write it</h3><p>How apps work, step by step.</p><a class="btn btn-sm" href="/code">How to write code →</a></div>
+      <div class="card part dev"><div class="num">2</div><h3>Or let your agent</h3><p>Give it the skill file and let it rip.</p><a class="btn btn-sm" href="/skill.md" target="_blank">skill.md →</a></div>
+      <div class="card part dev"><div class="num">3</div><h3>Test it</h3><p>A virtual wedgie in its own window. No hardware needed.</p><button class="btn btn-sm btn-green" id="pop-emu">Pop out a virtual wedgie</button></div>
+    </div>
   </section>
 
   <section id="teaser" class="sec teaser">
