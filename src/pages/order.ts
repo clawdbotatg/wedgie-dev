@@ -202,9 +202,9 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
     box.querySelectorAll<HTMLElement>(".order-line").forEach((l) => {
       const k = l.dataset.item as Item;
       l.querySelector(".n")!.textContent = String(cart[k]);
-      l.querySelector(".price")!.innerHTML = usd(ITEMS[k].cents) + (extra ? ` <span class="surge">+${usd(extra)} surge</span>` : "") + STAR;
-      wire(box);
+      l.querySelector(".price")!.innerHTML = usd(ITEMS[k].cents) + (extra ? ` <span class="surge why-open">+${usd(extra)} surge</span>` : "") + STAR;
     });
+    wire(box, extra > 0);
     box.querySelector("#o-total")!.textContent = usd(cartCents(cart, extra));
     const lines = cartLines(cart, extra), el = box.querySelector<HTMLElement>("#o-lines")!;
     el.hidden = lines.length < 2;

@@ -6,6 +6,7 @@
 //      the session lists the orders; a 2nd send waits a minute; signed out, the session is dead
 //   4. an email with no orders still gets a link; signed in, it claims this device's order
 //   5. shipped: a mail with the tracking number; the locked email is wiped
+//   5b. price alert: stored locked, one mail once the surge is gone, then deleted
 //   6. two tabs: tab A asks to sign in, the mail's link opens in tab B, and A signs in by itself; Sign out keeps only the email
 // Run: node tools/mailprobe.mjs
 import { createServer } from "vite";
@@ -20,7 +21,7 @@ Object.assign(process.env, { SHOP_DATABASE_URL: "pglite", SHOP_MAIL_KEY: "probe-
   SHOP_PAY_TO: "0x" + "ab".repeat(20), SHOP_RPC_8453: "http://127.0.0.1:8598", SHOP_ADMIN_TOKEN: "t".repeat(40), STRIPE_SECRET_KEY: "" });
 const vs = await createServer({ configFile: false, server: { middlewareMode: true }, appType: "custom", logLevel: "silent",
   resolve: { alias: { "@neondatabase/serverless": new URL("./neonlite.mjs", import.meta.url).pathname } } });
-const order = await vs.ssrLoadModule("/api/order.ts"), login = await vs.ssrLoadModule("/api/login.ts"), admin = await vs.ssrLoadModule("/api/admin.ts");
+const order = await vs.ssrLoadModule("/api/order.ts"), alert = await vs.ssrLoadModule("/api/alert.ts"), login = await vs.ssrLoadModule("/api/login.ts"), admin = await vs.ssrLoadModule("/api/admin.ts");
 const { db } = await vs.ssrLoadModule("/api/_shop.ts");
 const call = async (fn, body, headers = {}) => { const r = await fn(new Request("https://wedgie.dev/api/x", { method: "POST", headers, body: JSON.stringify(body) })); return { status: r.status, ...(await r.json()) }; };
 const mails = () => (existsSync(MAILS) ? readFileSync(MAILS, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)) : []);
@@ -77,6 +78,23 @@ const sm = mails().find((m) => /shipped/.test(m.subject));
 ok(shipped.mailed && sm?.to === EMAIL && sm.text.includes("9400100000000000000001"), "shipped mail with the tracking number");
 const [after] = await sql`select email_enc, email_hash from orders where id = ${o.id}`;
 ok(!after.email_enc && after.email_hash, "shipped: the locked email is wiped (the hash stays for login)");
+
+// 5b
+const get = async () => (await order.GET(new Request("https://wedgie.dev/api/order"))).json();
+ok((await get()).extra > 0, "a surge on (the paid order)");
+ok((await call(alert.POST, { email: "nope" })).status === 400, "alert: a bad email is refused");
+ok((await call(alert.POST, { email: "Watcher@Example.com" })).ok, "alert: asked");
+const [al] = await sql`select * from alerts`;
+ok(al && !JSON.stringify(al).toLowerCase().includes("watcher@"), "alert: only a hash and a locked copy");
+await get();
+ok(!mails().some((m) => m.to === "Watcher@Example.com"), "alert: no mail while the surge is on");
+await sql`update orders set created = created - interval '3 days', paid_at = paid_at - interval '3 days'`;
+ok((await get()).extra === 0, "the surge is gone");
+const am = mails().filter((m) => m.to === "Watcher@Example.com");
+ok(am.length === 1 && /\$67 again/.test(am[0].subject) && am[0].text.includes("https://wedgie.dev/order"), "alert: one mail, with a link to order");
+await get();
+ok(mails().filter((m) => m.to === "Watcher@Example.com").length === 1 && !(await sql`select * from alerts`).length, "alert: sent once, then deleted");
+ok((await call(alert.POST, { email: "watcher@example.com" })).status === 400, "alert: refused while it's already $67");
 
 // 6: the real pages under vite, in a browser
 await vs.close();

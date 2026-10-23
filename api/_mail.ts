@@ -8,8 +8,8 @@
 // Probes: SHOP_MAIL_FILE = append each mail there as a JSON line instead of sending it.
 import nodemailer from "nodemailer";
 import { appendFileSync } from "node:fs";
-import { env, hmac, sha256, randomHex, type db } from "./_shop.js";
-import { nameOf, SHIPS, type Line } from "../src/shop/catalog.js";
+import { env, hmac, sha256, randomHex, extraNow, type db } from "./_shop.js";
+import { nameOf, SHIPS, ITEMS, BUMP, type Line } from "../src/shop/catalog.js";
 
 export const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const key = () => env("SHOP_MAIL_KEY");
@@ -80,4 +80,19 @@ async function pingPaid(sql: Awaited<ReturnType<typeof db>>, id: string) {
       body: JSON.stringify({ chat_id: chat, text: `💰 wedgie order ${o.id} paid: ${items(o.lines)} · ${usd(o.cents)} (${o.pay})` }) });
     if (!r.ok) throw 0;
   } catch { await sql`update orders set paid_pinged = null where id = ${id}`.catch(() => {}); }
+}
+
+/** Price alerts (api/alert.ts): once the surge is gone, each one gets one mail and is deleted. 50 a call (Gmail's
+ * daily cap); a failed send goes back for next time. Runs on GET /api/order (every shop page view) and omen's admin GETs. */
+export async function sendAlerts(sql: Awaited<ReturnType<typeof db>>, origin: string, extra?: number) {
+  const [any] = await sql`select 1 from alerts limit 1`;
+  if (!any || (extra ?? (await extraNow(sql))) > 0) return;
+  const rows = await sql`delete from alerts where email_hash in (select email_hash from alerts order by created limit 50) returning *`;
+  for (const r of rows) {
+    try {
+      await send(await unlock(r.email_enc), `wedgie is ${usd(ITEMS.wedgie.cents)} again`,
+        [`The price is back to ${usd(ITEMS.wedgie.cents)}.`, `Each sale adds ${usd(BUMP)}, so it may not last.`, "You asked for this one email on wedgie.dev. That's the only one."],
+        { text: "Order one", href: `${origin}/order` });
+    } catch { await sql`insert into alerts (email_hash, email_enc, created) values (${r.email_hash}, ${r.email_enc}, ${r.created}) on conflict do nothing`; }
+  }
 }

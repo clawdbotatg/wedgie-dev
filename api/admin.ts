@@ -13,7 +13,7 @@
 // holds their price (older empty ones settle when their buyer opens the order page), and deletes what's done with: shipped or canceled orders and
 // unpaid or expired ones with nothing sent, 30 days on. GET ?stock=1: just the stock count.
 import { db, env, json, oops, same, settleDeposit, stockLeft, endCard, type Order, crossSite } from "./_shop.js";
-import { unlock, shippedMail, mailPaid } from "./_mail.js";
+import { unlock, shippedMail, mailPaid, sendAlerts } from "./_mail.js";
 
 const allowed = (req: Request) => {
   const t = env("SHOP_ADMIN_TOKEN");
@@ -24,6 +24,7 @@ export async function GET(req: Request) {
   if (!allowed(req)) return oops("no", 401);
   const sql = await db();
   const q = new URL(req.url).searchParams;
+  if (env("SHOP_MAIL_KEY")) await sendAlerts(sql, new URL(req.url).origin).catch(() => {});   // omen's timer: alerts go out even on a quiet site
   if (q.get("funnel")) {
     const days = Math.max(1, Math.min(365, Number(q.get("days")) || 30));
     const counts = await sql`select day::text, k, n from counts where day > current_date - ${days}::int order by day, k`;

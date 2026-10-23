@@ -93,3 +93,10 @@ Orders from before 2026-10-15 were paid straight to wedgie.eth with an exact amo
 Where people stop. A number per day per step or error (`src/shop/count.ts`, `api/count.ts`): no IP, cookie, id, or typed text.
 An expired order asks "Didn't buy? Why:" with 4 buttons. Read: `node tools/funnel.mjs [days]`.
 Counting never waits or throws, so it can't break checkout.
+
+## Price alerts
+
+The red Email alert in the price's box (open it with the green * or the green surge amount; shows only during a surge).
+`api/alert.ts` keeps the email like a buyer's: a keyed hash and a locked copy. Once the price is back to $67,
+`sendAlerts` (`api/_mail.ts`) mails each one once and deletes it. It runs on every `GET /api/order` (shop page
+views) and every omen admin GET (the 3-hour track timer), so a quiet site still sends. Test: `node tools/mailprobe.mjs`.

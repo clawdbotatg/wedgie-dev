@@ -1,6 +1,6 @@
 // /api/order
 //   GET                                       what's open: card, usdc; extra = cents over list price right now;
-//                                             left = boxes in stock (_shop.ts stockLeft)
+//                                             left = boxes in stock (_shop.ts stockLeft); sends the price alerts once it's back down
 //   POST {cart, sealed, email, pay, chain?}   a new order -> {id, token, url?} (url: Stripe Checkout); email: _mail.ts
 //   POST {id, token, tx?, renew?}             its status (a USDC one: what its deposit address holds); tx: old orders only;
 //                                             renew: an expired order quoted again at today's price
@@ -8,16 +8,17 @@
 // The token is the buyer's: only its hash is kept. See _shop.ts for what is and isn't stored.
 import { PAY_CHAINS, cartOk, cartLines } from "../src/shop/catalog.js";
 import { depositOf } from "../src/shop/deposits.js";
-import { EMAIL, emailHash, lock, tokenOf, mailPaid } from "./_mail.js";
+import { EMAIL, emailHash, lock, tokenOf, mailPaid, sendAlerts } from "./_mail.js";
 import { db, env, json, oops, randomHex, sha256, same, publicView, checkout, session, markPaid, endCard, usdcPaid, usdcFind, settleDeposit, extraNow, expireOld, late, rpc, ipOf, tooMany, stockLeft, boxes, soldOut, type Order, crossSite } from "./_shop.js";
 
 const open = () => ({ card: !!env("STRIPE_SECRET_KEY"), usdc: !!env("SHOP_PAY_TO"), chains: Object.keys(PAY_CHAINS).map(Number).filter((c) => env("SHOP_RPC_" + c)) });
 
-export async function GET() {
+export async function GET(req: Request) {
   const sql = env("SHOP_DATABASE_URL") ? await db() : null;
-  const extra = sql ? await extraNow(sql).catch(() => 0) : 0;
+  const extra = sql ? await extraNow(sql).catch(() => -1) : 0;
+  if (sql && extra === 0 && env("SHOP_MAIL_KEY")) await sendAlerts(sql, new URL(req.url).origin, 0).catch(() => {});
   const left = sql ? Math.max(0, await stockLeft(sql).catch(() => 0)) : 0;
-  return json({ ...open(), extra, left });
+  return json({ ...open(), extra: Math.max(0, extra), left });
 }
 
 export async function POST(req: Request) {

@@ -941,6 +941,11 @@ body.sx-sheet-open #s-msg { display: none; }
 p.surge, .order-body > p.surge { margin: 4px 0 0; font-size: 22px; color: var(--mint-d); }
 .why { margin: 12px 0; padding: 12px 14px; border-radius: 10px; background: var(--recess); box-shadow: var(--recess-shadow); max-width: 520px; text-align: left; }
 .why p { margin: 6px 0; }
+.why-open { cursor: pointer; }
+.why-alert { margin-top: 10px; }
+.why-alert [hidden] { display: none; }
+.why-form { gap: 8px; flex-wrap: wrap; margin: 6px 0; }
+.why-form input { font: inherit; font-size: 16px; height: 44px; padding: 0 12px; border: 1px solid #cfcfca; border-radius: 10px; background: #fff; flex: 1 1 200px; min-width: 0; }
 /* Safe signer: a Safe transaction that signs itself as it scrolls by (home.ts safeTx, --p 0..1).
    Stages: owner 1 .1-.3, key -> wedgie .35-.55, wedgie signs .6-.75, executed .85-1. */
 .signer { display: grid; grid-template-columns: 1fr 1.1fr; gap: 28px; align-items: center; }

@@ -108,7 +108,7 @@ export function home(main: HTMLElement): Promise<unknown> {
       <div class="order-art truck-lane" aria-hidden="true"><img class="truck" src="/img/truck.webp" alt=""></div>
       <div class="order-body">
         <div class="order-price"><i class="sixseven-box"></i><b class="list">$67</b>${STAR} <span>shipped</span></div>
-        <p class="surge" hidden></p>
+        <p class="surge why-open" hidden></p>
         ${WHY}
         <p id="order-what">One wedgie: pico, screen, chip, and case.</p>
         <div class="seg" role="radiogroup" aria-label="who is it for">
@@ -179,7 +179,9 @@ export function home(main: HTMLElement): Promise<unknown> {
     const surge = price.parentElement!.querySelector<HTMLElement>("p.surge")!;   // not the hero button's *
     surge.hidden = !extra;
     surge.textContent = `+${usd(extra)} right now`;
+    wire(price.parentElement!, extra > 0);
   };
+  wire(price.parentElement!);
   fetch("/api/order").then((r) => r.json()).then((r) => {
     extra = r.extra || 0; showPrice();
     if (r.left === 0) {     // sold out (api/_shop.ts stockLeft)
@@ -187,7 +189,6 @@ export function home(main: HTMLElement): Promise<unknown> {
       go.textContent = "Sold out"; go.classList.remove("btn-green"); go.removeAttribute("href"); go.setAttribute("aria-disabled", "true");
     }
   }, () => {});
-  wire(price.parentElement!);
 
   main.querySelectorAll<HTMLButtonElement>(".seg button").forEach((b) => (b.onclick = () => {
     main.querySelectorAll<HTMLButtonElement>(".seg button").forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-checked", String(x === b)); });
