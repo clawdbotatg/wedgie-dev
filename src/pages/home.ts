@@ -152,6 +152,7 @@ export function home(main: HTMLElement): Promise<unknown> {
   </section>
 
   <section id="teaser" class="sec teaser">
+    <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
     <div class="teaser-box">
       <video playsinline preload="none" poster="/video/teaser.jpg" src="/video/teaser.mp4"></video>
       <button class="teaser-play" aria-label="Play"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg></button>
@@ -208,6 +209,8 @@ export function home(main: HTMLElement): Promise<unknown> {
     item = kit ? "kit" : "wedgie";
     showPrice(); sold();
   }));
+  // The footer's divider moves up, above the video (it's here, in the teaser).
+  document.querySelector(".foot > .band")?.remove();
   // The teaser: a big green play button over it; one tap plays it with sound (autoplay would have to be muted).
   const teaser = main.querySelector<HTMLVideoElement>(".teaser video")!;
   main.querySelector<HTMLButtonElement>(".teaser-play")!.onclick = (e) => {
