@@ -276,6 +276,10 @@
     {
       "source": "/dollar",
       "destination": "/dollar/index.html"
+    },
+    {
+      "source": "/dollar/seven",
+      "destination": "/dollar/seven.html"
     }
   ],
   "redirects": [
