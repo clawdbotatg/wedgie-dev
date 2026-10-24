@@ -149,7 +149,7 @@ export function emu(main: HTMLElement) {
 
     // ?no3d: just the screen, big (a headless browser has no GPU: tools/emu.mjs)
     if (new URLSearchParams(location.search).has("no3d")) {
-      live.style.cssText = "width:480px;max-width:100%;image-rendering:pixelated;border-radius:10px";
+      live.style.cssText = "display:block;margin:0 auto;width:480px;max-width:100%;image-rendering:pixelated;border-radius:10px";
       $("emu-3d").appendChild(live);
     } else place3D($("emu-3d"), { interactive: true, screen: live, eager: true, onKey: (k, down) => hold(k, down, "3d") }).then((w) => {
       w3d = w;
