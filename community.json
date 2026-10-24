@@ -444,6 +444,15 @@
       "v": {
         "poidh": "e757ab7cadc6"
       }
+    },
+    {
+      "repo": "clawdbotatg/wedgie-ethprice",
+      "sha": "54dbcd56ff411bb2e987e494cff28be33720be6c",
+      "at": "2026-10-24T21:00:00Z",
+      "approved": "2026-10-24",
+      "v": {
+        "ethprice": "7bf5790f34a8"
+      }
     }
   ]
 }

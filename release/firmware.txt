@@ -11,6 +11,7 @@ e8f645382cc4d21e5d58168101e7f3891cd0f3921c26205e153393ff78f5c309  bunker_art.mpy
 79f2fd80c3f2954497e463309a039707c95eb354da61bd59d5b7cb414c3c9d5c  bunker_game.mpy
 8e228f1f9d15dcc6210319e1034ad59afa21b92c1661cd4b88a3653ea59ff132  buttons.py
 8e058e1e4ad84a39bab4b4ba832322c16797aed1f2f85dcb20671ff13758a59c  drive.bin
+3920438a54d5d023808d1622251640c9476aa10d3b4583dfd0c3e997c65a792c  ethprice.py
 cf5456e981f7230c0e2b3e1e6a1658c7482159708047d44f89e490aad1891d66  frog.py
 73267cc4d9bcc4cd5bd31117476f67ee7817db055e39274c5636df5a563169c0  g2048.py
 f0224e865a8f55c77b0c13d353b4663e6d9642e99439d98c3045dea3f594ef91  grove.py
@@ -55,6 +56,7 @@ e20d454f74229b3aaa09a15829cbb6b85aa50c6b3bf229287b9cdbff73bee90d  wedgiedrive.mp
 @app  {"mod":"blocks","name":"Blocks","entry":"run","files":["blocks.py"]}
 @app  {"mod":"bunker","name":"Demon Bunker","entry":"run","files":["bunker.py","bunker_draw.py","bunker_art.mpy","bunker_game.mpy"]}
 @app  {"mod":"buttons","name":"Buttons","entry":"run","files":["buttons.py"]}
+@app  {"mod":"ethprice","name":"ETH Price","entry":"run","files":["ethprice.py"]}
 @app  {"mod":"frog","name":"Frog","entry":"run","files":["frog.py"]}
 @app  {"mod":"g2048","name":"2048","entry":"run","files":["g2048.py"]}
 @app  {"mod":"grove","name":"Crystal Grove","entry":"run","files":["grove.py"]}
@@ -63,4 +65,4 @@ e20d454f74229b3aaa09a15829cbb6b85aa50c6b3bf229287b9cdbff73bee90d  wedgiedrive.mp
 @app  {"mod":"safe","name":"Safe Signer","entry":"run","usb":true,"files":["safe.py","safe_read.py","safe_ur.py","safe_7730.py","safe_wire.py","safe_roots.py","safe_keccak.py","safe_addr.py","safe_blockie.py","safe_key.py"]}
 @app  {"mod":"secret","name":"Secrets","entry":"run","usb":true,"files":["secret.py","secret_box.py"]}
 @app  {"mod":"welcome","name":"Welcome","entry":"run","files":["welcome.py"]}
-@serial  17
+@serial  18
