@@ -1,5 +1,6 @@
 // /api/rpc?chain=<id>: /safe's chain reads (eth_getLogs: a Safe's history, src/safe/history.ts), through the shop's Alchemy key (never a public RPC; the key never
 // reaches the browser). One JSON-RPC call per POST, read methods only (READ). Never log a body here.
+// wedgie_symbols [up to 25 symbols]: {BTC: usd, ...} from Alchemy's prices API (a wedgie app's net.chain, firmware/net.py).
 // wedgie_prices [token addresses]: {eth, tokens: {address: usd}, logos: {address: url}} from Alchemy's prices API
 // (mainnets only); eth is the chain's own coin (ETH, POL, …). DexScreener fills the long tail, as in Instant Wallet:
 // a price Alchemy doesn't have, and a logo (Alchemy has none for most small tokens).
@@ -25,6 +26,25 @@ const LOGOS = new Map<string, { at: number; v: string }>();   // chain:token -> 
 const LOGO_MS = 2 * 86_400_000;
 const logo = (k: string) => { const l = LOGOS.get(k); return l && Date.now() - l.at < LOGO_MS ? l.v : null; };
 const PRICE_MS = 60_000;
+
+/** Dollar prices by symbol (BTC, SOL, PEPE ...), any chain's coins. A symbol Alchemy doesn't know is left out. */
+async function symbols(list: unknown[]) {
+  const syms = [...new Set(list.filter((x): x is string => typeof x === "string" && /^[A-Z0-9]{1,10}$/.test(x)))].slice(0, 25);
+  const k = "sym:" + syms.slice().sort().join(","), hit = PRICED.get(k);
+  if (hit && Date.now() - hit.at < PRICE_MS) return hit.v;
+  const out: Record<string, number> = {};
+  if (syms.length) {
+    const r: any = await fetch(`https://api.g.alchemy.com/prices/v1/${key()}/tokens/by-symbol?` + syms.map((x) => "symbols=" + x).join("&"))
+      .then((x) => x.json()).catch(() => null);
+    for (const p of r?.data || []) {
+      const v = Number(p?.prices?.find((x: any) => x.currency === "usd")?.value);
+      if (v > 0 && syms.includes(p.symbol)) out[p.symbol] = v;
+    }
+  }
+  if (PRICED.size > 500) PRICED.clear();
+  PRICED.set(k, { at: Date.now(), v: out });
+  return out;
+}
 
 /** Dollar prices: the chain's coin and up to 25 tokens on one chain. A test chain's coins are worth nothing. */
 async function prices(chain: number, host: string, tokens: unknown[]) {
@@ -113,6 +133,7 @@ export async function POST(req: Request) {
   let b: any;
   try { b = JSON.parse(text); } catch { return oops("Bad request."); }
   if (!b || Array.isArray(b) || !Array.isArray(b.params)) return oops("Not allowed.", 403);
+  if (b.method === "wedgie_symbols") return json({ jsonrpc: "2.0", id: b.id ?? 1, result: await symbols(b.params) });
   if (b.method === "wedgie_prices") return json({ jsonrpc: "2.0", id: b.id ?? 1, result: await prices(Number(new URL(req.url).searchParams.get("chain")), host, b.params) });
   if (!READ.has(b.method)) return oops("Not allowed.", 403);
   const mk = b.method === "alchemy_getTokenMetadata" ? `${host}:${String(b.params[0]).toLowerCase()}` : "";

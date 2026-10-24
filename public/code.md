@@ -389,6 +389,8 @@ A wedgie has no network, but the computer it's plugged into does. List the sites
 ```python
 import net
 p = net.price()                                      # ETH in dollars (a float)
+ps = net.chain(1, "wedgie_symbols", ["BTC", "SOL"])  # {"BTC": 80449.85, "SOL": 101.46}: any coin by symbol (25 max)
+t = net.chain(8453, "wedgie_prices", ["0x4ed4...efed"])["tokens"]   # tokens on that chain by address: {address: usd}
 n = int(net.chain(8453, "eth_blockNumber"), 16)      # a chain read: eth_call, eth_getBalance, eth_blockNumber, ...
 amt = net.get("https://api.coinbase.com/v2/prices/ETH-USD/spot", pick="data.amount")   # "3412.10"
 rows = net.get("https://example.com/list.json", pick="0:5.{title,amount}")             # [{title, amount}] x 5
@@ -397,6 +399,7 @@ rows = net.get("https://example.com/list.json", pick="0:5.{title,amount}")      
 - Who fetches: **the wedgie's page on wedgie.dev, open in a tab** (wedgie.dev/connect, pick it; Chrome or
   Edge), or `python3 wedgie.py net` in a terminal. Nothing open: `net.Error("no internet: ...")` after 15 s.
   Say so on your screen and in your README.
+- `net.chain(chain, method, params)` is any read-only JSON-RPC call on that chain; wedgie.dev makes it. No URL.
 - Only what `"net"` lists, through wedgie.dev. `"chain"` uses wedgie.dev's Alchemy key (it never reaches the
   app or the page); read methods only, no sending transactions. Chains: 1 Ethereum, 8453 Base, 10 Optimism,
   42161 Arbitrum, 137 Polygon, and more. Sites: https only, GET only, rate-limited.
@@ -409,7 +412,7 @@ rows = net.get("https://example.com/list.json", pick="0:5.{title,amount}")      
   (`ui.progress("Getting the price", "wedgie.dev", bar=False)`). Not waiting: `rid = net.ask({"url": ...})`,
   then `net.answer(rid)` each frame (None till it's in).
 - Errors raise `net.Error` with a short reason: catch it and show it.
-- A full example: https://github.com/clawdbotatg/wedgie-ethprice
+- Full examples: https://github.com/clawdbotatg/wedgie-ethprice, https://github.com/clawdbotatg/wedgie-ticker
 
 ## The rest of the hardware
 

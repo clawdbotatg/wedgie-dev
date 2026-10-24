@@ -161,7 +161,7 @@ and the host holding its port answers (its page on wedgie.dev, or `wedgie.py net
 A host fetches only what the running app's wedgie.json lists in `"net"` (its sites, `"chain"` for chain
 reads) and goes through wedgie.dev: `POST https://wedgie.dev/api/net {"url","pick","max"}` -> `{data}` for a
 site, `POST https://wedgie.dev/api/rpc?chain=<id>` (JSON-RPC, read methods only, `wedgie_prices` for the ETH
-price) for a chain. Answers are plain ASCII JSON, under 5 KB.
+price, `wedgie_symbols` for any coins by symbol) for a chain. Answers are plain ASCII JSON, under 5 KB.
 
 hello's fields: `version` the firmware, `running` the app on screen (null: none), `chip` the secure
 chip found, `sealed` locked, `open` let in right now, `ram` bytes of free RAM, `free` bytes of free
