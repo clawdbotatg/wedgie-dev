@@ -19,6 +19,9 @@ history before commit 020765c.
 - A new commit in the app's repo changes nothing until someone adds it again (`community.mjs update`).
 - Repos a person adds by hand on their wedgie's page aren't signed. They install through full access.
 
+- **Review an app's `"net"` too:** the sites it may reach through its computer (firmware/net.py). The page
+  and wedgie.py fetch nothing else for it, so the list in the reviewed commit is the whole of its internet.
+
 ## Versions
 
 **An app's version is its repo's commit** (`4f7748d · Oct 4`). There is no version number to bump.
