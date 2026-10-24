@@ -56,7 +56,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   <div class="picks" id="picks" role="group" aria-label="Design"></div>
   <div id="stage"><span class="hint">drag to turn · pinch or scroll to zoom</span></div>
   <div class="controls">
-    <label for="ex">Pull apart <input id="ex" type="range" min="0" max="1" step="0.01" value="0.5"></label>
+    <label for="ex">Pull apart <input id="ex" type="range" min="0" max="1" step="0.01" value="0.6"></label>
     <button id="flip" aria-pressed="false">Show back</button>
     <button id="cut" aria-pressed="false">Cut in half</button>
     <button id="nolid" aria-pressed="false">Hide lid</button>
@@ -187,7 +187,7 @@ const DATA = {"dims":{"W":88.9,"H":50.8,"FLOOR":1.2,"FACE":0.8,"POCKET":0.600000
   const flipBtn = document.getElementById('flip');
   flipBtn.addEventListener('click', () => { flipped = !flipped; flipBtn.setAttribute('aria-pressed', flipped); flipBtn.textContent = flipped ? 'Show front' : 'Show back'; });
   function resetView() {
-    if (sel === -1) { const k = cards.length <= 3 ? 0.55 : 1; camera.position.set(0, 330 * k, 220 * k); controls.target.set(0, 0, 0); }
+    if (sel === -1) { if (cards.length <= 3) { camera.position.set(70, 95, 175); controls.target.set(0, 14, 0); } else { camera.position.set(0, 330, 220); controls.target.set(0, 0, 0); } }
     else { camera.position.set(0, 105, 82); controls.target.set(0, 0, 3); }
     controls.update();
   }
@@ -201,7 +201,7 @@ const DATA = {"dims":{"W":88.9,"H":50.8,"FLOOR":1.2,"FACE":0.8,"POCKET":0.600000
     camera.fov = w < 500 ? 46 : 32; camera.updateProjectionMatrix();
   }
   new ResizeObserver(size).observe(stage); size();
-  choose(0);
+  choose(-1);
   const cutBtn = document.getElementById('cut');
   cutBtn.addEventListener('click', () => { const on = cutBtn.getAttribute('aria-pressed') !== 'true';
     cutBtn.setAttribute('aria-pressed', on); clips.length = 0; if (on) { clips.push(clip); camera.position.set(8, 22, 70); controls.target.set(8, 0.6, 0); controls.update(); } });
