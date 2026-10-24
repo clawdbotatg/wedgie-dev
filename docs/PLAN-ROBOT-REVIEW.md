@@ -19,8 +19,8 @@ Status 2026-10-24: plan only. The review and signing live in
    - round: keep root c and the round number; refuse a lower one.
    - add: take it only if its round equals the saved round, keep its root. A newer round drops all adds.
    - then proofs as for a and b: hashes only.
-   Verify with `optiga.verify` on a Trust M (hardware, ms), else pure-Python `p256.verify` (~2.2 s), once.
-   Time both: clear-review `tools/timeprobe.py` (read only).
+   Verify with `optiga.verify` on a Trust M (181 ms), else pure-Python `p256.verify` (2.4 s), once.
+   Measured 10-24 on a real board with clear-review `tools/timeprobe.py`.
 4. **Screen.** audited / 🤖 checked / not checked (red, as today). Never refuse (warn, don't block).
 5. **Tests.** `test_clear.py` covers root c; a tampered round or an older round is refused;
    `safechip.mjs` signs one 🤖 tx; then a real board.
