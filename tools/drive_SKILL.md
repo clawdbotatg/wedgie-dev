@@ -15,14 +15,14 @@ or an ATECC608) **wedged** between the boards on I2C. It runs MicroPython plus t
 into one app, and asks on its own screen before anything that matters. Games, tools, and a hardware signer for a
 Safe multisig. Everything is MIT. Home: https://wedgie.dev
 
-**The current firmware is 0.3.61.** If a wedgie's `hello` says older, update it first: everything here assumes
+**The current firmware is 0.3.62.** If a wedgie's `hello` says older, update it first: everything here assumes
 current firmware.
 
 ```yaml
 name: wedgie
 site: https://wedgie.dev
 skill_index: https://wedgie.dev/skill.md          # this file
-firmware: 0.3.61
+firmware: 0.3.62
 license: MIT (hardware design, case, firmware, site, art)
 source: https://github.com/clawdbotatg/wedgie-dev
 made_by: Austin Griffith and Gus Griffith, with @ClawdBotATG; sold by BuidlGuidl DAO LLC
@@ -222,7 +222,7 @@ https://instantwallet.io. Details: safe.md.
 
 # Talk to a wedgie over USB
 
-Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.61**; if `hello`
+Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.62**; if `hello`
 says older, run `wedgie.py update` first.
 
 ## Talk to it directly
@@ -345,7 +345,7 @@ from answering. Hold **Y**: no WEDGIE drive this time (debugging only).
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.61","fw":"wedgie-0.3.61","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.62","fw":"wedgie-0.3.62","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":3,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -1047,7 +1047,7 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md. Or build one your
 
 You are writing a game or app for a **wedgie**: a Raspberry Pi Pico (RP2040 or RP2350) under a
 240x240 color screen, with a 5-way joystick on the left and four buttons A B X Y down the right. It
-runs MicroPython plus the wedgie firmware (current: 0.3.61), which boots straight into one app. You
+runs MicroPython plus the wedgie firmware (current: 0.3.62), which boots straight into one app. You
 write that app.
 
 What you hand back is a **folder** (later a GitHub repo) with a `wedgie.json` at its top and the app's
@@ -1442,7 +1442,8 @@ rows = net.get("https://example.com/list.json", pick="0:5.{title,amount}")      
   42161 Arbitrum, 137 Polygon, and more. Sites: https only, GET only, rate-limited.
 - **The answer must fit in 5 KB** (RAM). Use `pick` to take only what you need from a JSON answer. A path
   is steps split by `.`: a field name, `3` an item (`-1` the last), `2:5` items 2-4, `*` every item,
-  `{a,b}` just those fields; each list step applies the rest of the path to every item. Or a dict of
+  `{a,b}` just those fields; each list step applies the rest of the path to every item. On text, `0:500`
+  is its first 500 characters (`"items.3.description.0:500"`). Or a dict of
   paths: `pick={"price": "data.amount", "base": "data.base"}`. A text page comes back as a string.
 - Each call waits for its answer (usually under a second): draw your loading screen first
   (`ui.progress("Getting the price", "wedgie.dev", bar=False)`). Not waiting: `rid = net.ask({"url": ...})`,

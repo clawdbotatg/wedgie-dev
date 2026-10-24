@@ -7,7 +7,7 @@ description: Make games and apps for a wedgie (a Raspberry Pi Pico with a 240x24
 
 You are writing a game or app for a **wedgie**: a Raspberry Pi Pico (RP2040 or RP2350) under a
 240x240 color screen, with a 5-way joystick on the left and four buttons A B X Y down the right. It
-runs MicroPython plus the wedgie firmware (current: 0.3.61), which boots straight into one app. You
+runs MicroPython plus the wedgie firmware (current: 0.3.62), which boots straight into one app. You
 write that app.
 
 What you hand back is a **folder** (later a GitHub repo) with a `wedgie.json` at its top and the app's

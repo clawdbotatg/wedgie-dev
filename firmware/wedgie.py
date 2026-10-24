@@ -3,7 +3,7 @@
 # interrupted; from the REPL they are plain calls:  import wedgie; wedgie.shot(); wedgie.press("A")
 import sys, os, json, machine
 
-VERSION = "0.3.61"
+VERSION = "0.3.62"
 
 # The lock. main.py turns Ctrl-C off before anything else and never ends by itself, so a computer
 # can only send the slot's JSON lines: it can't stop the app, reach the REPL, or make the secure chip
@@ -416,12 +416,14 @@ class Lines:
             self.n += 1
         return None
 
-    def raw(self, mv):
+    def raw(self, mv, poll=None, ms=5000):
         """Exactly len(mv) raw bytes, right after the line just read (a raw put, job.py), in one C loop
         (stdin.buffer.readinto): 4 KB in ~37 ms on an RP2040, where the same as a base64 line read a char
         at a time took ~4 s. Ctrl-C is off while sealed, so any byte value comes through."""
         got, n = 0, len(mv)
         while got < n:
+            if poll and not poll.poll(ms):      # bytes lost on the way: say so, never wait for good (0.3.62)
+                raise OSError("raw bytes stopped at %d of %d" % (got, n))
             got += sys.stdin.buffer.readinto(mv[got:min(n, got + 512)]) or 0
 
     def pump(self, poll, wait=0):

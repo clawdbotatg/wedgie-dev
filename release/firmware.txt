@@ -1,5 +1,5 @@
 wedgie-release 1
-version 0.3.61
+version 0.3.62
 e7a778721b06600e621f717961deb086a255d99fef82bb135d84b421ae1f0206  atecc.mpy
 5ac401b4dcabd6cfa942c011dc9280a9e7890acac41dcf787c2279c6d8a887f6  bar.bin
 9afe5f025fc1c6a559587dadfa1b59fdba605466fa2551b3d01bf3fc7fa1ea10  blackjack.py
@@ -10,7 +10,7 @@ e8f645382cc4d21e5d58168101e7f3891cd0f3921c26205e153393ff78f5c309  bunker_art.mpy
 42688335337e67532924c86df2d9fdf0e05a82083728985ea43429cc5dcb5f32  bunker_draw.py
 79f2fd80c3f2954497e463309a039707c95eb354da61bd59d5b7cb414c3c9d5c  bunker_game.mpy
 8e228f1f9d15dcc6210319e1034ad59afa21b92c1661cd4b88a3653ea59ff132  buttons.py
-8e058e1e4ad84a39bab4b4ba832322c16797aed1f2f85dcb20671ff13758a59c  drive.bin
+e36802986597becb47e4b839b12df48f473e5cb8dfbb944b092a2b0834dd89a8  drive.bin
 3920438a54d5d023808d1622251640c9476aa10d3b4583dfd0c3e997c65a792c  ethprice.py
 cf5456e981f7230c0e2b3e1e6a1658c7482159708047d44f89e490aad1891d66  frog.py
 73267cc4d9bcc4cd5bd31117476f67ee7817db055e39274c5636df5a563169c0  g2048.py
@@ -18,7 +18,7 @@ f0224e865a8f55c77b0c13d353b4663e6d9642e99439d98c3045dea3f594ef91  grove.py
 2cec32b1db4f308ae0457f380ef97cfd033df0a5369cb1a727d0dff26b872ca4  hatch.mpy
 e48b5026c29584c98ffd8abb53f313c5f012adc41cf8fc6a1e5b0dee30915226  home.bin
 a853621f0087dd9b513c40c674cc5ed7d5b95ae3b314cbac65fbc15d1473d7e2  inbox.mpy
-8935cbeee93a61e58efd3d94e9e4a25619bdeb47464b2b11792666c0c46b0f8d  job.mpy
+75d14cf56ccc666af24e451550567354517d6063480040106887d982e5e4bccd  job.mpy
 0cf9561df639b610056d896dbf503f37d4df3c1ef59eab58dfd3118913be23aa  keypad.py
 92e4f671ff8822d5c3b81d96e3b59b7a198a1e4cfaeead5e07eef0c0938d56f7  lcd.mpy
 e627c2160e96810bdc39c40562c90871b61ae4ee736d667b6fea6108eac2cb21  loader.mpy
@@ -49,7 +49,7 @@ ca324e0a4598275f90d016e04322efea2c4c9b47a8602a143ce6524fc57adb95  secret.py
 37e2f01c86ccb98a9b516f2d4e32a0bcb0543ca498d823f31cb6f189585a9253  trustm.mpy
 d6df4f29a7415948273c50a9095b4533535cca6f2d88aee02cd80b822f715397  ui.mpy
 8891352abecddf9de45f4e7aa87afad8c9dd30964d5b99a9853a3758878d7f36  usbdev.mpy
-de1256c320201c8084ae590d7b1abd22e72244e70d1226ada1419b5b8ed974a6  wedgie.mpy
+37a55a43bf25b6333c91a9753efefd8dd1c309d7245c64053b845dcf64df0a91  wedgie.mpy
 e20d454f74229b3aaa09a15829cbb6b85aa50c6b3bf229287b9cdbff73bee90d  wedgiedrive.mpy
 5178bde1e2c81e1c14f11630911499f7cfd202306e880588de6d6c23bfed0280  welcome.py
 @app  {"mod":"blackjack","name":"Blackjack","entry":"run","files":["blackjack.py"]}
@@ -65,4 +65,4 @@ e20d454f74229b3aaa09a15829cbb6b85aa50c6b3bf229287b9cdbff73bee90d  wedgiedrive.mp
 @app  {"mod":"safe","name":"Safe Signer","entry":"run","usb":true,"files":["safe.py","safe_read.py","safe_ur.py","safe_7730.py","safe_wire.py","safe_roots.py","safe_keccak.py","safe_addr.py","safe_blockie.py","safe_key.py"]}
 @app  {"mod":"secret","name":"Secrets","entry":"run","usb":true,"files":["secret.py","secret_box.py"]}
 @app  {"mod":"welcome","name":"Welcome","entry":"run","files":["welcome.py"]}
-@serial  18
+@serial  19

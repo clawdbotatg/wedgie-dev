@@ -84,7 +84,7 @@ class Host:
             self.q.pop(0)
         return self.q.pop(0) if self.q else None
 
-    def raw(self, mv):
+    def raw(self, mv, poll=None, ms=5000):
         kind, b = self.q.pop(0)
         mv[:] = b
 

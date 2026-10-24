@@ -168,10 +168,17 @@ def check(m, sig=True, tick=None):
     return version, files, required
 
 
+def _err(qid, e):
+    """An install stops on a bad request: the host hears why, and the log keeps it (wedgie.py debug)."""
+    W.send({"id": qid, "type": "error", "error": e})
+    W.log("install stopped:", e[:80])
+
+
 def _nope(mid, e):
     """A check failed after the yes: tell the host, and the person on its screen for a few seconds (0.3.55
     and before only restarted, saying nothing: Austin, 10-19). Nothing was written."""
     W.send({"id": mid, "type": "error", "error": str(e)})
+    W.log("install stopped:", str(e)[:80])
     try:
         import lcd, ui
         d = lcd.LCD()
@@ -309,7 +316,7 @@ def run(mid, m, ask, show=None):
     R = W.lines()                           # the one line reader: never a string grown per char (wedgie.Lines)
     buf = bytearray(RAW)                    # raw puts land here: made once, on install mode's clean heap
     bv = memoryview(buf)
-    last, qid = time.ticks_ms(), mid
+    last, qid, t = time.ticks_ms(), mid, "go"
     gc.collect()
     try:
         while time.ticks_diff(time.ticks_ms(), last) < IDLE_MS:
@@ -325,7 +332,7 @@ def run(mid, m, ask, show=None):
             qid, t = q.get("id"), q.get("type")
             if t == "release":
                 if files is not None:
-                    W.send({"id": qid, "type": "error", "error": "one signed list per job"})
+                    _err(qid, "one signed list per job")
                     return
                 show(title, "checking the signature", plan.at("sig"))
                 try:
@@ -356,10 +363,10 @@ def run(mid, m, ask, show=None):
             elif t == "put":
                 n = q.get("name")
                 if files is None:
-                    W.send({"id": qid, "type": "error", "error": "the signed list comes first"})
+                    _err(qid, "the signed list comes first")
                     return
                 if n not in write:
-                    W.send({"id": qid, "type": "error", "error": "%s isn't in this job" % n})
+                    _err(qid, "%s isn't in this job" % n)
                     return
                 if n != cur:                # a new upload: whatever was checked under this name isn't any more
                     if f:                   # (a finished file sent again was committed as the new bytes,
@@ -370,10 +377,10 @@ def run(mid, m, ask, show=None):
                 k = q.get("n")
                 if k is not None:           # raw (0.3.16+): k bytes follow this line, no base64
                     if not isinstance(k, int) or k < 0 or k > RAW:
-                        W.send({"id": qid, "type": "error", "error": "a raw put is 0..%d bytes" % RAW})
+                        _err(qid, "a raw put is 0..%d bytes" % RAW)
                         return
                     b = bv[:k]
-                    R.raw(b)
+                    R.raw(b, poll)
                 else:
                     b = binascii.a2b_base64((q.pop("data", None) or "").encode())
                 q = None
@@ -386,16 +393,16 @@ def run(mid, m, ask, show=None):
                     f, cur = None, None
                     got[n] = binascii.hexlify(h.digest()).decode()
                     if got[n] != files[n]:
-                        W.send({"id": qid, "type": "error", "error": "%s doesn't match the signed list" % n})
+                        _err(qid, "%s doesn't match the signed list" % n)
                         return
                 W.send({"id": qid, "type": "ok"})
                 gc.collect()
             elif t == "commit":
                 if files is None:
-                    W.send({"id": qid, "type": "error", "error": "the signed list comes first"})
+                    _err(qid, "the signed list comes first")
                     return
                 if cur is not None:
-                    W.send({"id": qid, "type": "error", "error": "%s isn't finished" % cur})
+                    _err(qid, "%s isn't finished" % cur)
                     return
                 show(title, "restarting", plan.at("commit"))
                 # Recheck existing required files here, even when the host never asked for their sums.
@@ -403,7 +410,7 @@ def run(mid, m, ask, show=None):
                 existing = sums([n for n in required if n not in got])
                 missing = [n for n in required if got.get(n, existing.get(n)) != files[n]]
                 if missing:
-                    W.send({"id": qid, "type": "error", "error": "not sent: " + " ".join(missing)})
+                    _err(qid, "not sent: " + " ".join(missing))
                     return
                 for n in sorted(got, key=lambda n: n == "main.py"):     # main.py last
                     try:                # one step: littlefs renames over the old file, so a power cut leaves the
@@ -446,9 +453,11 @@ def run(mid, m, ask, show=None):
                 return                      # (the emulator's soft_reset returns: it restarts once this does)
             elif t == "abort":
                 W.send({"id": qid, "type": "ok"})
+                W.log("install stopped: the computer said stop", title)
                 return
             elif t == "hello":              # job: a host whose port dropped at the restart finds the job here
                 W.send(W.hello(qid, job=True, asked_ms=W.asked_ms))
+        W.log("install stopped: nothing from the computer for %d s after %s, %d bytes in" % (IDLE_MS // 1000, t, sent), title)
     except Exception as e:                  # out of memory, a full flash...: nothing changed, it restarts
         W.failed(qid, e)
     finally:
