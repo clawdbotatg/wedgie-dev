@@ -2,6 +2,27 @@
 // Board code prints results as "@<tag> <json>" lines; those stream to onLine as they arrive.
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// The trace of the last install or update: every request, answer, timeout, port open and drop, and the
+// wedgie's printed lines, with ms since it began. An install spans two ports (its yes restarts it), so it's
+// one trace for the page, not one per Repl. Kept in localStorage ("wedgie.trace") so a failed update can
+// still be read after the tab closed; the bug report sends it (ui/report.ts).
+const TRACE = "wedgie.trace";
+let traceAt = 0, traceLines: string[] | null = null;
+export function traceStart(what: string) {
+  traceAt = Date.now();
+  traceLines = [];
+  traceNote(`${new Date().toISOString()} ${what} (${navigator.userAgent.match(/Chrome\/[\d.]+|Edg\/[\d.]+/)?.[0] || "?"})`);
+}
+export function traceNote(s: string) {
+  if (!traceLines) return;
+  traceLines.push(`${String(Date.now() - traceAt).padStart(6)} ${s.slice(0, 160)}`);
+  if (traceLines.length > 600) traceLines.splice(1, traceLines.length - 600);
+  try { localStorage.setItem(TRACE, traceLines.join("\n")); } catch {}
+}
+export function traceEnd(result: string) { traceNote(result); traceLines = null; }
+export function lastTrace() { try { return localStorage.getItem(TRACE) || ""; } catch { return ""; } }
+const what = (m: Record<string, unknown>) => `${m.type}${m.name ? " " + m.name : ""}${m.job ? " " + m.job : ""}`;
 const RAW_PROMPT = "raw REPL; CTRL-B to exit\r\n>";
 
 type Waiter = { str: string; res: (before: string) => void; rej: (e: Error) => void; t: number };
@@ -25,6 +46,7 @@ export class Repl {
   }
 
   async open() {
+    traceNote("port open");
     await this.port.open({ baudRate: 115200 });
     this.writer = this.port.writable!.getWriter();
     this.reader = this.port.readable!.getReader();
@@ -50,6 +72,7 @@ export class Repl {
   // Unplugged (or its restart dropped the port): the read ends, or only the disconnect event says so.
   private onGone = (e: Event) => { if (((e as any).port || e.target) === this.port) this.gone(); };
   private gone() {
+    if (this.alive) traceNote("port gone");
     this.alive = false;
     this.check(true);
     navigator.serial?.removeEventListener("disconnect", this.onGone);
@@ -64,6 +87,7 @@ export class Repl {
     while ((i = this.lineBuf.indexOf("\n")) >= 0) {
       const line = this.lineBuf.slice(0, i).replace(/\r$/, "").replace(/^[\x04>]*(OK)?/, "");
       this.lineBuf = this.lineBuf.slice(i + 1);
+      if (traceLines && line.trim() && !line.startsWith("{") && !line.startsWith("@")) traceNote("· " + line.trim());
       if (line.startsWith("@") && this.onLine) {
         const sp = line.indexOf(" ");
         try { this.onLine(line.slice(1, sp), JSON.parse(line.slice(sp + 1))); } catch {}
@@ -95,6 +119,7 @@ export class Repl {
       const w: Waiter = { str, res, rej, t: 0 };
       w.t = window.setTimeout(() => {
         this.waiters = this.waiters.filter((x) => x !== w);
+        traceNote(`✗ no answer: waited ${ms} ms for ${JSON.stringify(str.slice(0, 30))}`);
         rej(new Error("wedgie did not answer"));
       }, ms);
       this.waiters.push(w);
@@ -125,8 +150,9 @@ export class Repl {
    *  list: a job's question asking for its signed list ({"type": "list"}, 0.3.56+); the answer comes after. */
   request(msg: Record<string, unknown>, ms = 5000, list?: () => void): Promise<any> {
     const id = this.nextId++;
+    traceNote(`→ ${what(msg)} #${id}`);
     return new Promise((res, rej) => {
-      const t = window.setTimeout(() => { this.pending.delete(id); rej(new Error("wedgie did not answer")); }, ms);
+      const t = window.setTimeout(() => { this.pending.delete(id); traceNote(`✗ no answer: ${what(msg)} #${id} in ${ms} ms`); rej(new Error(`wedgie did not answer (${what(msg)})`)); }, ms);
       this.pending.set(id, { parts: [], res, rej, t, list });
       this.write(JSON.stringify({ ...msg, id }) + "\n").catch(rej);
     });
@@ -135,8 +161,9 @@ export class Repl {
   /** A request whose line is followed by raw bytes (a raw put: msg.n = raw.length, firmware 0.3.16+). */
   requestRaw(msg: Record<string, unknown>, raw: Uint8Array, ms = 5000): Promise<any> {
     const id = this.nextId++;
+    traceNote(`→ ${what(msg)} +${raw.length} raw #${id}`);
     return new Promise((res, rej) => {
-      const t = window.setTimeout(() => { this.pending.delete(id); rej(new Error("wedgie did not answer")); }, ms);
+      const t = window.setTimeout(() => { this.pending.delete(id); traceNote(`✗ no answer: ${what(msg)} #${id} in ${ms} ms`); rej(new Error(`wedgie did not answer (${what(msg)})`)); }, ms);
       this.pending.set(id, { parts: [], res, rej, t });
       this.write(JSON.stringify({ ...msg, n: raw.length, id }) + "\n").then(() => this.write(raw)).catch(rej);
     });
@@ -144,7 +171,7 @@ export class Repl {
 
   private json(v: any) {
     const p = v && typeof v.id === "number" ? this.pending.get(v.id) : undefined;
-    if (!p) { this.onJson?.(v); return; }
+    if (!p) { if (traceLines && v?.type !== "poidh_want") traceNote(`← (unasked) ${v?.type}`); this.onJson?.(v); return; }
     if (v.type === "list" && p.list) { p.list(); return; }
     if (v.type === "shot" || v.type === "file") {
       p.parts[v.i] = v.type === "file" ? atob(v.data) : v.data;
@@ -156,6 +183,7 @@ export class Repl {
     }
     clearTimeout(p.t);
     this.pending.delete(v.id);
+    traceNote(`← ${v.type}${v.error ? " " + v.error : ""} #${v.id}`);
     p.res(v);
   }
 

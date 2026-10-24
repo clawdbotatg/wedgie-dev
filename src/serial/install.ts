@@ -22,6 +22,7 @@
 // (it must, to run the new core), and then the wedgie comes back as a new port (wedgies.ts).
 import type { Repl } from "./repl";
 import { waitBack, withRepl, type Wedgie } from "./wedgies";
+import { traceNote } from "./repl";
 import { cmpVersion } from "../apps/appjson.mjs";
 import { busy, progress, writeFile } from "./files";
 
@@ -147,16 +148,16 @@ export async function letIn(r: Repl, ask: (s: string) => void = askHint, job = "
   if (!h?.sealed || h.open) return;
   ask(ASK_TEXT);
   const site = performance.now() - (askStart || performance.now());
-  const asked = r.request({ type: "open", for: job }, 65000);   // job: what the wedgie's screen asks
+  const t0 = Date.now(), asked = r.request({ type: "open", for: job }, 65000);   // job: what the wedgie's screen asks
   asked.catch(() => {});
   const close = typeof document !== "undefined" ? (await import("../ui/askmodal")).askModal(job) : () => {};
   let v: any;
   try { v = await asked; }
-  catch { throw new Error("nobody pressed A on the wedgie"); }
+  catch { throw new Error("nobody pressed the green button on the wedgie"); }
   finally { ask(""); close(); askStart = 0; }
   lastAsk = { site: Math.round(site), wedgie: v.asked_ms ?? null, what: job };
   if (v.type === "open") return;
-  if (v.type === "refused") throw new Error("the wedgie said no (Y on its screen)");
+  if (v.type === "refused") throw new Error(Date.now() - t0 > 55000 ? "nobody pressed the green button on the wedgie in time" : "the wedgie said no (the red button)");
   if (v.type === "busy") throw new Error("the wedgie is busy signing; try again after");
   throw new Error(`the wedgie said ${v.error || v.type}`);
 }
@@ -309,10 +310,12 @@ async function job(r: Repl, m: Manifest, title: string, write: string[], del: st
     // plugged in drops the port (the WEDGIE drive goes): the go went out on a port that's gone. Find it
     // again by its ID; in install mode its hello says job.
     const uid = uidOf.get(r);
-    if (r.alive || !uid) throw new Error("nobody pressed A on the wedgie");
+    if (r.alive || !uid) throw new Error("nobody pressed the green button on the wedgie");
     onProgress(0, "it's restarting into the install");
+    traceNote("its port dropped: waiting for it to come back");
     await r.close();                    // it's dead: let go of the port (it may come back as this same one)
     const back = await waitBack(uid, sent);
+    traceNote(back ? "it's back" : "it didn't come back in 20 s");
     if (!back) throw new Error("the wedgie restarted and didn't come back. Unplug it and plug it in again");
     v = { type: "go", port: back };
   }
@@ -325,7 +328,7 @@ async function job(r: Repl, m: Manifest, title: string, write: string[], del: st
     if (h.bin) binOf.set(r2, h.bin);
     return rest(r2);
   });
-  if (v.type === "refused") throw new Error("the wedgie said no (Y on its screen)");
+  if (v.type === "refused") throw new Error(Date.now() - sent > 55000 ? "nobody pressed the green button on the wedgie in time" : "the wedgie said no (the red button)");
   if (v.type === "busy") throw new Error("the wedgie is busy signing; try again after");
   if (v.type !== "go") throw new Error(`the wedgie said ${v.error || v.type}`);
   return rest(r);

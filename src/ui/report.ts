@@ -1,9 +1,10 @@
 // "Send a bug report": everything we'd want to see, shown to the person first, then POSTed to /api/report
 // (it mails wedgie@buidlguidl.com). What's in it: the page and browser, this page's last errors, and for a
 // plugged-in wedgie its hello facts, the log it keeps (firmware 0.3.52+, wedgie.py log: power-ons, app
-// starts, crashes, installs; no keys) and the page's own conversation with it. Works with no wedgie too.
+// starts, crashes, installs; no keys) and the page's own conversation with it, and the last install's step trace. Works with no wedgie too.
 import { esc } from "./device";
 import type { Wedgie } from "../serial/wedgies";
+import { lastTrace } from "../serial/repl";
 
 const errors: string[] = [];
 const keep = (s: string) => { errors.push(new Date().toISOString().slice(11, 19) + " " + s.slice(0, 600)); errors.splice(0, errors.length - 20); };
@@ -21,6 +22,7 @@ export function reportText(w?: Wedgie, log?: string) {
     out.push("", "== its log", log || "(none)");
     out.push("", "== what the page and it said (last part)", (w.log || "").slice(-8000) || "(nothing)");
   } else out.push("", "== no wedgie plugged in");
+  out.push("", "== the last install or update, step by step", lastTrace() || "(none in this browser)");
   out.push("", "== page errors", errors.join("\n") || "(none)");
   return out.join("\n");
 }

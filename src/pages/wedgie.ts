@@ -16,7 +16,7 @@ import { esc, KEYS, type Screen } from "../ui/device";
 import { place3D, idScreen as idCanvas, colorScreen, baseColor } from "../ui/place3d";
 import type { Wedgie3D } from "../ui/wedgie3d";
 import * as W from "../serial/wedgies";
-import { pyStr, type Repl } from "../serial/repl";
+import { pyStr, traceStart, traceEnd, type Repl } from "../serial/repl";
 import { answerNet } from "../serial/net";
 import { installCore, useApp, appVer, removeApp, takeOver, setAskHint, askHint, firmwareManifest, lastAsk, type Cart, type Manifest } from "../serial/install";
 import * as FS from "../serial/files";
@@ -461,6 +461,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     if ((wrongChip(c) || oldFw(c)) && confirmChip !== c.mod) { confirmChip = c.mod; paint(); return; }
     confirmChip = "";
     busy = "cart"; inserting[c.mod] = 0; paint();
+    traceStart(`install ${c.mod} on ${x.short} ${x.version} running ${x.running}`);
     const T = `Installing ${c.name}`, sub = appVer(c);
     setScreen({ kind: "loading", p: 0, title: T, sub });
     try {
@@ -473,7 +474,9 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
       W.reidentify(x);
       release?.(); release = null; link = null;
       setTimeout(() => status(""), 6000);
+      traceEnd("ok");
     } catch (e: any) {
+      traceEnd("FAILED: " + (e?.message || e));
       delete inserting[c.mod];
       status(`<b class="bad">${esc(c.name)} didn't go on:</b> ${esc(e?.message || e)}`);
       await backToApp(r).catch(() => {});
@@ -639,6 +642,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     if (!link || busy || !w) return;
     const r = link, x = w;
     busy = "fw"; paint(); meter(0, "starting");
+    traceStart(`update ${x.short} ${x.version} -> ${m?.version} running ${x.running}`);
     try {
       if (x.kind === "micropython") { await r.enter({ reset: true }); }   // bare MicroPython: no drive, a reset is safe
       setScreen({ kind: "loading", p: 0, title: "Updating firmware" });
@@ -656,7 +660,9 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
       W.reidentify(x);
       release?.(); release = null; link = null;
       setTimeout(() => { status(""); meter(null); }, 8000);
+      traceEnd("ok");
     } catch (e: any) {
+      traceEnd("FAILED: " + (e?.message || e));
       meter(null);
       status(`<b class="bad">Update failed:</b> ${esc(e?.message || e)}. It's safe to try again.`);
       await backToApp(r).catch(() => {});
