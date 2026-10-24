@@ -29,7 +29,7 @@ import { busy, progress, writeFile } from "./files";
 export type FileInfo = { name: string; size: number; sha256: string; url?: string };
 /** chip: the secure chip it needs ("ATECC608" / "OPTIGA Trust M", as the chip check names them), if any.
  *  fw: the oldest wedgie firmware it runs on. repo/sha/at: an app from a GitHub repo, at that commit (its date); unreviewed: added on this browser, not on the shelf. */
-export type Cart = { mod: string; name: string; entry?: string; usb?: boolean; chip?: string; fw?: string; about?: string; files: string[]; v: string; size: number; label: string; icon: string[]; repo?: string; sha?: string; at?: string; unreviewed?: boolean };
+export type Cart = { mod: string; name: string; entry?: string; usb?: boolean; chip?: string; fw?: string; about?: string; files: string[]; v: string; size: number; label: string; icon: string[]; repo?: string; sha?: string; at?: string; unreviewed?: boolean; net?: string[] };
 /** Core files a newer core dropped: an update deletes them (0.2.0: the menu went). */
 const RETIRED = ["menu.py", "menu.mpy"];
 /** What the firmware keeps free for saves and itself (save.py FLOOR). */

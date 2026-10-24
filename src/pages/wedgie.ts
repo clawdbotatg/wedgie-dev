@@ -17,6 +17,7 @@ import { place3D, idScreen as idCanvas, colorScreen, baseColor } from "../ui/pla
 import type { Wedgie3D } from "../ui/wedgie3d";
 import * as W from "../serial/wedgies";
 import { pyStr, type Repl } from "../serial/repl";
+import { answerNet } from "../serial/net";
 import { installCore, useApp, appVer, removeApp, takeOver, setAskHint, askHint, firmwareManifest, lastAsk, type Cart, type Manifest } from "../serial/install";
 import * as FS from "../serial/files";
 import { cartHtml } from "../ui/cart";
@@ -216,6 +217,12 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
   let release: (() => void) | null = null;
   let stopFn: (() => void) | null = null;
   const wedgie = () => w?.kind === "wedgie";
+  // its app's wedgie.json "net": the sites this page fetches for it (serial/net.ts), by the version it has
+  const netOf = () => {
+    const have = w?.carts?.find((c) => c.mod === w?.running), cs = view()?.carts.filter((c) => c.mod === w?.running) || [];
+    return (cs.find((c) => have?.v && c.v === have.v) || cs[0])?.net;
+  };
+  let netUsed = "";                // the last site this page fetched for its app
   const carts = () => (w?.carts || []);
   const newCarts = () => !!w?.carts;                // firmware 0.1.4+: cartridges come and go
 
@@ -289,6 +296,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     W.withRepl(x, async (r) => {
       if (x !== w) return;
       link = r;
+      r.onJson = (v) => { if (v?.type === "net") answerNet(r, v, netOf(), (what) => { netUsed = what; paint(); }); };
       setScreen(home());
       paint();
       if (liveFs()) loadSaves();
@@ -323,7 +331,8 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     w3?.setColor("base", baseColor(x.chip?.type));
     $("#d-light").className = `light ${F.overall(x, m)}`;
     $("#d-virtual").hidden = !x.virtual;
-    $("#d-hint").textContent = mirrorOn && wedgie() && link ? "Its real screen. Click its buttons (or press arrows, Enter, A, B, X, Y) to press the real ones." : "";
+    $("#d-hint").textContent = mirrorOn && wedgie() && link ? "Its real screen. Click its buttons (or press arrows, Enter, A, B, X, Y) to press the real ones."
+      : netUsed && link ? `Its app gets the internet through this tab (${netUsed}). Keep it open.` : "";
     const mb = $<HTMLButtonElement>('[data-act="mirror"]');
     if (mb) mb.textContent = mirrorOn ? "Stop showing its screen" : "Show its screen here";
     paintHw(x); paintFw(x); paintCarts(x); paintSaves();

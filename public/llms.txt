@@ -11,7 +11,7 @@
 - [shop.md](https://wedgie.dev/shop.md): buy one: prices, what's in the box, shipping, card or USDC
 - [virtual.md](https://wedgie.dev/virtual.md): the virtual wedgie in a browser tab
 - [security.md](https://wedgie.dev/security.md): is it safe, exactly how, known gaps
-- [code.md](https://wedgie.dev/code.md): make apps and games
+- [code.md](https://wedgie.dev/code.md): make apps and games; apps can use the internet (net) through wedgie.dev
 - [trustm.md](https://wedgie.dev/trustm.md): the Trust M secure chip from an app
 - [lore.md](https://wedgie.dev/lore.md): why it's called a wedgie
 

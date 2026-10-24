@@ -40,6 +40,9 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md
 - **A dead chip is a lost key:** keep a second owner or recovery on every Safe.
 - **Apps decide** whether a USB press counts inside their own screens; the firmware's own questions take only real
   presses.
+- **The internet (0.3.61+):** an app can fetch from the sites its wedgie.json lists (`"net"`), through its open
+  wedgie.dev page or `wedgie.py net`. The page and wedgie.py refuse any other site, so a reviewed app can only
+  talk to what the review saw. Chain reads are read-only; wedgie.dev's Alchemy key never leaves wedgie.dev.
 - **Not an audited hardware wallet.** Don't keep more on it than you can afford to lose.
 - No secp256k1 in either chip: a wedgie owns smart accounts (Safe) through P-256, never a plain Ethereum key.
 

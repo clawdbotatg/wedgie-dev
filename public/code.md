@@ -7,7 +7,7 @@ description: Make games and apps for a wedgie (a Raspberry Pi Pico with a 240x24
 
 You are writing a game or app for a **wedgie**: a Raspberry Pi Pico (RP2040 or RP2350) under a
 240x240 color screen, with a 5-way joystick on the left and four buttons A B X Y down the right. It
-runs MicroPython plus the wedgie firmware (current: 0.3.60), which boots straight into one app. You
+runs MicroPython plus the wedgie firmware (current: 0.3.61), which boots straight into one app. You
 write that app.
 
 What you hand back is a **folder** (later a GitHub repo) with a `wedgie.json` at its top and the app's
@@ -103,12 +103,14 @@ https://wedgie.dev/virtual.md
 - `fw`: the oldest firmware it runs on. Using the whole `ui` kit below (`ui.say`, `{g}` squares,
   `lcd.tint`): `"0.3.36"`. Older floors: `"0.2.3"` `show(y0, y1)`/`show_rect`, `"0.2.4"` `wedgie.rand`,
   `"0.2.5"` `Keys(physical=True)`, `"0.3.5"` `ui`, `"0.3.17"` `optiga`, `"0.3.23"` `lcd.art`,
-  `"0.3.28"` `ui.right`.
+  `"0.3.28"` `ui.right`, `"0.3.61"` `net`.
 - `name` up to 14 characters (it's printed on the cartridge), Title Case. `about` one line, up to 140
   characters. `label` the cartridge color (`#rrggbb`). `icon` 12 rows of 12 characters: `.` clear,
   `k` black, `w` white, `g` green, `r` red, `y` yellow, `b` blue, `s` grey.
 - `chip`: `"ATECC608"` or `"OPTIGA Trust M"` if it needs that secure chip. `usb`: true only if the app
   speaks its own protocol on USB (a wallet); almost never. Then the firmware stops answering USB for you.
+- `net`: the sites it gets from the internet (below), like `["api.coinbase.com", "chain"]`. A site name
+  covers its subdomains; `"chain"` is read-only chain calls and the ETH price. Needs `"fw": "0.3.61"`.
 - One repo can hold up to 20 apps; each is its own entry.
 
 ## How the firmware runs your app
@@ -379,6 +381,35 @@ for i in range(51, 0, -1):          # a fair shuffle: Fisher-Yates, every swap f
 **More from the chip** (Trust M: keys that never leave it, signatures, ECDH, RSA, counters, storage):
 `import optiga`, firmware 0.3.17+. Every call, with examples and timings: https://wedgie.dev/trustm.md
 
+## The internet (0.3.61+)
+
+A wedgie has no network, but the computer it's plugged into does. List the sites in wedgie.json
+(`"net": ["api.coinbase.com", "chain"]`) and `import net`:
+
+```python
+import net
+p = net.price()                                      # ETH in dollars (a float)
+n = int(net.chain(8453, "eth_blockNumber"), 16)      # a chain read: eth_call, eth_getBalance, eth_blockNumber, ...
+amt = net.get("https://api.coinbase.com/v2/prices/ETH-USD/spot", pick="data.amount")   # "3412.10"
+rows = net.get("https://example.com/list.json", pick="0:5.{title,amount}")             # [{title, amount}] x 5
+```
+
+- Who fetches: **the wedgie's page on wedgie.dev, open in a tab** (wedgie.dev/connect, pick it; Chrome or
+  Edge), or `python3 wedgie.py net` in a terminal. Nothing open: `net.Error("no internet: ...")` after 15 s.
+  Say so on your screen and in your README.
+- Only what `"net"` lists, through wedgie.dev. `"chain"` uses wedgie.dev's Alchemy key (it never reaches the
+  app or the page); read methods only, no sending transactions. Chains: 1 Ethereum, 8453 Base, 10 Optimism,
+  42161 Arbitrum, 137 Polygon, and more. Sites: https only, GET only, rate-limited.
+- **The answer must fit in 5 KB** (RAM). Use `pick` to take only what you need from a JSON answer. A path
+  is steps split by `.`: a field name, `3` an item (`-1` the last), `2:5` items 2-4, `*` every item,
+  `{a,b}` just those fields; each list step applies the rest of the path to every item. Or a dict of
+  paths: `pick={"price": "data.amount", "base": "data.base"}`. A text page comes back as a string.
+- Each call waits for its answer (usually under a second): draw your loading screen first
+  (`ui.progress("Getting the price", "wedgie.dev", bar=False)`). Not waiting: `rid = net.ask({"url": ...})`,
+  then `net.answer(rid)` each frame (None till it's in).
+- Errors raise `net.Error` with a short reason: catch it and show it.
+- A full example: https://github.com/clawdbotatg/wedgie-ethprice
+
 ## The rest of the hardware
 
 - Screen: `lcd.LCD()` is a `framebuf.FrameBuffer` (240x240, 16 colors: GS4_HMSB) plus `show()`,
@@ -392,8 +423,8 @@ for i in range(51, 0, -1):          # a fair shuffle: Fisher-Yates, every swap f
 - Some wedgies have a 128x64 OLED instead (two keys: A and Y only). `ui` lays out its own screens for
   it; your app checks `d.width` (128) to draw a small layout, or it gets cut off.
 - MicroPython, not CPython: `math random struct json time array framebuf micropython gc hashlib`,
-  `time.ticks_ms()`, `ticks_diff()`, `sleep_ms()`. No real clock, no network, no files outside the
-  flash, no pip.
+  `time.ticks_ms()`, `ticks_diff()`, `sleep_ms()`. No real clock, no network of its own (`net` above), no
+  files outside the flash, no pip.
 - Who it is: `import wedgie; wedgie.VERSION` (firmware), `wedgie.uid()` (board ID).
 - Sound: none built in. Free pins for extras: GP0 GP1 GP6 GP7 GP14 GP22 GP26 GP27 GP28.
 - The secure chip (ATECC608 or Trust M): random numbers above. Keys and signing: a Trust M through

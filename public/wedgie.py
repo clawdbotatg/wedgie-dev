@@ -20,6 +20,8 @@
   python3 wedgie.py saves [backup f.json | restore f.json]    its saves (/saves/<game>/), out to a file and back
   python3 wedgie.py unlock                    full control (mpremote, Ctrl-C, its chip) until it restarts; asks on its screen, in red
   python3 wedgie.py debug                     a report (firmware, files, free space and RAM, error.log); asks on its screen
+  python3 wedgie.py net [folder]              stay plugged in and be its app's internet (the sites its wedgie.json
+                                              "net" lists, through wedgie.dev; folder: an app you put on from there)
 
   --port /dev/cu.usbmodemXXXX  (or --id A1B2C3) picks one when several are plugged in.
 
@@ -36,7 +38,7 @@ reconnects USB, so a wedgie you just plugged in shows up, vanishes and shows up 
 same ID). Wait a couple of seconds after plugging in; pick it by --id, not by port, in scripts. A soft
 reset doesn't re-add the drive on 0.1.3+, but the first one after updating from older firmware does.
 """
-import sys, os, re, time, json, base64, hashlib, zlib, struct, argparse, urllib.request
+import sys, os, re, time, json, base64, hashlib, zlib, struct, argparse, urllib.request, urllib.error, urllib.parse
 
 try:
     import serial
@@ -646,6 +648,81 @@ def need_firmware(wg):
     return h
 
 
+# ---- net: its app's internet (firmware net.py; the page does the same: src/serial/net.ts) ---------------
+def net_allows(net, url):
+    try:
+        u = urllib.parse.urlsplit(url)
+        bad = u.scheme != "https" or u.port or u.username or u.password
+    except ValueError:
+        return False
+    h = (u.hostname or "").lower()
+    return not bad and any(s != "chain" and (h == s or h.endswith("." + s)) for s in net or [])
+
+
+def site_post(path, body):
+    req = urllib.request.Request(SITE + path, data=json.dumps(body).encode(), headers={"Content-Type": "application/json", "User-Agent": "wedgie.py"})
+    try:
+        return json.load(urllib.request.urlopen(req, timeout=20))
+    except urllib.error.HTTPError as e:
+        try:
+            return json.load(e)
+        except ValueError:
+            return {"error": "wedgie.dev said %d" % e.code}
+    except (OSError, ValueError) as e:
+        return {"error": "no internet (%s)" % e}
+
+
+def net_answer(v, net):
+    """One request from the app -> what to answer: {"data": ...} or {"error": "..."}."""
+    if isinstance(v.get("url"), str):
+        if not net_allows(net, v["url"]):
+            return {"error": "%s isn't in the app's \"net\" (wedgie.json)" % (urllib.parse.urlsplit(v["url"]).hostname or v["url"])[:40]}
+        j = site_post("/api/net", {"url": v["url"], "pick": v.get("pick"), "max": 4900} if "pick" in v else {"url": v["url"], "max": 4900})
+        return {"error": str(j["error"])[:120]} if j.get("error") else {"data": j.get("data")}
+    if isinstance(v.get("method"), str):
+        if "chain" not in (net or []):
+            return {"error": "chain calls need \"chain\" in the app's \"net\" (wedgie.json)"}
+        j = site_post("/api/rpc?chain=%d" % int(v.get("chain") or 1), {"jsonrpc": "2.0", "id": 1, "method": v["method"], "params": v.get("params") or []})
+        e = j.get("error")
+        return {"error": str(e.get("message") if isinstance(e, dict) else e)[:120]} if e else {"data": j.get("result")}
+    return {"error": "a url, or a chain and method"}
+
+
+def cmd_net(wg, args):
+    h = need_firmware(wg)
+    mod, net = h.get("running"), None
+    if args.rest:
+        j = json.load(open(os.path.join(args.rest[0], "wedgie.json")))
+        net = next((a.get("net") for a in j.get("apps", []) if a.get("mod") == mod), None)
+    else:
+        have = next((c.get("v") for c in h.get("carts") or [] if c.get("mod") == mod), None)
+        cs = [c for c in manifest()["carts"] if c["mod"] == mod]
+        c = next((c for c in cs if c.get("v") == have), cs[0] if cs else None)
+        net = c and c.get("net")
+    print("its app (%s) gets the internet from here: %s. Ctrl-C to stop." % (mod, ", ".join(net) if net else "nothing (no \"net\" in its wedgie.json)"))
+    while True:
+        try:
+            for line in wg._lines(lambda l: False, 10 ** 9):
+                if not line.startswith("{") or '"net"' not in line:
+                    continue
+                try:
+                    v = json.loads(line)
+                except ValueError:
+                    continue
+                if not isinstance(v, dict) or v.get("type") != "net" or not isinstance(v.get("rid"), int):
+                    continue
+                a = net_answer(v, net)
+                print(("  %s: %s" % (v.get("url") or "chain %s %s" % (v.get("chain"), v.get("method")), a["error"] if "error" in a else "ok"))[:160])
+                out = json.dumps(dict(a, type="net", rid=v["rid"]))
+                if len(out) > 5000:
+                    out = json.dumps({"type": "net", "rid": v["rid"], "error": "the answer is too big for a wedgie: pick fewer parts"})
+                wg.s.write((out + "\n").encode())
+        except (serial.SerialException, OSError):
+            print("its port dropped; waiting for it")
+            if not wg.reopen(60):
+                sys.exit("it didn't come back")
+
+
 def cmd_list(args):
     ps = ports()
     if not ps:
@@ -675,7 +752,9 @@ def main():
         return cmd_list(args)
     wg = pick(args)
     try:
-        if c == "hello":
+        if c == "net":
+            cmd_net(wg, args)
+        elif c == "hello":
             h = wg.hello(2)
             print(json.dumps(h, indent=1) if h else "no answer: not running wedgie firmware (try: wedgie.py update)")
         elif c == "unlock":

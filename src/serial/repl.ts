@@ -102,7 +102,15 @@ export class Repl {
     });
   }
 
-  async write(s: string | Uint8Array) {
+  // One write at a time, in order: a net answer (net.ts) and a request from the page never mix their chunks.
+  private queue: Promise<void> = Promise.resolve();
+  write(s: string | Uint8Array): Promise<void> {
+    const p = this.queue.then(() => this.writeNow(s));
+    this.queue = p.catch(() => {});
+    return p;
+  }
+
+  private async writeNow(s: string | Uint8Array) {
     const bytes = typeof s === "string" ? new TextEncoder().encode(s) : s;
     for (let i = 0; i < bytes.length; i += 256) {
       await this.writer!.write(bytes.slice(i, i + 256));

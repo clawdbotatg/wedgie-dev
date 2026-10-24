@@ -90,15 +90,16 @@ async function morpho(chain: number, ask: string[], tokens: Record<string, numbe
 export const key = () => env("ALCHEMY_API_KEY") || (env("SHOP_RPC_1").match(/alchemy\.com\/v2\/([\w-]+)/) || [])[1] || "";
 
 // A /safe page reads every 1.5 s while it waits: about 40 a minute. Past these, the IP waits (the key costs money).
+// tag: another endpoint's own count in the same table (api/net.ts).
 const PER_MIN = 600, PER_DAY = 20_000;
-async function overLimit(req: Request) {
+export async function overLimit(req: Request, perMin = PER_MIN, perDay = PER_DAY, tag = "") {
   if (!env("SHOP_DATABASE_URL")) return false;
   try {
-    const sql = await db(), ip = await ipOf(req), t = new Date().toISOString();
+    const sql = await db(), ip = tag + (await ipOf(req)), t = new Date().toISOString();
     const rows = await sql`insert into rpc_hits (k, n) values (${ip + ":" + t.slice(0, 16)}, 1), (${ip + ":" + t.slice(0, 10)}, 1)
       on conflict (k) do update set n = rpc_hits.n + 1 returning n`;
     if (Math.random() < 0.01) await sql`delete from rpc_hits where at < now() - interval '2 days'`;
-    return rows[0].n > PER_MIN || rows[1].n > PER_DAY;
+    return rows[0].n > perMin || rows[1].n > perDay;
   } catch { return false; }   // the database down: reads still work
 }
 

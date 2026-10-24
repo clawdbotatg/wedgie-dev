@@ -11,14 +11,14 @@ or an ATECC608) **wedged** between the boards on I2C. It runs MicroPython plus t
 into one app, and asks on its own screen before anything that matters. Games, tools, and a hardware signer for a
 Safe multisig. Everything is MIT. Home: https://wedgie.dev
 
-**The current firmware is 0.3.60.** If a wedgie's `hello` says older, update it first: everything here assumes
+**The current firmware is 0.3.61.** If a wedgie's `hello` says older, update it first: everything here assumes
 current firmware.
 
 ```yaml
 name: wedgie
 site: https://wedgie.dev
 skill_index: https://wedgie.dev/skill.md          # this file
-firmware: 0.3.60
+firmware: 0.3.61
 license: MIT (hardware design, case, firmware, site, art)
 source: https://github.com/clawdbotatg/wedgie-dev
 made_by: Austin Griffith and Gus Griffith, with @ClawdBotATG; sold by BuidlGuidl DAO LLC
@@ -117,10 +117,17 @@ https://wedgie.dev/connect or `python3 wedgie.py use <mod>`. One app runs at a t
 | Blocks | blocks | clawdbotatg/wedgie-blocks | falling blocks |
 | 2048 | g2048 | clawdbotatg/wedgie-2048 | slide the tiles |
 | Blackjack | blackjack | clawdbotatg/wedgie-blackjack | beat the dealer; the secure chip shuffles |
+| ETH Price | ethprice | clawdbotatg/wedgie-ethprice | the ETH price and the newest Ethereum and Base blocks (uses the internet, below) |
+| Poidh Bounties | poidh | swiftbotlab/wedgie-poidh | live poidh.xyz bounties and claims (needs its own bridge on the computer) |
 
 **Any public GitHub repo** with a `wedgie.json` can be added on a wedgie's page (Software, "Apps from a GitHub
 repo"). It is not signed and installs with full access: only repos you trust. Make one: code.md; starter:
 https://github.com/clawdbotatg/wedgie-starter. Get it on the shelf: open an issue on github.com/clawdbotatg/wedgie-dev.
+
+**The internet** (firmware 0.3.61+): a wedgie has none, but an app can use its computer's. It lists the sites in
+wedgie.json (`"net"`) and calls `net.get(url)`, `net.chain(...)` or `net.price()`; the wedgie's page on wedgie.dev
+(open in a tab) or `python3 wedgie.py net` fetches them through wedgie.dev. Only the listed sites; chain reads use
+wedgie.dev's Alchemy key, read-only. How: code.md, "The internet".
 
 ## wedgie.dev, every page
 

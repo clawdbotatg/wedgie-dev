@@ -5,7 +5,7 @@ description: Talk to a plugged-in wedgie over USB - find its port, hello, wedgie
 
 # Talk to a wedgie over USB
 
-Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.60**; if `hello`
+Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.61**; if `hello`
 says older, run `wedgie.py update` first.
 
 ## Talk to it directly
@@ -68,6 +68,7 @@ One file: `curl -O https://wedgie.dev/wedgie.py`, then `python3 wedgie.py <comma
     python3 wedgie.py saves [backup f.json | restore f.json]                                           A
     python3 wedgie.py debug                a report: firmware, files, free space and RAM, error.log     A
     python3 wedgie.py unlock               full control until it restarts (mpremote, the REPL, the chip) A, red screen
+    python3 wedgie.py net [folder]         stay plugged in and be its app's internet (below); Ctrl-C stops
 
 `--port /dev/cu.usbmodemXXXX` or `--id A1B2C3` picks one when several are plugged in. The person can
 also do all of it by clicking at https://wedgie.dev/connect (Chrome or Edge).
@@ -127,7 +128,7 @@ from answering. Hold **Y**: no WEDGIE drive this time (debugging only).
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.60","fw":"wedgie-0.3.60","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.61","fw":"wedgie-0.3.61","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":3,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -149,6 +150,18 @@ from answering. Hold **Y**: no WEDGIE drive this time (debugging only).
     {"type":"phone"}                     -> makes the WEDGIE drive writable (phone mode), no question
     {"id":13,"type":"remount"}           -> {"type":"remount"}, then USB off for 2 s and back, still writable
                                             (phone mode only, 0.3.45+: a host whose view of the drive is stale)
+
+**From the wedgie: its app's internet** (0.3.61+, the app's `import net`; wedgie.dev/code.md). The app sends,
+and the host holding its port answers (its page on wedgie.dev, or `wedgie.py net`):
+
+    {"type":"net","rid":1,"url":"https://api.coinbase.com/v2/prices/ETH-USD/spot","pick":"data.amount"}
+    {"type":"net","rid":2,"chain":8453,"method":"eth_blockNumber","params":[]}
+    -> {"type":"net","rid":1,"data":"3412.10"}   or   {"type":"net","rid":1,"error":"..."}
+
+A host fetches only what the running app's wedgie.json lists in `"net"` (its sites, `"chain"` for chain
+reads) and goes through wedgie.dev: `POST https://wedgie.dev/api/net {"url","pick","max"}` -> `{data}` for a
+site, `POST https://wedgie.dev/api/rpc?chain=<id>` (JSON-RPC, read methods only, `wedgie_prices` for the ETH
+price) for a chain. Answers are plain ASCII JSON, under 5 KB.
 
 hello's fields: `version` the firmware, `running` the app on screen (null: none), `chip` the secure
 chip found, `sealed` locked, `open` let in right now, `ram` bytes of free RAM, `free` bytes of free

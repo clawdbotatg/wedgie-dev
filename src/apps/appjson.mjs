@@ -3,7 +3,8 @@
 // a repo someone adds on their wedgie's page). wedgie.dev/code.md is the spec agents read: keep it true.
 //
 //   { "apps": [ { "mod": "snake", "name": "Snake", "about": "...", "files": ["snake/snake.py", ...],
-//                 "entry"?: "run", "chip"?: "ATECC608", "usb"?: true, "fw"?: "0.2.3", "label"?: "#22c452", "icon"?: [12 x 12] } ] }
+//                 "entry"?: "run", "chip"?: "ATECC608", "usb"?: true, "fw"?: "0.2.3", "label"?: "#22c452", "icon"?: [12 x 12],
+//                 "net"?: ["poidh.xyz", "chain"] } ] }
 //
 // A wedgie's flash has no folders for apps: every file goes to its root under its own name. So every file
 // name starts with the app's mod (snake.py, snake_tiles.bin): two apps can't collide, and no app can
@@ -16,6 +17,17 @@ export const CHIPS = ["ATECC608", "OPTIGA Trust M"];
 const MOD = /^[a-z][a-z0-9_]{1,19}$/;
 const FILE = /^[a-z][a-z0-9_]*\.(py|mpy|bin|json|txt)$/;
 const ICON_CH = /^[kwgrybs.]{12}$/;
+const HOST = /^(?=.{4,100}$)([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/;
+
+/** "net": the sites an app may fetch through its computer (firmware/net.py): host names (each covers its
+ *  subdomains too), and "chain" for read-only chain calls and prices. Is url one of them? */
+export function netAllows(net, url) {
+  let u;
+  try { u = new URL(url); } catch { return false; }
+  if (u.protocol !== "https:" || u.port || u.username || u.password) return false;
+  const h = u.hostname.toLowerCase();
+  return (net || []).some((s) => s !== "chain" && (h === s || h.endsWith("." + s)));
+}
 export const DEFAULT_ICON = ["............", ".kkkkkkkkkk.", ".k........k.", ".k.k....k.k.", ".k........k.", ".k........k.",
   ".k.k....k.k.", ".k..kkkk..k.", ".k........k.", ".kkkkkkkkkk.", "............", "............"];
 
@@ -62,12 +74,15 @@ export function checkAppJson(j, core = [], taken = []) {
     if (a.chip !== undefined && !CHIPS.includes(a.chip)) bad(`chip: ${CHIPS.map((c) => `"${c}"`).join(" or ")}, or leave it out`);
     if (a.fw !== undefined && (typeof a.fw !== "string" || !/^\d+\.\d+\.\d+$/.test(a.fw))) bad("fw: the oldest wedgie firmware it runs on, like \"0.2.3\"");
     if (a.label !== undefined && (typeof a.label !== "string" || !/^#[0-9a-f]{6}$/i.test(a.label))) bad("label: a color like \"#22c452\"");
+    if (a.net !== undefined && (!Array.isArray(a.net) || a.net.length > 10 || !a.net.every((s) => s === "chain" || (typeof s === "string" && HOST.test(s)))))
+      bad("net: up to 10 site names like \"poidh.xyz\" (no https://, no path), or \"chain\"");
     if (a.icon !== undefined && (!Array.isArray(a.icon) || a.icon.length !== 12 || !a.icon.every((r) => typeof r === "string" && ICON_CH.test(r))))
       bad("icon: 12 strings of 12 characters from . k w g r y b s");
     if (errors.some((e) => e.startsWith(at + ":"))) return;
     apps.push({
       mod: a.mod, name: a.name.trim(), about: a.about || "", files: names, paths: a.files.slice(),
       ...(a.entry ? { entry: a.entry } : {}), ...(a.usb ? { usb: true } : {}), ...(a.chip ? { chip: a.chip } : {}), ...(a.fw ? { fw: a.fw } : {}),
+      ...(a.net?.length ? { net: a.net } : {}),
       label: a.label || "#8a8c8e", icon: a.icon || DEFAULT_ICON,
     });
   });
