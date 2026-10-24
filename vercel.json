@@ -272,6 +272,10 @@
     {
       "source": "/virtual",
       "destination": "/index.html"
+    },
+    {
+      "source": "/dollar",
+      "destination": "/dollar/index.html"
     }
   ],
   "redirects": [
