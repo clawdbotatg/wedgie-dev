@@ -120,7 +120,7 @@ https://wedgie.dev/connect or `python3 wedgie.py use <mod>`. One app runs at a t
 
 **Any public GitHub repo** with a `wedgie.json` can be added on a wedgie's page (Software, "Apps from a GitHub
 repo"). It is not signed and installs with full access: only repos you trust. Make one: code.md; starter:
-https://github.com/clawdbotatg/wedgie-starter. Get it on the shelf: email wedgie@buidlguidl.com.
+https://github.com/clawdbotatg/wedgie-starter. Get it on the shelf: open an issue on github.com/clawdbotatg/wedgie-dev.
 
 ## wedgie.dev, every page
 

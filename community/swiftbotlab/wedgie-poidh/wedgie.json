@@ -1,0 +1,30 @@
+{
+  "apps": [
+    {
+      "mod": "poidh",
+      "name": "Poidh Bounties",
+      "about": "Browse live poidh bounties on Ethereum, Base and Arbitrum: rewards, descriptions and claims. Needs the bridge on your computer.",
+      "files": [
+        "poidh/poidh.py"
+      ],
+      "entry": "run",
+      "fw": "0.3.36",
+      "usb": true,
+      "label": "#168c34",
+      "icon": [
+        "............",
+        "....kkkk....",
+        ".kkkkwwkkkk.",
+        ".kwwwwwwwwk.",
+        ".kwwkkkkwwk.",
+        ".kwkggggkwk.",
+        ".kwkgwwgkwk.",
+        ".kwkggggkwk.",
+        ".kwwkkkkwwk.",
+        ".kwwwwwwwwk.",
+        ".kkkkkkkkkk.",
+        "............"
+      ]
+    }
+  ]
+}

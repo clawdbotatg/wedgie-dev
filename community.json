@@ -435,6 +435,15 @@
           }
         }
       ]
+    },
+    {
+      "repo": "swiftbotlab/wedgie-poidh",
+      "sha": "c2fe57c47ab75650a4cd06f27a682dbd45247e25",
+      "at": "2026-10-24T17:50:13Z",
+      "approved": "2026-10-24",
+      "v": {
+        "poidh": "e757ab7cadc6"
+      }
     }
   ]
 }
