@@ -22,6 +22,7 @@ export function publicHost(u: URL) {
 /**
  * pick: one path ("0:5.{title,amount}") or {name: path}. A path is steps split by ".":
  *   name   a field          3   an item (-1: the last)       2:5   items 2-4, each takes the rest of the path
+ *   (on text, 0:500 is its first 500 characters)
  *   *      every item       {a,b}   just those fields, each takes the rest of the path
  * A step that doesn't fit gives null.
  */
@@ -37,6 +38,10 @@ function walk(v: any, steps: string[]): any {
   if (s.startsWith("{") && s.endsWith("}")) {
     if (!v || typeof v !== "object" || Array.isArray(v)) return null;
     return Object.fromEntries(s.slice(1, -1).split(",").map((k) => k.trim()).filter(Boolean).map((k) => [k, walk(v[k], rest)]));
+  }
+  if (typeof v === "string") {
+    const sl = s.match(/^(-?\d*):(-?\d*)$/);
+    return sl ? walk(v.slice(sl[1] === "" ? 0 : +sl[1], sl[2] === "" ? undefined : +sl[2]), rest) : null;
   }
   if (Array.isArray(v)) {
     if (s === "*") return v.map((x) => walk(x, rest));

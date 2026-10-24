@@ -12,6 +12,8 @@ eq(m.pickOf(v, "data.*.title"), ["a", "b", "c"], "star");
 eq(m.pickOf(v, "data.-1.title"), "c", "last");
 eq(m.pickOf(v, { t: "n.k", q: "nope.x" }), { t: "z", q: null }, "dict");
 eq(m.pickOf(v, "data.title"), null, "key on array");
+eq(m.pickOf({ d: "abcdef" }, "d.0:3"), "abc", "text cut");
+eq(m.pickOf({ d: "abcdef" }, "d.x"), null, "field on text");
 eq(m.publicHost(new URL("https://127.0.0.1/")), false, "ip");
 eq(m.publicHost(new URL("https://localhost/")), false, "localhost");
 eq(m.publicHost(new URL("https://api.coinbase.com/x")), true, "coinbase");

@@ -402,7 +402,8 @@ rows = net.get("https://example.com/list.json", pick="0:5.{title,amount}")      
   42161 Arbitrum, 137 Polygon, and more. Sites: https only, GET only, rate-limited.
 - **The answer must fit in 5 KB** (RAM). Use `pick` to take only what you need from a JSON answer. A path
   is steps split by `.`: a field name, `3` an item (`-1` the last), `2:5` items 2-4, `*` every item,
-  `{a,b}` just those fields; each list step applies the rest of the path to every item. Or a dict of
+  `{a,b}` just those fields; each list step applies the rest of the path to every item. On text, `0:500`
+  is its first 500 characters (`"items.3.description.0:500"`). Or a dict of
   paths: `pick={"price": "data.amount", "base": "data.base"}`. A text page comes back as a string.
 - Each call waits for its answer (usually under a second): draw your loading screen first
   (`ui.progress("Getting the price", "wedgie.dev", bar=False)`). Not waiting: `rid = net.ask({"url": ...})`,
