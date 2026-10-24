@@ -4,10 +4,11 @@
 //   a fresh P-256 key per order; ECDH with SEAL_KEY; HKDF-SHA256 (salt = epk, info "wedgie order v1")
 //   -> AES-256-GCM. orders.py open_sealed() is the other half; keep the two in step.
 
-// The shipping computer's public key (uncompressed P-256 point, base64url). Its private half is made by
-// `orders.py keygen` on omen and never leaves it. It's committed here, not set on the server, so a
-// changed key shows in git. Empty = the shop stays closed. VITE_SEAL_KEY is for the probes' test key.
-const OMEN_KEY = "BGH00bcOxeN8KvqPy64-hPKDsu7-zlPru_C-y87P1ujL1oDei8yBD53W6Ts0TEJFcnWqTg1kIFJAc7W3w-WTYuU";
+// The shipping computer's public key (uncompressed P-256 point, base64url). Its private half was made on a
+// YubiKey by `orders.py keygen --yubikey` (slot 82) and can't be copied off it; opening an address takes a tap.
+// Orders before 2026-10-24 were sealed to omen's key.pem, which omen keeps. It's committed here, not set on
+// the server, so a changed key shows in git. Empty = the shop stays closed. VITE_SEAL_KEY is for the probes' test key.
+const OMEN_KEY = "BCi806wU1YQ9TNoMfi2nAgzvRednV6gKzxaHvQ_m6FGsz4rLBMwRoZeI1D6YA35yll_8f-BkTzh3fzalvQxAbFk";
 export const SEAL_KEY: string = import.meta.env.VITE_SEAL_KEY || OMEN_KEY;
 
 const b64u = (b: ArrayBuffer | Uint8Array) => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
