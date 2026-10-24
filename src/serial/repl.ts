@@ -137,10 +137,11 @@ export class Repl {
 
   private async writeNow(s: string | Uint8Array) {
     const bytes = typeof s === "string" ? new TextEncoder().encode(s) : s;
-    for (let i = 0; i < bytes.length; i += 256) {
-      await this.writer!.write(bytes.slice(i, i + 256));
-      if (bytes.length > 256) await sleep(5);
-    }
+    // No pause between pieces: the writer already waits until the wedgie takes them (USB flow control). A
+    // sleep(5) here became a whole second in a background tab (Chrome throttles its timers), so a 4 KB put took
+    // 16 s, past its 15 s, and an update failed with "did not answer (put drive.bin)" whenever the person
+    // switched tabs while it ran (a real board, 10-24).
+    for (let i = 0; i < bytes.length; i += 256) await this.writer!.write(bytes.slice(i, i + 256));
   }
 
   private nextId = 100;
