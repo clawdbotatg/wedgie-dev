@@ -1,0 +1,28 @@
+/* wedgie.dev/clear: the dapp list (index.html) and each dapp's page (<dapp>/index.html), drawn by clear.js. */
+:root { --paper: #f4f4f1; --card: #fff; --ink: #1a1b1a; --muted: #6b6e6b; --line: #e2e2dd; --mint-d: #168c34; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 500 17px/1.5 ui-rounded, system-ui, -apple-system, sans-serif; }
+main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 64px; }
+a { color: var(--mint-d); }
+.top { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); font-weight: 800; }
+.top img { width: 28px; height: 28px; }
+h1 { font-size: 34px; line-height: 1.15; margin: 28px 0 8px; letter-spacing: -.02em; }
+.lead { color: var(--muted); max-width: 640px; margin: 0 0 8px; }
+h2 { font-size: 24px; margin: 40px 0 4px; }
+.note { color: var(--muted); margin: 0 0 16px; max-width: 720px; font-size: 15px; }
+.tx { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 14px 10px; margin: 0 0 14px; min-width: 0; overflow: hidden; }
+.tx .meta a { word-break: break-all; }
+.tx h3 { margin: 0; font-size: 17px; }
+.tx .meta { color: var(--muted); font-size: 13px; font-family: ui-monospace, monospace; word-break: break-all; }
+.pages { display: flex; gap: 10px; overflow-x: auto; padding: 10px 0 6px; }
+.pages img { width: 240px; height: 240px; flex: none; border-radius: 10px; image-rendering: pixelated; background: #000; }
+@media (max-width: 520px) { .pages img { width: 200px; height: 200px; } h1 { font-size: 28px; } }
+.dapps { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; margin: 24px 0 0; }
+.dapp { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; text-decoration: none; color: var(--ink); }
+.dapp h2 { margin: 0 0 4px; font-size: 22px; }
+.dapp p { margin: 0; color: var(--muted); font-size: 15px; }
+.back { display: inline-block; margin: 20px 0 0; font-size: 15px; }
+.finding { background: #fff4f2; border: 1px solid #f2c9c2; border-radius: 16px; padding: 14px 16px; margin: 16px 0 0; max-width: 760px; font-size: 15px; }
+.finding h2 { margin: 0 0 6px; font-size: 19px; }
+.finding p { margin: 6px 0 0; }
+.finding code { font-size: 13px; }

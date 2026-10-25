@@ -381,5 +381,173 @@
     ]
    }
   ]
+ },
+ {
+  "slug": "1inch-v3",
+  "title": "1inch AggregationRouterV3",
+  "note": "The V3 router with the registry's test transactions. One isn't here: its data is too big for one USB line to a wedgie (a wedgie limit to fix). Not audited.",
+  "cases": [
+   {
+    "name": "Swap - chain 1 (2)",
+    "chainId": 1,
+    "to": "0x11111112542d85b3ef69ae05771c2dccff4faa26",
+    "pages": [
+     "screens/1inch-v3/02-1.png",
+     "screens/1inch-v3/02-2.png"
+    ]
+   }
+  ]
+ },
+ {
+  "slug": "1inch-v4",
+  "title": "1inch AggregationRouterV4",
+  "note": "The V4 router, one registry test transaction, on BNB Chain. Not audited.",
+  "cases": [
+   {
+    "name": "Swap",
+    "chainId": 56,
+    "to": "0x1111111254fb6c44bac0bed2854e76f90643097d",
+    "pages": [
+     "screens/1inch-v4/01-1.png",
+     "screens/1inch-v4/01-2.png"
+    ]
+   }
+  ]
+ },
+ {
+  "slug": "1inch-v5",
+  "title": "1inch AggregationRouterV5",
+  "note": "The V5 router, one registry test transaction. Not audited.",
+  "cases": [
+   {
+    "name": "Swap",
+    "chainId": 1,
+    "to": "0x1111111254eeb25477b68fb85ed929f73a960582",
+    "pages": [
+     "screens/1inch-v5/01-1.png",
+     "screens/1inch-v5/01-2.png",
+     "screens/1inch-v5/01-3.png"
+    ]
+   }
+  ]
+ },
+ {
+  "slug": "1inch-v6",
+  "title": "1inch AggregationRouterV6",
+  "note": "The V6 router with the registry's 12 test transactions. Not audited. Tokens outside the wedgie's list show as unknown, in red.",
+  "cases": [
+   {
+    "name": "1inch: AggregationRouterV6: unoswapTo",
+    "chainId": 1,
+    "to": "0x111111125421ca6dc452d289314280a0f8842a65",
+    "pages": [
+     "screens/1inch-v6/01-1.png",
+     "screens/1inch-v6/01-2.png",
+     "screens/1inch-v6/01-3.png"
+    ]
+   },
+   {
+    "name": "1inch: AggregationRouterV6: increaseEpoch",
+    "chainId": 1,
+    "to": "0x111111125421ca6dc452d289314280a0f8842a65",
+    "pages": [
+     "screens/1inch-v6/02-1.png"
+    ]
+   },
+   {
+    "name": "1inch: AggregationRouterV6: ethUnoswap",
+    "chainId": 1,
+    "to": "0x111111125421ca6dc452d289314280a0f8842a65",
+    "pages": [
+     "screens/1inch-v6/03-1.png",
+     "screens/1inch-v6/03-2.png"
+    ]
+   },
+   {
+    "name": "1inch: AggregationRouterV6: swap",
+    "chainId": 1,
+    "to": "0x111111125421ca6dc452d289314280a0f8842a65",
+    "pages": [
+     "screens/1inch-v6/04-1.png",
+     "screens/1inch-v6/04-2.png",
+     "screens/1inch-v6/04-3.png"
+    ]
+   },
+   {
+    "name": "1inch: AggregationRouterV6: ethUnoswap2",
+    "chainId": 1,
+    "to": "0x111111125421ca6dc452d289314280a0f8842a65",
+    "pages": [
+     "screens/1inch-v6/05-1.png",
+     "screens/1inch-v6/05-2.png"
+    ]
+   },
+   {
+    "name": "1inch: AggregationRouterV6: unoswap2",
+    "chainId": 1,
+    "to": "0x111111125421ca6dc452d289314280a0f8842a65",
+    "pages": [
+     "screens/1inch-v6/06-1.png",
+     "screens/1inch-v6/06-2.png",
+     "screens/1inch-v6/06-3.png"
+    ]
+   },
+   {
+    "name": "1inch: AggregationRouterV6: unoswap",
+    "chainId": 1,
+    "to": "0x111111125421ca6dc452d289314280a0f8842a65",
+    "pages": [
+     "screens/1inch-v6/07-1.png",
+     "screens/1inch-v6/07-2.png"
+    ]
+   },
+   {
+    "name": "1inch: AggregationRouterV6: fillContractOrder",
+    "chainId": 1,
+    "to": "0x111111125421ca6dc452d289314280a0f8842a65",
+    "pages": [
+     "screens/1inch-v6/08-1.png",
+     "screens/1inch-v6/08-2.png"
+    ]
+   },
+   {
+    "name": "1inch: AggregationRouterV6: cancelOrder",
+    "chainId": 1,
+    "to": "0x111111125421ca6dc452d289314280a0f8842a65",
+    "pages": [
+     "screens/1inch-v6/09-1.png",
+     "screens/1inch-v6/09-2.png"
+    ]
+   },
+   {
+    "name": "1inch: AggregationRouterV6: unoswapTo3",
+    "chainId": 1,
+    "to": "0x111111125421ca6dc452d289314280a0f8842a65",
+    "pages": [
+     "screens/1inch-v6/10-1.png",
+     "screens/1inch-v6/10-2.png",
+     "screens/1inch-v6/10-3.png"
+    ]
+   },
+   {
+    "name": "1inch: AggregationRouterV6: permitAndCall",
+    "chainId": 1,
+    "to": "0x111111125421ca6dc452d289314280a0f8842a65",
+    "pages": [
+     "screens/1inch-v6/11-1.png",
+     "screens/1inch-v6/11-2.png",
+     "screens/1inch-v6/11-3.png"
+    ]
+   },
+   {
+    "name": "1inch: AggregationRouterV6: fillOrder",
+    "chainId": 1,
+    "to": "0x111111125421ca6dc452d289314280a0f8842a65",
+    "pages": [
+     "screens/1inch-v6/12-1.png",
+     "screens/1inch-v6/12-2.png"
+    ]
+   }
+  ]
  }
 ]

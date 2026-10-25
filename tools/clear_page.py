@@ -1,7 +1,8 @@
 # Adds a dapp's screens to wedgie.dev/clear (public/clear/index.html reads public/clear/screens/index.json).
 #   python3 tools/clear_page.py <slug> "<title>" <txs.json> <shots dir> "<note>"
 # txs.json: tools/clear_txs.py's output; shots dir: safechip --shots (<case>-<n>.png, n=1 the "Reading" splash, skipped).
-# Run again with the same slug to replace that section.
+# Run again with the same slug to replace that section. The dapp is the slug up to its first "-" (1inch-v6 -> 1inch):
+# its page is wedgie.dev/clear/<dapp>/ (a copy of public/clear/index.html, made here if missing; clear.js tells them apart).
 import json, os, re, shutil, sys
 
 slug, title, txs, shots, note = sys.argv[1:6]
@@ -26,4 +27,8 @@ idx = os.path.join(root, "index.json")
 sections = [s for s in (json.load(open(idx)) if os.path.exists(idx) else []) if s["slug"] != slug]
 sections.append({"slug": slug, "title": title, "note": note, "cases": cases})
 json.dump(sections, open(idx, "w"), indent=1)
+page = os.path.join(root, "..", slug.split("-")[0], "index.html")
+if not os.path.exists(page):
+    os.makedirs(os.path.dirname(page), exist_ok=True)
+    shutil.copy(os.path.join(root, "..", "index.html"), page)
 print("%s: %d transactions, %d screens" % (slug, len(cases), sum(len(c["pages"]) for c in cases)))

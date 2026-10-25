@@ -35,8 +35,8 @@ def decode(raw):
         return num(f[0]), f[i], num(f[i + 1]), f[i + 2]
     f = rlp(b)[0]
     chain = num(f[6]) if len(f) > 6 else 1
-    if len(f) == 9 and num(f[6]) > 36:
-        chain = (num(f[6]) - 35) // 2
+    if len(f) == 9 and num(f[6]) > 36 and (num(f[7]) or num(f[8])):     # signed: v = chain * 2 + 35/36. Unsigned
+        chain = (num(f[6]) - 35) // 2                                    # (EIP-155: v = chain, r = s = 0): as is
     return chain, f[3], num(f[4]), f[5]
 
 
