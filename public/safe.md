@@ -75,8 +75,12 @@ Waiting (the queue), Assets, Activity.
   **Execute all** (several signed ones in one wallet tx via Multicall3), Reject (a 0-value tx at that nonce),
   Remove (an owner signs a delete; no gas). Queues: Safe's Transaction Service, Instant Wallet's shared queue,
   and this browser, merged.
-- **Connect app (WalletConnect):** paste or scan a dapp's `wc:` link. The Safe becomes the dapp's wallet; its
-  requests land in Waiting, unsigned. Sign with the wedgie, Execute, and the dapp gets the hash.
+- **Connect app (WalletConnect):** the Safe becomes the dapp's wallet; its requests land in Waiting, unsigned.
+  Sign with the wedgie, Execute, and the dapp gets the hash. Three ways in:
+  1. In the dapp pick WalletConnect, copy its link, and press Cmd+V (Ctrl+V) anywhere on the Safe's page.
+  2. **Connect app**, then paste the link or scan the dapp's QR code.
+  3. A link (agents): `https://wedgie.dev/safe/base:<safe address>?wc=<the wc: link, URL-encoded>`. It connects
+     as soon as the Safe loads, then drops `?wc=` from the address bar.
 - **Other chains:** the same Safe address can be made on another chain from Settings.
 - **Execute on wedgie.dev/safe, not Safe{Wallet}.** Safe{Wallet} can't execute a tx a wedgie signed: it fails with
   **GS021** (https://github.com/safe-global/safe-wallet-monorepo/issues/8808). Signing there is fine.

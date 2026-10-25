@@ -183,5 +183,113 @@
     ]
    }
   ]
+ },
+ {
+  "slug": "uniswap-v3-pr3135",
+  "title": "Uniswap V3 SwapRouter (open PR #3135)",
+  "note": "From an open registry PR (github.com/ethereum/clear-signing-erc7730-registry/pull/3135), not merged yet: its 11 test transactions, as a wedgie would show them if it were.",
+  "cases": [
+   {
+    "name": "exactInputSingle",
+    "chainId": 1,
+    "to": "0xe592427a0aece92de3edee1f18e0157c05861564",
+    "pages": [
+     "screens/uniswap-v3-pr3135/01-1.png",
+     "screens/uniswap-v3-pr3135/01-2.png",
+     "screens/uniswap-v3-pr3135/01-3.png"
+    ]
+   },
+   {
+    "name": "exactOutputSingle",
+    "chainId": 1,
+    "to": "0xe592427a0aece92de3edee1f18e0157c05861564",
+    "pages": [
+     "screens/uniswap-v3-pr3135/02-1.png",
+     "screens/uniswap-v3-pr3135/02-2.png",
+     "screens/uniswap-v3-pr3135/02-3.png"
+    ]
+   },
+   {
+    "name": "refundETH",
+    "chainId": 1,
+    "to": "0xe592427a0aece92de3edee1f18e0157c05861564",
+    "pages": [
+     "screens/uniswap-v3-pr3135/03-1.png"
+    ]
+   },
+   {
+    "name": "selfPermit",
+    "chainId": 1,
+    "to": "0xe592427a0aece92de3edee1f18e0157c05861564",
+    "pages": [
+     "screens/uniswap-v3-pr3135/04-1.png",
+     "screens/uniswap-v3-pr3135/04-2.png"
+    ]
+   },
+   {
+    "name": "selfPermitAllowed",
+    "chainId": 1,
+    "to": "0xe592427a0aece92de3edee1f18e0157c05861564",
+    "pages": [
+     "screens/uniswap-v3-pr3135/05-1.png"
+    ]
+   },
+   {
+    "name": "selfPermitAllowedIfNecessary",
+    "chainId": 1,
+    "to": "0xe592427a0aece92de3edee1f18e0157c05861564",
+    "pages": [
+     "screens/uniswap-v3-pr3135/06-1.png"
+    ]
+   },
+   {
+    "name": "selfPermitIfNecessary",
+    "chainId": 1,
+    "to": "0xe592427a0aece92de3edee1f18e0157c05861564",
+    "pages": [
+     "screens/uniswap-v3-pr3135/07-1.png",
+     "screens/uniswap-v3-pr3135/07-2.png"
+    ]
+   },
+   {
+    "name": "sweepToken",
+    "chainId": 1,
+    "to": "0xe592427a0aece92de3edee1f18e0157c05861564",
+    "pages": [
+     "screens/uniswap-v3-pr3135/08-1.png",
+     "screens/uniswap-v3-pr3135/08-2.png"
+    ]
+   },
+   {
+    "name": "sweepTokenWithFee",
+    "chainId": 1,
+    "to": "0xe592427a0aece92de3edee1f18e0157c05861564",
+    "pages": [
+     "screens/uniswap-v3-pr3135/09-1.png",
+     "screens/uniswap-v3-pr3135/09-2.png",
+     "screens/uniswap-v3-pr3135/09-3.png",
+     "screens/uniswap-v3-pr3135/09-4.png"
+    ]
+   },
+   {
+    "name": "unwrapWETH9",
+    "chainId": 1,
+    "to": "0xe592427a0aece92de3edee1f18e0157c05861564",
+    "pages": [
+     "screens/uniswap-v3-pr3135/10-1.png",
+     "screens/uniswap-v3-pr3135/10-2.png"
+    ]
+   },
+   {
+    "name": "unwrapWETH9WithFee",
+    "chainId": 1,
+    "to": "0xe592427a0aece92de3edee1f18e0157c05861564",
+    "pages": [
+     "screens/uniswap-v3-pr3135/11-1.png",
+     "screens/uniswap-v3-pr3135/11-2.png",
+     "screens/uniswap-v3-pr3135/11-3.png"
+    ]
+   }
+  ]
  }
 ]
