@@ -79,8 +79,9 @@ for (const vp of [{ width: 1360, height: 900, name: "desktop" }, { width: 390, h
 {
   const page = await browser.newPage();
   await page.goto(base + "/");
-  await page.waitForSelector("#agents", { state: "attached" });
-  check(await page.locator('a[href="/build"]').count() === 0, "front page: no link to /build");
+  await page.waitForSelector("#dev", { state: "attached" });
+  // (one exception since 10-17: the Pico card's "More boards" opens it)
+  check(await page.locator('a[href="/build"]:not(:text-is("More boards"))').count() === 0, "front page: no link to /build but More boards");
 }
 await browser.close();
 process.exit(fail ? 1 : 0);
