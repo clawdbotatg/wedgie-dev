@@ -24,6 +24,8 @@ import "./ui/report";             // from the start: it keeps the page's errors 
 import { legal } from "./pages/legal";
 import { emu } from "./pages/emu";
 
+// safe.wedgie.eth (the IPFS copy): its front page is /safe
+if (location.hostname.startsWith("safe.") && location.pathname === "/") history.replaceState(null, "", "/safe" + location.hash);
 const path = location.pathname.replace(/\/+$/, "");
 const onConnect = path === "/connect" || path.startsWith("/connect/");   // the list, or one wedgie (/connect/<ID>)
 const onAssemble = path === "/assemble";
