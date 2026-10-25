@@ -167,7 +167,7 @@ const clearDir = args.includes("--clear") ? args[args.indexOf("--clear") + 1] : 
 Clear.loadFrom(async (p) => { try { return JSON.parse(readFileSync(join(clearDir, `${p}.json`), "utf8")); } catch { return null; } });
 const txsFile = args.includes("--txs") ? args[args.indexOf("--txs") + 1] : null;
 const cases = txsFile ? JSON.parse(readFileSync(txsFile, "utf8")).map((c) =>
-  [c.name, { ...tx(c.to, c.data, c.value), chainId: c.chainId, safe: c.safe || safe, operation: c.operation || 0 }, 1, true]) : [
+  [c.name, { ...tx(c.to, c.data, c.value), chainId: c.chainId, safe: c.safe || safe, operation: c.operation || 0, ...(c.sim ? { sim: c.sim } : {}) }, 1, true, c.keys]) : [
   ...clearTxs.map((c) => [`clear signing: ${c.name}${c.trust === "a" ? "" : " (not audited)"}`, { ...tx(c.to, c.data, c.value), chainId: c.chainId, operation: c.operation || 0 }, 1, true]),
   ["change the daily limit (3 actions, 1 page)", limit, 1],
   ["Uniswap: swap 0.4805 ETH for USDC (V4)", urIn, 1],
@@ -180,7 +180,8 @@ const cases = txsFile ? JSON.parse(readFileSync(txsFile, "utf8")).map((c) =>
 ];
 /** Send one safe_sign, press k once a second (the app drops presses made before its question is up) until
  *  it answers; the answer and how long it took in chip time. */
-function ask(t, k, msg = { type: "safe_sign", tx: t }, cb = null, shot = null) {
+function ask(t, k, msg = { type: "safe_sign", tx: t }, cb = null, shot = null, keys = []) {
+  keys = [...(keys || [])];          // pressed first, one a second (a case's "keys": the d-pad through its details)
   for (let o = 0; cb && o < cb.length; o += hi.safe_chunk) {     // a clear-signing bundle first, in pieces
     const a = h.req({ id: ++id, type: "safe_clear", at: o / 2, hex: cb.slice(o, o + hi.safe_chunk) }, 20000);
     if (a?.type !== "safe_clear") console.log("     clear piece:", JSON.stringify(a));
@@ -193,16 +194,17 @@ function ask(t, k, msg = { type: "safe_sign", tx: t }, cb = null, shot = null) {
   for (let s = 0; s < 240 && !got; s++) {
     h.until((b) => { const m = b.match(re); if (m) got = JSON.parse(m[0]); return !!m; }, 1000, 20);
     if (!got && shot && !(seen.length && seen[seen.length - 1].equals(frame))) seen.push(Buffer.from(frame));
-    if (!got) press(k);
+    const kk = keys.length ? keys.shift() : k;
+    if (!got && kk !== "wait") press(kk);     // "wait": a second with no press (a slow page)
   }
   seen.forEach((f, i) => png(`${shot}-${i + 1}.png`, f, 240, 240));     // each page it showed, in order
   return { got, secs: ((h.chip.ms - t0) / 1000).toFixed(1) };
 }
-for (const [what, t, pages, clear] of cases) {
+for (const [what, t, pages, clear, keys] of cases) {
   const before = all.length;
   const cb = clear && hi?.safe_clear ? await Clear.bundle(hi.safe_clear, t.chainId, t) : null;
   if (clear && !cb) { check(!hi?.safe_clear, `${what}: no bundle for it (an app without clear signing: skipped)`); continue; }
-  const { got, secs } = ask(t, "A", undefined, cb, shots && join(shots, what.replace(/[^a-z0-9]+/gi, "-").slice(0, 60)));
+  const { got, secs } = ask(t, "A", undefined, cb, shots && join(shots, what.replace(/[^a-z0-9]+/gi, "-").slice(0, 60)), keys);
   const out = all.slice(before);
   if (!got) console.log("     no answer; it said:", JSON.stringify(out.slice(-800)));
   const r = ram(what);
