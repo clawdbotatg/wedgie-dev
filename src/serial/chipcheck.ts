@@ -48,13 +48,22 @@ async function signedBy(c: Cert, by: Cert) {
   return crypto.subtle.verify({ name: "ECDSA", hash: c.hash }, await key(by), rs(c.sig, by.size) as BufferSource, c.tbs as BufferSource);
 }
 
+// base: where public/ is served ("" in the page; the API passes https://wedgie.dev).
 let anchors: Promise<Cert[]> | null = null;
-const infineon = () => (anchors ??= Promise.all(["ca101", "ca300", "ca306", "rootC", "root2"].map((n) =>
-  fetch(`/device/infineon/${n}.crt`).then((r) => r.arrayBuffer()).then((b) => cert(new Uint8Array(b))))));
+const infineon = (base: string) => (anchors ??= Promise.all(["ca101", "ca300", "ca306", "rootC", "root2"].map((n) =>
+  fetch(`${base}/device/infineon/${n}.crt`).then((r) => r.arrayBuffer()).then((b) => cert(new Uint8Array(b))))));
+
+/** A Trust M answer's device certificate (DER): stored behind a small header (tag C0, lengths); the DER starts at 30 82. */
+export function trustmCert(d: any) {
+  const blob = hexb(d.cert);
+  let at = 0;
+  while (at < blob.length - 4 && !(blob[at] === 0x30 && blob[at + 1] === 0x82 && tlv(blob, at).end <= blob.length)) at++;
+  return blob.slice(at, tlv(blob, at).end);
+}
 
 export type ChipCheck = { pass: boolean; detail: string; facts: [string, string][] };
 
-export async function checkChip(d: any): Promise<ChipCheck> {
+export async function checkChip(d: any, base = ""): Promise<ChipCheck> {
   if (d.error) return { pass: false, detail: `Chip didn't finish: ${d.error}`, facts: [["Chip test", d.error]] };
   const msg = hexb(d.msg);
   if (d.kind === "atecc") {
@@ -69,16 +78,12 @@ export async function checkChip(d: any): Promise<ChipCheck> {
     const rndOk = fixed || (r1 !== r2 && !/^(00)+$|^(ff)+$/.test(r1));
     return { pass: ok && rndOk, detail: ok ? "ATECC608: hashed on the chip ✓" : "ATECC608 hashed wrong", facts };
   }
-  // Trust M: the certificate is stored behind a small header (tag C0, lengths); the DER starts at 30 82.
-  const blob = hexb(d.cert);
-  let at = 0;
-  while (at < blob.length - 4 && !(blob[at] === 0x30 && blob[at + 1] === 0x82 && tlv(blob, at).end <= blob.length)) at++;
-  const dev = cert(blob.slice(at, tlv(blob, at).end));
+  const dev = cert(trustmCert(d));
   const facts: [string, string][] = [["Trust M certificate", dev.cn || "?"]];
   const devKey = await key(dev);
   const sigOk = await crypto.subtle.verify({ name: "ECDSA", hash: "SHA-256" }, devKey, hexb(d.r + d.s), msg);
   facts.push(["Trust M signature", sigOk ? "valid: its factory key signed our random bytes" : "INVALID"]);
-  const cas = await infineon();
+  const cas = await infineon(base);
   const mid = cas.find((c) => same(c.subject, dev.issuer));
   let chain = "";
   if (!mid) chain = "issuer isn't an Infineon CA we know";

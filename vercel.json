@@ -280,6 +280,10 @@
     {
       "source": "/dollar/seven",
       "destination": "/dollar/seven.html"
+    },
+    {
+      "source": "/telegram",
+      "destination": "/index.html"
     }
   ],
   "redirects": [
