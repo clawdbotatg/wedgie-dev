@@ -9,6 +9,7 @@
 import binascii, hashlib
 import safe_wire as w
 import safe_roots as R
+import safe_icons as I
 
 MAX_DEPTH = 1           # calldata inside calldata: one level, the spec's minimum
 
@@ -199,6 +200,11 @@ def _values(ctx, call, v):
         raise Bad(str(e))
 
 
+def _amount(pic):
+    """The kind of an amount: "amount", or "amount<n>" with the token's picture n (safe_icons, by address)."""
+    return "amount" if pic is None else "amount%d" % pic
+
+
 def _text(ctx, call, param, val, i):
     """One value as (text, kind). kind: "amount", "addr", "safe" (this Safe), "warn" (red), "token?" (an amount of a
     token no list knows), "addr?" (a token no list knows), or None."""
@@ -222,7 +228,7 @@ def _text(ctx, call, param, val, i):
                 pass
         return _hex(val), None
     if k == 1:                          # amount: the chain's coin
-        return "%s %s" % (dec(_int(val, 1, None), 18), ctx.coin), "amount"
+        return "%s %s" % (dec(_int(val, 1, None), 18), ctx.coin), _amount(I.of(ctx.coin))
     if k == 2:                          # token amount
         n = _int(val, fam, size)
         tok = _pick(_values(ctx, call, param[2]), i) if param[2] else None
@@ -232,7 +238,7 @@ def _text(ctx, call, param, val, i):
         natives = param[3] or []
         if tok is not None and any(_same(tok, x, 5) for x in natives):
             tok = None
-            ticker, d = ctx.coin, 18
+            ticker, d, pic = ctx.coin, 18, I.of(ctx.coin)
         elif tok is None:               # no token named: the number, red (the spec's "Unknown token")
             return "%d (unknown token)" % n, "warn"
         else:
@@ -240,9 +246,10 @@ def _text(ctx, call, param, val, i):
             if t is None:
                 return "%d of %s" % (n, _addr(tok)), "token?"
             ticker, d = t
+            pic = I.at(chain, _addr(tok))
         if param[4] is not None and n >= param[4]:
-            return "%s %s" % (param[5] or "Unlimited", ticker), "amount"
-        return "%s %s" % (dec(n, d), ticker), "amount"
+            return "%s %s" % (param[5] or "Unlimited", ticker), _amount(pic)
+        return "%s %s" % (dec(n, d), ticker), _amount(pic)
     if k == 3:                          # nft
         c = _addr(_pick(_values(ctx, call, param[2]), i))
         return "#%d of %s" % (_int(val, 1, None), c), None
@@ -402,8 +409,8 @@ def read(tx, bundle):
             lines.append((ci + (" (" + co + ")" if co else ""), INK))
             for x in cs:
                 add(*x)
-        elif kind == "amount":
-            lines.append((text, INK, BIG))
+        elif kind and kind[:6] == "amount":
+            lines.append((text, INK, BIG, int(kind[6:]) if kind[6:] else None))
         elif kind == "addr":
             lines.append((text, INK, ADDR))
         elif kind == "safe":

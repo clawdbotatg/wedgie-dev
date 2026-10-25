@@ -14,7 +14,9 @@
         "safe_keccak.py",
         "safe_addr.py",
         "safe_blockie.py",
-        "safe_key.py"
+        "safe_key.py",
+        "safe_icons.py",
+        "safe_icons.bin"
       ],
       "entry": "run",
       "fw": "0.3.17",

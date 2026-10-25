@@ -30,15 +30,17 @@ f8404e021a509bab89a4ed947def97d5d6ad4910cad9af9970feb76dc7bb0fc0  optiga.mpy
 ba422f72ca334b9681bf77e6cbb972bc6b0733d410d05cfe772c00529354ae2f  p256.mpy
 9333052151fee99ff38ba0bd4d696f10707f3837abcf019d057fb7740c54e0a1  poidh.py
 9858dc942ff0577fbe2c921e0fd1c01cea9f57e4d9452e21cb7f9c285b8fba8e  power.mpy
-6736ec0ed2e3a23b17209fac370cf78168bbe0b1282a964696b6c07e30a7855a  safe.py
-2c965e2e53be72f79180bc2154f9447d8265f2734f73dbf5be80143d5a7b881c  safe_7730.py
+957d85e0da1e027bf1dc2aa5315a8fba2fdd76b938bf6369600b1ca0ca2b9ea1  safe.py
+ed2cca455411fc7cfd3ef6a8c333a4a7a895e529e182568867c54cc2b346f4d6  safe_7730.py
 ebb05bac073a564d54741c5ff029132e66ca2001260c080fb9c171481901304e  safe_addr.py
 44e2ec64f5e7c9acd8c50a293ffa16d19f45deaf2201d88bc7dc4c3a5996bb1e  safe_blockie.py
+5103284e98ba1298532b0b5a1f9bb74d1882544795678726c88dda69f63cc012  safe_icons.bin
+8039de5fb6b0250004ae979a417a65527180c6fbf7e332543309d4aa1f1e33d9  safe_icons.py
 f5465cbfa72b6ea201d7993d09d0c4c163cf40fa1313f7938204bc32c12c94f5  safe_keccak.py
 c94e3e1188f0e7a6fbf8df03066a9b6f63be336d9f81b7279a1cdcfc784e288f  safe_key.py
-73737415cc08628aaa2969e7a02d23329693729d82fc41d337b413b13fbf678e  safe_read.py
+ddcd0d3e270aea9c908148d86702ca2b7a26572cca09e4ff801b610673ddcf07  safe_read.py
 e77cb9d919f1a418a57cac0af8e156ae5bef7eadb02544a9ee8ed637e79f956c  safe_roots.py
-ab36705e2b35b1367e90d79731f8960de652328104b752f196f6b4b940243603  safe_ur.py
+5d43d337db03ac4f1b35946b50d7027e38fadd892f0b85c538f809d4447fd03c  safe_ur.py
 66d84d7ecfddba61aaaeec4887242674954c03816ac1bd6b8d9b5e7e1f8bb042  safe_wire.py
 3024f60d440b2494fdc24d7dc374e5e435de2d424168fa237c46b9c999c4194a  save.mpy
 ca324e0a4598275f90d016e04322efea2c4c9b47a8602a143ce6524fc57adb95  secret.py
@@ -62,7 +64,7 @@ e20d454f74229b3aaa09a15829cbb6b85aa50c6b3bf229287b9cdbff73bee90d  wedgiedrive.mp
 @app  {"mod":"grove","name":"Crystal Grove","entry":"run","files":["grove.py"]}
 @app  {"mod":"keypad","name":"Keypad","entry":"run","files":["keypad.py"]}
 @app  {"mod":"poidh","name":"Poidh Bounties","entry":"run","usb":true,"files":["poidh.py"]}
-@app  {"mod":"safe","name":"Safe Signer","entry":"run","usb":true,"files":["safe.py","safe_read.py","safe_ur.py","safe_7730.py","safe_wire.py","safe_roots.py","safe_keccak.py","safe_addr.py","safe_blockie.py","safe_key.py"]}
+@app  {"mod":"safe","name":"Safe Signer","entry":"run","usb":true,"files":["safe.py","safe_read.py","safe_ur.py","safe_7730.py","safe_wire.py","safe_roots.py","safe_keccak.py","safe_addr.py","safe_blockie.py","safe_key.py","safe_icons.py","safe_icons.bin"]}
 @app  {"mod":"secret","name":"Secrets","entry":"run","usb":true,"files":["secret.py","secret_box.py"]}
 @app  {"mod":"welcome","name":"Welcome","entry":"run","files":["welcome.py"]}
-@serial  21
+@serial  22

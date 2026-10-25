@@ -5,8 +5,8 @@
 // The virtual chip has no secure chip, so a yes ends in the app's error answer at the chip step; everything
 // before it (parsing, the Safe tx hash in pure-Python keccak, the decode, the screens) runs for real.
 // A MemoryError, a traceback, "wedgie broke" or no answer fails it. Prints the least free heap seen.
-//   node tools/safechip.mjs [--app <wedgie-safe checkout>] [--shot <file.png>]   (default: the shelf's copy
-//   in community/; --shot: its home screen)
+//   node tools/safechip.mjs [--app <wedgie-safe checkout>] [--shot <file.png>] [--shots <dir>]   (default: the
+//   shelf's copy in community/; --shot: its home screen; --shots: each case's first page, as the panel got it)
 // 0.3.54+: a locked wedgie refuses shot (slot.py), so the Bunker/--shot screens need firmware older than 0.3.54. Open item.
 // Needs uv (the flash image: littlefs-python).
 import { readFileSync, existsSync, writeFileSync } from "node:fs";
@@ -76,21 +76,46 @@ const hi = ram("started, its key loaded");
 check(hi?.running === "safe" && hi?.safe?.x === key.x, `hello: running safe, its key (${hi?.ram} B free)`);
 if (hi?.signer !== undefined) check(E.checksum(hi.signer || "0x0") === signer, `hello: its signer address ${hi.signer} = /safe's (${signer})`);
 
+const crc = (b) => { let c = ~0; for (const x of b) { c ^= x; for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1)); } return ~c >>> 0; };
+const chunk = (t, d) => { const l = Buffer.alloc(4); l.writeUInt32BE(d.length); const td = Buffer.concat([Buffer.from(t), d]); const c = Buffer.alloc(4); c.writeUInt32BE(crc(td)); return Buffer.concat([l, td, c]); };
+/** px (RGB565, big-endian) as a PNG at file. */
+function png(file, px, W, H) {
+  const raw = Buffer.alloc((W * 3 + 1) * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const v = px.readUInt16BE(2 * (y * W + x)), o = y * (W * 3 + 1) + 1 + 3 * x;
+    raw[o] = (v >> 11) << 3; raw[o + 1] = ((v >> 5) & 63) << 2; raw[o + 2] = (v & 31) << 3;
+  }
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(W, 0); ihdr.writeUInt32BE(H, 4); ihdr[8] = 8; ihdr[9] = 2;
+  writeFileSync(file, Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", ihdr), chunk("IDAT", deflateSync(raw)), chunk("IEND", Buffer.alloc(0))]));
+}
+// --shots: the ST7789 on SPI1 (DC on GP8), read off the wire as src/chip/sim.ts does (a locked wedgie refuses shot)
+const shots = args.includes("--shots") ? args[args.indexOf("--shots") + 1] : null;
+const frame = Buffer.alloc(240 * 240 * 2);
+if (shots) {
+  const spi = h.chip.mcu.spi[1], dc = h.chip.mcu.gpio[8], lcd = { cmd: 0, args: [], xs: 0, xe: 239, ys: 0, ye: 239, cur: 0 };
+  spi.onTransmit = (b) => {
+    if (!dc.outputValue) { lcd.cmd = b; lcd.args = []; if (b === 0x2c) lcd.cur = 0; }
+    else if (lcd.cmd === 0x2a || lcd.cmd === 0x2b) {
+      lcd.args.push(b);
+      if (lcd.args.length === 4) {
+        const s0 = (lcd.args[0] << 8) | lcd.args[1], e = (lcd.args[2] << 8) | lcd.args[3];
+        if (lcd.cmd === 0x2a) { lcd.xs = s0; lcd.xe = e; } else { lcd.ys = s0; lcd.ye = e; }
+      }
+    } else if (lcd.cmd === 0x2c) {
+      const ww = lcd.xe - lcd.xs + 1, p = lcd.cur >> 1, x = lcd.xs + (p % ww), y = lcd.ys + Math.floor(p / ww);
+      if (x < 240 && y < 240) frame[(y * 240 + x) * 2 + (lcd.cur & 1)] = b;
+      lcd.cur++;
+    }
+    spi.completeTransmit(0);
+  };
+}
 if (args.includes("--shot")) {           // the home screen, from the slot's shot answer (rgb565, big-endian)
   const rid = ++id, parts = [];
   h.chip.write(JSON.stringify({ id: rid, type: "shot" }) + "\n");
   h.until((b) => { const L = b.split("\n").filter((l) => l.includes(`"id": ${rid}`)); return L.length && JSON.parse(L[0]).n === L.length; }, 30000, 20);
   for (const l of h.out.split("\n").filter((l) => l.includes(`"id": ${rid}`))) parts.push(JSON.parse(l));
   const px = Buffer.concat(parts.sort((a, b) => a.i - b.i).map((p) => Buffer.from(p.data, "base64"))), W = parts[0].w, H = parts[0].h;
-  const raw = Buffer.alloc((W * 3 + 1) * H);
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const v = px.readUInt16BE(2 * (y * W + x)), o = y * (W * 3 + 1) + 1 + 3 * x;
-    raw[o] = (v >> 11) << 3; raw[o + 1] = ((v >> 5) & 63) << 2; raw[o + 2] = (v & 31) << 3;
-  }
-  const crc = (b) => { let c = ~0; for (const x of b) { c ^= x; for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1)); } return ~c >>> 0; };
-  const chunk = (t, d) => { const l = Buffer.alloc(4); l.writeUInt32BE(d.length); const td = Buffer.concat([Buffer.from(t), d]); const c = Buffer.alloc(4); c.writeUInt32BE(crc(td)); return Buffer.concat([l, td, c]); };
-  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(W, 0); ihdr.writeUInt32BE(H, 4); ihdr[8] = 8; ihdr[9] = 2;
-  writeFileSync(args[args.indexOf("--shot") + 1], Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", ihdr), chunk("IDAT", deflateSync(raw)), chunk("IEND", Buffer.alloc(0))]));
+  png(args[args.indexOf("--shot") + 1], px, W, H);
   h.take();
 }
 
@@ -150,26 +175,28 @@ const cases = [
 ];
 /** Send one safe_sign, press k once a second (the app drops presses made before its question is up) until
  *  it answers; the answer and how long it took in chip time. */
-function ask(t, k, msg = { type: "safe_sign", tx: t }, cb = null) {
+function ask(t, k, msg = { type: "safe_sign", tx: t }, cb = null, shot = null) {
   for (let o = 0; cb && o < cb.length; o += hi.safe_chunk) {     // a clear-signing bundle first, in pieces
     const a = h.req({ id: ++id, type: "safe_clear", at: o / 2, hex: cb.slice(o, o + hi.safe_chunk) }, 20000);
     if (a?.type !== "safe_clear") console.log("     clear piece:", JSON.stringify(a));
   }
   const rid = ++id, t0 = h.chip.ms;
   h.chip.write(JSON.stringify({ id: rid, ...msg }) + "\n");
-  let got = null;
+  let got = null, last = null;
   const re = new RegExp(`\\{[^\\n]*"id": ${rid}[,}][^\\n]*\\n`);
   for (let s = 0; s < 240 && !got; s++) {
     h.until((b) => { const m = b.match(re); if (m) got = JSON.parse(m[0]); return !!m; }, 1000, 20);
+    if (!got && shot) last = Buffer.from(frame);
     if (!got) press(k);
   }
+  if (last) png(shot, last, 240, 240);        // the screen the last press answered: its last page
   return { got, secs: ((h.chip.ms - t0) / 1000).toFixed(1) };
 }
 for (const [what, t, pages, clear] of cases) {
   const before = all.length;
   const cb = clear && hi?.safe_clear ? await Clear.bundle(hi.safe_clear, t.chainId, t) : null;
   if (clear && !cb) { check(!hi?.safe_clear, `${what}: no bundle for it (an app without clear signing: skipped)`); continue; }
-  const { got, secs } = ask(t, "A", undefined, cb);
+  const { got, secs } = ask(t, "A", undefined, cb, shots && join(shots, what.replace(/[^a-z0-9]+/gi, "-").slice(0, 60) + ".png"));
   const out = all.slice(before);
   if (!got) console.log("     no answer; it said:", JSON.stringify(out.slice(-800)));
   const r = ram(what);

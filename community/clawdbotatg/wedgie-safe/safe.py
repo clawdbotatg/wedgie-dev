@@ -36,7 +36,7 @@ import save
 import ui
 from ui import WHITE, INK, MUTED, GREY, GREEN_D, RED
 
-FW = "safe-25"
+FW = "safe-26"
 RP_ID = b"wedgie.dev"
 FIELDS = '"origin":"https://wedgie.dev"'
 ASK_MS = 120000
@@ -277,6 +277,24 @@ def _h(line, big=False):
     return (30 if len(line[0]) <= 10 else 22) if k == BIG else (52 if big else 38) if k == ADDR else 6 if k == "gap" else 12
 
 
+def _iconed(s, c, i, y):
+    """A big amount with its token's picture before it (safe_icons), at the size it has without one; False, and
+    nothing drawn, if the two don't fit across."""
+    sc = 3 if len(s) <= 10 else 2 if len(s) <= ui.COLS_BIG else 1
+    for n in (24, 16) if sc == 3 else (16,):
+        w = 8 * len(s) * sc + n + 4
+        if w <= d.width - 4:
+            import safe_icons
+            x, ty = (d.width - w) // 2, y + 5 - sc
+            safe_icons.draw(d, i, x, ty + (8 * sc - n) // 2, n)
+            if sc == 1:
+                d.text(s, x + n + 4, ty, c)
+            else:
+                d.big_text(s, x + n + 4, ty, c, sc)
+            return True
+    return False
+
+
 def _draw(lines, y, bottom=182, big=False):
     """Lines of (text, color) or (text, color, kind) from y; stops before bottom. Returns the y under them.
     big: each address gets a 48 px blockie and 3 lines of 14 (the caller checks they fit)."""
@@ -285,7 +303,9 @@ def _draw(lines, y, bottom=182, big=False):
         if y + _h(l, big) > bottom:
             break
         s, c, k = l[0], l[1], (l[2] if len(l) > 2 else None)
-        if k == BIG and len(s) <= 10:
+        if k == BIG and len(l) > 3 and l[3] is not None and _iconed(s, c, l[3], y):
+            pass
+        elif k == BIG and len(s) <= 10:
             d.center_text(s, y + 3, c, 3)
         elif k == BIG and len(s) <= ui.COLS_BIG:
             d.center_text(s, y + 2, c, 2)

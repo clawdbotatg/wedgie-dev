@@ -2,7 +2,7 @@
 # safe_read only for a call to execute(): the RP2040's heap can't compile it with safe_read in one file.
 from ui import INK, MUTED, GREEN_D, RED
 from safe import hx, short, amount, coin, BIG
-from safe_read import TOKENS, _amt
+from safe_read import TOKENS, _big, _bigv
 
 # Uniswap's Universal Router, by chain (v2.0, v2.1.1, v2.1.2: what the Uniswap app swaps through now). The same
 # address on two chains can be someone else's, so only on its own chain. v2.0 reads a V4 multi-hop swap one word
@@ -246,11 +246,11 @@ def read(tx):
             return None
     lines = [("pay at most" if most else "pay", MUTED)]
     if tx["value"]:
-        lines.append(("%s %s" % (amount(tx["value"], 18), coin(tx)), INK, BIG))
-    lines += [(_amt(tx, t, n), INK, BIG) for t, n in pay.items()]
+        lines.append(_bigv(tx, tx["value"]))
+    lines += [_big(tx, t, n) for t, n in pay.items()]
     if len(lines) == 1:
         return None
-    gets = [("%s %s" % (amount(n, 18), coin(tx)) if t == NATIVE else _amt(tx, t, n), INK, BIG)
+    gets = [_bigv(tx, n) if t == NATIVE else _big(tx, t, n)
             for t, n in get.items() if n]
     f = "%d.%02d" % (fee // 100, fee % 100)
     lines.append(("get at least" + (" (%s%% fee)" % f.rstrip("0").rstrip(".") if fee else ""), RED if fee > 100 else MUTED))

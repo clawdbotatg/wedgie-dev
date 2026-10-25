@@ -5,24 +5,7 @@ import safe as A
 from ui import INK, MUTED, GREEN_D, RED
 from safe import word, aword, unhex, hx, short, amount, coin, CHAINS, BIG, ADDR
 
-# tokens the wedgie knows itself: (chain, address) -> (symbol, decimals). Others show their raw amount.
-TOKENS = {
-    (1, "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"): ("USDC", 6),
-    (1, "0xdac17f958d2ee523a2206206994597c13d831ec7"): ("USDT", 6),
-    (1, "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"): ("WETH", 18),
-    (1, "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599"): ("WBTC", 8),
-    (1, "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf"): ("cbBTC", 8),
-    (1, "0x6b175474e89094c44da98b954eedeac495271d0f"): ("DAI", 18),
-    (8453, "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"): ("USDC", 6),
-    (8453, "0x4200000000000000000000000000000000000006"): ("WETH", 18),
-    (8453, "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf"): ("cbBTC", 8),
-    (8453, "0x50c5725949a6f0c72e6c4a641f24049a917db0cb"): ("DAI", 18),
-    (8453, "0xfde4c96c8593536e31f229ea8f37b2ada2699bb2"): ("USDT", 6),
-    (84532, "0x036cbd53842c5426634e7929541ec2318f3dcf7e"): ("USDC", 6),
-    (10, "0x0b2c639c533813f4aa9d7837caf62653d097ff85"): ("USDC", 6),
-    (42161, "0xaf88d065e77c8cc2239327c5edb3a432268e5831"): ("USDC", 6),
-    (11155111, "0x1c7d4b196cb0c7b01d743fbc6116a902379c7238"): ("USDC", 6),
-}
+from safe_icons import TOKENS     # tokens the wedgie knows itself: (chain, address) -> (symbol, decimals)
 
 # contracts with a name: the same address on every chain unless the chain is in the key.
 # A swap router gets an exact approval and the swap names this Safe as who gets paid (checked below).
@@ -102,6 +85,23 @@ def _amt(tx, a, n):
     return "%s %s" % (amount(n, dec), sym) if sym else "%d of %s" % (n, short(a))
 
 
+def _ico(tx, a):
+    """The picture of a token the wedgie knows itself (safe_icons), found by its address; None for any other."""
+    import safe_icons
+    return safe_icons.at(tx["chainId"], a)
+
+
+def _big(tx, a, n, c=INK):
+    """An amount of the token at a, big, with its picture if the wedgie knows it."""
+    return (_amt(tx, a, n), c, BIG, _ico(tx, a))
+
+
+def _bigv(tx, v, c=INK):
+    """An amount of the chain's coin, big, with its picture (ETH's on an ETH chain)."""
+    import safe_icons
+    return ("%s %s" % (amount(v, 18), coin(tx)), c, BIG, safe_icons.of(coin(tx)))
+
+
 def _name(a, safe):
     return "this Safe" if a == safe else ROUTERS.get(a) or MODULES.get(a) or short(a)
 
@@ -153,12 +153,12 @@ def _uniswap(tx):
         to, eth_out = hx(calls[1][4 + 44:4 + 64]), True
     elif len(calls) != 1:
         return None
-    get = "%s %s" % (amount(min_out, 18), coin(tx)) if eth_out else _amt(tx, z, min_out)
+    get = _bigv(tx, min_out) if eth_out else _big(tx, z, min_out)
     if tx["value"] and not (_tok(tx, a)[0] == "WETH" and amt_in == tx["value"]):   # ETH sent, but the swap pays
-        pay = [(_amt(tx, a, amt_in), RED, BIG), ("and sends %s %s" % (amount(tx["value"], 18), coin(tx)), RED)]   # something else
+        pay = [_big(tx, a, amt_in, RED), ("and sends %s %s" % (amount(tx["value"], 18), coin(tx)), RED)]   # something else
     else:                                                                            # (audit 10-18)
-        pay = [("%s %s" % (amount(tx["value"], 18), coin(tx)) if tx["value"] else _amt(tx, a, amt_in), INK, BIG)]
-    return "Swap", [("pay", MUTED)] + pay + [("get at least", MUTED), (get, INK, BIG),
+        pay = [_bigv(tx, tx["value"]) if tx["value"] else _big(tx, a, amt_in)]
+    return "Swap", [("pay", MUTED)] + pay + [("get at least", MUTED), get,
                     ("to this Safe", GREEN_D) if to == safe else ("to " + short(to) + "!", RED)]
 
 
@@ -290,7 +290,7 @@ def describe(tx):
     if tx["operation"] == 1:            # (a MultiSend batch never gets here: confirm reads its actions)
         return "Danger", [("can take all", RED, BIG)] + _addr_lines("", to, RED)[1:]
     if not data:
-        return "Fee" if to == RELAY else "Send", out + [("%s %s" % (amount(tx["value"], 18), coin(tx)), INK, BIG)] + _who(to, safe)
+        return "Fee" if to == RELAY else "Send", out + [_bigv(tx, tx["value"])] + _who(to, safe)
     ur = sel in ("3593564c", "24856bc3")   # execute(commands, inputs[, deadline]): maybe Uniswap's Universal Router
     if ur:
         import safe_ur
@@ -335,7 +335,7 @@ def describe(tx):
         if n >> 128:                    # "unlimited": every one of them, now and later
             c = RED
         who = [("by " + ROUTERS[sp], c)] if sp in ROUTERS else [("by", c)] + _addr_lines("", sp, c)[1:]
-        return "Allow taking", out + [("ALL " + (_tok(tx, to)[0] or "of it") if n >> 128 else _amt(tx, to, n), c, BIG)] + who
+        return "Allow taking", out + [("ALL " + (_tok(tx, to)[0] or "of it"), c, BIG, _ico(tx, to)) if n >> 128 else _big(tx, to, n, c)] + who
     if to in UNISWAP and sel == "5ae401dc":
         try:
             u = _uniswap(tx)
@@ -349,7 +349,7 @@ def describe(tx):
         except Exception:
             u = None
         return u or ("Swap", [("via Uniswap", INK)] +
-                     ([("pay", MUTED), ("%s %s" % (amount(tx["value"], 18), coin(tx)), INK, BIG)] if tx["value"] else []) +
+                     ([("pay", MUTED), _bigv(tx, tx["value"])] if tx["value"] else []) +
                      [("can't read it", RED, BIG), ("can't check what you get", RED)])
     why = None
     if tx.get("clear") and not ur:      # an ERC-7730 descriptor came with it (safe_7730: proven, or ignored)
@@ -361,7 +361,7 @@ def describe(tx):
     if to in ROUTERS:
         far = _lifi_to(data, safe) if to == LIFI else None     # a Uniswap call _uniswap couldn't read: can't tell
         return ("Bridge" if far else "Swap"), out + [("via " + ROUTERS[to], INK)] + \
-            ([("pay", MUTED), ("%s %s" % (amount(tx["value"], 18), coin(tx)), INK, BIG)] if tx["value"] else []) + \
+            ([("pay", MUTED), _bigv(tx, tx["value"])] if tx["value"] else []) + \
             ([("to this Safe", GREEN_D)] if far == 0 else
              [("to this Safe on", INK), (CHAINS.get(far, "chain %d" % far), INK, BIG)] if far else
              [("can't tell who gets it", RED)]) + \
@@ -375,7 +375,7 @@ def describe(tx):
         if not tok:
             return "Send", out + [("%d of token" % n, INK)] + _addr_lines("", to, RED)[1:] + _who(_aarg(data, 0), safe)
         r = _aarg(data, 0)
-        return "Fee" if r == RELAY else "Send", out + [("%s %s" % (amount(n, tok[1]), tok[0]), INK, BIG)] + _who(r, safe)
+        return "Fee" if r == RELAY else "Send", out + [_big(tx, to, n)] + _who(r, safe)
     return "Unknown", out + [("can't read this", RED, BIG)] + _addr_lines("on", to, RED) + ([(why[:28], RED)] if why else [])
 
 
@@ -429,7 +429,7 @@ def fold(acts):
                 pages[-1] = (head, lines + fees, None)
                 continue
             if not any(l[0] == "pay" for l in lines):
-                pages[-1] = (head, lines[:1] + [("pay", MUTED), (amt, INK, BIG)] + lines[1:] + fees, None)
+                pages[-1] = (head, lines[:1] + [("pay", MUTED), (amt, INK, BIG) + app[1][0][3:]] + lines[1:] + fees, None)
                 continue
         mine = head in ("Daily limit", "Fee limit") or head == "Turn on" and lines == [("Daily limit", INK, BIG)]
         if mine and not red and not (a["to"] != a["safe"] and sel in ("957ed2b3", "610b5925")):
