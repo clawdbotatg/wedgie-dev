@@ -66,7 +66,6 @@ const backup = (uid?: string): FS.Bundle | null => { try { return uid ? JSON.par
 export function format(main: HTMLElement) {
   main.innerHTML = `
   <section class="test-page">
-    <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
     <h1>Test a wedgie</h1>
     <p class="test-safe">This wipes and resets the wedgie. It never changes the chip. Your crypto stays safe.</p>
     <div class="boot-hint card" id="t-hint" hidden>

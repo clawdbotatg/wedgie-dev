@@ -20,7 +20,6 @@ const LABEL: Record<Job["state"], string> = { waiting: "Waiting", updating: "Upd
 export function update(main: HTMLElement) {
   main.innerHTML = `
   <section class="test-page upd-page">
-    <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
     <h1>Wedgie update bench</h1>
     <div class="test-status" id="u-status">
       <div class="status-text" id="u-text">Plug in wedgies</div>

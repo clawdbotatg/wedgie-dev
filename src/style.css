@@ -405,9 +405,8 @@ html, body { overflow-x: clip; }
 /* /test: the assembly-line check */
 body.test-mode .top, body.test-mode .foot { display: none; }
 .test-page { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 16px; gap: 22px; text-align: center; }
-.test-page .band { width: 200px; margin: 0; }
 .test-safe { margin: 0; max-width: 520px; font-size: 22px; font-weight: 800; line-height: 1.35; }
-.test-page h1 { font-size: 15px; color: var(--muted); font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.test-page h1 { font-size: clamp(40px, 8vw, 64px); color: var(--ink); margin: 0; }
 .test-status { background: var(--shell); box-shadow: var(--shell-shadow); border-radius: 30px; padding: 30px 40px; display: flex; flex-direction: column; align-items: center; gap: 6px; width: min(100%, 540px); }
 .status-text { font-size: 48px; font-weight: 900; letter-spacing: -.02em; line-height: 1.05; }
 .status-detail { font-size: 16px; color: var(--muted); }
@@ -703,7 +702,6 @@ body.dock-running #s-msg { display: none; }
    sheets for Send / Receive / Connect app / New Safe (a bottom sheet on a phone) */
 .safe-page { gap: 16px; padding-bottom: 40px; align-items: stretch; text-align: left; }
 .safe-page [hidden] { display: none !important; }
-.safe-page h1 { font-size: clamp(28px, 5vw, 40px); text-transform: none; letter-spacing: -.02em; color: var(--ink); margin: 0; }
 .safe-page h2 { font-size: 26px; margin: 0 0 14px; }
 .safe-page h3 { font-size: 19px; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
 .safe-page p { margin: 8px 0; }
@@ -1019,7 +1017,7 @@ p.surge, .order-body > p.surge { margin: 4px 0 0; font-size: 22px; color: var(--
 @media (prefers-reduced-motion: reduce) { .stx { --p: 1 !important; } }
 .order-fields input[readonly] { opacity: .6; cursor: default; }
 .legal-page { display: block; min-height: 0; max-width: 720px; margin: 0 auto; text-align: left; }
-.legal-page h1 { font-size: 28px; color: var(--ink, #1a1b1a); letter-spacing: 0; text-transform: none; margin: 16px 0 4px; }
+.legal-page h1 { margin: 16px 0 4px; }
 .legal-page h2 { font-size: 19px; margin: 26px 0 6px; }
 .legal-page p { line-height: 1.55; margin: 0 0 10px; }
 .chat-msgs { max-height: 50vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin: 8px 0 12px; }

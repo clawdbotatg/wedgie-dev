@@ -81,7 +81,6 @@ const PRIVACY = `
 
 export function legal(main: HTMLElement, which: "terms" | "privacy") {
   main.innerHTML = `<section class="test-page legal-page">
-    <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
     ${which === "terms" ? TERMS : PRIVACY}
   </section>`;
 }

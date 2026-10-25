@@ -26,7 +26,6 @@ const LABEL: Record<Job["state"], string> = { checking: "Checking", installing: 
 export function prepare(main: HTMLElement) {
   main.innerHTML = `
   <section class="test-page upd-page">
-    <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
     <h1>Prepare to ship</h1>
     <div class="test-status" id="p-status">
       <div class="status-text" id="p-text">Plug in a wedgie</div>

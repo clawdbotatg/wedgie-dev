@@ -44,7 +44,6 @@ export function order(main: HTMLElement) {
   const id = /^\/order\/([0-9a-f]{12})$/.exec(path)?.[1], all = path === "/orders", signin = path === "/signin";
   main.innerHTML = `
   <section class="test-page safe-page order-page${signin ? " signin-page" : ""}">
-    <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
     <h1>${signin ? "Sign in" : all ? "Your orders" : id ? "Your order" : "Order"}</h1>
     <div id="o-body" class="order-stack"></div>
     <p class="safe-msg" id="o-msg" hidden></p>

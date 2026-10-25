@@ -13,7 +13,6 @@ export function telegram(main: HTMLElement) {
   const t = new URLSearchParams(location.search).get("t");
   main.innerHTML = `
   <section class="test-page">
-    <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
     <h1>wedgie Telegram</h1>
     <p class="test-safe">Plug in your wedgie to get in.</p>
     <div class="card">

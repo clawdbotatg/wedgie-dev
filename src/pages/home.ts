@@ -99,6 +99,8 @@ export function home(main: HTMLElement): Promise<unknown> {
     </div>
   </section>
 
+  <div class="band" aria-hidden="true"><i></i><i></i><i></i></div>
+
   <section id="get" class="sec">
     <div class="sec-head">
       <span class="kicker">Get one</span>
@@ -139,6 +141,8 @@ export function home(main: HTMLElement): Promise<unknown> {
       </div>
     </div>
   </section>
+
+  <div class="band" aria-hidden="true"><i></i><i></i><i></i></div>
 
   <section id="dev" class="sec">
     <div class="sec-head dev-head">

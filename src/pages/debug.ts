@@ -10,7 +10,6 @@ const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt
 export function debug(main: HTMLElement) {
   main.innerHTML = `
   <section class="test-page">
-    <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
     <h1>Debug a wedgie</h1>
     <p id="g-text">Plug in the wedgie. The report needs you to press its green button: that gives this computer full access, for this one report.</p>
     <div id="g-list"></div>

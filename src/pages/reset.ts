@@ -10,7 +10,6 @@ import { setupCard } from "./setup";
 export function reset(main: HTMLElement) {
   main.innerHTML = `
   <section class="test-page">
-    <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
     <h1>Reset a wedgie</h1>
     <p class="test-safe">Puts the latest firmware on, whatever is on it now. It never changes the chip. Your crypto stays safe.</p>
     <div class="boot-hint card">
