@@ -1,5 +1,5 @@
 // /api/alert: "email me when it's $67 again" (src/shop/why.ts).
-//   POST {email}   one mail the next time the surge is gone (_mail.ts sendAlerts), then the row is deleted
+//   POST {email}   a mail the next time the surge is gone, one more 2 weeks on (_mail.ts sendAlerts), then the row is deleted
 // Kept like a buyer's email: a keyed hash (one alert per email) and a locked copy, never in clear. IP_HOUR an hour
 // per IP (ipOf, a hash; wiped after a day).
 import { db, json, oops, env, ipOf, crossSite, extraNow } from "./_shop.js";
@@ -21,6 +21,6 @@ export async function POST(req: Request) {
   const [n] = await sql`select count(*)::int as n from alerts where ip = ${ip} and created > now() - interval '1 hour'`;
   if (n.n >= IP_HOUR) return oops("Too many tries. Wait an hour.", 429);
   await sql`insert into alerts (email_hash, email_enc, ip) values (${await emailHash(email)}, ${await lock(email)}, ${ip})
-    on conflict (email_hash) do update set email_enc = excluded.email_enc`;
+    on conflict (email_hash) do update set email_enc = excluded.email_enc, sent = 0, sent_at = null`;
   return json({ ok: true });
 }

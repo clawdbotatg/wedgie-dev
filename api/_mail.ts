@@ -82,17 +82,26 @@ async function pingPaid(sql: Awaited<ReturnType<typeof db>>, id: string) {
   } catch { await sql`update orders set paid_pinged = null where id = ${id}`.catch(() => {}); }
 }
 
-/** Price alerts (api/alert.ts): once the surge is gone, each one gets one mail and is deleted. 50 a call (Gmail's
- * daily cap); a failed send goes back for next time. Runs on GET /api/order (every shop page view) and omen's admin GETs. */
+/** Price alerts (api/alert.ts): once the surge is gone, each one gets a mail; ALERT_AGAIN later, the next time it's
+ * back to list, one more, and it's deleted. 50 a call (Gmail's daily cap); a failed send goes back for next time.
+ * Runs on GET /api/order (every shop page view) and omen's admin GETs. */
+const ALERT_AGAIN = "14 days";
 export async function sendAlerts(sql: Awaited<ReturnType<typeof db>>, origin: string, extra?: number) {
-  const [any] = await sql`select 1 from alerts limit 1`;
+  const [any] = await sql`select 1 from alerts where sent = 0 or sent_at < now() - ${ALERT_AGAIN}::interval limit 1`;
   if (!any || (extra ?? (await extraNow(sql))) > 0) return;
-  const rows = await sql`delete from alerts where email_hash in (select email_hash from alerts order by created limit 50) returning *`;
+  const rows = await sql`update alerts set sent = sent + 1, sent_at = now()
+    where email_hash in (select email_hash from alerts where sent = 0 or sent_at < now() - ${ALERT_AGAIN}::interval order by created limit 50) returning *`;
+  const list = usd(ITEMS.wedgie.cents);
   for (const r of rows) {
+    const last = r.sent >= 2;
     try {
-      await send(await unlock(r.email_enc), `wedgie is ${usd(ITEMS.wedgie.cents)} again`,
-        [`The price is back to ${usd(ITEMS.wedgie.cents)}.`, `Each sale adds ${usd(BUMP)}, so it may not last.`, "You asked for this one email on wedgie.dev. That's the only one."],
+      await send(await unlock(r.email_enc), `wedgie is ${list} again`,
+        [`The price is back to ${list}.`, `Each sale adds ${usd(BUMP)}, so it may not last.`,
+          last ? "That's the last price email from us." : `You asked for this on wedgie.dev. One more in a couple of weeks, the next time it's ${list}, then that's it.`],
         { text: "Order one", href: `${origin}/order` });
-    } catch { await sql`insert into alerts (email_hash, email_enc, created) values (${r.email_hash}, ${r.email_enc}, ${r.created}) on conflict do nothing`; }
+      if (last) await sql`delete from alerts where email_hash = ${r.email_hash}`;
+    } catch {
+      await sql`update alerts set sent = sent - 1, sent_at = case when sent > 1 then now() - ${ALERT_AGAIN}::interval - interval '1 hour' end where email_hash = ${r.email_hash}`;
+    }
   }
 }

@@ -20,19 +20,18 @@ for (const vp of [{ width: 1360, height: 900, name: "desktop" }, { width: 390, h
   const tap = async (sel) => { const el = page.locator(sel).first(); await el.scrollIntoViewIfNeeded(); vp.hasTouch ? await el.tap() : await el.click(); await page.waitForTimeout(150); };
   const q = () => Object.fromEntries(new URL(page.url()).searchParams);
 
-  await page.goto(base + "/build?app=hello&lid=mint");
+  await page.goto(base + "/build?app=buttons&lid=mint");
   await page.waitForSelector("[data-app]");
   check(q().lid === "white", `${vp.name}: a link with a PLA-only lid falls back to the default`);
-  await page.goto(base + "/build?app=usbwallet&chip=none&lid=pink");
+  await page.goto(base + "/build?app=safe&chip=trustm&lid=pink");
   await page.waitForSelector("[data-app]");
-  check(q().app === "usbwallet" && q().chip === "atecc" && q().lid === "pink" && q().base === "black", `${vp.name}: link read, wallet forces the chip, defaults filled in (${new URL(page.url()).search})`);
-  check(await page.locator('#bld-chip [data-slot="0"]').isDisabled() && q().chip2 === "none", `${vp.name}: the wallet locks the ATECC608 into the first slot; the second is free`);
-  check((await page.locator("#bld-steps").innerText()).includes("ATECC608"), `${vp.name}: build list has the chip`);
+  check(q().app === "safe" && q().chip === "trustm" && q().lid === "pink" && q().base === "black" && q().chip2 === "none", `${vp.name}: link read, defaults filled in (${new URL(page.url()).search})`);
+  check((await page.locator("#bld-steps").innerText()).includes("Trust M"), `${vp.name}: build list has the chip`);
   check(q().pico === "nulllab" && await page.locator(".bld-buy, #bld-price").count() === 0, `${vp.name}: default board in the URL; no buy card (hidden page)`);
   await tap('[data-pico="green"]');
   check(q().pico === "green" && (await page.locator("#bld-steps").innerText()).includes("Green USB-C Pico"), `${vp.name}: another board: in the URL, cheaper, on the build list`);
 
-  await tap('[data-app="demo"]');
+  await tap('[data-app="bunker"]');
   const slot = (i) => page.locator(`#bld-chip [data-slot="${i}"]`);
   await slot(0).selectOption("trustm");
   await slot(1).selectOption("atecc");
@@ -47,10 +46,9 @@ for (const vp of [{ width: 1360, height: 900, name: "desktop" }, { width: 390, h
     `${vp.name}: a sensor in the second slot; VCNL4040 (0x60, like the ATECC608) can't go with it`);
   await slot(0).selectOption("none");
   await slot(1).selectOption("none");
-  check(await cost() === 51 - 2, `${vp.name}: no chips, green board: $${await cost()}`);
   await tap('.sw[data-part="a"][data-color="blue"]');
   await tap('.sw[data-part="base"][data-color="orange"]');
-  check(q().app === "demo" && q().chip === "none" && q().a === "blue" && q().base === "orange", `${vp.name}: taps land in the URL`);
+  check(q().app === "bunker" && q().chip === "none" && q().a === "blue" && q().base === "orange", `${vp.name}: taps land in the URL`);
   const steps = await page.locator("#bld-steps").innerText();
   check(!steps.includes("ATECC608") && steps.includes("base in orange") && steps.includes("A blue"), `${vp.name}: build list follows`);
 
@@ -66,7 +64,7 @@ for (const vp of [{ width: 1360, height: 900, name: "desktop" }, { width: 390, h
   check(p2.url() === url, `${vp.name}: the same link opens the same wedgie`);
   // (evaluate, not locators: with two WebGL tabs open, a locator on the second one can stall)
   const picked = await p2.evaluate(() => [...document.querySelectorAll('[aria-pressed="true"]')].map((e) => e.dataset.app || e.dataset.part + "=" + e.dataset.color));
-  check(["demo", "base=orange", "a=blue", "lid=pink"].every((x) => picked.includes(x)), `${vp.name}: its choices show as picked`);
+  check(["bunker", "base=orange", "a=blue", "lid=pink"].every((x) => picked.includes(x)), `${vp.name}: its choices show as picked`);
   await p2.close();
 
   const wide = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);

@@ -98,5 +98,5 @@ Counting never waits or throws, so it can't break checkout.
 
 The red Email alert in the price's box (open it with the green * or the green surge amount; shows only during a surge).
 `api/alert.ts` keeps the email like a buyer's: a keyed hash and a locked copy. Once the price is back to $67,
-`sendAlerts` (`api/_mail.ts`) mails each one once and deletes it. It runs on every `GET /api/order` (shop page
+`sendAlerts` (`api/_mail.ts`) mails each one, then once more the next time it's $67 at least 2 weeks later, and deletes it. It runs on every `GET /api/order` (shop page
 views) and every omen admin GET (the 3-hour track timer), so a quiet site still sends. Test: `node tools/mailprobe.mjs`.

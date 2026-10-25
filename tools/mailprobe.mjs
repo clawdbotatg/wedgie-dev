@@ -6,7 +6,7 @@
 //      the session lists the orders; a 2nd send waits a minute; signed out, the session is dead
 //   4. an email with no orders still gets a link; signed in, it claims this device's order
 //   5. shipped: a mail with the tracking number; the locked email is wiped
-//   5b. price alert: stored locked, one mail once the surge is gone, then deleted
+//   5b. price alert: stored locked, a mail once the surge is gone, one more 2 weeks on, then deleted
 //   6. two tabs: tab A asks to sign in, the mail's link opens in tab B, and A signs in by itself; Sign out keeps only the email
 // Run: node tools/mailprobe.mjs
 import { createServer } from "vite";
@@ -93,7 +93,13 @@ ok((await get()).extra === 0, "the surge is gone");
 const am = mails().filter((m) => m.to === "Watcher@Example.com");
 ok(am.length === 1 && /\$67 again/.test(am[0].subject) && am[0].text.includes("https://wedgie.dev/order"), "alert: one mail, with a link to order");
 await get();
-ok(mails().filter((m) => m.to === "Watcher@Example.com").length === 1 && !(await sql`select * from alerts`).length, "alert: sent once, then deleted");
+ok(mails().filter((m) => m.to === "Watcher@Example.com").length === 1, "alert: not again right away");
+await sql`update alerts set sent_at = sent_at - interval '15 days'`;
+await get();
+const am2 = mails().filter((m) => m.to === "Watcher@Example.com");
+ok(am2.length === 2 && /last price email/.test(am2[1].text) && !(await sql`select * from alerts`).length, "alert: a 2nd mail 2 weeks on, then deleted");
+await get();
+ok(mails().filter((m) => m.to === "Watcher@Example.com").length === 2, "alert: never a 3rd");
 ok((await call(alert.POST, { email: "watcher@example.com" })).status === 400, "alert: refused while it's already $67");
 
 // 6: the real pages under vite, in a browser

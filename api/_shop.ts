@@ -67,8 +67,10 @@ export async function db() {
     await sql`create table if not exists safe_cmp (n bigserial primary key, what text not null, chain int not null, safe text not null, diffs text not null, at timestamptz not null default now())`;   // api/safe.ts PUT: where Safe's API and the chain disagreed
     await sql`alter table orders add column if not exists moving_at timestamptz`;      // shipped: USPS has it moving (omen, admin.ts step); never a place
     await sql`alter table orders add column if not exists delivered_at timestamptz`;   // shipped: USPS delivered it
-    await sql`create table if not exists alerts (     -- "email me when it's $67 again" (api/alert.ts, _mail.ts sendAlerts); gone once mailed
+    await sql`create table if not exists alerts (     -- "email me when it's $67 again" (api/alert.ts, _mail.ts sendAlerts); gone after its 2nd mail
       email_hash text primary key, email_enc text not null, ip text, created timestamptz not null default now())`;
+    await sql`alter table alerts add column if not exists sent int not null default 0`;   // mails sent so far (2 at most)
+    await sql`alter table alerts add column if not exists sent_at timestamptz`;
   })().catch((e) => { ready = null; throw e; });
   await ready;
   return sql;

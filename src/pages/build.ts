@@ -171,8 +171,7 @@ const GROUPS = [...new Set(CHIPS.map((c) => c.group))];
 const chipOf = (key: string) => CHIPS.find((c) => c.key === key);
 // What each app looks like on the preview's screen.
 const SCREENS: Record<string, string[]> = {
-  buttons: ["buttons"], hello: ["hello"], keytest: ["buttons"], demo: ["demo", "demo-2"], mock: ["wallet-home", "wallet-chart", "wallet-send", "wallet-receive"],
-  wire_demo: ["clear-sign"], usbwallet: ["wallet-home", "wallet-send", "wallet-signing", "wallet-receive"],
+  buttons: ["buttons"], safe: ["safe-home", "safe-sign"], bunker: ["bunker-title", "bunker", "bunker-2"], frog: ["frog", "frog-feed", "frog-eat"],
 };
 // Ready-made wedgies: each is just a /build link, like any shared one.
 const PRESETS = [
@@ -333,8 +332,6 @@ export async function build(main: HTMLElement) {
       ${picked.map((c, i) => `<li><b>${esc(c.name)}</b> <span>${esc(c.about)} ${i ? "It chains off the first board's spare port: add a 50 mm STEMMA QT cable."
           : "Plus a STEMMA QT / Qwiic cable with bare wire ends."}</span>
         <div class="buy">${c.buy.map(([u, t]) => link(u, t)).join("")}${i ? link("https://www.adafruit.com/product/4399", "50 mm cable") : link("https://www.adafruit.com/product/4209", "Cable")}</div></li>`).join("")}
-      ${b.app === "battery" ? `<li><b>A battery hat</b> <span>The Battery app reads a Waveshare Pico-UPS-B.</span>
-        <div class="buy">${link("https://www.waveshare.com/pico-ups-b.htm", "Waveshare")}</div></li>` : ""}
       <li><b>Get the filament</b> <span>1.75 mm. The case in PETG; buttons and joystick in PETG or PLA.</span>
         <div class="buy">${filament()}</div></li>
       <li><b>Print the case</b> <span>0.16 mm layers, 4 walls, no supports. Lid in ${cname("lid").toLowerCase()}, base in ${cname("base").toLowerCase()}, joystick in ${cname("stick").toLowerCase()}, buttons: ${buttons}.</span>
