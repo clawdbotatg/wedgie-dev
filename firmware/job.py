@@ -25,6 +25,7 @@ import wedgie as W
 KEEP = ("main.py", "boot.py", "wedgie.py", "slot.py", "lcd.py", "job.py", "p256.py", "loader.py", "serial", "modified",
         "wedgie.mpy", "slot.mpy", "lcd.mpy", "job.mpy", "p256.mpy", "loader.mpy")    # 0.3.14+: the core is compiled
 IDLE_MS = 30000
+DOG_MS = 8000       # a raw put's bytes stop for this long: stop (_dog)
 
 
 sums = W.sums           # it lives in wedgie.py: the slot answers sums without loading this file
@@ -166,6 +167,13 @@ def check(m, sig=True, tick=None):
     if any(n not in files for n in required):
         raise ValueError("required file isn't in the signed list")
     return version, files, required
+
+
+def _dog(_):
+    """A raw put's bytes stopped mid-put (the computer's tab closed, its USB went): its read would wait for good.
+    Nothing was written to a live file yet, so restart on the old ones, as an install that ends does (resume)."""
+    W.log("install stopped: its bytes stopped coming for %d s" % (DOG_MS // 1000))
+    restart()
 
 
 def _err(qid, e):
@@ -316,7 +324,7 @@ def run(mid, m, ask, show=None):
     R = W.lines()                           # the one line reader: never a string grown per char (wedgie.Lines)
     buf = bytearray(RAW)                    # raw puts land here: made once, on install mode's clean heap
     bv = memoryview(buf)
-    last, qid, t = time.ticks_ms(), mid, "go"
+    last, qid, t, dog = time.ticks_ms(), mid, "go", None
     gc.collect()
     try:
         while time.ticks_diff(time.ticks_ms(), last) < IDLE_MS:
@@ -380,7 +388,18 @@ def run(mid, m, ask, show=None):
                         _err(qid, "a raw put is 0..%d bytes" % RAW)
                         return
                     b = bv[:k]
-                    R.raw(b, poll)
+                    if dog is None:         # Lines.raw's read can block for good if bytes stop mid-put (the tab
+                        dog = False         # closed): a timer then logs it and restarts on the old files (0.3.63)
+                        if sys.implementation.name == "micropython":     # (not tools/test_job.py's CPython)
+                            from machine import Timer
+                            dog = Timer(-1)
+                    if dog:
+                        dog.init(period=DOG_MS, mode=dog.ONE_SHOT, callback=_dog)
+                    try:
+                        R.raw(b, poll)
+                    finally:
+                        if dog:
+                            dog.deinit()
                 else:
                     b = binascii.a2b_base64((q.pop("data", None) or "").encode())
                 q = None

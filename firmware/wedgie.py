@@ -3,7 +3,7 @@
 # interrupted; from the REPL they are plain calls:  import wedgie; wedgie.shot(); wedgie.press("A")
 import sys, os, json, machine
 
-VERSION = "0.3.62"
+VERSION = "0.3.63"
 
 # The lock. main.py turns Ctrl-C off before anything else and never ends by itself, so a computer
 # can only send the slot's JSON lines: it can't stop the app, reach the REPL, or make the secure chip
@@ -422,7 +422,7 @@ class Lines:
         at a time took ~4 s. Ctrl-C is off while sealed, so any byte value comes through."""
         got, n = 0, len(mv)
         while got < n:
-            if poll and not poll.poll(ms):      # bytes lost on the way: say so, never wait for good (0.3.62)
+            if poll and not poll.poll(ms):      # none came at all: say so (bytes that stop mid-slice: job.py's timer)
                 raise OSError("raw bytes stopped at %d of %d" % (got, n))
             got += sys.stdin.buffer.readinto(mv[got:min(n, got + 512)]) or 0
 

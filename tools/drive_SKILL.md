@@ -15,14 +15,14 @@ or an ATECC608) **wedged** between the boards on I2C. It runs MicroPython plus t
 into one app, and asks on its own screen before anything that matters. Games, tools, and a hardware signer for a
 Safe multisig. Everything is MIT. Home: https://wedgie.dev
 
-**The current firmware is 0.3.62.** If a wedgie's `hello` says older, update it first: everything here assumes
+**The current firmware is 0.3.63.** If a wedgie's `hello` says older, update it first: everything here assumes
 current firmware.
 
 ```yaml
 name: wedgie
 site: https://wedgie.dev
 skill_index: https://wedgie.dev/skill.md          # this file
-firmware: 0.3.62
+firmware: 0.3.63
 license: MIT (hardware design, case, firmware, site, art)
 source: https://github.com/clawdbotatg/wedgie-dev
 made_by: Austin Griffith and Gus Griffith, with @ClawdBotATG; sold by BuidlGuidl DAO LLC
@@ -222,7 +222,7 @@ https://instantwallet.io. Details: safe.md.
 
 # Talk to a wedgie over USB
 
-Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.62**; if `hello`
+Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.63**; if `hello`
 says older, run `wedgie.py update` first.
 
 ## Talk to it directly
@@ -345,7 +345,7 @@ from answering. Hold **Y**: no WEDGIE drive this time (debugging only).
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.62","fw":"wedgie-0.3.62","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.63","fw":"wedgie-0.3.63","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":3,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -378,7 +378,7 @@ and the host holding its port answers (its page on wedgie.dev, or `wedgie.py net
 A host fetches only what the running app's wedgie.json lists in `"net"` (its sites, `"chain"` for chain
 reads) and goes through wedgie.dev: `POST https://wedgie.dev/api/net {"url","pick","max"}` -> `{data}` for a
 site, `POST https://wedgie.dev/api/rpc?chain=<id>` (JSON-RPC, read methods only, `wedgie_prices` for the ETH
-price) for a chain. Answers are plain ASCII JSON, under 5 KB.
+price, `wedgie_symbols` for any coins by symbol) for a chain. Answers are plain ASCII JSON, under 5 KB.
 
 hello's fields: `version` the firmware, `running` the app on screen (null: none), `chip` the secure
 chip found, `sealed` locked, `open` let in right now, `ram` bytes of free RAM, `free` bytes of free
@@ -1047,7 +1047,7 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md. Or build one your
 
 You are writing a game or app for a **wedgie**: a Raspberry Pi Pico (RP2040 or RP2350) under a
 240x240 color screen, with a 5-way joystick on the left and four buttons A B X Y down the right. It
-runs MicroPython plus the wedgie firmware (current: 0.3.62), which boots straight into one app. You
+runs MicroPython plus the wedgie firmware (current: 0.3.63), which boots straight into one app. You
 write that app.
 
 What you hand back is a **folder** (later a GitHub repo) with a `wedgie.json` at its top and the app's
@@ -1429,6 +1429,8 @@ A wedgie has no network, but the computer it's plugged into does. List the sites
 ```python
 import net
 p = net.price()                                      # ETH in dollars (a float)
+ps = net.chain(1, "wedgie_symbols", ["BTC", "SOL"])  # {"BTC": 80449.85, "SOL": 101.46}: any coin by symbol (25 max)
+t = net.chain(8453, "wedgie_prices", ["0x4ed4...efed"])["tokens"]   # tokens on that chain by address: {address: usd}
 n = int(net.chain(8453, "eth_blockNumber"), 16)      # a chain read: eth_call, eth_getBalance, eth_blockNumber, ...
 amt = net.get("https://api.coinbase.com/v2/prices/ETH-USD/spot", pick="data.amount")   # "3412.10"
 rows = net.get("https://example.com/list.json", pick="0:5.{title,amount}")             # [{title, amount}] x 5
@@ -1437,6 +1439,7 @@ rows = net.get("https://example.com/list.json", pick="0:5.{title,amount}")      
 - Who fetches: **the wedgie's page on wedgie.dev, open in a tab** (wedgie.dev/connect, pick it; Chrome or
   Edge), or `python3 wedgie.py net` in a terminal. Nothing open: `net.Error("no internet: ...")` after 15 s.
   Say so on your screen and in your README.
+- `net.chain(chain, method, params)` is any read-only JSON-RPC call on that chain; wedgie.dev makes it. No URL.
 - Only what `"net"` lists, through wedgie.dev. `"chain"` uses wedgie.dev's Alchemy key (it never reaches the
   app or the page); read methods only, no sending transactions. Chains: 1 Ethereum, 8453 Base, 10 Optimism,
   42161 Arbitrum, 137 Polygon, and more. Sites: https only, GET only, rate-limited.
@@ -1449,7 +1452,7 @@ rows = net.get("https://example.com/list.json", pick="0:5.{title,amount}")      
   (`ui.progress("Getting the price", "wedgie.dev", bar=False)`). Not waiting: `rid = net.ask({"url": ...})`,
   then `net.answer(rid)` each frame (None till it's in).
 - Errors raise `net.Error` with a short reason: catch it and show it.
-- A full example: https://github.com/clawdbotatg/wedgie-ethprice
+- Full examples: https://github.com/clawdbotatg/wedgie-ethprice, https://github.com/clawdbotatg/wedgie-ticker
 
 ## The rest of the hardware
 
