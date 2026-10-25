@@ -7,7 +7,7 @@
 # or checks a signature: the person sees it in milliseconds. A no answers {"type":"refused"}. A yes
 # answers {"type":"go"}, and until the job ends nothing else runs (under the boot bar):
 #   {"type":"release","release":<release.txt>,"sig":"<r> <s>"} -> {"type":"ok"}  the signed list (our key,
-#        wedgie.release_ok: seconds of pure-Python P-256) must name every file to write and be that version
+#        wedgie.release_ok: 0.2 s on a Trust M, else 2.4 s of pure-Python P-256) must name every file to write and be that version
 #   {"type":"sums","names":[..],"exists":[..]}           -> {"type":"sums"}  what's on it already
 #   {"type":"put","name":n,"data":<base64>,"end":bool}  -> {"type":"ok"}   (chunks, in order)
 #   {"type":"commit"}                                    -> {"type":"done"}, then a soft reset
@@ -90,7 +90,7 @@ def _files_of(a, signed):
 
 def check(m, sig=True, tick=None):
     """The job against its signed list: (version, {name: sha}, required names) or raises ValueError. sig=False skips the
-    signature (pure-Python P-256: 2.2 s on an RP2040), which run() checks after the yes.
+    signature (0.2 s on a Trust M, else pure-Python P-256: 2.4 s on an RP2040), which run() checks after the yes.
     Signed too (0.3.12+): which app it puts on and what it may touch. The host says only which signed
     app (its mod); apps.json is written from the signed "@app" line (a host once named wedgie.set_open
     as an app's entry: Ctrl-C on at the next boot). "Install X" must put on the signed app named X; a
@@ -218,7 +218,7 @@ def progress(title, what, p):
 
 
 # The bar moves by time, not by step: each part of a job gets the share of the bar it takes of the
-# job's time, so it never sits still (the signature is 2.2 s of a 4 s app install, and sat at 0).
+# job's time, so it never sits still (without a Trust M the signature is 2.4 s of a 4 s app install, and sat at 0).
 # ms, measured on the virtual RP2040 (tools/chipprobe.mjs --log, firmware 0.3.12): the yes to the job
 # running again after the restart, the P-256 check, the sums, the commit. Re-measure on a real board.
 RESTART, SIG, SUMS, COMMIT = 1600, 3100, 500, 300

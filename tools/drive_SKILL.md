@@ -15,14 +15,14 @@ or an ATECC608) **wedged** between the boards on I2C. It runs MicroPython plus t
 into one app, and asks on its own screen before anything that matters. Games, tools, and a hardware signer for a
 Safe multisig. Everything is MIT. Home: https://wedgie.dev
 
-**The current firmware is 0.3.63.** If a wedgie's `hello` says older, update it first: everything here assumes
+**The current firmware is 0.3.64.** If a wedgie's `hello` says older, update it first: everything here assumes
 current firmware.
 
 ```yaml
 name: wedgie
 site: https://wedgie.dev
 skill_index: https://wedgie.dev/skill.md          # this file
-firmware: 0.3.63
+firmware: 0.3.64
 license: MIT (hardware design, case, firmware, site, art)
 source: https://github.com/clawdbotatg/wedgie-dev
 made_by: Austin Griffith and Gus Griffith, with @ClawdBotATG; sold by BuidlGuidl DAO LLC
@@ -222,7 +222,7 @@ https://instantwallet.io. Details: safe.md.
 
 # Talk to a wedgie over USB
 
-Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.63**; if `hello`
+Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.64**; if `hello`
 says older, run `wedgie.py update` first.
 
 ## Talk to it directly
@@ -345,7 +345,7 @@ from answering. Hold **Y**: no WEDGIE drive this time (debugging only).
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.63","fw":"wedgie-0.3.63","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.64","fw":"wedgie-0.3.64","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":3,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -889,6 +889,7 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md
 | 0.3.55 | Two release keys that can't be copied (Secure Enclave, YubiKey); the old key file's lists refused |
 | 0.3.56 | Signature checked while the question is up (green check / red warning); red border after full control |
 | 0.3.57 | Yes is grey until the check ends; installs end in a hard reset |
+| 0.3.64 | Release signatures checked on the Trust M (0.2 s, was 2.4 s); pure Python only without one, or if it says no |
 
 Report a problem: wedgie@buidlguidl.com, or **Send a bug report** on a wedgie's page at wedgie.dev/connect.
 
@@ -1047,7 +1048,7 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md. Or build one your
 
 You are writing a game or app for a **wedgie**: a Raspberry Pi Pico (RP2040 or RP2350) under a
 240x240 color screen, with a 5-way joystick on the left and four buttons A B X Y down the right. It
-runs MicroPython plus the wedgie firmware (current: 0.3.63), which boots straight into one app. You
+runs MicroPython plus the wedgie firmware (current: 0.3.64), which boots straight into one app. You
 write that app.
 
 What you hand back is a **folder** (later a GitHub repo) with a `wedgie.json` at its top and the app's
@@ -1607,6 +1608,9 @@ c.verify(d, r, s, pub, optiga.P384)        # other curves: say which
 c.verify(d, r, s, cert=optiga.CERT2)       # check against the key in a stored certificate
 ```
 - ECDSA over the digest as given. For P-256 hash with SHA-256 (`hashlib.sha256` or `c.sha256`).
+- **Check every P-256 signature here, not in pure Python** (0.2 s vs 2.4 s on an RP2040). Without `optiga`:
+  `wedgie.chip_verify(d, r, s, x, y)` (0.3.64+) uses the Trust M and returns False when there isn't one; then
+  fall back to `p256.verify`.
 - On a computer, `(r, s)` with `pub` verifies with any ECDSA library (Python `cryptography`:
   `encode_dss_signature(r, s)` + `ec.ECDSA(hashes.SHA256())`).
 - **Ethereum needs secp256k1, which the Trust M doesn't have.** P-256 works with passkey-style smart

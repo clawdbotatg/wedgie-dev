@@ -202,6 +202,23 @@ class Session:
     def random(self, n):
         return self.command(0x0C, 0x00, n.to_bytes(2, "big"))
 
+    def verify(self, digest, r, s, x, y):
+        """VerifySign 0x32: True if (r, s) is a P-256 ECDSA signature of digest by the key (x, y), checked on the chip
+        (~0.2 s on an RP2040; pure-Python p256.verify: 2.4 s). False if the chip says it isn't (0x2C); any other
+        trouble raises."""
+        def i(v):
+            b = v.to_bytes(32, "big").lstrip(b"\x00") or b"\x00"
+            return b"\x02" + bytes([len(b) + (b[0] >> 7)]) + b"\x00" * (b[0] >> 7) + b
+        t = lambda tag, v: bytes([tag]) + len(v).to_bytes(2, "big") + v
+        k = b"\x03\x42\x00\x04" + x.to_bytes(32, "big") + y.to_bytes(32, "big")     # the key: a DER BIT STRING
+        try:
+            self.command(0x32, 0x11, t(1, digest) + t(2, i(r) + i(s)) + t(5, b"\x03") + t(6, k))
+            return True
+        except OSError:
+            if self.get(0xF1C2, 0, 1) == b"\x2c":       # the chip's last error (reading clears it): bad signature
+                return False
+            raise
+
     def get_all(self, oid, step=200):
         out = b""
         while True:

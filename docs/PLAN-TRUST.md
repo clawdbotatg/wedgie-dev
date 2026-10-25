@@ -52,7 +52,7 @@ Done 2026-10-19, differently: a Mac Secure Enclave key + one YubiKey, in 0.3.55.
 ### Phase 2: firmware (one release)
 
 - **A key list, not one key.** `RELEASE_KEYS` holds both YubiKeys' keys. The signature names which
-  key signed, so the wedgie still checks only one (2.2 s on an RP2040, no slower).
+  key signed, so the wedgie still checks only one (0.18 s on a Trust M, 2.4 s in pure Python on an RP2040, no slower).
 - **Rotation.** A signed list may carry a new key set (`@keys` line), signed by a current key. The
   wedgie saves it. Losing one key = sign a rotation with the other. No reflash, no lockout.
 - **No going back.** The wedgie keeps the lowest version it accepts (the version it's on, or a

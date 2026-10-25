@@ -122,6 +122,9 @@ c.verify(d, r, s, pub, optiga.P384)        # other curves: say which
 c.verify(d, r, s, cert=optiga.CERT2)       # check against the key in a stored certificate
 ```
 - ECDSA over the digest as given. For P-256 hash with SHA-256 (`hashlib.sha256` or `c.sha256`).
+- **Check every P-256 signature here, not in pure Python** (0.2 s vs 2.4 s on an RP2040). Without `optiga`:
+  `wedgie.chip_verify(d, r, s, x, y)` (0.3.64+) uses the Trust M and returns False when there isn't one; then
+  fall back to `p256.verify`.
 - On a computer, `(r, s)` with `pub` verifies with any ECDSA library (Python `cryptography`:
   `encode_dss_signature(r, s)` + `ec.ECDSA(hashes.SHA256())`).
 - **Ethereum needs secp256k1, which the Trust M doesn't have.** P-256 works with passkey-style smart

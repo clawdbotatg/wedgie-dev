@@ -76,5 +76,6 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md
 | 0.3.55 | Two release keys that can't be copied (Secure Enclave, YubiKey); the old key file's lists refused |
 | 0.3.56 | Signature checked while the question is up (green check / red warning); red border after full control |
 | 0.3.57 | Yes is grey until the check ends; installs end in a hard reset |
+| 0.3.64 | Release signatures checked on the Trust M (0.2 s, was 2.4 s); pure Python only without one, or if it says no |
 
 Report a problem: wedgie@buidlguidl.com, or **Send a bug report** on a wedgie's page at wedgie.dev/connect.

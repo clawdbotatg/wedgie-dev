@@ -3,7 +3,7 @@
 # interrupted; from the REPL they are plain calls:  import wedgie; wedgie.shot(); wedgie.press("A")
 import sys, os, json, machine
 
-VERSION = "0.3.63"
+VERSION = "0.3.64"
 
 # The lock. main.py turns Ctrl-C off before anything else and never ends by itself, so a computer
 # can only send the slot's JSON lines: it can't stop the app, reach the REPL, or make the secure chip
@@ -26,15 +26,20 @@ RELEASE_KEYS = (("4c65afa37faa35c84301f2ba183b21563a7c6e6c9e8a6a5fb3b074495c5c56
 
 def release_ok(text, sig, tick=None, digest=None):
     """text: the signed list (tools/release.mjs), sig: "r s" in hex, then which key ("1"; none: 0). True if
-    that key signed it. Pure-Python P-256 (p256.py): 2.2 s on an RP2040, once per job; tick(0..1) moves a bar.
+    that key signed it. A Trust M checks it (0.2 s, chip_verify); without one, or if it says no, pure-Python
+    P-256 (p256.py: 2.4 s on an RP2040) does, once per job; tick(0..1) moves a bar.
     digest: the list's sha256 instead of text (slot._sig hashes it as it arrives, in pieces)."""
     import gc
     try:
-        import p256, hashlib
+        import hashlib
         f = sig.split()
         r, s = int(f[0], 16), int(f[1], 16)
         x, y = RELEASE_KEYS[int(f[2]) if len(f) == 3 else 0 if len(f) == 2 else 9]
-        return p256.verify(int(x, 16), int(y, 16), digest or hashlib.sha256(text).digest(), r, s, tick)
+        x, y, d = int(x, 16), int(y, 16), digest or hashlib.sha256(text).digest()
+        if chip_verify(d, r, s, x, y):
+            return True
+        import p256
+        return p256.verify(x, y, d, r, s, tick)
     except MemoryError:                     # not "unsigned": it couldn't tell (slot._sig: no mark; a job: its error)
         raise
     except Exception:
@@ -320,6 +325,23 @@ def _find_rng():
         return ("trustm", trustm.Session())
     except Exception:
         return ("none", "no chip")
+
+
+def chip_verify(digest, r, s, x, y):
+    """True if a Trust M on the bus says (r, s) is key (x, y)'s P-256 signature of digest (0.2 s). False when it
+    says no, or there's no Trust M, or it fails: the caller then checks in pure Python (p256.verify, 2.4 s), so a
+    chip that's missing or wrong only makes a check slow. Use it for every P-256 check."""
+    global _rng
+    for _ in range(2):              # a chip that stopped answering (wedgie.chip() resets a Trust M): find it again
+        try:                        # even looking for one can fail: then it's only slower, never a no
+            if _rng is None:
+                _rng = _find_rng()
+            if _rng[0] != "trustm":
+                return False
+            return _rng[1].verify(digest, r, s, x, y)
+        except Exception:
+            _rng = None
+    return False
 
 
 def rand(n=32):

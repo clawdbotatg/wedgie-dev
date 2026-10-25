@@ -141,7 +141,7 @@ Release gate for any firmware change:
 |---|---|---|
 | Request to question on screen | ~90 ms (**measured**, `asked_ms`) | keep: nothing loads before the question (0.3.10 rule) |
 | Yes to install mode running | ~0.5-1 s restart (estimate; boot logo at once) | measure with asked/go timestamps; trim boot.py work on a job restart |
-| Checking the signature (pure-Python P-256) | "a few seconds" (code comment; not measured today) | measure on the board. Options: verify on the ATECC608 when there is one (hardware P-256 verify, ms); cache a verified list by hash until the next release |
+| Checking the signature | 0.3.64+: Trust M VerifySign 177 ms (real board, 10-24); without one pure-Python P-256 2.4 s | done for a Trust M (`wedgie.chip_verify`). Left: the ATECC608's hardware verify; cache a verified list by hash until the next release |
 | File transfer | 1 KB chunks, one round trip each | .mpy halves the bytes. In install mode the heap is clean and the line buffer fixed, so 2-3 KB chunks are safe up to the 6 KB line limit: fewer round trips. Measure before changing |
 | Only changed files | yes (sums after the yes) | keep |
 
