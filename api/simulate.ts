@@ -11,10 +11,38 @@
 // tx = sha256 hex of "<from>\n<to>\n<value, decimal>\n<data>", all lowercase: the wedgie works it out from what it signs.
 // Only a guide: the wedgie still checks the screen against the transaction's own numbers (clear-review docs).
 import { createHash, createPrivateKey, sign } from "node:crypto";
-import { json, oops, TRANSFER } from "./_shop.js";
+import { json, oops, env, db, TRANSFER } from "./_shop.js";
 import { HOSTS, COIN, key, prices, overLimit } from "./rpc.js";
 
 const META = new Map<string, { symbol: string; decimals: number }>();
+// Per IP: 60 a minute, 2,000 a day (overLimit). All of them: ALL_DAY a day, then no more till tomorrow (each costs
+// ~3 Alchemy calls). Austin hears on Telegram (the shop's bot) when that cap is hit, or when the count can't be kept.
+const ALL_DAY = 20_000;
+let toldAt = 0;
+
+/** A Telegram note to Austin, at most one an hour from a warm instance. Never throws. */
+async function tell(text: string) {
+  const bot = env("TELEGRAM_BOT_TOKEN"), chat = env("TELEGRAM_CHAT_ID");
+  if (!bot || !chat || Date.now() - toldAt < 3_600_000) return;
+  toldAt = Date.now();
+  await fetch(`https://api.telegram.org/bot${bot}/sendMessage`, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: chat, text: "⚠️ wedgie.dev /api/simulate: " + text }) }).catch(() => {});
+}
+
+/** True once today's total is past ALL_DAY. The count down: let it through, and say so. */
+async function allCapped() {
+  if (!env("SHOP_DATABASE_URL")) return false;
+  try {
+    const sql = await db();
+    const [r] = await sql`insert into rpc_hits (k, n) values (${"sim:all:" + new Date().toISOString().slice(0, 10)}, 1)
+      on conflict (k) do update set n = rpc_hits.n + 1 returning n`;
+    if (r.n === ALL_DAY + 1) await tell(`${ALL_DAY} today, the cap. Off till tomorrow (UTC). Someone slamming it?`);
+    return r.n > ALL_DAY;
+  } catch {
+    await tell("can't count requests (database down?): no cap right now");
+    return false;
+  }
+}
 
 const hex = (x: unknown, n?: number) => typeof x === "string" && (n ? new RegExp(`^0x[0-9a-f]{${n}}$`) : /^0x([0-9a-f]{2})*$/).test(x);
 
@@ -65,6 +93,7 @@ export async function POST(req: Request) {
   const pk = process.env.PRICE_KEY;
   if (!pk || !key()) return oops("not set up", 503);
   if (await overLimit(req, 60, 2000, "sim:")) return oops("Too many. Wait a minute.", 429);
+  if (await allCapped()) return oops("Too busy today. Try tomorrow.", 503);
   let b: any;
   try { b = JSON.parse(await req.text()); } catch { return oops("Bad request."); }
   const chain = Number(b?.chain), host = HOSTS[chain];
