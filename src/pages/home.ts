@@ -123,16 +123,19 @@ export function home(main: HTMLElement): Promise<unknown> {
     </div>
   </section>
 
-  <section id="library" class="sec">
-    <div class="sec-head">
-      <span class="kicker">Software</span>
-      <h2>A growing app store.</h2>
-      <p>Games, tools, a wallet. More every week.</p>
+  <section id="videos" class="sec teaser">
+    <div class="teaser-one" id="video-unbox">
+      <div class="sec-head"><span class="kicker">Unboxing</span><h2>You&rsquo;ve got a wedgie.</h2><p>Out of the box, plugged in, saying hello.</p></div>
+      <div class="teaser-box">
+        <video playsinline preload="none" poster="/video/unbox.jpg" src="/video/unbox.mp4"></video>
+        <button class="teaser-play" aria-label="Play"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg></button>
+      </div>
     </div>
-    <div class="lib" id="lib">
-      <div class="lib-sticky card">
-        <div class="lib-stage"><div class="lib-row"></div><div class="lib-plank"></div></div>
-        <div class="lib-cap"><h3></h3><p></p></div>
+    <div class="teaser-one" id="video-safe">
+      <div class="sec-head"><span class="kicker">Wallet</span><h2>Deploy, send, and swap.</h2><p>A wedgie deploys a Safe, sends from it, and swaps on a dapp.</p></div>
+      <div class="teaser-box">
+        <video playsinline preload="none" poster="/video/safe.jpg" src="/video/safe.mp4"></video>
+        <button class="teaser-play" aria-label="Play"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg></button>
       </div>
     </div>
   </section>
@@ -150,22 +153,22 @@ export function home(main: HTMLElement): Promise<unknown> {
     </div>
   </section>
 
+  <section id="library" class="sec">
+    <div class="sec-head">
+      <span class="kicker">Software</span>
+      <h2>A growing app store.</h2>
+      <p>Games, tools, a wallet. More every week.</p>
+    </div>
+    <div class="lib" id="lib">
+      <div class="lib-sticky card">
+        <div class="lib-stage"><div class="lib-row"></div><div class="lib-plank"></div></div>
+        <div class="lib-cap"><h3></h3><p></p></div>
+      </div>
+    </div>
+  </section>
+
   <section id="teaser" class="sec teaser">
     <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
-    <div class="teaser-one" id="video-unbox">
-      <div class="sec-head"><span class="kicker">Unboxing</span><h2>You&rsquo;ve got a wedgie.</h2><p>Out of the box, plugged in, saying hello.</p></div>
-      <div class="teaser-box">
-        <video playsinline preload="none" poster="/video/unbox.jpg" src="/video/unbox.mp4"></video>
-        <button class="teaser-play" aria-label="Play"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg></button>
-      </div>
-    </div>
-    <div class="teaser-one" id="video-safe">
-      <div class="sec-head"><span class="kicker">Wallet</span><h2>Deploy, send, and swap.</h2><p>A wedgie deploys a Safe, sends from it, and swaps on a dapp.</p></div>
-      <div class="teaser-box">
-        <video playsinline preload="none" poster="/video/safe.jpg" src="/video/safe.mp4"></video>
-        <button class="teaser-play" aria-label="Play"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg></button>
-      </div>
-    </div>
     <div class="teaser-one" id="video-virtual">
       <div class="sec-head"><span class="kicker">No hardware</span><h2>The virtual wedgie.</h2><p>The real firmware, running in your browser.</p></div>
       <div class="teaser-box">
