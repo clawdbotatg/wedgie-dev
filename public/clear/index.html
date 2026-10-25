@@ -42,7 +42,7 @@
 <script>
 const CHAINS = { 1: ["Ethereum", "etherscan.io"], 8453: ["Base", "basescan.org"], 10: ["Optimism", "optimistic.etherscan.io"], 42161: ["Arbitrum", "arbiscan.io"] };
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
-fetch("screens/index.json").then((r) => r.json()).then((sections) => {
+fetch("/clear/screens/index.json").then((r) => r.json()).then((sections) => {
   const root = document.getElementById("sections");
   for (const s of sections) {
     const h = el("h2", null, s.title); h.id = s.slug; root.append(h);
@@ -55,7 +55,7 @@ fetch("screens/index.json").then((r) => r.json()).then((sections) => {
       if (scan) { const a = el("a", null, c.to); a.href = `https://${scan}/address/${c.to}`; meta.append(a); } else meta.append(c.to);
       card.append(meta);
       const row = el("div", "pages");
-      c.pages.forEach((p, i) => { const img = el("img"); img.src = p; img.alt = `${c.name}, page ${i + 1} of ${c.pages.length}`; img.loading = "lazy"; row.append(img); });
+      c.pages.forEach((p, i) => { const img = el("img"); img.src = "/clear/" + p; img.alt = `${c.name}, page ${i + 1} of ${c.pages.length}`; img.loading = "lazy"; row.append(img); });
       card.append(row);
       root.append(card);
     }
