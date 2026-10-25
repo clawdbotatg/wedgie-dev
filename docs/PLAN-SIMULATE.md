@@ -73,4 +73,6 @@ Chainlink price) with Merkle proofs the wedgie checks itself.
 
 - `api/simulate.ts`: the endpoint.
 - `tools/safechip.mjs`: a case's `sim` goes with its tx; `keys` press the d-pad (`"wait"` = a second with none).
-- The screen prototype (`safe_sim.py`, `_browse` in `safe.py`) is not in the Safe Signer app yet.
+- The screen prototype: `docs/proto-sim/` (`safe_sim.py`, `safe.py.patch` for `_browse`). Not in the Safe Signer
+  app yet. To see it: copy the app, add both, then `node tools/safechip.mjs --app <copy> --txs <cases> --shots <dir>`. Cases: `tools/clear_txs.py` output, each with `sim` (the
+  /api/simulate answer, from = its safe) and `keys` (e.g. `["wait","down","wait","wait","down"]`).

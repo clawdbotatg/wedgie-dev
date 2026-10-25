@@ -1,0 +1,68 @@
+--- wd/community/clawdbotatg/wedgie-safe/safe.py	2026-10-24 19:53:46
++++ safe-proto/safe.py	2026-10-25 09:20:41
+@@ -244,6 +244,7 @@
+     if tx["operation"] > 1:
+         raise ValueError("bad operation")
+     tx["clear"] = cb
++    tx["sim"] = t.get("sim") if isinstance(t.get("sim"), dict) else None     # wedgie.dev's signed simulation (safe_sim)
+     return tx
+ 
+ 
+@@ -493,7 +494,7 @@
+             d.text(ch, x + 8 * j, y, WHITE if n < 6 or n >= 38 else GREY)
+ 
+ 
+-def _screen(head, lines, yes, k, foot="", safe=None):
++def _screen(head, lines, yes, k, foot="", safe=None, nav=False):
+     """One page of the question: which Safe in a card at the top, the action big, its lines, the chain small
+     at the bottom. True on a real A, False on Y or no answer."""
+     d.fill(WHITE)
+@@ -513,6 +514,8 @@
+         for kk in k.pressed():          # nor one in its first SETTLE ms: a press meant for what was there (audit 10-18)
+             if kk in ("A", "Y") and time.ticks_diff(time.ticks_ms(), t0) >= SETTLE:
+                 return kk == "A"
++            if nav and kk in ("up", "down"):
++                return kk
+         time.sleep_ms(20)
+     return False
+ 
+@@ -536,6 +539,17 @@
+     k.pressed()
+     sf = tx["safe"]
+     foot = CHAINS.get(tx["chainId"], "chain %d" % tx["chainId"])
++    if tx.get("sim") and not tx["operation"]:      # the clean page, details under it (PROTOTYPE)
++        import safe_sim
++        try:
++            pg = safe_sim.pages(tx, tx["clear"], tx["sim"])
++        finally:
++            for m in ("safe_sim", "safe_7730", "safe_wire", "p256"):
++                sys.modules.pop(m, None)
++            gc.collect()
++        if not isinstance(pg, str):
++            return _browse(pg, k, foot, sf)
++        print("safe_sim:", pg)
+     import safe_read
+     acts = None
+     try:
+@@ -565,6 +579,21 @@
+     return True
+ 
+ 
++def _browse(pages, k, foot, sf):
++    """The short page, and the d-pad through the details under it. Green signs and red says no on any of them."""
++    i, n = 0, len(pages)
++    while True:
++        head, lines = pages[i]
++        hint = "down: more" if i < n - 1 else "up: back"
++        r = _screen(head, lines, "sign", k, "%d/%d %s  %s" % (i + 1, n, hint, foot), sf, True)
++        if r == "down":
++            i = min(i + 1, n - 1)
++        elif r == "up":
++            i = max(i - 1, 0)
++        else:
++            return r
++
++
+ # ---- requests ---------------------------------------------------------------------------------
+ 
+ def on_sign(mid, t):
