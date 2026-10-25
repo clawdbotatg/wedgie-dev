@@ -134,7 +134,7 @@ export function assemble(main: HTMLElement) {
     <div class="sec-head">
       <span class="kicker">Assembly</span>
       <h2>Put a wedgie together.</h2>
-      <p>No soldering. ${STEPS.length} steps. Take your time on the wires (3 to 9); the rest just clicks. <a href="/assemble.pdf" download>Print the manual (PDF)</a></p>
+      <p>No soldering. ${STEPS.length} steps. Take your time on the wires (2 to 9); the rest just clicks. <a href="/assemble.pdf" download>Print the manual (PDF)</a></p>
       <p class="row"><a class="btn btn-green" href="/assemble/3d">Every step in 3D →</a></p>
     </div>
     <ol class="asm-steps">

@@ -64,7 +64,7 @@ function list(main: HTMLElement, go: (path: string) => void) {
     if (!ws.length) {
       if (!rows.querySelector(".empty")) {
         rows.replaceChildren();
-        rows.insertAdjacentHTML("beforeend", `<div class="empty"><div class="empty-dev"></div><p>No wedgies yet. Plug one in with a USB cable and press <b>Connect</b>. After the first time, it shows up by itself.</p></div>`);
+        rows.insertAdjacentHTML("beforeend", `<div class="empty"><div class="empty-dev"></div><p>No wedgies yet. Plug one in with a USB cable and press <b>Connect a wedgie</b>. After the first time, it shows up by itself.</p></div>`);
         place3D(rows.querySelector<HTMLElement>(".empty-dev")!, { demo: "PLUGIN", side: -1 });
       }
     } else {
