@@ -13,7 +13,7 @@ export function telegram(main: HTMLElement) {
   <section class="test-page">
     <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
     <h1>wedgie Telegram</h1>
-    <p class="test-safe">A Telegram group for people with a wedgie. Your wedgie's chip gets you in.</p>
+    <p class="test-safe">Plug in your wedgie to get in.</p>
     <div class="card">
       <p>1. Message <a href="https://t.me/${BOT}" target="_blank" rel="noopener"><b>@${BOT}</b></a> on Telegram. It sends you a link.</p>
       <p>2. Open the link in Chrome or Edge on a computer.</p>
