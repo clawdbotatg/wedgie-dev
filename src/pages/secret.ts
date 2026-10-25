@@ -9,6 +9,7 @@
 import * as W from "../serial/wedgies";
 import * as Drive from "../serial/drive";
 import * as S from "../secret/box";
+import { pressModal } from "../ui/askmodal";
 
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 const msgOf = (e: any) => e?.message || String(e);
@@ -237,7 +238,8 @@ export function secret(main: HTMLElement) {
     const first = onWedgie !== name || !name;
     if (first) $("x-smsg").innerHTML = "<b>Press green on your wedgie.</b> It shows there, not here.";
     try {
-      const r = await ask(wedgie, (q) => q.request({ type: "secret_open", blob: m.blob, from: name }, 200000));
+      const close = pressModal("Read a secret?", "", "read");
+      const r = await ask(wedgie, (q) => q.request({ type: "secret_open", blob: m.blob, from: name }, 200000)).finally(close);
       if (r.type === "secret_shown") { onWedgie = r.chat ? name : null; $("x-smsg").innerHTML = `<span class="good">On your wedgie. Red closes it.</span>`; }
       else { onWedgie = null; $("x-smsg").innerHTML = r.type === "refused" ? "Not opened." : `<span class="bad">${esc(r.error || r.type)}</span>`; }
     } catch (e) {

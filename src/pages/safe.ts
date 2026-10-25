@@ -19,6 +19,7 @@
 // Nothing here remembers "the" Safe: a wedgie has many. The list comes from Safe's API (every chain), the
 // wedgie itself (safe_list: the Safes it signed for or was told about, wedgie-safe safe-4+; the page tells it
 // with safe_note), and this browser's own memory (per wedgie). Each is checked on chain before it's shown.
+import { pressModal } from "../ui/askmodal";
 import { askYes } from "../ui/askyes";
 import * as W from "../serial/wedgies";
 import * as Drive from "../serial/drive";
@@ -1760,6 +1761,7 @@ export function safe(main: HTMLElement) {
     say("Look at the wedgie: check what it shows, then press the green button to sign (red says no).");
     // what the registry says about it (ERC-7730), sent ahead: the wedgie checks it against its own roots
     const cb = clearTag && chunk ? await Clear.bundle(clearTag, chain, t).catch(() => null) : null;
+    const close = pressModal("Check it", "then sign", "sign");     // its pages say next, then sign
     try {
       const g = await ask(wedgie, async (r) => {
         for (let o = 0; cb && o < cb.length; o += chunk) {
@@ -1780,7 +1782,7 @@ export function safe(main: HTMLElement) {
       if (g.type !== "safe_sig") throw new Error(g.error || "The wedgie didn't sign.");
       if (g.safeTxHash !== E.safeTxHash(chain, safeAddr, t)) throw new Error("The wedgie signed a different hash: not sent.");
       return slots.map((a) => ({ owner: a, signature: E.safeSignature(a, g as E.WedgieSig) }));
-    } finally { asking = false; }
+    } finally { asking = false; close(); }
   }
   async function walletSig(t: E.SafeTx) {
     const from = account = await wallet(chain);

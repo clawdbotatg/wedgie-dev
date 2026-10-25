@@ -5,6 +5,7 @@
 // Nothing looks at USB until Connect is tapped.
 import * as W from "../serial/wedgies";
 import { esc } from "../ui/device";
+import { pressModal } from "../ui/askmodal";
 
 const BOT = "wedgiechatbot";
 
@@ -68,7 +69,8 @@ export function telegram(main: HTMLElement) {
     try {
       if (w.running !== "safe") throw new Error("Open Safe Signer on your wedgie.");
       say(`<p class="fine"><b>Press green on your wedgie.</b></p>`);
-      const d = await W.withRepl(w, (r) => r.request({ type: "safe_prove", text: "Join Telegram", code: t }, 130000));
+      const close = pressModal("Prove it", "Join Telegram", "sign");
+      const d = await W.withRepl(w, (r) => r.request({ type: "safe_prove", text: "Join Telegram", code: t }, 130000)).finally(close);
       if (d.type === "refused") throw new Error("You said no.");
       if (d.type !== "safe_proof") throw new Error(d.error || "Update Safe Signer.");
       say(`<p class="fine">Checking</p>`);

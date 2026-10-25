@@ -148,7 +148,7 @@ async function identify(w: Wedgie) {
     if ((w.state as string) === "gone") return;   // set by the disconnect listener while talk() ran
     w.state = "error";
     w.error = e?.message || String(e);
-    if (/failed to open|busy|access denied|already open/i.test(w.error || "")) w.error = "Something else has this wedgie open: another wedgie.dev tab, mpremote or Thonny. Close it, then unplug and replug.";
+    if (/failed to open|busy|access denied|already open/i.test(w.error || "")) w.error = "Another tab has your wedgie. Close other wedgie.dev tabs (or mpremote, Thonny), then try again.";
   }
   emit();
 }

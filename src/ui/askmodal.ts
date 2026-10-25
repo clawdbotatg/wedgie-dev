@@ -67,8 +67,36 @@ export function askScreen(job: string, checked = false, version = "", ver = "") 
   return c;
 }
 
+/** An app's own question (ui.title + ui.buttons): its head, what it's about big, its green answer. */
+export function appScreen(head: string, big: string, yes: string) {
+  const c = document.createElement("canvas");
+  c.width = c.height = 240;
+  const g = c.getContext("2d")!;
+  g.textAlign = "center"; g.textBaseline = "top";
+  g.fillStyle = P.WHITE; g.fillRect(0, 0, 240, 240);
+  [[P.GREEN, 10], [P.GREY, 19], [P.RED, 28]].forEach(([col, y]) => { g.fillStyle = col as string; g.fillRect(0, y as number, 240, 5); });
+  g.fillStyle = P.INK; g.font = "16px Silkscreen, monospace";
+  g.fillText(head.slice(0, 15), 120, 54);
+  if (big) { g.font = "24px Silkscreen, monospace"; wrap(big, 10).slice(0, 3).forEach((t, i) => g.fillText(t, 120, 96 + i * 28)); }
+  g.fillStyle = P.GREEN; g.fillRect(0, 184, 240, 26);
+  g.fillStyle = P.RED; g.fillRect(0, 214, 240, 26);
+  g.fillStyle = P.WHITE; g.font = "16px Silkscreen, monospace";
+  g.fillText(yes, 120, 189); g.fillText("no", 120, 219);
+  return c;
+}
+
+/** Any press an app waits for (Austin 10-25: "show a picture of a wedgie and point to the green button"):
+ *  appScreen on the 3D wedgie, its green pressing itself. Returns close(). */
+export function pressModal(head: string, big: string, yes: string): () => void {
+  return show(appScreen(head, big, yes));
+}
+
 /** Show it; returns close(). */
 export function askModal(job: string, checked = false, version = ""): () => void {
+  return show(askScreen(job, checked, version));
+}
+
+function show(screen: HTMLCanvasElement): () => void {
   const el = document.createElement("div");
   el.className = "panel-wrap";
   el.innerHTML = `<div class="card bt-ask ask-a" role="dialog" aria-live="assertive" aria-label="Press the green button on your wedgie">
@@ -77,7 +105,7 @@ export function askModal(job: string, checked = false, version = ""): () => void
   </div>`;
   document.body.appendChild(el);
   let w: Wedgie3D | null = null, t = 0, closed = false;
-  place3D(el.querySelector<HTMLElement>(".ask-3d")!, { interactive: false, eager: true, screen: askScreen(job, checked, version) }).then((x) => {
+  place3D(el.querySelector<HTMLElement>(".ask-3d")!, { interactive: false, eager: true, screen }).then((x) => {
     w = x;
     if (closed) return w?.destroy();
     let down = false;
