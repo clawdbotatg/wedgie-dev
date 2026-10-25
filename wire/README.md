@@ -29,6 +29,8 @@ cp -r ../wedgie-safe /tmp/app && uv run ... python3 wire/release.py /tmp/reg /tm
 node tools/safechip.mjs --app /tmp/app --clear /tmp/clear --txs /tmp/v2.json --shots /tmp/v2   # <case>-<page>.png
 ```
 
+Put them on wedgie.dev/clear: `python3 tools/clear_page.py uniswap-v2 "Uniswap V2" /tmp/v2.json /tmp/v2 "<note>"`.
+
 ## Make a release (new registry data)
 
 ```

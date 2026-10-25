@@ -1,0 +1,66 @@
+<!doctype html>
+<!-- wedgie.dev/clear: real transactions as a wedgie shows them, page by page. Made by tools/clear_page.py from
+     safechip --shots (a virtual RP2040 running the real firmware and Safe Signer). The data: screens/index.json. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clear signing on a wedgie</title>
+<meta name="description" content="Real transactions, page by page, as a wedgie shows them before it signs.">
+<link rel="icon" href="/img/favicon.png">
+<style>
+  :root { --paper: #f4f4f1; --card: #fff; --ink: #1a1b1a; --muted: #6b6e6b; --line: #e2e2dd; --mint-d: #168c34; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 500 17px/1.5 ui-rounded, system-ui, -apple-system, sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 64px; }
+  a { color: var(--mint-d); }
+  .top { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); font-weight: 800; }
+  .top img { width: 28px; height: 28px; }
+  h1 { font-size: 34px; line-height: 1.15; margin: 28px 0 8px; letter-spacing: -.02em; }
+  .lead { color: var(--muted); max-width: 640px; margin: 0 0 8px; }
+  h2 { font-size: 24px; margin: 40px 0 4px; }
+  .note { color: var(--muted); margin: 0 0 16px; max-width: 720px; font-size: 15px; }
+  .tx { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 14px 10px; margin: 0 0 14px; min-width: 0; overflow: hidden; }
+  .tx .meta a { word-break: break-all; }
+  .tx h3 { margin: 0; font-size: 17px; }
+  .tx .meta { color: var(--muted); font-size: 13px; font-family: ui-monospace, monospace; word-break: break-all; }
+  .pages { display: flex; gap: 10px; overflow-x: auto; padding: 10px 0 6px; }
+  .pages img { width: 240px; height: 240px; flex: none; border-radius: 10px; image-rendering: pixelated; background: #000; }
+  @media (max-width: 520px) { .pages img { width: 200px; height: 200px; } h1 { font-size: 28px; } }
+</style>
+</head>
+<body>
+<main>
+  <a class="top" href="/"><img src="/img/favicon.png" alt="">wedgie</a>
+  <h1>Clear signing on a wedgie</h1>
+  <p class="lead">Real mainnet transactions, page by page, as a wedgie shows them before you press sign. The
+    wedgie reads the transaction itself, from <a href="https://github.com/ethereum/clear-signing-erc7730-registry">the public ERC-7730 registry</a>,
+    and checks every descriptor against roots built into its app. None of these were sent.</p>
+  <p class="lead">Screens from the real firmware and Safe Signer on a virtual RP2040.</p>
+  <div id="sections"></div>
+</main>
+<script>
+const CHAINS = { 1: ["Ethereum", "etherscan.io"], 8453: ["Base", "basescan.org"], 10: ["Optimism", "optimistic.etherscan.io"], 42161: ["Arbitrum", "arbiscan.io"] };
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+fetch("screens/index.json").then((r) => r.json()).then((sections) => {
+  const root = document.getElementById("sections");
+  for (const s of sections) {
+    const h = el("h2", null, s.title); h.id = s.slug; root.append(h);
+    if (s.note) root.append(el("p", "note", s.note));
+    for (const c of s.cases) {
+      const card = el("div", "tx");
+      card.append(el("h3", null, c.name));
+      const [chain, scan] = CHAINS[c.chainId] || ["chain " + c.chainId, null];
+      const meta = el("div", "meta", chain + " · ");
+      if (scan) { const a = el("a", null, c.to); a.href = `https://${scan}/address/${c.to}`; meta.append(a); } else meta.append(c.to);
+      card.append(meta);
+      const row = el("div", "pages");
+      c.pages.forEach((p, i) => { const img = el("img"); img.src = p; img.alt = `${c.name}, page ${i + 1} of ${c.pages.length}`; img.loading = "lazy"; row.append(img); });
+      card.append(row);
+      root.append(card);
+    }
+  }
+}).catch(() => { document.getElementById("sections").textContent = "Couldn't load the screens."; });
+</script>
+</body>
+</html>

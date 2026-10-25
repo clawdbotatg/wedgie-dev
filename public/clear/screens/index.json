@@ -1,0 +1,187 @@
+[
+ {
+  "slug": "uniswap-v2",
+  "title": "Uniswap V2",
+  "note": "The Router02 descriptor, with the registry's 18 test transactions. Not on wedgies yet: it came after our last data release. Not audited yet. Tokens outside the Uniswap list show as unknown, in red.",
+  "cases": [
+   {
+    "name": "addLiquidity",
+    "chainId": 1,
+    "to": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d",
+    "pages": [
+     "screens/uniswap-v2/01-1.png",
+     "screens/uniswap-v2/01-2.png",
+     "screens/uniswap-v2/01-3.png",
+     "screens/uniswap-v2/01-4.png"
+    ]
+   },
+   {
+    "name": "addLiquidityETH",
+    "chainId": 1,
+    "to": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d",
+    "pages": [
+     "screens/uniswap-v2/02-1.png",
+     "screens/uniswap-v2/02-2.png",
+     "screens/uniswap-v2/02-3.png",
+     "screens/uniswap-v2/02-4.png"
+    ]
+   },
+   {
+    "name": "removeLiquidity",
+    "chainId": 1,
+    "to": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d",
+    "pages": [
+     "screens/uniswap-v2/03-1.png",
+     "screens/uniswap-v2/03-2.png",
+     "screens/uniswap-v2/03-3.png"
+    ]
+   },
+   {
+    "name": "removeLiquidityETH",
+    "chainId": 1,
+    "to": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d",
+    "pages": [
+     "screens/uniswap-v2/04-1.png",
+     "screens/uniswap-v2/04-2.png",
+     "screens/uniswap-v2/04-3.png"
+    ]
+   },
+   {
+    "name": "removeLiquidityETHSupportingFeeOnTransferTokens",
+    "chainId": 1,
+    "to": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d",
+    "pages": [
+     "screens/uniswap-v2/05-1.png",
+     "screens/uniswap-v2/05-2.png",
+     "screens/uniswap-v2/05-3.png"
+    ]
+   },
+   {
+    "name": "removeLiquidityETHWithPermit",
+    "chainId": 1,
+    "to": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d",
+    "pages": [
+     "screens/uniswap-v2/06-1.png",
+     "screens/uniswap-v2/06-2.png",
+     "screens/uniswap-v2/06-3.png"
+    ]
+   },
+   {
+    "name": "removeLiquidityETHWithPermitSupportingFeeOnTransferTokens",
+    "chainId": 1,
+    "to": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d",
+    "pages": [
+     "screens/uniswap-v2/07-1.png",
+     "screens/uniswap-v2/07-2.png",
+     "screens/uniswap-v2/07-3.png"
+    ]
+   },
+   {
+    "name": "removeLiquidityWithPermit",
+    "chainId": 1,
+    "to": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d",
+    "pages": [
+     "screens/uniswap-v2/08-1.png",
+     "screens/uniswap-v2/08-2.png",
+     "screens/uniswap-v2/08-3.png"
+    ]
+   },
+   {
+    "name": "swapETHForExactTokens",
+    "chainId": 1,
+    "to": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d",
+    "pages": [
+     "screens/uniswap-v2/09-1.png",
+     "screens/uniswap-v2/09-2.png"
+    ]
+   },
+   {
+    "name": "swapExactETHForTokens",
+    "chainId": 1,
+    "to": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d",
+    "pages": [
+     "screens/uniswap-v2/10-1.png",
+     "screens/uniswap-v2/10-2.png",
+     "screens/uniswap-v2/10-3.png"
+    ]
+   },
+   {
+    "name": "swapExactETHForTokensSupportingFeeOnTransferTokens",
+    "chainId": 1,
+    "to": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d",
+    "pages": [
+     "screens/uniswap-v2/11-1.png",
+     "screens/uniswap-v2/11-2.png",
+     "screens/uniswap-v2/11-3.png"
+    ]
+   },
+   {
+    "name": "swapExactTokensForETH-stablecoin",
+    "chainId": 1,
+    "to": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d",
+    "pages": [
+     "screens/uniswap-v2/12-1.png",
+     "screens/uniswap-v2/12-2.png"
+    ]
+   },
+   {
+    "name": "swapExactTokensForETH",
+    "chainId": 1,
+    "to": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d",
+    "pages": [
+     "screens/uniswap-v2/13-1.png",
+     "screens/uniswap-v2/13-2.png"
+    ]
+   },
+   {
+    "name": "swapExactTokensForETHSupportingFeeOnTransferTokens",
+    "chainId": 1,
+    "to": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d",
+    "pages": [
+     "screens/uniswap-v2/14-1.png",
+     "screens/uniswap-v2/14-2.png",
+     "screens/uniswap-v2/14-3.png"
+    ]
+   },
+   {
+    "name": "swapExactTokensForTokens",
+    "chainId": 1,
+    "to": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d",
+    "pages": [
+     "screens/uniswap-v2/15-1.png",
+     "screens/uniswap-v2/15-2.png",
+     "screens/uniswap-v2/15-3.png"
+    ]
+   },
+   {
+    "name": "swapExactTokensForTokensSupportingFeeOnTransferTokens",
+    "chainId": 1,
+    "to": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d",
+    "pages": [
+     "screens/uniswap-v2/16-1.png",
+     "screens/uniswap-v2/16-2.png",
+     "screens/uniswap-v2/16-3.png"
+    ]
+   },
+   {
+    "name": "swapTokensForExactETH",
+    "chainId": 1,
+    "to": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d",
+    "pages": [
+     "screens/uniswap-v2/17-1.png",
+     "screens/uniswap-v2/17-2.png",
+     "screens/uniswap-v2/17-3.png"
+    ]
+   },
+   {
+    "name": "swapTokensForExactTokens",
+    "chainId": 1,
+    "to": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d",
+    "pages": [
+     "screens/uniswap-v2/18-1.png",
+     "screens/uniswap-v2/18-2.png"
+    ]
+   }
+  ]
+ }
+]
