@@ -291,5 +291,95 @@
     ]
    }
   ]
+ },
+ {
+  "slug": "uniswap-v3",
+  "title": "Uniswap V3 SwapRouter02",
+  "note": "The router the Uniswap app used before the Universal Router. Its descriptor is merged and on wedgies now. The registry's 9 test transactions.",
+  "cases": [
+   {
+    "name": "Swap - chain 1 (1)",
+    "chainId": 1,
+    "to": "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45",
+    "pages": [
+     "screens/uniswap-v3/01-1.png",
+     "screens/uniswap-v3/01-2.png",
+     "screens/uniswap-v3/01-3.png"
+    ]
+   },
+   {
+    "name": "swap",
+    "chainId": 1,
+    "to": "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45",
+    "pages": [
+     "screens/uniswap-v3/02-1.png",
+     "screens/uniswap-v3/02-2.png"
+    ]
+   },
+   {
+    "name": "Swap - chain 1 (2)",
+    "chainId": 1,
+    "to": "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45",
+    "pages": [
+     "screens/uniswap-v3/03-1.png",
+     "screens/uniswap-v3/03-2.png",
+     "screens/uniswap-v3/03-3.png"
+    ]
+   },
+   {
+    "name": "Swap - chain 1 (3)",
+    "chainId": 1,
+    "to": "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45",
+    "pages": [
+     "screens/uniswap-v3/04-1.png",
+     "screens/uniswap-v3/04-2.png"
+    ]
+   },
+   {
+    "name": "Swap exact output, no input cap (path)",
+    "chainId": 1,
+    "to": "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45",
+    "pages": [
+     "screens/uniswap-v3/05-1.png",
+     "screens/uniswap-v3/05-2.png"
+    ]
+   },
+   {
+    "name": "Swap exact output, no input cap (single)",
+    "chainId": 1,
+    "to": "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45",
+    "pages": [
+     "screens/uniswap-v3/06-1.png",
+     "screens/uniswap-v3/06-2.png"
+    ]
+   },
+   {
+    "name": "Swap exact tokens for tokens (V2)",
+    "chainId": 1,
+    "to": "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45",
+    "pages": [
+     "screens/uniswap-v3/07-1.png",
+     "screens/uniswap-v3/07-2.png"
+    ]
+   },
+   {
+    "name": "Swap tokens for exact tokens (V2)",
+    "chainId": 1,
+    "to": "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45",
+    "pages": [
+     "screens/uniswap-v3/08-1.png",
+     "screens/uniswap-v3/08-2.png"
+    ]
+   },
+   {
+    "name": "Swap tokens for exact tokens (V2), no input cap",
+    "chainId": 1,
+    "to": "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45",
+    "pages": [
+     "screens/uniswap-v3/09-1.png",
+     "screens/uniswap-v3/09-2.png"
+    ]
+   }
+  ]
  }
 ]
