@@ -7,6 +7,7 @@ import { boot, flashFromUf2 } from "../src/chip/sim.ts";
 import { trustM, newTrustM } from "../src/chip/trustm.ts";
 const [host, path] = process.argv.slice(2);
 const tamper = process.argv.includes("--tamper");
+const leave = process.argv.includes("--leave") ? Number(process.argv[process.argv.indexOf("--leave") + 1]) : 0;   // fill the heap till only this much is free
 let buf = "";
 const tm = trustM(newTrustM(), () => chip.ms, () => {});
 const chip = boot({ rom: readFileSync(new URL("../tools/rp2040/bootrom-b1.bin", import.meta.url)), flash: flashFromUf2(readFileSync(new URL("../public/mp/RPI_PICO.uf2", import.meta.url))), i2c: tm,
@@ -26,8 +27,8 @@ const py = (b) => "b'" + [...b].map((c) => "\\x" + c.toString(16).padStart(2, "0
 async function put(name, data) { let code = `f=open('${name}','wb')\n`; for (let o = 0; o < data.length; o += 256) code += `f.write(${py(data.subarray(o, o + 256))})\n`; await exec(code + "f.close()\n"); }
 
 if (!await until(() => chip.connected && buf.includes(">>> "), 30000)) { write("\r\n"); await until(() => buf.includes(">>> "), 5000); }
-for (const f of ["tls.mpy", "roots.mpy"]) await put(f, readFileSync(new URL("./" + f, import.meta.url)));
-for (const f of ["optiga.mpy", "trustm.mpy"]) await put(f, readFileSync(new URL("../firmware/" + f, import.meta.url)));
+for (const f of ["tls.mpy", "roots.bin"]) await put(f, readFileSync(new URL("./" + f, import.meta.url)));
+for (const f of ["trustm.mpy"]) await put(f, readFileSync(new URL("../firmware/" + f, import.meta.url)));
 console.log("files on, chip ms", Math.round(chip.ms));
 
 // the run: the chip asks for bytes with \x1eR, sends with \x1eS<hex>
@@ -37,8 +38,23 @@ sock.on("data", (d) => { inq = Buffer.concat([inq, d]); });
 sock.on("end", () => { closed = true; }); sock.on("error", (e) => { console.log("sock", e.message); closed = true; });
 await new Promise((r) => sock.once("connect", r));
 const code = `
-import gc, time, binascii, sys, tls, roots
-tls.ROOTS = roots.ROOTS
+import gc, time, binascii, sys, trustm
+trustm.bus()
+gc.collect()
+ball = []
+k = 65536
+while ${leave} and k >= 256:
+    want = gc.mem_free() - ${leave} - 64
+    if want < 256:
+        break
+    try:
+        ball.append(bytearray(min(k, want)))
+    except MemoryError:
+        k //= 2
+gc.collect()
+free0 = gc.mem_free()
+print('free before import', free0)
+import tls
 gc.collect()
 low = [gc.mem_free()]
 t0 = time.ticks_ms()

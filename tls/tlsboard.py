@@ -1,4 +1,4 @@
-# tls.py on a REAL wedgie: asks for full control (press green), puts tls.mpy + roots.mpy on, runs one GET
+# tls.py on a REAL wedgie: asks for full control (press green), puts tls.mpy + roots.bin on, runs one GET
 # with this computer carrying the TCP bytes, then deletes the two files.
 #   uv run --with pyserial python3 tlsboard.py <host> <path> [--tamper]
 import sys, time, json, glob, socket, serial, os
@@ -10,7 +10,7 @@ import wedgie as WG
 wg = WG.Wedgie(glob.glob("/dev/cu.usbmodem*")[0])
 print("press GREEN on the wedgie")
 WG.take_over(wg, "TLS test")
-for name in ("tls.mpy", "roots.mpy"):
+for name in ("tls.mpy", "roots.bin"):
     wg.put(name, open(os.path.join(here, name), "rb").read())
 wg.exec("import gc\nfor _n in list(globals()):\n    if not _n.startswith('__') and _n != 'gc': del globals()[_n]\ngc.collect()")
 print("files on")
@@ -26,8 +26,10 @@ def read_until(pat, t):
 sock = socket.create_connection((host, 443))
 sock.settimeout(0.05)
 code = '''
-import gc, time, binascii, sys, tls, roots
-tls.ROOTS = roots.ROOTS
+import gc, time, binascii, sys
+gc.collect()
+free0 = gc.mem_free()
+import tls
 gc.collect()
 low = [gc.mem_free()]
 t0 = time.ticks_ms()
@@ -90,6 +92,6 @@ while time.time() < end:
         if len(e) > 1 and e[1].strip(): print("ERR", e[1].decode(errors="replace"))
         break
 time.sleep(0.3); s.read(65536); wg.buf = b""
-wg.exec("import os\nfor n in ('tls.mpy','roots.mpy'):\n    os.remove(n)", 10)
+wg.exec("import os\nfor n in ('tls.mpy','roots.bin'):\n    os.remove(n)", 10)
 print("files removed")
 wg.leave(reset=True)
