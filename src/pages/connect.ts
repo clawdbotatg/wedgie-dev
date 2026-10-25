@@ -49,6 +49,14 @@ function list(main: HTMLElement, go: (path: string) => void) {
   const rows = main.querySelector<HTMLElement>("#rows")!;
   const actions = main.querySelector<HTMLElement>("#plug-actions")!;
   const tg = main.querySelector<HTMLElement>("#tg-sticker")!;   // shows once a real wedgie is plugged in and talking
+  // Seen 3+ times: smaller, slower wiggle. Joined (tapped Join the chat on /telegram): smaller still, still.
+  let tgCounted = false;
+  const tgShow = () => {
+    let seen = 0, joined = false;
+    try { seen = +(localStorage.getItem("tg-seen") || 0) + 1; localStorage.setItem("tg-seen", String(seen)); joined = !!localStorage.getItem("tg-joined"); } catch {}
+    tg.classList.toggle("calm", seen > 3);
+    tg.classList.toggle("joined", joined);
+  };
   const setup = setupCard(main.querySelector<HTMLElement>("#setup")!);
   firmwareManifest().then((m) => { manifest = m; draw(); }).catch(() => {});
 
@@ -59,6 +67,7 @@ function list(main: HTMLElement, go: (path: string) => void) {
   function draw() {
     const ws = W.wedgies().filter((w) => !needsSetup(w));
     tg.hidden = !ws.some((w) => w.state === "ready" && !w.virtual);
+    if (!tg.hidden && !tgCounted) { tgCounted = true; tgShow(); }
     if (!W.supported()) {
       rows.innerHTML = `<div class="empty"><p><b>This browser can't see USB devices.</b><br>Open wedgie.dev in Chrome or Edge on a computer to plug in a wedgie.</p></div>`;
       actions.innerHTML = `<a class="btn btn-green" href="/">Back to wedgie.dev</a>`;

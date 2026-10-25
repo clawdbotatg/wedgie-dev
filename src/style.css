@@ -1038,4 +1038,8 @@ p.surge, .order-body > p.surge { margin: 4px 0 0; font-size: 22px; color: var(--
 .tg-sticker img { display: block; width: 100%; filter: drop-shadow(0 8px 14px rgba(0,0,0,.18)); }
 .tg-sticker:hover { animation-play-state: paused; scale: 1.06; }
 @keyframes tg-wiggle { 0%, 100% { rotate: -4deg; } 50% { rotate: 4deg; translate: 0 -4px; } }
+.tg-sticker.calm { width: min(150px, 34vw); animation: tg-calm 6s ease-in-out infinite; }
+@keyframes tg-calm { 0%, 100% { rotate: -1.5deg; } 50% { rotate: 1.5deg; } }
+.tg-sticker.joined { width: min(110px, 28vw); animation: none; opacity: .85; }
+.tg-sticker.joined:hover { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { .tg-sticker { animation: none; } }

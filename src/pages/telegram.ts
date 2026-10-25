@@ -93,6 +93,8 @@ export function telegram(main: HTMLElement) {
       <p class="fine">The link works once, for an hour.</p>
     </section>`;
     confetti(main.querySelector<HTMLCanvasElement>(".tg-confetti")!);
+    // /connect's sticker goes small and still once they've joined
+    main.querySelector<HTMLElement>(".tg-in .btn")!.addEventListener("click", () => { try { localStorage.setItem("tg-joined", "1"); } catch {} });
   }
 }
 
