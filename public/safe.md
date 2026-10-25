@@ -102,7 +102,13 @@ One JSON line each way, on the same serial port as the firmware (usb.md). The pa
 {"id":4,"type":"safe_remove","tx":{...,"dataHash":"0x..","nonce":15},"totp":497960} -> safe_sig + "deleteHash"
 {"id":5,"type":"safe_list"}                          -> {"type":"safe_list","safes":["8453:0x..", ...]}
 {"id":6,"type":"safe_note","chainId":8453,"safe":"0x.."} -> {"type":"ok","safes":3}
+{"id":7,"type":"safe_prove","text":"Join Telegram","code":".."} -> {"type":"safe_proof","text","code","x","y","r","s","cert","fr","fs"}
 ```
+
+- `safe_prove` (safe-27+, Trust M only): "Prove it" shows the text; on A the key signs
+  `sha256("wedgie prove\0" + sha256(text + "\n" + code))` (r, s), and the chip's factory key signs
+  `sha256("wedgie safe key\0" + X + Y)` (fr, fs; its Infineon certificate in `cert`). Check both and the
+  certificate's chain: this wedgie, this key, just now. wedgie.dev/telegram uses it (`api/_prove.ts`).
 
 - `hello` adds `"safe": {"x","y","chip"}`, `"signer"` (its owner address), `"safe_state"` (`ok`, `none` = no key
   yet, `lock` = an old key waiting to be locked, `swap` = someone else's key), `"safe_chunk"`, `"safe_clear"`

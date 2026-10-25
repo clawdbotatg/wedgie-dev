@@ -1,12 +1,15 @@
 // /api/telegram: the gate to the wedgie Telegram group (wedgie.dev/telegram, bot/telegram.mjs).
-//   POST {t, proof}   t: the bot's link token "<telegram id>.<expires>.<hmac>"; proof: a wedgie's {"type":"chip"}
-//                     answer. A Trust M that traces to Infineon gets a one-person invite, sent by the bot too.
+//   POST {t, proof}   t: the bot's link token "<telegram id>.<expires>.<hmac>"; proof: Safe Signer's safe_proof for
+//                     TEXT with t as its code (_prove.ts). Checks out: a one-person invite, sent by the bot too.
 //   GET ?member=<id>  (Authorization: Bearer TELEGRAM_GATE_SECRET) the bot asking: did this account prove a chip?
 // One chip, one account: we keep the SHA-256 of its certificate and the Telegram id it let in. Nothing else.
 // Env: TELEGRAM_GATE_BOT_TOKEN, TELEGRAM_GATE_SECRET (shared with the bot), TELEGRAM_GATE_CHAT, SHOP_DATABASE_URL.
 import { neon } from "@neondatabase/serverless";
-import { checkChip, trustmCert } from "../src/serial/chipcheck.js";
+import { checkProof } from "./_prove.js";
 import { env, json, oops, crossSite, hmac, same } from "./_shop.js";
+
+// What the wedgie shows and signs, with the bot's link token as the code: a proof is good for one account, one hour.
+const TEXT = "Join Telegram";
 
 let ready: Promise<unknown> | null = null;
 async function db() {
@@ -46,12 +49,8 @@ export async function POST(req: Request) {
   try { body = await req.json(); } catch { return oops("Bad request."); }
   const id = await who(body?.t);
   if (!id) return oops("Link expired. Message @wedgiechatbot for a new one.", 401);
-  const d = body?.proof;
-  if (d?.kind !== "trustm") return oops(d?.kind === "atecc" ? "Needs a Trust M chip." : "No Trust M chip found.");
-  let ok;
-  try { ok = await checkChip(d, "https://wedgie.dev"); } catch { return oops("Bad chip answer."); }
-  if (!ok.pass) return oops(`Chip check failed: ${ok.detail}`);
-  const chip = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", trustmCert(d))), (x) => x.toString(16).padStart(2, "0")).join("");
+  let chip;
+  try { chip = await checkProof(body?.proof, TEXT, body.t); } catch (e: any) { return oops(`Didn't check out: ${e?.message || e}`); }
   const sql = await db();
   await sql`insert into tg_members (chip, tg_id) values (${chip}, ${id}) on conflict (chip) do nothing`;
   const [row] = await sql`select tg_id from tg_members where chip = ${chip}`;

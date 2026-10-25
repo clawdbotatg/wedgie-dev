@@ -29,6 +29,8 @@
 #   "deleteHash": the wedgie works out the Safe tx hash, shows "Remove #n?", and on A signs Safe's DeleteRequest
 #   (EIP-712, what Safe's Transaction Service asks a proposer to sign) for it. Hosts drop it from their list; it
 #   can still run (only a tx at its nonce stops it), and the screen says so.
+#   {"type":"safe_prove","text":"Join Telegram","code":".."} -> "Prove it" on screen; on A, safe_proof: the key signs
+#   the code and the chip's factory key vouches for the key (safe_key.prove; wedgie.dev/telegram).
 import sys, select, json, time, gc, binascii, hashlib
 import lcd as L
 import wedgie as W
@@ -36,7 +38,7 @@ import save
 import ui
 from ui import WHITE, INK, MUTED, GREY, GREEN_D, RED
 
-FW = "safe-26"
+FW = "safe-27"
 RP_ID = b"wedgie.dev"
 FIELDS = '"origin":"https://wedgie.dev"'
 ASK_MS = 120000
@@ -670,6 +672,12 @@ def handle(m):
         on_clear(mid, m)
     elif t == "safe_remove":
         on_remove(mid, m.get("tx"), m.get("totp"))
+        dirty = True
+    elif t == "safe_prove":            # rare: in safe_key.py, loaded only for it
+        try:
+            key_module().prove(sys.modules[__name__], mid, m.get("text"), m.get("code"))
+        finally:
+            drop_key_module()
         dirty = True
     elif t == "safe_list":
         W.send({"id": mid, "type": "safe_list", "safes": save.load("safes", [])})

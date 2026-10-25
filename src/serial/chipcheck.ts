@@ -61,6 +61,24 @@ export function trustmCert(d: any) {
   return blob.slice(at, tlv(blob, at).end);
 }
 
+/** A Trust M's factory key (its certificate, DER) signed msg (rs: r||s hex), and the certificate traces to Infineon.
+ *  chain: "" when it does, else why not; path: who signed whom. */
+export async function trustmSigned(der: Uint8Array | Cert, msg: Uint8Array, rs: string, base = "") {
+  const dev = der instanceof Uint8Array ? cert(der) : der;
+  const sigOk = await crypto.subtle.verify({ name: "ECDSA", hash: "SHA-256" }, await key(dev), hexb(rs) as BufferSource, msg as BufferSource);
+  const cas = await infineon(base);
+  const mid = cas.find((c) => same(c.subject, dev.issuer));
+  let chain = "", path = "";
+  if (!mid) chain = "issuer isn't an Infineon CA we know";
+  else if (!(await signedBy(dev, mid))) chain = `not really signed by ${mid.cn}`;
+  else {
+    const root = cas.find((c) => same(c.subject, mid.issuer) && same(c.issuer, c.subject));
+    chain = !root ? `${mid.cn}, root unknown` : (await signedBy(mid, root)) ? "" : `${mid.cn} not signed by ${root.cn}`;
+    if (!chain) path = `${dev.cn} ← ${mid.cn} ← ${root!.cn}`;
+  }
+  return { sigOk, chain, path };
+}
+
 export type ChipCheck = { pass: boolean; detail: string; facts: [string, string][] };
 
 export async function checkChip(d: any, base = ""): Promise<ChipCheck> {
@@ -80,20 +98,9 @@ export async function checkChip(d: any, base = ""): Promise<ChipCheck> {
   }
   const dev = cert(trustmCert(d));
   const facts: [string, string][] = [["Trust M certificate", dev.cn || "?"]];
-  const devKey = await key(dev);
-  const sigOk = await crypto.subtle.verify({ name: "ECDSA", hash: "SHA-256" }, devKey, hexb(d.r + d.s), msg);
+  const { sigOk, chain, path } = await trustmSigned(dev, msg, d.r + d.s, base);
   facts.push(["Trust M signature", sigOk ? "valid: its factory key signed our random bytes" : "INVALID"]);
-  const cas = await infineon(base);
-  const mid = cas.find((c) => same(c.subject, dev.issuer));
-  let chain = "";
-  if (!mid) chain = "issuer isn't an Infineon CA we know";
-  else if (!(await signedBy(dev, mid))) chain = `not really signed by ${mid.cn}`;
-  else {
-    const root = cas.find((c) => same(c.subject, mid.issuer) && same(c.issuer, c.subject));
-    chain = !root ? `${mid.cn}, root unknown` : (await signedBy(mid, root)) ? "" : `${mid.cn} not signed by ${root.cn}`;
-    if (!chain) facts.push(["Trust M chain", `${dev.cn} ← ${mid.cn} ← ${root!.cn}`]);
-  }
-  if (chain) facts.push(["Trust M chain", chain]);
+  facts.push(["Trust M chain", chain || path]);
   const [r1, r2] = d.random as string[];
   facts.push(["Trust M random", `${r1.slice(0, 16)}… ${r2.slice(0, 16)}…`]);
   const pass = sigOk && !chain && r1 !== r2;

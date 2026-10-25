@@ -1,6 +1,7 @@
 // /telegram: the wedgie Telegram group. Without ?t= it says how to get in (the link to share). With the
-// bot's ?t= (bot/telegram.mjs), Connect: the wedgie's Trust M signs ({"type":"chip"}, no yes needed, like
-// /connect's chip check) and /api/telegram checks it and hands back a one-person invite. One chip, one account.
+// bot's ?t= (bot/telegram.mjs), Connect: Safe Signer shows "Join Telegram" and on green signs it with the bot's
+// token (safe_prove: its key, vouched for by the chip's factory key); /api/telegram checks both and hands back
+// a one-person invite. One chip, one account.
 // Nothing looks at USB until Connect is tapped.
 import * as W from "../serial/wedgies";
 import { esc } from "../ui/device";
@@ -17,10 +18,11 @@ export function telegram(main: HTMLElement) {
     <div class="card">
       <p>1. Message <a href="https://t.me/${BOT}" target="_blank" rel="noopener"><b>@${BOT}</b></a>.</p>
       <p>2. Open its link in Chrome on a computer.</p>
-      <p>3. Plug in your wedgie. Tap Connect.</p>
+      <p>3. Open Safe Signer on your wedgie. Plug it in. Tap Connect.</p>
+      <p>4. Press green.</p>
     </div>
     <div class="test-actions" id="tg-actions"></div>
-    <p class="fine">Needs a Trust M chip. One wedgie, one account.</p>
+    <p class="fine">Needs a Trust M chip and a Safe Signer key. One wedgie, one account.</p>
   </section>`;
   const box = main.querySelector<HTMLElement>("#tg-actions")!;
   if (!t) {
@@ -33,13 +35,14 @@ export function telegram(main: HTMLElement) {
   }
   const say = (html: string) => { box.innerHTML = html; };
   let busy = false, done = false;
-  const tried = new Set<number>();      // each wedgie signs on its own once; after that, Try again
+  const tried = new Set<number>();      // each wedgie is asked on its own once; after that, Try again
   const ask = () => say(`<button class="btn btn-green" id="tg-go">Connect</button>`);
   ask();
   box.addEventListener("click", (e) => {
     if ((e.target as HTMLElement).id !== "tg-go" || busy) return;
     const w = ready();
-    if (w) void prove(w); else W.connectNew().catch(() => {});
+    if (w && w.running !== "safe") { tried.clear(); W.reidentify(w); }      // they may have opened Safe Signer since
+    else if (w) void prove(w); else W.connectNew().catch(() => {});
   });
   const ready = () => W.wedgies().find((x) => x.state === "ready" && x.kind === "wedgie");
   W.start();
@@ -51,16 +54,13 @@ export function telegram(main: HTMLElement) {
 
   async function prove(w: W.Wedgie) {
     busy = true;
-    say(`<p class="fine">Signing</p>`);
     try {
-      const d = await W.withRepl(w, async (r) => {
-        let d = await r.request({ type: "chip" }, 15000);
-        for (let i = 0; d.busy && i < 40; i++) {      // its app is mid-command on the chip
-          await new Promise((res) => setTimeout(res, 250));
-          d = await r.request({ type: "chip" }, 15000);
-        }
-        return d;
-      });
+      if (w.running !== "safe") throw new Error("Open Safe Signer on your wedgie.");
+      say(`<p class="fine"><b>Press green on your wedgie.</b></p>`);
+      const d = await W.withRepl(w, (r) => r.request({ type: "safe_prove", text: "Join Telegram", code: t }, 130000));
+      if (d.type === "refused") throw new Error("You said no.");
+      if (d.type !== "safe_proof") throw new Error(d.error || "Update Safe Signer.");
+      say(`<p class="fine">Checking</p>`);
       const res = await fetch("/api/telegram", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ t, proof: d }) });
       const out = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(out.error || `The server said ${res.status}`);
