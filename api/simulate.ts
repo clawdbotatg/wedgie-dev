@@ -1,8 +1,9 @@
 // /api/simulate: what a transaction would move in and out of its sender, signed, for a wedgie that doesn't trust the
 // computer it's plugged into (built like api/price.ts, same key). Runs the call on the latest block (Alchemy's
 // debug_traceCall), adds up the sender's ETH and ERC-20 changes, names each token and prices it.
-//   POST {chain, from, to, value, data, nonce: <32 hex>}
-//   -> {block, ok, tx, changes: [{token, symbol, decimals, amount, usd}], nonce, r, s}
+//   POST {chain, from, to, value, data, nonce: <32 hex>, sig?: "p256"}
+//   -> {block, ok, tx, changes: [{token, symbol, decimals, amount, usd}], nonce, sig, r, s}
+// sig: the scheme the asker can check fast. Only "p256" (the default) for now: what a wedgie's Trust M checks.
 // token "eth" is the chain's coin; amount is signed, raw units (- = out of the sender); usd is the whole change in
 // dollars, "" if no price. ok: "ok" or "reverts".
 // Signed text (sha256, P-256, ieee-p1363):
@@ -72,6 +73,7 @@ export async function POST(req: Request) {
   if (!hex(from, 40) || !hex(to, 40) || !hex(data) || data.length > 200_000) return oops("from, to, data: hex");
   if (!/^\d{1,78}$/.test(String(b?.value ?? ""))) return oops("value: a decimal string");
   if (!/^[0-9a-f]{32}$/.test(b?.nonce || "")) return oops("nonce: 32 lowercase hex");
+  if ((b.sig ?? "p256") !== "p256") return oops("sig: only p256 for now");
   const value = BigInt(b.value);
   let block: number, trace: any;
   try {
@@ -92,5 +94,5 @@ export async function POST(req: Request) {
   const tx = createHash("sha256").update(`${from}\n${to}\n${value}\n${data}`).digest("hex");
   const text = [`wedgie.dev simulate`, b.nonce, chain, tx, block, ok, ...list.map((c) => [c.token, c.symbol, c.decimals, c.amount, c.usd].join(","))].join("\n");
   const sig = sign("sha256", Buffer.from(text), { key: createPrivateKey({ key: Buffer.from(pk, "base64"), format: "der", type: "pkcs8" }), dsaEncoding: "ieee-p1363" });
-  return json({ block, ok, tx, changes: list, nonce: b.nonce, r: sig.subarray(0, 32).toString("hex"), s: sig.subarray(32).toString("hex") });
+  return json({ block, ok, tx, changes: list, nonce: b.nonce, sig: "p256", r: sig.subarray(0, 32).toString("hex"), s: sig.subarray(32).toString("hex") });
 }
