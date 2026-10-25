@@ -4,7 +4,7 @@
 export const SELLER = "BuidlGuidl DAO LLC";
 const ADDR = "3307 S College Ave Unit 104, Fort Collins, CO 80525";
 const MAIL = "wedgie@buidlguidl.com";
-const UPDATED = "October 20, 2026";
+const UPDATED = "October 24, 2026";
 
 const TERMS = `
 <h1>Terms of Sale</h1>
@@ -65,7 +65,11 @@ const PRIVACY = `
 <p>We keep what you ordered and its status. Once it ships, the dates USPS has it moving and delivers it (never where). We delete an order 30 days after it ships or is canceled, or 30 days after it was made if it was never paid. An unpaid order that got some USDC is kept until it's sorted out with you.</p>
 
 <h2>Your wedgie</h2>
-<p>The site talks to a wedgie only after you tap Connect, and only in your browser. Nothing about your wedgie or its keys is sent to us.</p>
+<p>The site talks to a wedgie only after you tap Connect, and only in your browser. Its keys never leave it.</p>
+<p>To find your Safes, /safe sends us Safe addresses and their owners' addresses (yours, your wedgie's). They're public on chain anyway. We keep which address owns which Safe, never your IP.</p>
+<p>To put a transaction in words, /safe sends it to us. If no one has written words for it, a model writes a line (marked 🤖). We keep the answer, so the same transaction is explained once.</p>
+<p>An app that uses the internet asks through us, only for sites it listed. We don't keep what it asks.</p>
+<p>A bug report sends what you see before you press Send, including a plugged-in wedgie's log. We keep it 90 days.</p>
 
 <h2>Cookies</h2>
 <p>No ads, no trackers. Your browser stores your sign-in and your order links on your own computer. We count how many people reach each step of checkout, per day: just numbers, nothing about you. To stop abuse we keep a one-way hash of your IP address for a day (with a chat message, for its 7 days); never the address itself.</p>

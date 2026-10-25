@@ -20,9 +20,10 @@ r, s = c.sign(optiga.KEY2, digest)   # ECDSA over a 32-byte digest, 140 ms
 
 Which chip does this wedgie have? `wedgie.chip()` says (or hello's `"chip"`): `"OPTIGA Trust M"` or
 `"ATECC608"`. `optiga` is for the Trust M only. The emulator at wedgie.dev/code has no secure chip:
-`optiga.Chip()` fails there, so test chip code on a real wedgie (`python3 wedgie.py run app.py`).
+`optiga.Chip()` fails there. Test chip code on the virtual wedgie (wedgie.dev/virtual: a software Trust M, no RSA
+or AES) or a real wedgie (`python3 wedgie.py run app.py`).
 
-Other wedgie docs: making apps https://wedgie.dev/code.md, the hardware and USB https://wedgie.dev/skill.md
+Other wedgie docs: making apps https://wedgie.dev/code.md, USB https://wedgie.dev/usb.md, the hardware https://wedgie.dev/build.md
 
 ## What you should know first
 

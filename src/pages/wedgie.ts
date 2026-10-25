@@ -721,7 +721,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
       setScreen(idScreen());
       KEYS.forEach((k) => w3?.keyVisual(k, false));
       const seen = new Set<string>();
-      tstatus(`Press every button on the wedgie: joystick up, down, left, right, push it in, then A, B, X, Y. <span id="d-left"></span>`);
+      tstatus(`Press every button on the wedgie: joystick up, down, left, right, push it in, then the four buttons, green to red. <span id="d-left"></span>`);
       const left = () => { const l = KEYS.filter((k) => !seen.has(k)); const e = main.querySelector("#d-left"); if (e) e.textContent = l.length ? `Left: ${l.join(" ")}` : ""; };
       left();
       r.onLine = (t, v) => {

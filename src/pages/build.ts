@@ -176,7 +176,7 @@ const SCREENS: Record<string, string[]> = {
 };
 // Ready-made wedgies: each is just a /build link, like any shared one.
 const PRESETS = [
-  { name: "Wallet", q: "app=buttons&pico=nulllab&chip=trustm&chip2=none&lid=white&base=black&a=green&b=darkgrey&x=darkgrey&y=red&stick=darkgrey" },
+  { name: "Wallet", q: "app=safe&pico=nulllab&chip=trustm&chip2=none&lid=white&base=black&a=green&b=darkgrey&x=darkgrey&y=red&stick=darkgrey" },
   { name: "Game", q: "app=buttons&pico=nulllab&chip=none&chip2=none&lid=purple&base=black&a=yellow&b=skyblue&x=mint&y=magenta&stick=yellow" },
   { name: "Plain", q: "app=buttons&pico=nulllab&chip=none&chip2=none&lid=white&base=black&a=green&b=darkgrey&x=darkgrey&y=red&stick=darkgrey" },
 ];

@@ -1,5 +1,9 @@
 # Real-board test before a firmware release (0.3.12)
 
+**Old (10-24):** the record of the 0.3.12 test. Its apps (battery, usbwallet, demo, keytest, speed, mock,
+wire_demo) are gone from the shelf. Today: `python3 tools/boardprobe.py <mod>` with a shelf app, and the
+virtual wedgie (`docs/EMU.md`).
+
 Use a test wedgie, not the one with your wallet on it. Each step: press A on the wedgie when it asks.
 
 ## Setup (once)

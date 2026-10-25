@@ -113,7 +113,8 @@ how you harden it. Same team (BuidlGuidl), MIT, built from audited Safe contract
 
 - **Level 1, Instant wallet:** Face ID makes a passkey; the wallet is a Safe owned by it. The address exists at
   once, the same on 14 chains (Base, Ethereum, Arbitrum, Optimism, Robinhood, Polygon, Avalanche, BNB Chain,
-  Gnosis, Celo, Sonic, HyperEVM, Plasma, Arc). No seed phrase, no gas: a relay sends, the fee is paid in USDC or
+  Gnosis, Celo, Sonic, HyperEVM, Plasma, Arc). A wedgie signs on 12 of them: HyperEVM and Plasma lack the P-256
+  precompile its signer needs. No seed phrase, no gas: a relay sends, the fee is paid in USDC or
   ETH inside the tx (about $0.04 on Base). Recovery starts as the BuidlGuidl DAO (7 days).
 - **Level 2, add a wedgie:** Keys, Connect, add the wedgie (Chrome on a computer, or the iPhone over the WEDGIE
   drive). One batch: the wedgie becomes an owner (two owner slots, one press signs both), the phone keeps a

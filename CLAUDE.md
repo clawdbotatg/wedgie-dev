@@ -10,7 +10,7 @@ Push to main = deploy (Vercel). **Before every push that touches `src/`: `node t
   (`tools/drive_SKILL.md`); at a firmware release `tools/drive.py --refresh`. `tools/test_docs.py` checks them.
 - App rules: `src/apps/appjson.mjs`, `folder_app` in `public/wedgie.py`, `public/code.md`. Keep in step.
 - Style: `docs/STYLE.md`, enforced by `tools/test_style.py`. Apps: `docs/APPS.md`. Memory: `docs/PLAN-MEMORY.md`.
-- Clear signing groundwork (ERC-7730 wire format, not used yet) and its next steps: `wire/README.md`.
+- Clear signing (ERC-7730 wire format, used by Safe Signer) and its next steps: `wire/README.md`.
 
 ## Accounts
 

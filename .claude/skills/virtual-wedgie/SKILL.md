@@ -69,7 +69,7 @@ dapp for the Safe's balance before pairing again.
 
 ## Know
 
-- Answer a wedgie question soon: it says no after 60 s of the chip's time (it runs at 50-70% speed).
+- Answer a wedgie question soon: it says no after 60 s of the chip's time (it runs at 20-70% speed).
 - An install's yes is grey while the signature check runs: wait for green, then A.
 - After a deploy, wait until the new bundle is live before reloading a tab, or it gets the old page.
 - Austin can save the screen with the Screenshot button (a folder he picked once): "look at the

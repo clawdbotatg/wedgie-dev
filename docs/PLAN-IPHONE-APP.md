@@ -108,5 +108,5 @@ reads  ANSWER.TXT   ◄───────────   a file in drive.bin, 
 
 - Never skip the A press. A file on the drive is just another way in, with the same rules as USB.
 - RAM: every firmware change is measured with `node tools/chipprobe.mjs` and run on a real RP2040
-  before anyone calls it tested (CLAUDE.md landmine 13).
+  before anyone calls it tested (CLAUDE.md firmware rule 3).
 - The browser page (wedgie.dev/drive.html) stays as the no-install way.

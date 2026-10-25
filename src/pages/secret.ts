@@ -97,7 +97,7 @@ export function secret(main: HTMLElement) {
     if (Drive.inApp() && !ws.length) h += `<p class="fine">Plug in your wedgie. <button class="btn btn-sm" id="x-drive">Find it</button></p>`;
     else if (!Drive.inApp() && !W.supported()) h += `<p class="fine">This browser can't talk to a wedgie over USB. Use Chrome, Edge or Brave on a computer.</p>`;
     else if (!ws.length) h += `<p class="fine">Plug it in. Not showing? <a href="/connect">Connect</a> it first.</p>`;
-    else if (!app.length) h += `<p class="fine">It isn't running Secrets. <a class="btn btn-sm btn-green" href="/connect/${esc(ws[0].short)}">Install Secrets</a> (on its page, Software: Apps from a GitHub repo, add <b class="mono">clawdbotatg/wedgie-secret</b>).</p>`;
+    else if (!app.length) h += `<p class="fine">It isn't running Secrets. <a class="btn btn-sm btn-green" href="/connect/${esc(ws[0].short)}">Install Secrets</a> (one tap, from the shelf).</p>`;
     else if (!live) h += noKey ? `<p><b>Press green on the wedgie to make its key.</b></p>` : `<p class="fine">Reading its key.</p>`;
     if (me) h += `<p>Key <b class="mono">${esc(me.id)}</b>${live ? " (the wedgie shows the same)" : ""}</p>
       <p class="row"><button class="btn btn-sm" id="x-link">Copy my link</button> <span class="fine">Give it out: anyone with it can write to you.</span></p>`;

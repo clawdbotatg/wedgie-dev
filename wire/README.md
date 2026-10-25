@@ -84,7 +84,8 @@ Not yet run on a real wedgie.
 
 ## Next steps
 
-Done: test messages from the real registry (`from7730.py`).
+Done: test messages from the real registry (`from7730.py`); showing it in Safe Signer (safe-24, 10-22); trust
+through Merkle roots built into the app (algorithm 4) instead of checking signatures.
 
 1. **Bacca's answers** (Telegram DM, 10-20):
    - **Empty field list** (`pause()`): signers should accept it; `[+ field]` should allow empty. We send `[]`.
@@ -101,15 +102,14 @@ Done: test messages from the real registry (`from7730.py`).
    - Not asked, low value: his example messages (none published; we have 8,774 of our own), the `[1, null]`
      array step (we refuse it), Safe-only signing.
    - On 10-17 he said he has to compare the wedgie with Leek, which does something very similar.
-2. **Check signatures.** The spec's signatures are secp256k1 or Ed25519. We only have P-256 (`firmware/p256.py`).
-   secp256k1 in pure Python is ~2 s per check. Asked Bacca to allow P-256 (10-20).
+2. **Signatures (if roots aren't enough).** The spec's are secp256k1 or Ed25519; a wedgie checks P-256 fast. Asked
+   Bacca to allow P-256 (10-20).
 3. **Trusted sources.** Which keys the wedgie accepts and how many must agree, changed only with an A press.
    Local mode: only your own node, and the screen says "local mode". Same plan as the signed price demo
    (`api/price.ts`, `clawdbotatg/wedgie-price`).
 4. **Fresh answers.** Messages carry a date, but a wedgie has no clock. Use our nonce (as the price demo does,
    and as Ledger does for proxies) so an old answer can't be replayed.
 5. **Proxies.** Use `proxy-information` to match an upgradeable contract's current code, and warn if it changed.
-6. **Show it.** Match the descriptor to the Safe transaction's inner call, draw the fields in Safe Signer.
-   If anything can't be read, refuse or ask to blind sign. Never show half.
+6. **Unreadable calls.** A big red page; A still signs (never refuse). Never show half.
 7. **Speed and size.** Ship it compiled (`.mpy`), measure on a real wedgie.
-8. **Watch the spec.** EIP-712 isn't in it yet. Next sync call: 2026-10-21.
+8. **Watch the spec.** EIP-712 isn't in it yet.

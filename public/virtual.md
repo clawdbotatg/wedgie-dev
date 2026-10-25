@@ -52,7 +52,7 @@ Details: `docs/EMU.md` in the repo.
 ## Install an app on it
 
 1. Open https://wedgie.dev/connect in another tab of the same browser; pick the virtual wedgie.
-2. Click the app on the shelf. The virtual wedgie asks **Install X?**. Its yes is grey while it checks the
+2. Click the app on the shelf. The virtual wedgie asks **Install**, the app's name big under it. Its yes is grey while it checks the
    signature: wait for green, then press A.
 3. Its page says it runs that app.
 

@@ -25,7 +25,7 @@ Known gaps (2026-10-18), to close:
   the wedgie itself.
 - No host, no USB message, no bug, no "just for testing" path skips that press.
 
-Where it lives: CLAUDE.md landmine 9 (the lock, `slot.let_in`, `firmware/hatch.py`).
+Where it lives: CLAUDE.md firmware rule 7 (the lock, `slot.let_in`, `firmware/hatch.py`).
 
 ## 2. The wedgie always works
 
@@ -34,7 +34,7 @@ Where it lives: CLAUDE.md landmine 9 (the lock, `slot.let_in`, `firmware/hatch.p
 - The emulator passing proves nothing about memory. A real RP2040 has far less RAM.
   Firmware is tested on the virtual chip and a real board before it ships.
 
-Where it lives: CLAUDE.md landmines 12-14, `tools/test_memory.py`, `tools/chipprobe.mjs`,
+Where it lives: CLAUDE.md firmware rule 3, `tools/test_memory.py`, `tools/chipprobe.mjs`,
 `tools/boardprobe.py`, `docs/PLAN-MEMORY.md`.
 
 ## 3. Everything has one style
@@ -45,5 +45,5 @@ Where it lives: CLAUDE.md landmines 12-14, `tools/test_memory.py`, `tools/chippr
 - Nothing does its own thing. Busy always means the boot logo + a title + the loader bar.
   Never "working...", never a second bar.
 
-Where it lives: `docs/STYLE.md`, CLAUDE.md landmines 10-11, `tools/test_style.py`,
+Where it lives: `docs/STYLE.md`, CLAUDE.md firmware rule 8, `tools/test_style.py`,
 `tools/busyprobe.mjs`.

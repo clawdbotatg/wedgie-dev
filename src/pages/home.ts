@@ -113,7 +113,6 @@ export function home(main: HTMLElement): Promise<unknown> {
         <p id="order-what">One wedgie: pico, screen, chip, and case.</p>
         <div class="seg" role="radiogroup" aria-label="who is it for">
           <button class="on" data-for="me" role="radio" aria-checked="true">For me</button>
-          <button data-for="gift" role="radio" aria-checked="false">Give someone a wedgie</button>
           <button data-for="kit" role="radio" aria-checked="false">Kit</button>
         </div>
         <div class="row">
@@ -228,7 +227,7 @@ export function home(main: HTMLElement): Promise<unknown> {
     main.querySelectorAll<HTMLButtonElement>(".seg button").forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-checked", String(x === b)); });
     const kit = b.dataset.for === "kit";
     main.querySelector("#order-what")!.innerHTML = kit
-      ? `Every part and the case in the mail, with <a href="/assemble">assembly instructions</a> (also <a href="/assemble/3d">in 3D</a>). You need a wire stripper, tape, tweezers, and a USB data cable that fits your Pico (USB-C or micro USB, depending on the model).`
+      ? `Every part and the case in the mail, with <a href="/assemble">assembly instructions</a> (also <a href="/assemble/3d">in 3D</a>). You need a wire stripper, electrical tape, tweezers, a stiff wire or pin, and a USB data cable that fits your Pico (USB-C or micro USB, depending on the model).`
       : "One wedgie: pico, screen, chip, and case.";
     item = kit ? "kit" : "wedgie";
     showPrice(); sold();

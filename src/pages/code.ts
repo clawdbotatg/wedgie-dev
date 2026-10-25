@@ -95,7 +95,7 @@ export function code(main: HTMLElement) {
 
     <ol class="code-steps">
       <li class="card"><span class="num">3</span><h3>On your wedgie</h3><p>Your AI can put it on with <code>wedgie.py install .</code> (the skill says how). Or push it to GitHub, open your wedgie's page in <a href="/connect">Connect</a>, and add the repo under <b>Apps from a GitHub repo</b>.</p></li>
-      <li class="card"><span class="num">4</span><h3>For everyone</h3><p>The shelf: apps anyone can put on their wedgie at <a href="/connect">/connect</a>. Send us your repo (<a href="https://github.com/clawdbotatg/wedgie-dev/issues" target="_blank" rel="noopener">an issue</a>); we read it, sign it, and it's on. Start from <a href="https://github.com/${STARTER}" target="_blank" rel="noopener">${STARTER}</a> so yours is ready.</p></li>
+      <li class="card"><span class="num">4</span><h3>For everyone</h3><p>The shelf: apps anyone can put on their wedgie at <a href="/connect">/connect</a>. Email your repo to <a href="mailto:wedgie@buidlguidl.com">wedgie@buidlguidl.com</a>; we read it, sign it, and it's on. Start from <a href="https://github.com/${STARTER}" target="_blank" rel="noopener">${STARTER}</a> so yours is ready.</p></li>
     </ol>
 
     <div class="card code-fast">

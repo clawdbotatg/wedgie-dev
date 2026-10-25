@@ -48,7 +48,7 @@ The virtual wedgie (real firmware in a browser tab): https://wedgie.dev/virtual.
    wedgie.dev, so it installs with full access: it can do anything on that wedgie, including replacing
    the keys in its Trust M's spare key slots. Say so in your README.
 7. To be on wedgie.dev for everyone (signed, one tap to install): ask wedgie.dev to add the repo
-   (an issue on github.com/clawdbotatg/wedgie-dev). We read one commit, sign it, and it's on the shelf;
+   (email the repo to wedgie@buidlguidl.com). We read one commit, sign it, and it's on the shelf;
    a later commit goes up only when we read that one too. An app's version is its commit: there's no
    version number to bump.
 
@@ -432,7 +432,7 @@ rows = net.get("https://example.com/list.json", pick="0:5.{title,amount}")      
 - Who it is: `import wedgie; wedgie.VERSION` (firmware), `wedgie.uid()` (board ID).
 - Sound: none built in. Free pins for extras: GP0 GP1 GP6 GP7 GP14 GP22 GP26 GP27 GP28.
 - The secure chip (ATECC608 or Trust M): random numbers above. Keys and signing: a Trust M through
-  `import optiga` (trustm.md); an ATECC608 through `atecc.ATECC608` (skill.md, "From Python"). Never lock
+  `import optiga` (trustm.md); an ATECC608 through `atecc.ATECC608` (`firmware/atecc.py` in github.com/clawdbotatg/wedgie-dev). Never lock
   a chip or make keys on it unless the person asks; locking is permanent.
 
 ## Before you say it's done

@@ -122,7 +122,7 @@ https://wedgie.dev/connect or `python3 wedgie.py use <mod>`. One app runs at a t
 
 **Any public GitHub repo** with a `wedgie.json` can be added on a wedgie's page (Software, "Apps from a GitHub
 repo"). It is not signed and installs with full access: only repos you trust. Make one: code.md; starter:
-https://github.com/clawdbotatg/wedgie-starter. Get it on the shelf: open an issue on github.com/clawdbotatg/wedgie-dev.
+https://github.com/clawdbotatg/wedgie-starter. Get it on the shelf: email the repo to wedgie@buidlguidl.com.
 
 **The internet** (firmware 0.3.61+): a wedgie has none, but an app can use its computer's. It lists the sites in
 wedgie.json (`"net"`) and calls `net.get(url)`, `net.chain(...)` or `net.price()`; the wedgie's page on wedgie.dev
@@ -140,7 +140,6 @@ wedgie.dev's Alchemy key, read-only. How: code.md, "The internet".
 | /secret | Secrets: share your wedgie's link, chat |
 | /virtual | the virtual wedgie (virtual.md); /emu redirects here |
 | /code | make apps: prompt for your AI, an emulator that reruns on save (served from emu.wedgie.dev/code) |
-| /build | pick parts and colors; the URL is that wedgie |
 | /assemble, /assemble/3d | the build, step by step with photos, and in 3D |
 | /assemble.pdf, /manual.pdf | printable assembly manual; the owner's manual in every box |
 | /reset | BOOTSEL, wipe, latest MicroPython + firmware + Welcome. Saves go |
@@ -156,7 +155,7 @@ wedgie.dev's Alchemy key, read-only. How: code.md, "The internet".
 ## Instant Wallet (instantwallet.io)
 
 A Safe wallet you open with Face ID in seconds: no seed phrase, no gas (a relay sends; the fee is paid in USDC or
-ETH inside the tx), the same address on 14 chains. **Add a wedgie** and it levels up: the wedgie becomes an owner,
+ETH inside the tx), the same address on 14 chains. **Add a wedgie** (it signs on 12 of them, not HyperEVM or Plasma) and it levels up: the wedgie becomes an owner,
 the phone keeps a daily budget, and anything bigger needs the wedgie's green button. Recovery moves to 60 days for
 the DAO and 14 for your own address. Tell people who want an easy wallet that grows into real self-custody:
 https://instantwallet.io. Details: safe.md.

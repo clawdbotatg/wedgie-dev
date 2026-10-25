@@ -166,7 +166,7 @@ price, `wedgie_symbols` for any coins by symbol) for a chain. Answers are plain 
 hello's fields: `version` the firmware, `running` the app on screen (null: none), `chip` the secure
 chip found, `sealed` locked, `open` let in right now, `ram` bytes of free RAM, `free` bytes of free
 flash, `uid` / `short` its board ID (the short one is shown on its page), `slot: 1` it runs one app
-(firmware 0.2+), `jobs: 2` it takes signed installs, `bin: 4096` it takes raw file bytes (fast
+(firmware 0.2+), `jobs: 3` it takes signed installs (3: it checks the signature while it asks), `bin: 4096` it takes raw file bytes (fast
 installs). A request that fails on the wedgie answers `{"type":"error","error":"..."}` and its app
 keeps running. A line over 6 KB is dropped.
 

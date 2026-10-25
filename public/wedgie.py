@@ -8,8 +8,8 @@
   python3 wedgie.py hello                     what it is and runs (JSON)
   python3 wedgie.py shot [out.png]            the real screen, as a PNG you can look at
   python3 wedgie.py press A [ms]              press a button: A B X Y up down left right press
-  python3 wedgie.py apps                      the apps on wedgie.dev, and which one it runs
-  python3 wedgie.py use usbwallet             make that the app it runs (the old one comes off, saves stay); it restarts into it
+  python3 wedgie.py apps                      the apps on wedgie.dev, and which one it runs (asks on its screen)
+  python3 wedgie.py use buttons               make that the app it runs (the old one comes off, saves stay); it restarts into it
   python3 wedgie.py uninstall                 uninstall its app ("no software")
   python3 wedgie.py run app.py                run a file once (output streams; Ctrl-C stops), then back to its app
   python3 wedgie.py install .                 make the app in this folder's wedgie.json the app it runs (wedgie.dev/code.md)
@@ -26,7 +26,8 @@
   --port /dev/cu.usbmodemXXXX  (or --id A1B2C3) picks one when several are plugged in.
 
 A wedgie (firmware 0.2+) runs one app: it boots straight into it and the app gets every button.
-hello/shot/press talk to the firmware over JSON lines while the app runs and never interrupt it.
+hello/shot/press talk to the firmware over JSON lines while the app runs and never interrupt it
+(0.3.54+: shot and press need `unlock` first).
 The rest stop it (Ctrl-C), use MicroPython's raw REPL, then start the app again by running main.py.
 Firmware 0.2.5+ is sealed: the first of those asks on the wedgie's screen and waits for you to press the
 green button there. A yes is for that one command: the next one asks again.

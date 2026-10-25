@@ -188,6 +188,6 @@ Release gate for any firmware change:
   (one reader, 6 KB, errors answered), `keccak.py`/`trustm.py` (`# small:` notes only).
 - tools: `test_memory.py`, `chipprobe.mjs` + `rp2040/` (virtual chip), `boardprobe.py`, `sign.mjs`
   guard, every probe finds Chromium on Linux too. (memprobe.mjs and an emulator `heap` option were added and deleted the same day: the emulator can't test memory.)
-- docs: CLAUDE.md landmine 13, `public/code.md` (no `+=` strings in loops), `public/skill.md` (error
+- docs: CLAUDE.md firmware rule 3, `public/code.md` (no `+=` strings in loops), `public/skill.md` (error
   answers, 6 KB lines).
 - Not done: signing (needs the Mac), release, rule 3, open items.

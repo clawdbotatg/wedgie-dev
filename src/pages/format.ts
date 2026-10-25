@@ -68,7 +68,7 @@ export function format(main: HTMLElement) {
   <section class="test-page">
     <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
     <h1>Test a wedgie</h1>
-    <p class="test-safe">This wipes and resets the computer. It never changes the chip. Your crypto stays safe.</p>
+    <p class="test-safe">This wipes and resets the wedgie. It never changes the chip. Your crypto stays safe.</p>
     <div class="boot-hint card" id="t-hint" hidden>
       <div class="boot-hint-3d" id="t-hint-3d"></div>
       <div><h3>Hold BOOTSEL, plug it in</h3>
@@ -85,7 +85,7 @@ export function format(main: HTMLElement) {
     <div class="test-id" id="t-id"></div>
     <dl class="kv test-facts" id="t-facts" hidden></dl>
     <label class="fine test-wipe"><input type="checkbox" id="t-wipe"> Wipe its saves too</label>
-    <p class="fine">Test wipes the wedgie and sets it up fresh: MicroPython, the wedgie firmware, then a test of the chip, its wires while you shake it, and every button. It ends with no app on it. Its saves are kept unless you tick the box.</p>
+    <p class="fine">Test wipes the wedgie and sets it up fresh: MicroPython, the wedgie firmware, then a test of the chip, its wires while you shake it, and every button. It ends with Welcome on it. Its saves are kept unless you tick the box.</p>
     ${benchSetup()}
   </section>`;
   const $ = (id: string) => document.getElementById(id)!;
@@ -137,7 +137,7 @@ export function format(main: HTMLElement) {
     buttons("");
     const wipe = ($("t-wipe") as HTMLInputElement).checked;
     W.withRepl(w, async (r) => {
-      await letIn(r, (s) => s && status(s + ".", "It asks on its screen: A lets this computer wipe it."));
+      await letIn(r, (s) => s && status(s + ".", "It asks on its screen: green lets this computer wipe it."));
       await r.write("\r\x03\x03");
       await new Promise((res) => setTimeout(res, 150));
       await r.write("\x01");
@@ -221,7 +221,7 @@ export function format(main: HTMLElement) {
         try {
           // keep: no reset (a soft reset with the WEDGIE drive up dropped the port: "unplugged"); the bench
           // runs over the loaded firmware, so bench.py keeps its buffers small.
-          if (keep) await takeOver(r, (s) => s && status(s + ".", "It asks on its screen: A lets this computer test it."), "Test it", "Testing");
+          if (keep) await takeOver(r, (s) => s && status(s + ".", "It asks on its screen: green lets this computer test it."), "Test it", "Testing");
           else await r.enter();
           status("Testing…", "Don't unplug it.");
           await r.exec(await W.probe(), 10000);
@@ -448,7 +448,7 @@ export function format(main: HTMLElement) {
     const kept = backup(uid);
     const current = !!w && w.kind === "wedgie" && !!latest && w.version === latest;
     status(`Plugged in: ${what}`, kept ? `Saves from its last format are waiting in this browser (${Object.keys(kept.files).length} files); they go back on.`
-      : current ? `It has the latest firmware (${latest}). Test only checks the chip, shake, buttons and colors and changes nothing. Format and test wipes it and sets it up fresh first.`
+      : current ? `It has the latest firmware (${latest}). Test only checks the chip, wires, buttons and colors. It changes nothing.`
       : "Test it wipes it, sets it up fresh, then tests it.");
     if (!document.getElementById("t-go") || !!document.getElementById("t-test") !== current)
       buttons(current ? `<button class="btn" id="t-go">Format and test</button><button class="btn btn-green" id="t-test">Test only</button>`

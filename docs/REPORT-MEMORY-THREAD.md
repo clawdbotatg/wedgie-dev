@@ -58,7 +58,7 @@ failed", on any wedgie, from any state, including a fresh plug-in. Know it befor
 ## What I'd do next
 
 1. **Read the crash off Austin's board** (error.log, which line, free memory at each boot step).
-   No more guessing: trace it on real hardware, as CLAUDE.md landmine 12 says.
+   No more guessing: trace it on real hardware, as CLAUDE.md firmware rule 3 says.
 2. **Allocate the 6 KB USB buffer first thing in boot.py**, before the drive starts. The real crashes
    were at `import slot`, the simulated one at this buffer: both right after the drive comes up.
 3. **Shrink the drive image** (another thread is on it).
