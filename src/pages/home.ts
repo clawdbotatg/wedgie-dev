@@ -99,7 +99,7 @@ export function home(main: HTMLElement): Promise<unknown> {
     </div>
   </section>
 
-  <div class="band" aria-hidden="true"><i></i><i></i><i></i></div>
+  <div class="band roomy" aria-hidden="true"><i></i><i></i><i></i></div>
 
   <section id="get" class="sec">
     <div class="sec-head">
@@ -113,8 +113,8 @@ export function home(main: HTMLElement): Promise<unknown> {
         <p class="surge why-open" hidden></p>
         ${WHY}
         <p id="order-what">One wedgie: pico, screen, chip, and case.</p>
-        <div class="seg" role="radiogroup" aria-label="who is it for">
-          <button class="on" data-for="me" role="radio" aria-checked="true">For me</button>
+        <div class="seg" role="radiogroup" aria-label="assembled or kit">
+          <button class="on" data-for="me" role="radio" aria-checked="true">Assembled</button>
           <button data-for="kit" role="radio" aria-checked="false">Kit</button>
         </div>
         <div class="row">
@@ -142,7 +142,7 @@ export function home(main: HTMLElement): Promise<unknown> {
     </div>
   </section>
 
-  <div class="band" aria-hidden="true"><i></i><i></i><i></i></div>
+  <div class="band roomy" aria-hidden="true"><i></i><i></i><i></i></div>
 
   <section id="dev" class="sec">
     <div class="sec-head dev-head">
@@ -233,7 +233,7 @@ export function home(main: HTMLElement): Promise<unknown> {
     main.querySelectorAll<HTMLButtonElement>(".seg button").forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-checked", String(x === b)); });
     const kit = b.dataset.for === "kit";
     main.querySelector("#order-what")!.innerHTML = kit
-      ? `Every part and the case in the mail, with <a href="/assemble">assembly instructions</a> (also <a href="/assemble/3d">in 3D</a>). You need a wire stripper, electrical tape, tweezers, a stiff wire or pin, and a USB data cable that fits your Pico (USB-C or micro USB, depending on the model).`
+      ? `All the parts, and <a href="/assemble">how to build it</a>.`
       : "One wedgie: pico, screen, chip, and case.";
     item = kit ? "kit" : "wedgie";
     showPrice(); sold();
