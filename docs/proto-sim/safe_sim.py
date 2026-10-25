@@ -1,12 +1,13 @@
-# Safe Signer: the clean screen from a simulation (PROTOTYPE, 10-25). The computer sends wedgie.dev's signed
-# /api/simulate answer with the tx (tx["sim"]); this checks the signature (the key pinned in wedgie-price too) and
+# Safe Signer: the clean screen from a simulation (PROTOTYPE, 10-25). The computer sends a signed clear-sim answer
+# (sim.wedgie.dev, SPEC.md in github.com/clawdbotatg/clear-sim) with the tx (tx["sim"]); this checks the signature and
 # the answer against the tx, then gives one short page and detail pages under it (the d-pad's down).
 #   pages(tx, bundle) -> [(head, lines)], the short page first; or a reason string it can't
 # Not yet: the wedgie's own nonce (the computer picks it now: an old answer for the same tx could come back).
 import hashlib, binascii
 
-KEY = (0xd7909a464f1dd7cce5a5309780bc15a6ba9c6da66d439ecd0bc1179d7ae81af2,
-       0x21943b1c7a934405adf8f053144258a00e28b08a7b499c9a15aa8ac3152daeda)
+# sim.wedgie.dev's public key (GET https://sim.wedgie.dev/). Later: a list, and your own added with one press.
+KEY = (0x963d7c90cbcfef8f6ff9e745c097294340502c2efb0e8c65b7ed9c37ccfecba4,
+       0xff9be230b6062fd80d2f78a6b00d744f745ae8d6e1647108646dcd230a024b92)
 SUF = ((12, "T"), (9, "B"), (6, "M"), (3, "K"))
 
 
@@ -82,13 +83,13 @@ def check(tx, sim):
         raise ValueError("not p256")
     tx_h = _txhash(tx)
     ch = sim.get("changes") or []
-    text = "\n".join(["wedgie.dev simulate", sim["nonce"], str(tx["chainId"]), tx_h, str(int(sim["block"])), sim["ok"]] +
+    text = "\n".join(["clear-sim v1", sim["nonce"], str(tx["chainId"]), tx_h, str(int(sim["block"])), sim["ok"]] +
                      [",".join((c["token"], c["symbol"], str(c["decimals"]), c["amount"], c["usd"])) for c in ch])
     dg = hashlib.sha256(text.encode()).digest()
     r, s = int(sim["r"], 16), int(sim["s"], 16)
     ok = W.chip_verify(dg, r, s, KEY[0], KEY[1]) if hasattr(W, "chip_verify") else False
     if not ok and not p256.verify(KEY[0], KEY[1], dg, r, s):
-        raise ValueError("wedgie.dev didn't sign this")
+        raise ValueError("sim.wedgie.dev didn't sign this")
     return [(c["token"], c["symbol"], int(c["decimals"]), int(c["amount"]), c["usd"]) for c in ch]
 
 
@@ -162,6 +163,6 @@ def pages(tx, bundle, sim):
         tail = binascii.hexlify(tx["data"][-extra:]).decode()
         out.append(("Extra bytes", [("%d after the call" % extra, RED), ("0x" + tail[:COLS_SMALL - 2], INK),
                                     ("the call doesn't read them", MUTED)]))
-    out.append(("Checked", [("simulated at block", MUTED), (str(sim["block"]), INK), ("signed by wedgie.dev", GREEN_D)] +
+    out.append(("Checked", [("simulated at block", MUTED), (str(sim["block"]), INK), ("signed by sim.wedgie.dev", GREEN_D)] +
                 [(w_, RED) for w_ in warns[:3]]))
     return out

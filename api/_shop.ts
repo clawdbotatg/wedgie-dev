@@ -334,4 +334,3 @@ export async function usdcFind(o: Order): Promise<string | null> {
 }
 export const fmtUsdc = (u: string | bigint) => { const n = BigInt(u); return `${n / 1_000_000n}.${(n % 1_000_000n).toString().padStart(6, "0")}`; };
 
-export { TRANSFER };     // the ERC-20 Transfer event (api/simulate.ts)
