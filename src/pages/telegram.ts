@@ -42,14 +42,25 @@ export function telegram(main: HTMLElement) {
     if ((e.target as HTMLElement).id !== "tg-go" || busy) return;
     const w = ready();
     if (w && w.running !== "safe") { tried.clear(); W.reidentify(w); }      // they may have opened Safe Signer since
-    else if (w) void prove(w); else W.connectNew().catch(() => {});
+    else if (w) void prove(w);
+    else {
+      const bad = W.wedgies().find((x) => x.state === "error");
+      if (bad) W.reidentify(bad); else W.connectNew().catch(() => {});
+    }
   });
   const ready = () => W.wedgies().find((x) => x.state === "ready" && x.kind === "wedgie");
   W.start();
   W.onChange(() => {
     const w = ready();
-    if (w && !busy && !done && !tried.has(w.key)) { tried.add(w.key); void prove(w); }
-    else if (!busy && !done && W.wedgies().some((x) => x.state === "identifying")) say(`<p class="fine">Finding your wedgie</p>`);
+    if (busy || done) return;
+    if (w && !tried.has(w.key)) { tried.add(w.key); void prove(w); return; }
+    if (w) return;                      // asked already: its answer (or Try again) stays up
+    const all = W.wedgies().filter((x) => x.state !== "gone");
+    const bad = all.find((x) => x.state === "error");
+    // never "Finding your wedgie" for good: an error says what, and nothing found asks again (Austin 10-25)
+    if (all.some((x) => x.state === "identifying")) say(`<p class="fine">Finding your wedgie</p>`);
+    else if (bad) say(`<p class="fine"><b>${esc(bad.error || "It didn't answer.")}</b></p><button class="btn btn-green" id="tg-go">Try again</button>`);
+    else ask();
   });
 
   async function prove(w: W.Wedgie) {
