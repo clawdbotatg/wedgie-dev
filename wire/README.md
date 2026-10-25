@@ -18,6 +18,17 @@ https://github.com/ZKNoxHQ/eth-universal-signer/blob/7730-wire-format-implementa
   the app does: 1,367 show exactly what the registry expects, 125 differ on purpose, 18 explained in the test);
   `tools/safechip.mjs` signs four of them on a virtual RP2040.
 
+## See a dapp's screens
+
+Every page of a registry test file's real transactions, on a virtual RP2040. No assets, no fork: a wedgie signs
+what it's sent and never executes it. For data newer than our release, make a test release first (nothing ships):
+
+```
+python3 tools/clear_txs.py /tmp/reg/registry/uniswap/testsv2/calldata-UniswapV2Router02.tests.json > /tmp/v2.json
+cp -r ../wedgie-safe /tmp/app && uv run ... python3 wire/release.py /tmp/reg /tmp/clear /tmp/app/safe_roots.py
+node tools/safechip.mjs --app /tmp/app --clear /tmp/clear --txs /tmp/v2.json --shots /tmp/v2   # <case>-<page>.png
+```
+
 ## Make a release (new registry data)
 
 ```

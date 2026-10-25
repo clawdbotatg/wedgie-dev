@@ -5,8 +5,10 @@
 // The virtual chip has no secure chip, so a yes ends in the app's error answer at the chip step; everything
 // before it (parsing, the Safe tx hash in pure-Python keccak, the decode, the screens) runs for real.
 // A MemoryError, a traceback, "wedgie broke" or no answer fails it. Prints the least free heap seen.
-//   node tools/safechip.mjs [--app <wedgie-safe checkout>] [--shot <file.png>] [--shots <dir>]   (default: the
-//   shelf's copy in community/; --shot: its home screen; --shots: each case's first page, as the panel got it)
+//   node tools/safechip.mjs [--app <wedgie-safe checkout>] [--shot <file.png>] [--shots <dir>] [--txs <file.json>]
+//   (default: the shelf's copy in community/; --shot: its home screen; --shots: every page of every case, as the
+//   panel got it; --txs: only these, with their clear-signing bundles: tools/clear_txs.py makes them from the registry;
+//   --clear <dir>: a wire/release.py output to take bundles from, for an --app whose safe_roots.py it made)
 // 0.3.54+: a locked wedgie refuses shot (slot.py), so the Bunker/--shot screens need firmware older than 0.3.54. Open item.
 // Needs uv (the flash image: littlefs-python).
 import { readFileSync, existsSync, writeFileSync } from "node:fs";
@@ -161,8 +163,11 @@ const urOut = { ...tx(UR, "0x3593564c0000000000000000000000000000000000000000000
 // public/clear/<tag> (wire/release.py), as the app's hello asks: Aave, Lido, Uniswap's V3 router (a call inside a
 // call), one not audited, a MultiSend batch (app.morpho.org)
 const clearTxs = JSON.parse(readFileSync(new URL("fixtures/clear-txs.json", import.meta.url), "utf8"));
-Clear.loadFrom(async (p) => { try { return JSON.parse(readFileSync(new URL(`../public/clear/${p}.json`, import.meta.url), "utf8")); } catch { return null; } });
-const cases = [
+const clearDir = args.includes("--clear") ? args[args.indexOf("--clear") + 1] : new URL("../public/clear", import.meta.url).pathname;
+Clear.loadFrom(async (p) => { try { return JSON.parse(readFileSync(join(clearDir, `${p}.json`), "utf8")); } catch { return null; } });
+const txsFile = args.includes("--txs") ? args[args.indexOf("--txs") + 1] : null;
+const cases = txsFile ? JSON.parse(readFileSync(txsFile, "utf8")).map((c) =>
+  [c.name, { ...tx(c.to, c.data, c.value), chainId: c.chainId, safe: c.safe || safe, operation: c.operation || 0 }, 1, true]) : [
   ...clearTxs.map((c) => [`clear signing: ${c.name}${c.trust === "a" ? "" : " (not audited)"}`, { ...tx(c.to, c.data, c.value), chainId: c.chainId, operation: c.operation || 0 }, 1, true]),
   ["change the daily limit (3 actions, 1 page)", limit, 1],
   ["Uniswap: swap 0.4805 ETH for USDC (V4)", urIn, 1],
@@ -182,21 +187,22 @@ function ask(t, k, msg = { type: "safe_sign", tx: t }, cb = null, shot = null) {
   }
   const rid = ++id, t0 = h.chip.ms;
   h.chip.write(JSON.stringify({ id: rid, ...msg }) + "\n");
-  let got = null, last = null;
+  let got = null;
+  const seen = [];
   const re = new RegExp(`\\{[^\\n]*"id": ${rid}[,}][^\\n]*\\n`);
   for (let s = 0; s < 240 && !got; s++) {
     h.until((b) => { const m = b.match(re); if (m) got = JSON.parse(m[0]); return !!m; }, 1000, 20);
-    if (!got && shot) last = Buffer.from(frame);
+    if (!got && shot && !(seen.length && seen[seen.length - 1].equals(frame))) seen.push(Buffer.from(frame));
     if (!got) press(k);
   }
-  if (last) png(shot, last, 240, 240);        // the screen the last press answered: its last page
+  seen.forEach((f, i) => png(`${shot}-${i + 1}.png`, f, 240, 240));     // each page it showed, in order
   return { got, secs: ((h.chip.ms - t0) / 1000).toFixed(1) };
 }
 for (const [what, t, pages, clear] of cases) {
   const before = all.length;
   const cb = clear && hi?.safe_clear ? await Clear.bundle(hi.safe_clear, t.chainId, t) : null;
   if (clear && !cb) { check(!hi?.safe_clear, `${what}: no bundle for it (an app without clear signing: skipped)`); continue; }
-  const { got, secs } = ask(t, "A", undefined, cb, shots && join(shots, what.replace(/[^a-z0-9]+/gi, "-").slice(0, 60) + ".png"));
+  const { got, secs } = ask(t, "A", undefined, cb, shots && join(shots, what.replace(/[^a-z0-9]+/gi, "-").slice(0, 60)));
   const out = all.slice(before);
   if (!got) console.log("     no answer; it said:", JSON.stringify(out.slice(-800)));
   const r = ram(what);
@@ -204,6 +210,7 @@ for (const [what, t, pages, clear] of cases) {
   const chipStep = got?.type === "safe_sig" || /trustm|ATECC608/.test(got?.error || "");
   check(chipStep && !crash(out), `${what}: ${pages} page(s), A through them, ${secs} s: answered ${got ? got.type + (got.error ? " (" + got.error.slice(0, 40) + ")" : "") : "nothing"} · ${r?.ram} B free`);
 }
+if (txsFile) { console.log(failed ? `${failed} FAILED` : "all checks passed"); process.exit(failed ? 1 : 0); }
 if (hi?.safe_chunk) {     // a transaction over the 6 KB line: its data in safe_data pieces first, then "@"
   for (const size of (process.env.SIZES || "8000,12000").split(",").map(Number)) {
     const data = "0x12345678" + "ab".repeat(size - 4), before = all.length;
