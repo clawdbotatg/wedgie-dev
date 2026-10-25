@@ -21,10 +21,10 @@ export async function GET(req: Request) {
     coalesce(sum(coalesce((cart->>'wedgie')::int, 0) + coalesce((cart->>'kit')::int, 0)) filter (where status = 'paid'), 0)::int as "boxesToPack",
     count(*) filter (where status = 'shipped' and delivered_at is null)::int as "onTheWay",
     count(*) filter (where status = 'shipped' and delivered_at is not null)::int as delivered,
-    count(*) filter (where status = 'shipped')::int as shipped
-    from orders`;
-  const [g] = await sql`select coalesce(sum(n), 0)::int as n from counts where k = 'shipped_gone'`;
+    count(*) filter (where status = 'shipped')::int
+      + (select coalesce(sum(n), 0) from counts where k = 'shipped_gone')::int as shipped
+    from orders`;   // one statement: one snapshot, so a cleanup in between can't count a box twice
   const surge = await extraNow(sql);
-  return out({ ...r, shipped: r.shipped + g.n, left: await stockLeft(sql),
+  return out({ ...r, left: await stockLeft(sql),
     price: { wedgie: ITEMS.wedgie.cents + surge, kit: ITEMS.kit.cents + surge, surge } });
 }
