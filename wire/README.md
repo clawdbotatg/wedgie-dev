@@ -108,6 +108,8 @@ through Merkle roots built into the app (algorithm 4) instead of checking signat
      A trailer of whole slots can't be seen (the wire format has no parameter types).
    - **Signed data from the internet** (the price demo): "absolutely not a non starter". Commercial wallets
      use a server that signs it. A middle step: the device runs the TLS connection, the host only passes bytes.
+     Built (10-25): `api/simulate.ts` runs a tx on the latest block and signs what moves in and out of the sender
+     (tokens named, in dollars), the same way as `api/price.ts`. Not TLS: the RP2040 MicroPython build has none.
    - **His code:** decoding and screen text will live in `ethereum/ethereum-app/common-eth-signer` (Rust).
      He suggested it "if that's not redundant"; he hadn't read ours. A wedgie can't run Rust.
    - **Asked 10-20, waiting:** would he add P-256 as an allowed signature type? It's all a wedgie can check

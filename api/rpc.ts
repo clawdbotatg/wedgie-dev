@@ -11,7 +11,7 @@ export const HOSTS: Record<number, string> = { 1: "eth-mainnet", 8453: "base-mai
   137: "polygon-mainnet", 43114: "avax-mainnet", 56: "bnb-mainnet", 100: "gnosis-mainnet", 42220: "celo-mainnet",
   146: "sonic-mainnet", 5042: "arc-mainnet", 4663: "robinhood-mainnet", 84532: "base-sepolia", 11155111: "eth-sepolia" };
 // each chain's own coin, as Alchemy's prices API names it (ETH if not here; Arc's coin is USDC: a dollar)
-const COIN: Record<number, string> = { 137: "POL", 43114: "AVAX", 56: "BNB", 100: "XDAI", 42220: "CELO", 146: "S", 5042: "USDC" };
+export const COIN: Record<number, string> = { 137: "POL", 43114: "AVAX", 56: "BNB", 100: "XDAI", 42220: "CELO", 146: "S", 5042: "USDC" };
 // DexScreener's name for each chain
 const DEX: Record<number, string> = { 1: "ethereum", 8453: "base", 10: "optimism", 42161: "arbitrum", 137: "polygon",
   43114: "avalanche", 56: "bsc", 100: "gnosischain", 42220: "celo", 146: "sonic" };
@@ -47,7 +47,7 @@ async function symbols(list: unknown[]) {
 }
 
 /** Dollar prices: the chain's coin and up to 25 tokens on one chain. A test chain's coins are worth nothing. */
-async function prices(chain: number, host: string, tokens: unknown[]) {
+export async function prices(chain: number, host: string, tokens: unknown[]) {
   const k = chain + ":" + tokens.map(String).map((t) => t.toLowerCase()).sort().join(","), hit = PRICED.get(k);
   if (hit && Date.now() - hit.at < PRICE_MS) return hit.v;
   const v = await pricesNow(chain, host, tokens);
