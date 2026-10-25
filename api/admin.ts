@@ -37,8 +37,11 @@ export async function GET(req: Request) {
   if (q.get("moving")) return json({ orders: await sql`select id, tracking, shipped_at, moving_at from orders
     where status = 'shipped' and tracking is not null and delivered_at is null and shipped_at > now() - interval '60 days' order by shipped_at` });
   // The shipped boxes deleted here come off the stock count too, so stockLeft doesn't forget them and hand them out again.
+  // And they're tallied (counts "shipped_gone"), so api/stats.ts keeps an all-time shipped count.
   await sql`with gone as (delete from orders where (status in ('shipped', 'canceled') and coalesce(shipped_at, paid_at, created) < now() - interval '30 days')
-    or (status in ('new', 'expired') and coalesce(got, 0) = 0 and created < now() - interval '30 days') returning cart, status, paid_at)
+    or (status in ('new', 'expired') and coalesce(got, 0) = 0 and created < now() - interval '30 days') returning cart, status, paid_at),
+    tally as (insert into counts (day, k, n) select current_date, 'shipped_gone', count(*)::int from gone where status = 'shipped'
+      having count(*) > 0 on conflict (day, k) do update set n = counts.n + excluded.n)
     update stock set n = n - coalesce((select sum(coalesce((cart->>(case stock.id when ${STOCK_ROW.wedgie} then 'wedgie' else 'kit' end))::int, 0)) from gone
       where status = 'shipped' and paid_at >= stock.set_at), 0)::int where id in (${STOCK_ROW.wedgie}, ${STOCK_ROW.kit})`;
   // USDC sent to an order's deposit address after its buyer left the page still pays it

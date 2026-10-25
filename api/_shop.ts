@@ -6,7 +6,7 @@
 // And checkout counts (api/count.ts): a number per day per step, about no one.
 // Never log a request body here: even sealed, it doesn't belong in Vercel's logs.
 // Env: SHOP_DATABASE_URL, STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET (card), SHOP_PAY_TO (USDC),
-// SHOP_ADMIN_TOKEN (omen's orders.py), SHOP_RPC_<chainId> (an Alchemy URL: never a public RPC).
+// SHOP_ADMIN_TOKEN (omen's orders.py), SHOP_STATS_TOKEN (api/stats.ts, counts only), SHOP_RPC_<chainId> (an Alchemy URL: never a public RPC).
 import { neon } from "@neondatabase/serverless";
 import { ITEMS, nameOf, PAY_CHAINS, QUOTE, cartLines, extraAt, type Cart, type Item, type Line } from "../src/shop/catalog.js";
 
