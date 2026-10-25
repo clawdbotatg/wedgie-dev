@@ -78,10 +78,47 @@ export function telegram(main: HTMLElement) {
       const out = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(out.error || `The server said ${res.status}`);
       done = true;
-      say(`<a class="btn btn-green" href="${esc(out.link)}" target="_blank" rel="noopener">Join the group</a>
-        <p class="fine">Works once, for an hour.</p>`);
+      welcome(String(out.link));
     } catch (e: any) {
       say(`<p class="fine"><b>${esc(e?.message || String(e))}</b></p><button class="btn btn-green" id="tg-go">Try again</button>`);
     } finally { busy = false; }
   }
+
+  /** Signed: no steps, just "you're in", the join button and the waistband's colors falling (Austin 10-25). */
+  function welcome(link: string) {
+    main.innerHTML = `
+    <section class="test-page tg-in">
+      <canvas class="tg-confetti" aria-hidden="true"></canvas>
+      <h1>You're in</h1>
+      <a class="btn btn-green btn-lg" href="${esc(link)}" target="_blank" rel="noopener">Join the chat</a>
+      <p class="fine">The link works once, for an hour.</p>
+    </section>`;
+    confetti(main.querySelector<HTMLCanvasElement>(".tg-confetti")!);
+  }
+}
+
+function confetti(c: HTMLCanvasElement) {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const g = c.getContext("2d")!, dpr = devicePixelRatio || 1;
+  const W0 = innerWidth, H0 = innerHeight;
+  c.width = W0 * dpr; c.height = H0 * dpr; g.scale(dpr, dpr);
+  const cols = ["#22c452", "#e3312c", "#a9aaab", "#ffffff"];
+  const bits = Array.from({ length: 160 }, (_, i) => ({ x: Math.random() * W0, y: -20 - Math.random() * H0, w: 6 + Math.random() * 6, h: 10 + Math.random() * 8,
+    vy: 2 + Math.random() * 3, vx: Math.random() * 2 - 1, r: Math.random() * 6, vr: Math.random() * 0.2 - 0.1, col: cols[i % 4] }));
+  const t0 = performance.now();
+  const step = (t: number) => {
+    if (!c.isConnected) return;
+    g.clearRect(0, 0, W0, H0);
+    const fade = Math.min(1, Math.max(0, (6000 - (t - t0)) / 1500));
+    for (const b of bits) {
+      b.y += b.vy; b.x += b.vx + Math.sin((t + b.r * 500) / 400); b.r += b.vr;
+      if (b.y > H0 + 20 && t - t0 < 4000) { b.y = -20; b.x = Math.random() * W0; }
+      g.save(); g.globalAlpha = fade; g.translate(b.x, b.y); g.rotate(b.r);
+      g.fillStyle = b.col; g.fillRect(-b.w / 2, -b.h / 2, b.w, b.h * Math.abs(Math.cos(b.r)));
+      if (b.col === "#ffffff") { g.strokeStyle = "#d8d8d4"; g.strokeRect(-b.w / 2, -b.h / 2, b.w, b.h * Math.abs(Math.cos(b.r))); }
+      g.restore();
+    }
+    if (fade > 0) requestAnimationFrame(step); else c.remove();
+  };
+  requestAnimationFrame(step);
 }

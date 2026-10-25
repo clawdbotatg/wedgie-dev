@@ -1028,3 +1028,9 @@ p.surge, .order-body > p.surge { margin: 4px 0 0; font-size: 22px; color: var(--
 .chat-out { align-self: flex-end; background: var(--green-fill); color: #fff; white-space: pre-wrap; word-break: break-word; }
 .chat-in i, .chat-out i { font-size: 12px; font-style: normal; opacity: .7; }
 
+
+/* /telegram, signed: you're in */
+.tg-in { text-align: center; padding-top: 12vh; }
+.tg-in h1 { font-size: clamp(36px, 10vw, 56px); color: var(--ink); white-space: nowrap; margin: 0 0 28px; }
+.tg-in .btn-lg { min-width: 280px; }
+.tg-confetti { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 50; }
