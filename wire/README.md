@@ -10,11 +10,8 @@ https://github.com/ZKNoxHQ/eth-universal-signer/blob/7730-wire-format-implementa
 ## Status
 
 - **Used by Safe Signer safe-24** (clawdbotatg/wedgie-safe): `safe_wire.py` is a copy of `wire.py` (keep them the
-  same), `safe_7730.py` turns a descriptor into the screen. **Not on the shelf yet** (10-22): the gate's "install
-  over Buttons" check fails with it, on an old firmware race the bigger shelf entry exposes in the simulator:
-  `slot._to_job` (USB timer) runs `power.stop()`, which sets `lcd._on_frame = None` while `lcd._push` is between
-  `if _on_frame:` and the call (TypeError; the install still finishes). Fix in firmware: read `_on_frame` (and
-  `_on_show`) into a local once. Until then, install safe-24 from GitHub by hand (its page) or `wedgie.py install`.
+  same), `safe_7730.py` turns a descriptor into the screen. On the shelf since 10-22 (firmware 0.3.58).
+  Uniswap's Universal Router stays hand-read (`safe_ur.py`) until ERC-8362 lands: 7730 can't describe it yet.
 - **The data** wedgie.dev serves: `release.py` builds `public/clear/<tag>/` from the registry and a token list,
   every structure with a Merkle proof (algorithm 4) to two roots built into the app (`safe_roots.py`). See below.
 - **Tests:** `tools/test_clear.py` runs the app's reader on the registry's own test transactions (1,510 on chains
