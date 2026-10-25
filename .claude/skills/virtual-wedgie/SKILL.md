@@ -52,8 +52,8 @@ dapp for the Safe's balance before pairing again.
 2. Catch the link: `eval` `navigator.clipboard.writeText = (t) => { window.__wc = t; }`, then `click`
    the "Copy link" button. It's in shadow DOM: walk `shadowRoot`s for an element whose text is
    "Copy link". Read `window.__wc`.
-3. /safe: `click {selector: "#a-connect"}`, `type {selector: "#wc-uri", text: <link>}`,
-   `click {selector: "#wc-go"}`. It says "Connected."
+3. Open `https://wedgie.dev/safe/base:<safe>?wc=<link>` (link URL-encoded). It pairs as soon as the
+   Safe is read and says "Connected."
 
 ### Propose, look, sign
 

@@ -435,6 +435,14 @@ export function safe(main: HTMLElement) {
   try { oldSaved = localStorage.getItem("wedgie.safe") || ""; } catch {}
   const old = new URLSearchParams(location.search).get("safe")?.match(/^(\w+):(0x[0-9a-fA-F]{40})$/);
   if (old && KEYS[old[1]]) history.replaceState(null, "", route(KEYS[old[1]], E.checksum(old[2])));
+  // /safe/<chain>:<addr>?wc=<link>: connect that app as soon as the Safe is read (one step, for agents too).
+  // Last in the query; its own ?/& may come encoded or not. Dropped from the URL so a reload doesn't pair again.
+  let wcLink = "";
+  const wcq = location.search.match(/[?&]wc=(.*)$/);
+  if (wcq) {
+    wcLink = /^wc%3A/i.test(wcq[1]) ? decodeURIComponent(wcq[1]) : wcq[1];
+    history.replaceState(null, "", location.pathname + location.search.slice(0, wcq.index).replace(/^&/, "?"));
+  }
 
   /** The message box. A number instead of bad: a progress bar under it, that far along (0-100). */
   // While a bar is up it keeps creeping (1-2% every half second, slower near the end), so a wait never looks
@@ -2086,6 +2094,7 @@ export function safe(main: HTMLElement) {
   function paintAll() {
     paintWedgie(); paintWallet(); paintList(); paintCreate(); paintSafe(); paintAdd(); paintQueue(); paintApps(); paintAssets(); paintActivity();
     paintOwners(); paintAddons(); paintOwner(); paintChains(); paintNew(); paintReceive(); paintWc();
+    if (wcLink && safeAddr && info && !busy) { const u = wcLink; wcLink = ""; setTimeout(() => job(() => pairWith(u), false)); }
   }
 
   W.onChange(paintWedgie);
