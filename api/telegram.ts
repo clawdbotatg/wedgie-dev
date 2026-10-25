@@ -45,19 +45,19 @@ export async function POST(req: Request) {
   let body: any;
   try { body = await req.json(); } catch { return oops("Bad request."); }
   const id = await who(body?.t);
-  if (!id) return oops("This link is old. Message @wedgiechatbot for a new one.", 401);
+  if (!id) return oops("Link expired. Message @wedgiechatbot for a new one.", 401);
   const d = body?.proof;
-  if (d?.kind !== "trustm") return oops(d?.kind === "atecc" ? "This wedgie has an ATECC608. The group needs a Trust M chip." : "No Trust M chip answered.");
+  if (d?.kind !== "trustm") return oops(d?.kind === "atecc" ? "Needs a Trust M chip." : "No Trust M chip found.");
   let ok;
-  try { ok = await checkChip(d, "https://wedgie.dev"); } catch { return oops("Couldn't read the chip's answer."); }
-  if (!ok.pass) return oops(`The chip didn't prove itself: ${ok.detail}`);
+  try { ok = await checkChip(d, "https://wedgie.dev"); } catch { return oops("Bad chip answer."); }
+  if (!ok.pass) return oops(`Chip check failed: ${ok.detail}`);
   const chip = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", trustmCert(d))), (x) => x.toString(16).padStart(2, "0")).join("");
   const sql = await db();
   await sql`insert into tg_members (chip, tg_id) values (${chip}, ${id}) on conflict (chip) do nothing`;
   const [row] = await sql`select tg_id from tg_members where chip = ${chip}`;
-  if (String(row.tg_id) !== id) return oops("This wedgie already let in another Telegram account. One wedgie, one account.", 409);
+  if (String(row.tg_id) !== id) return oops("This wedgie already let in another account.", 409);
   const link = (await tg("createChatInviteLink", { chat_id: env("TELEGRAM_GATE_CHAT"), member_limit: 1,
     expire_date: Math.floor(Date.now() / 1000) + 3600, name: `wedgie ${id}` })).invite_link;
-  await tg("sendMessage", { chat_id: id, text: `Your wedgie checks out. Your invite (one use, one hour): ${link}` }).catch(() => {});
+  await tg("sendMessage", { chat_id: id, text: `You're in: ${link}` }).catch(() => {});
   return json({ link });
 }

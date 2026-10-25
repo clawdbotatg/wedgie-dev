@@ -15,14 +15,12 @@ export function telegram(main: HTMLElement) {
     <h1>wedgie Telegram</h1>
     <p class="test-safe">Plug in your wedgie to get in.</p>
     <div class="card">
-      <p>1. Message <a href="https://t.me/${BOT}" target="_blank" rel="noopener"><b>@${BOT}</b></a> on Telegram. It sends you a link.</p>
-      <p>2. Open the link in Chrome or Edge on a computer.</p>
-      <p>3. Plug in your wedgie and tap Connect.</p>
-      <p>4. You get a one-time invite.</p>
+      <p>1. Message <a href="https://t.me/${BOT}" target="_blank" rel="noopener"><b>@${BOT}</b></a>.</p>
+      <p>2. Open its link in Chrome on a computer.</p>
+      <p>3. Plug in your wedgie. Tap Connect.</p>
     </div>
     <div class="test-actions" id="tg-actions"></div>
-    <p class="fine">Needs a Trust M chip. It signs with the key Infineon put in it at the factory. No yes on the wedgie,
-    no wallet, nothing installed. One wedgie, one account. We keep a hash of the chip's certificate and your Telegram ID, nothing else.</p>
+    <p class="fine">Needs a Trust M chip. One wedgie, one account.</p>
   </section>`;
   const box = main.querySelector<HTMLElement>("#tg-actions")!;
   if (!t) {
@@ -30,7 +28,7 @@ export function telegram(main: HTMLElement) {
     return;
   }
   if (!W.supported()) {
-    box.innerHTML = `<p class="fine">Can't see USB here. Open this link in Chrome or Edge on a computer.</p>`;
+    box.innerHTML = `<p class="fine">Open this in Chrome on a computer.</p>`;
     return;
   }
   const say = (html: string) => { box.innerHTML = html; };
@@ -53,7 +51,7 @@ export function telegram(main: HTMLElement) {
 
   async function prove(w: W.Wedgie) {
     busy = true;
-    say(`<p class="fine">Its chip is signing</p>`);
+    say(`<p class="fine">Signing</p>`);
     try {
       const d = await W.withRepl(w, async (r) => {
         let d = await r.request({ type: "chip" }, 15000);
@@ -68,7 +66,7 @@ export function telegram(main: HTMLElement) {
       if (!res.ok) throw new Error(out.error || `The server said ${res.status}`);
       done = true;
       say(`<a class="btn btn-green" href="${esc(out.link)}" target="_blank" rel="noopener">Join the group</a>
-        <p class="fine">@${BOT} sent you the invite too. It works once, for an hour.</p>`);
+        <p class="fine">Works once, for an hour.</p>`);
     } catch (e: any) {
       say(`<p class="fine"><b>${esc(e?.message || String(e))}</b></p><button class="btn btn-green" id="tg-go">Try again</button>`);
     } finally { busy = false; }

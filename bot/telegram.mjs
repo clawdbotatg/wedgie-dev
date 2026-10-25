@@ -37,7 +37,7 @@ async function member(id) {
 async function onMessage(m) {
   if (m.chat.type === "private") {
     await tg("sendMessage", { chat_id: m.chat.id, disable_web_page_preview: true,
-      text: `Prove you have a wedgie:\n${link(m.from.id)}\n\nOpen it in Chrome or Edge on a computer, plug in your wedgie, tap Connect. The link works for an hour.` });
+      text: `Open in Chrome on a computer, plug in your wedgie, tap Connect:\n${link(m.from.id)}` });
     return;
   }
   if (String(m.chat.id) !== CHAT || !m.new_chat_members) return;
