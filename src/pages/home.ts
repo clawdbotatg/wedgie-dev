@@ -172,7 +172,6 @@ export function home(main: HTMLElement): Promise<unknown> {
   </section>
 
   <section id="teaser" class="sec teaser">
-    <div class="band small" aria-hidden="true"><i></i><i></i><i></i></div>
     <div class="teaser-one" id="video-virtual">
       <div class="sec-head"><span class="kicker">No hardware</span><h2>The virtual wedgie.</h2><p>The real firmware, running in your browser.</p></div>
       <div class="teaser-box">
@@ -239,7 +238,7 @@ export function home(main: HTMLElement): Promise<unknown> {
     item = kit ? "kit" : "wedgie";
     showPrice(); sold();
   }));
-  // The footer's divider moves up, above the video (it's here, in the teaser).
+  // No small divider in the footer here.
   document.querySelector(".foot > .band")?.remove();
   // The videos: a big green play button over each; one tap plays it with sound (autoplay would have to be muted).
   // Starting one pauses any other that's playing.

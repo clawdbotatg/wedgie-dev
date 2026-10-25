@@ -163,8 +163,7 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 22px; }
 .code { font-family: var(--mono); font-size: 17px; padding: 18px 20px; overflow-x: auto; white-space: nowrap; }
 
 .foot { max-width: 1160px; margin: 80px auto 0; padding: 0 22px 60px; text-align: center; color: #474947; display: grid; gap: 10px; justify-items: center; }
-.foot .band, .teaser .band { width: min(420px, 100%); }
-.teaser .band { margin: 0 auto 40px; }
+.foot .band { width: min(420px, 100%); }
 
 /* ---- dialogs (the Mac's Bluetooth explainer) ---- */
 .panel-wrap { position: fixed; inset: 0; z-index: 50; background: rgba(30,30,28,.35); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
