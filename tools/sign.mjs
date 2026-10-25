@@ -5,11 +5,13 @@
 //   node tools/sign.mjs        runs the release gate (tools/gate.mjs), then writes release/firmware.txt +
 //                              release/firmware.sig; run before every push
 //                              that changes firmware/ (fw.mjs marks the manifest unsigned otherwise)
+//   node tools/sign.mjs --gate-only   the gate alone, ahead of time: then signing these same files goes
+//                              straight to Touch ID (Austin, 10-24: never make him wait 13 min for the prompt)
 // The keys (firmware/wedgie.py RELEASE_KEYS) can't be copied: 0 is this Mac's Secure Enclave (Touch ID;
 // ~/.wedgie/sekey + release-se.key, tools/sekey.swift), 1 the YubiKey (PIN + touch, tools/yksign.py).
 // Either signs:  node tools/sign.mjs  (the Mac)   node tools/sign.mjs --yubikey
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { createPublicKey, verify } from "node:crypto";
+import { createPublicKey, verify, createHash } from "node:crypto";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -22,13 +24,24 @@ const keys = [...readFileSync(join(root, "firmware/wedgie.py"), "utf8").matchAll
 if (keys.length !== 2) { console.error("sign: firmware/wedgie.py should list 2 RELEASE_KEYS"); process.exit(1); }
 const pubOf = ([x, y]) => createPublicKey({ key: { kty: "EC", crv: "P-256", x: Buffer.from(x, "hex").toString("base64url"), y: Buffer.from(y, "hex").toString("base64url") }, format: "jwk" });
 
-// The gate (tools/gate.mjs) first, every time: no signature for firmware that hasn't passed it. No flag
-// skips it (Austin, 2026-10-03: no more memory errors reaching a wedgie).
-{
-  console.log("running the release gate (tools/gate.mjs, ~10 min); nothing is signed unless it passes");
+// The gate (tools/gate.mjs) first: no signature for firmware that hasn't passed it (Austin, 2026-10-03: no more
+// memory errors reaching a wedgie). A pass is kept for the exact bytes it passed (every file the list signs, and
+// the gate itself) for a day, in ~/.wedgie/gate-pass: signing those same bytes doesn't run it again. Any change
+// to them, and it runs. No flag skips it.
+const passFile = join(se, "gate-pass");
+const fp = createHash("sha256").update(releaseText(0)).update(readFileSync(join(root, "tools/gate.mjs"))).digest("hex");
+const passed = (() => { try { const [h, t] = readFileSync(passFile, "utf8").trim().split(" "); return h === fp && Date.now() - Number(t) < 86400_000; } catch { return false; } })();
+if (passed) console.log("the gate already passed on exactly these files (sign.mjs --gate-only): straight to signing");
+else {
+  console.log("running the release gate (tools/gate.mjs, ~13 min); nothing is signed unless it passes");
   const g = spawnSync("node", [join(root, "tools/gate.mjs")], { cwd: root, stdio: "inherit" });
   if (g.status !== 0) { console.error("not signed: the gate failed"); process.exit(1); }
+  if (fp !== createHash("sha256").update(releaseText(0)).update(readFileSync(join(root, "tools/gate.mjs"))).digest("hex")) {
+    console.error("not signed: the files changed while the gate ran; run it again"); process.exit(1);
+  }
+  writeFileSync(passFile, `${fp} ${Date.now()}\n`);
 }
+if (process.argv.includes("--gate-only")) { console.log("gate passed; `node tools/sign.mjs` now goes straight to Touch ID"); process.exit(0); }
 const text = releaseText(signedSerial() + 1);     // one more every signing: wedgies refuse a lower one (job.py)
 const k = yk ? 1 : 0;
 const run = yk ? spawnSync("uv", ["run", "-q", "--with", "yubikey-manager", "python3", join(root, "tools/yksign.py")], { input: text, encoding: "utf8", stdio: ["pipe", "pipe", "inherit"] })
