@@ -199,7 +199,7 @@ async function appsFor(m: Manifest, have: Have, only: string | null) {
   if (c && c.files.every((n) => have.hashes[n])) {
     list.push({ mod: c.mod, name: c.name, ...(c.entry ? { entry: c.entry } : {}), ...(c.usb ? { usb: true } : {}), about: c.about, v: await cartV(c.files.map((n) => have.hashes[n])),
       ...(c.repo ? { repo: c.repo, files: c.files } : {}) });
-  } else if (!c && only) {
+  } else if (only) {           // a repo app, or an older cart missing some of today's files: kept as it is
     const own = (have.apps || []).find((a) => a && a.mod === only);
     if (own) list.push(own);
   }
@@ -373,11 +373,12 @@ const twin = (n: string) => (n.endsWith(".mpy") ? n.slice(0, -4) + ".py" : null)
 const withTwins = (names: string[]) => [...new Set([...names, ...names.map(twin).filter((n): n is string => !!n)])];
 /** The app it runs now: the first in apps.json whose files are there (0.1.x kept several). A cart now
  *  shipped compiled still counts with its old .py files (so an update brings them up to date). */
+/** The app it runs, by the wedgie's own rule (wedgie.active): the first in apps.json whose mod.py or .mpy is
+ *  there. Not "all of today's files": an older Safe Signer without safe_icons read as no app, and the update's
+ *  apps [] was refused ("a firmware update keeps the app it runs", Austin 10-25). */
 function activeOf(m: Manifest, have: Have): string | null {
-  for (const a of have.apps || []) {
-    const c = m.carts.find((x) => x.mod === a?.mod);
-    if (c ? c.files.every((n) => have.hashes[n] || have.hashes[twin(n) || ""]) : a?.mod && (have.files.includes(a.mod + ".py") || have.files.includes(a.mod + ".mpy"))) return a.mod;
-  }
+  const on = (n: string) => !!have.hashes[n] || have.files.includes(n);
+  for (const a of have.apps || []) if (a?.mod && (on(a.mod + ".py") || on(a.mod + ".mpy"))) return a.mod;
   return null;
 }
 /** Every app file on it (a cart's, or one apps.json lists for a repo app) that neither the core nor `keep` needs. */
