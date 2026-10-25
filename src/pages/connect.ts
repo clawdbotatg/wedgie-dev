@@ -44,9 +44,11 @@ function list(main: HTMLElement, go: (path: string) => void) {
     <div id="setup"></div>
     <div class="rows" id="rows"></div>
     <div class="row center" id="plug-actions"></div>
-  </section>`;
+  </section>
+  <a class="tg-sticker" id="tg-sticker" href="/telegram" hidden><img src="/img/telegram-sticker.webp" alt="Join the Wedgies Telegram"></a>`;
   const rows = main.querySelector<HTMLElement>("#rows")!;
   const actions = main.querySelector<HTMLElement>("#plug-actions")!;
+  const tg = main.querySelector<HTMLElement>("#tg-sticker")!;   // shows once a real wedgie is plugged in and talking
   const setup = setupCard(main.querySelector<HTMLElement>("#setup")!);
   firmwareManifest().then((m) => { manifest = m; draw(); }).catch(() => {});
 
@@ -56,6 +58,7 @@ function list(main: HTMLElement, go: (path: string) => void) {
   // holds a 3D wedgie that must not be rebuilt).
   function draw() {
     const ws = W.wedgies().filter((w) => !needsSetup(w));
+    tg.hidden = !ws.some((w) => w.state === "ready" && !w.virtual);
     if (!W.supported()) {
       rows.innerHTML = `<div class="empty"><p><b>This browser can't see USB devices.</b><br>Open wedgie.dev in Chrome or Edge on a computer to plug in a wedgie.</p></div>`;
       actions.innerHTML = `<a class="btn btn-green" href="/">Back to wedgie.dev</a>`;

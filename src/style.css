@@ -1031,3 +1031,11 @@ p.surge, .order-body > p.surge { margin: 4px 0 0; font-size: 22px; color: var(--
 .tg-in h1 { font-size: clamp(36px, 10vw, 56px); color: var(--ink); white-space: nowrap; margin: 0 0 28px; }
 .tg-in .btn-lg { min-width: 280px; }
 .tg-confetti { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 50; }
+
+/* /connect: the "join the Wedgies telegram" sticker, bottom left, once a real wedgie is plugged in */
+.tg-sticker { position: fixed; left: 18px; bottom: 18px; z-index: 30; width: min(240px, 46vw); animation: tg-wiggle 2.4s ease-in-out infinite; transform-origin: 30% 80%; }
+.tg-sticker[hidden] { display: none; }
+.tg-sticker img { display: block; width: 100%; filter: drop-shadow(0 8px 14px rgba(0,0,0,.18)); }
+.tg-sticker:hover { animation-play-state: paused; scale: 1.06; }
+@keyframes tg-wiggle { 0%, 100% { rotate: -4deg; } 50% { rotate: 4deg; translate: 0 -4px; } }
+@media (prefers-reduced-motion: reduce) { .tg-sticker { animation: none; } }
