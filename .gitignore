@@ -12,3 +12,5 @@ public/lore.md
 __pycache__
 .env
 screenshots/
+tls/*.mpy
+tls/__pycache__/
