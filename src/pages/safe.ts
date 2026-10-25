@@ -2026,7 +2026,7 @@ export function safe(main: HTMLElement) {
     if (box.hidden) return;
     if (!document.getElementById("wc-uri")) {     // built once per Safe: keep a pasted link across repaints
       box.innerHTML = `<h2>Connect an app</h2>
-        <p class="fine">In the app (Uniswap, Aave, …) pick WalletConnect. Its requests come here, and your wedgie signs them.</p>
+        <p class="fine">In the app (Uniswap, Aave, …) pick WalletConnect and copy its link. Paste it here (or anywhere on this page). Its requests come here, and your wedgie signs them.</p>
         ${canScan() ? `<p><button class="btn btn-grey sx-wide" id="wc-scan">Scan its code</button></p><div class="sx-cam" id="wc-cam" hidden></div>` : ""}
         <p class="sx-label">Or paste its link</p>
         <p class="sx-row wc-pair"><input id="wc-uri" class="sx-mono" placeholder="wc:…" spellcheck="false" autocomplete="off"> <button class="btn btn-sm" id="wc-go">Connect</button></p>
@@ -2096,6 +2096,13 @@ export function safe(main: HTMLElement) {
     paintOwners(); paintAddons(); paintOwner(); paintChains(); paintNew(); paintReceive(); paintWc();
     if (wcLink && safeAddr && info && !busy) { const u = wcLink; wcLink = ""; setTimeout(() => job(() => pairWith(u), false)); }
   }
+  // A wc: link pasted anywhere on a Safe's page (not into a box) connects that app: copy it in the app, Cmd+V here.
+  document.addEventListener("paste", (e) => {
+    const t = (e.clipboardData?.getData("text") || "").trim();
+    if (!/^wc:[0-9a-f]+@2\?/i.test(t) || !safeAddr || !info || e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+    e.preventDefault();
+    job(() => pairWith(t), false);
+  });
 
   W.onChange(paintWedgie);
   W.start();          // serial ports only once armed (start waits for it); virtual wedgies right away
