@@ -136,7 +136,7 @@ wedgie.dev's Alchemy key, read-only. How: code.md, "The internet".
 | https://wedgie.dev/ | home: the parts, put it together, the case, Safe, order, the shelf, a virtual wedgie |
 | /connect | every plugged-in wedgie (real or virtual); set up, update |
 | /connect/&lt;ID&gt; | one wedgie: its app, the shelf, apps from GitHub, saves, hardware/screen/button tests, bug report |
-| /safe, /safe/&lt;chainId&gt;:&lt;address&gt; | the wedgie's Safes: make, send, receive, sign, execute, WalletConnect (safe.md) |
+| /safe, /safe/&lt;chainId&gt;:&lt;address&gt; | the wedgie's Safes: make, send, receive, sign, execute, WalletConnect (`?wc=<link>` connects a dapp in one step; safe.md) |
 | /secret | Secrets: share your wedgie's link, chat |
 | /virtual | the virtual wedgie (virtual.md); /emu redirects here |
 | /code | make apps: prompt for your AI, an emulator that reruns on save (served from emu.wedgie.dev/code) |
