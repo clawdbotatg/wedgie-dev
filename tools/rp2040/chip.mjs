@@ -21,7 +21,7 @@ export function boot({ uf2 = join(root, "public/mp/RPI_PICO.uf2"), flash = null,
   // peripheral fresh and only its flash, the watchdog's scratch registers and its reason kept, so this
   // builds a new chip from those (job.restart's hard reset after an install, 0.3.57; slot._cold).
   const make = (bytes, wd) => {
-    const pins = mcu ? mcu.gpio.map((g) => g.inputValue) : null;
+    const pins = mcu ? mcu.gpio.map((g) => g.rawInputValue) : null;     // the outside world (a button up or down), not what the pin reads: inputValue is false while its input is off, so B and X came back "held" (10-26)
     if (clock) base += clock.nanos / 1e6;
     sim = new Simulator();
     mcu = sim.rp2040; clock = sim.clock;
