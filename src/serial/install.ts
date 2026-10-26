@@ -219,7 +219,7 @@ async function appsFor(m: Manifest, have: Have, only: string | null) {
  *  late unless it's on this version already (then every file is hashed to tell "up to date"). */
 async function checkedHave(r: Repl, m: Manifest, hash?: string[], late: boolean | "update" = false): Promise<(Have & { late?: boolean }) | null> {
   if (!m.signed) return null;
-  const h = await r.hello(700).catch(() => null);
+  const h = await helloOf(r);
   if (!h?.jobs) return null;
   if (h.uid) uidOf.set(r, h.uid);
   if (h.bin) binOf.set(r, h.bin);
@@ -262,6 +262,21 @@ function mineOf(m: Manifest, have: Have) {
 export const APP_LIST = "0.3.66";
 export const UPDATE_FIRST = "Update the firmware first.";
 export const NOT_SIGNED = "this firmware isn't signed yet. Your wedgie stays as it is";
+/** Its hello, waiting out a busy app: an app in the middle of a fetch (ETH Price's TLS: seconds of Trust M
+ *  math) answers late, and a 0.7 s hello read that as old firmware and asked FULL CONTROL (Austin 10-26). */
+async function helloOf(r: Repl) {
+  for (const ms of [700, 4000, 4000]) {
+    const h = await r.hello(ms).catch(() => null);
+    if (h) return h;
+  }
+  return null;
+}
+/** 0.3.12+ installs, updates and uninstalls only through its checked question: never the red FULL CONTROL
+ *  one (Austin 10-25: "I should not see this when I go to update my firmware"; 10-26: an install asked it). */
+async function checkedOnly(r: Repl, m: Manifest) {
+  const h = await helloOf(r);
+  if (h?.version && cmpVersion(h.version, "0.3.12") >= 0) throw new Error(m.signed ? "the wedgie didn't take it. Unplug it, plug it in, try again" : NOT_SIGNED);
+}
 const appList = new WeakMap<Repl, boolean>();
 const uidOf = new WeakMap<Repl, string>();     // its board ID, to find it again if a job's restart drops the port
 const binOf = new WeakMap<Repl, number>();      // 0.3.16+: the most raw bytes one put takes (hello "bin")
@@ -458,12 +473,7 @@ export async function installCore(r: Repl, onProgress: (p: number, what: string)
       return { version: m.version, written: j.sent, outdated: one ? stale : m.carts.filter((c) => apps?.some((a) => a.mod === c.mod && a.v !== c.v)), restarted: true, untouched: false };
     }
   }
-  // 0.3.12+ updates only through its signed question: never the red FULL CONTROL one (Austin 10-25: "I should
-  // not see this when I go to update my firmware"). An unsigned release on the site isn't for it yet.
-  if (opts.launcher !== false) {
-    const h = await r.hello(700).catch(() => null);
-    if (h?.version && cmpVersion(h.version, "0.3.12") >= 0) throw new Error(m.signed ? "the wedgie didn't take the signed update. Unplug it, plug it in, try again" : NOT_SIGNED);
-  }
+  if (opts.launcher !== false) await checkedOnly(r, m);
   onProgress(0, "stopping what it runs");
   if (opts.launcher === false) { await r.enter({ reset: false }); await busy(r, "Installing firmware"); }   // a board already in the raw REPL (/test's bench)
   else await takeOver(r, (s) => { askHint(s); if (s) onProgress(0, s); }, `Update firmware to ${m.version}`);
@@ -505,6 +515,7 @@ export async function useApp(r: Repl, cart: Cart, onProgress: (p: number, what: 
       return { written: j.sent, restarted: true };
     }
   }
+  if (opts.launcher !== false) await checkedOnly(r, m);
   onProgress(0, "opening the slot");
   if (opts.launcher === false) { await r.enter({ reset: false }); await busy(r, `Installing ${cart.name}`); }
   else await takeOver(r, (s) => { askHint(s); if (s) onProgress(0, s); }, `Install ${cart.name}`);
@@ -537,6 +548,7 @@ export async function removeApp(r: Repl, opts: { manifest?: Manifest } = {}) {
     if (v?.sums) Object.assign(ch.hashes, v.sums);
   }
   if (ch && await job(r, m, "Uninstall the app", [], oneThing.get(r) ? mineOf(m, ch) : others(m, ch, null), [], () => {}, !!ch.late)) return { restarted: true };
+  await checkedOnly(r, m);
   await takeOver(r, askHint, "Uninstall the app");
   const have = await look(r, allNames(m));
   const extra = unasked(have);
