@@ -435,9 +435,14 @@ First: if ${site} is not https://wedgie.dev, stop and tell me.
    - Each one matches the repo. .mpy files rebuild from the .py next to them: uv run --with mpy-cross==1.29.0.post2 python3 tools/mpy.py --check
    - ${site}/fw/release.sig signs ${site}/fw/release.txt with one of RELEASE_KEYS (firmware/wedgie.py), and release.txt lists the same hashes. Say if this version is signed yet.
 
-Not covered: apps (like Safe Signer, each in its own repo) and MicroPython itself.
+Not covered: apps and MicroPython itself.
 
-3. Tell me in plain words: safe to update, or not, and why.`;
+3. Tell me in plain words: safe to update, or not, and why.
+
+4. Then ask me: "Want me to check Safe Signer too?" If yes, do the same review on it:
+   - Source: https://github.com/clawdbotatg/wedgie-safe (all safe_*.py and safe.py), at the commit pinned for clawdbotatg/wedgie-safe in community.json in ${gh}.
+   - What goes on the device: the "Safe Signer" @app line in ${site}/fw/apps.txt lists each file's sha256; fetch them from ${site}/fw/<name> and check. release.txt signs apps.txt by its hash (@apps).
+   Other apps work the same way: each is a clawdbotatg/wedgie-<name> repo, pinned in community.json.`;
   }
 
   // ---- software: the one app it runs ------------------------------------------------------------------
