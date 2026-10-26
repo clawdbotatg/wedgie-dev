@@ -112,7 +112,7 @@ export function home(main: HTMLElement): Promise<unknown> {
         <div class="order-price"><i class="sixseven-box"></i><b class="list">$67</b>${STAR} <span>shipped</span></div>
         <p class="surge why-open" hidden></p>
         ${WHY}
-        <p id="order-what">One wedgie: pico, screen, chip, and case.</p>
+        <p id="order-what">One wedgie and a USB cable.</p>
         <div class="seg" role="radiogroup" aria-label="assembled or kit">
           <button class="on" data-for="me" role="radio" aria-checked="true">Assembled</button>
           <button data-for="kit" role="radio" aria-checked="false">Kit</button>
@@ -233,8 +233,8 @@ export function home(main: HTMLElement): Promise<unknown> {
     main.querySelectorAll<HTMLButtonElement>(".seg button").forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-checked", String(x === b)); });
     const kit = b.dataset.for === "kit";
     main.querySelector("#order-what")!.innerHTML = kit
-      ? "All the parts, and how to build it."
-      : "One wedgie: pico, screen, chip, and case.";
+      ? "Parts, a cable, and how to build it."
+      : "One wedgie and a USB cable.";
     item = kit ? "kit" : "wedgie";
     showPrice(); sold();
   }));

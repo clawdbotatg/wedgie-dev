@@ -11,14 +11,14 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md. Or build one your
 
 | Item | List price | What it is |
 |---|---|---|
-| **wedgie** | **$67** shipped (US) | Assembled: Pico, screen hat, Trust M secure chip, printed case. Firmware and the Welcome app already on. Plug it in and go. |
-| **wedgie kit** | **$57** shipped (US) | Every part and the case, with assembly instructions (also in 3D at wedgie.dev/assemble/3d). No soldering. You need a wire stripper, electrical tape, tweezers, a stiff wire or pin, and a USB data cable that fits the Pico (USB-C or micro USB). |
+| **wedgie** | **$67** shipped (US) | Assembled: Pico, screen hat, Trust M secure chip, printed case. Firmware and the Welcome app already on. Comes with a USB cable (USB-C and USB-A). Plug it in and go. |
+| **wedgie kit** | **$57** shipped (US) | Every part and the case, with assembly instructions (also in 3D at wedgie.dev/assemble/3d). Comes with a USB cable (USB-C and USB-A). No soldering. You need a wire stripper, electrical tape, tweezers, and a stiff wire or pin. |
 
 - Order: https://wedgie.dev/order. Up to 3 boxes per order (wedgies and kits together). Stock is shown; "Sold out"
   when it's gone.
 - **Give someone a wedgie:** the same order, with their address as the shipping address.
 - Built by hand by Austin and Gus Griffith. **Ships within a week**, by USPS.
-- No USB cable in the box: use your own **data** cable (charge-only cables don't work).
+- A USB cable (USB-C and USB-A) is in the box. Using your own? It must be a **data** cable (charge-only cables don't work).
 - Want other parts or colors? https://wedgie.dev/build makes a link for any combination (Pico, chips, every
   printed part's color) to build yourself.
 

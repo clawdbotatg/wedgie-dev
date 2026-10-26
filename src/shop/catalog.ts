@@ -2,8 +2,8 @@
 // Prices are US dollars in cents, US shipping included (Ground Advantage is ~$6). Outside the US: a flat ABROAD
 // per order (USPS international is $16-30; wedgie-shipping README). The buyer pays any import tax.
 export const ITEMS = {
-  wedgie: { name: "wedgie", what: "Assembled: pico, screen, chip, and case. Plug it in and go.", cents: 6700 },
-  kit: { name: "wedgie kit", what: "Every part and the case, with assembly instructions. You need a wire stripper, electrical tape, tweezers, a stiff wire or pin, and a USB data cable that fits your Pico (USB-C or micro USB, depending on the model).", cents: 5700 },
+  wedgie: { name: "wedgie", what: "Assembled: pico, screen, chip, and case, plus a USB cable (USB-C and USB-A). Plug it in and go.", cents: 6700 },
+  kit: { name: "wedgie kit", what: "Every part and the case, a USB cable (USB-C and USB-A), and assembly instructions. You need a wire stripper, electrical tape, tweezers, and a stiff wire or pin.", cents: 5700 },
 } as const;
 export type Item = keyof typeof ITEMS;
 export type Cart = Record<Item, number> & { abroad?: boolean };   // abroad: ships outside the US (only that bit, never the country)
