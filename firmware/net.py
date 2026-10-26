@@ -1,6 +1,6 @@
 # net: the internet for an app, through the computer it's plugged into (0.3.61+). A wedgie has no internet:
-# its page on wedgie.dev (/connect/<ID>, open in a tab) or `wedgie.py net` fetches for it, through wedgie.dev
-# (api/net.ts, api/rpc.ts). Only the sites the app lists in its wedgie.json are fetched:
+# its page on wedgie.dev (/connect/<ID>, open in a tab) or `wedgie.py net` carries it. Only the sites the app
+# lists in its wedgie.json are reached:
 #   "net": ["poidh.xyz", "chain"]          ("chain": read-only chain calls and prices, Alchemy's key stays on wedgie.dev)
 #
 #   import net
@@ -8,14 +8,21 @@
 #   net.chain(8453, "eth_getBalance", ["0x...", "latest"])                    -> the call's result
 #   net.price()                                                               -> ETH in dollars (a float)
 #
+# net.get (0.3.67+) is the wedgie's own TLS 1.3 to the site (tls.py, the Trust M does the math): the computer
+# and wedgie.dev's relay carry encrypted bytes, so they can block an answer but never read or change it. The
+# whole answer must fit in MOST bytes; pick runs here. net.chain and net.price are wedgie.dev's answers (its
+# Alchemy key): the computer or wedgie.dev could change those.
 # Each waits for its answer (up to ms) and raises net.Error if none comes: draw your loading screen first.
-# Not waiting: rid = net.ask({...}); then net.answer(rid) each tick (None until it's in).
-# Wire (public/usb.md): {"type": "net", "rid": 7, "url": ..., "pick": ...} or {"type": "net", "rid": 7, "chain":
+# Not waiting (chain calls): rid = net.ask({...}); then net.answer(rid) each tick (None until it's in). A url
+# ask does the whole fetch before it returns.
+# Wire (public/usb.md): a site: {"type": "tcp", "rid": 7, "host": ...}, then {"type": "tcp", "rid": 7, "d": <base64>}
+# both ways, {..., "end": true} or {..., "error": "..."} to close. A chain call: {"type": "net", "rid": 7, "chain":
 # 1, "method": ..., "params": [...]}; the answer {"type": "net", "rid": 7, "data": ...} or {..., "error": "..."}.
 import time
 import wedgie as W
 
 MS = 15000
+MOST = 6000         # the biggest answer a site may send (bytes, the body): it's all in RAM before pick
 
 
 class Error(Exception):
@@ -24,24 +31,43 @@ class Error(Exception):
 
 _rid = 0
 _got = {}           # rid -> its answer line (a dict), till the app takes it
+_tcp = {}           # rid -> what the computer sent on that connection, not read yet: [bytes | None (end) | str (error)]
 
 
 def ask(req):
-    """Send one request; returns its rid. The answer comes back through slot.py (got)."""
+    """Send one request; returns its rid. The answer comes back through slot.py (got). A url: fetched now."""
     global _rid
     _rid += 1
+    if "url" in req:
+        try:
+            _got[_rid] = {"data": get(req["url"], req.get("pick"))}
+        except Error as e:
+            _got[_rid] = {"error": str(e)}
+        return _rid
     req["type"], req["rid"] = "net", _rid
     W.send(req)
     return _rid
 
 
 def got(m):
-    """slot.py: a "net" line from the computer."""
+    """slot.py: a "net" or "tcp" line from the computer."""
     rid = m.get("rid")
-    if isinstance(rid, int) and 0 < rid <= _rid:
-        _got[rid] = m
-        while len(_got) > 4:            # answers nobody took
-            del _got[min(_got)]
+    if not (isinstance(rid, int) and 0 < rid <= _rid):
+        return
+    if m.get("type") == "tcp":
+        q = _tcp.get(rid)
+        if q is not None:
+            if m.get("d"):
+                import binascii
+                q.append(binascii.a2b_base64(m["d"]))
+            elif m.get("error"):
+                q.append(str(m["error"])[:120])
+            elif m.get("end"):
+                q.append(None)
+        return
+    _got[rid] = m
+    while len(_got) > 4:            # answers nobody took
+        del _got[min(_got)]
 
 
 def answer(rid):
@@ -54,24 +80,123 @@ def answer(rid):
     return m.get("data")
 
 
-def wait(rid, ms=MS):
+def _serve():
     import slot
-    serve = slot.state != "entry" or slot._own_usb()    # an entry app's USB has its own timer (slot.step)
+    return slot.serve if slot.state != "entry" or slot._own_usb() else None    # an entry app's USB has its own timer
+
+
+def wait(rid, ms=MS):
+    serve = _serve()
     t = time.ticks_ms()
     while rid not in _got:
         if time.ticks_diff(time.ticks_ms(), t) > ms:
             raise Error("no internet: open its page on wedgie.dev")
         if serve:
-            slot.serve()
+            serve()
         time.sleep_ms(20)
     return answer(rid)
 
 
 def get(url, pick=None, ms=MS):
-    req = {"url": url}
-    if pick is not None:
-        req["pick"] = pick
-    return wait(ask(req), ms)
+    """GET an https site over the wedgie's own TLS; its JSON (or text), with pick applied."""
+    if not url.startswith("https://"):
+        raise Error("https only")
+    host, _, path = url[8:].partition("/")
+    if not host or ":" in host or "@" in host:
+        raise Error("a site name, no port")
+    global _rid
+    _rid += 1
+    rid, serve = _rid, _serve()
+    q, said = _tcp.setdefault(rid, []), []
+    W.send({"type": "tcp", "rid": rid, "host": host})
+
+    def send(b):
+        import binascii
+        W.send({"type": "tcp", "rid": rid, "d": binascii.b2a_base64(b, newline=False).decode()})
+
+    def recv():
+        t = time.ticks_ms()
+        while not q:
+            if time.ticks_diff(time.ticks_ms(), t) > ms:
+                raise Error("no internet: open its page on wedgie.dev")
+            if serve:
+                serve()
+            time.sleep_ms(10)
+        x = q.pop(0)
+        if isinstance(x, str):          # the computer's reason it closed ("not in its net", "can't reach")
+            said.append(x)
+            return b""
+        return x or b""
+    import sys
+    import gc
+    try:
+        import tls
+        try:
+            body = tls.Conn(host, send, recv).get("/" + path, most=MOST)
+        except tls.Error as e:
+            raise Error(said[0] if said else str(e))
+        except OSError as e:            # no Trust M to do the math
+            raise Error("needs the Trust M chip (%s)" % e)
+    finally:
+        del _tcp[rid]
+        W.send({"type": "tcp", "rid": rid, "end": True})
+        sys.modules.pop("tls", None)    # ~11 KB of code: back as soon as it's done
+        gc.collect()
+    try:
+        import json
+        v = json.loads(body)
+    except ValueError:
+        v = body.decode() if pick is None or isinstance(pick, str) else None
+        if v is None:
+            raise Error("not JSON")
+    del body
+    return v if pick is None else pick_of(v, pick)
+
+
+def pick_of(v, pick):
+    """pick: one path ("0:5.{title,amount}") or {name: path}. A path is steps split by ".": a field, 3 an item (-1
+    the last), 2:5 items 2-4 (each takes the rest of the path; on text, its characters), * every item, {a,b} just
+    those fields. A step that doesn't fit gives None. (wedgie.dev's api/net.ts pickOf, the same.)"""
+    if isinstance(pick, str):
+        return _walk(v, pick.split(".") if pick else [])
+    if isinstance(pick, dict):
+        return {k: pick_of(v, p) if isinstance(p, str) else None for k, p in list(pick.items())[:30]}
+    return v
+
+
+def _slice(s):
+    a, _, b = s.partition(":")
+    try:
+        return slice(int(a) if a else None, int(b) if b else None)
+    except ValueError:
+        return None
+
+
+def _walk(v, steps):
+    if not steps or v is None:
+        return v
+    s, rest = steps[0], steps[1:]
+    if s.startswith("{") and s.endswith("}"):
+        if not isinstance(v, dict):
+            return None
+        return {k: _walk(v.get(k), rest) for k in (x.strip() for x in s[1:-1].split(",")) if k}
+    if isinstance(v, str):
+        sl = _slice(s) if ":" in s else None
+        return _walk(v[sl], rest) if sl else None
+    if isinstance(v, list):
+        if s == "*":
+            return [_walk(x, rest) for x in v]
+        if ":" in s:
+            sl = _slice(s)
+            return [_walk(x, rest) for x in v[sl]] if sl else None
+        try:
+            i = int(s)
+        except ValueError:
+            return None
+        return _walk(v[i], rest) if -len(v) <= i < len(v) else None
+    if isinstance(v, dict) and s in v:
+        return _walk(v[s], rest)
+    return None
 
 
 def chain(chain_id, method, params=(), ms=MS):

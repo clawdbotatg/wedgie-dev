@@ -1,7 +1,7 @@
 # ECC roots (P-256, P-384) Mozilla trusts for websites (certifi's bundle) -> roots.bin for tls.py: per root
 # sha256(subject DER)[:12], the curve (3 P-256, 4 P-384) and its key (04 X Y). Not the Mac's store: it has roots
 # trusted only for email or code signing.
-#   uv run --with certifi --with cryptography python3 mkroots.py roots.bin
+#   uv run --with certifi --with cryptography python3 mkroots.py ../firmware/roots.bin
 import sys, hashlib, warnings
 from cryptography import x509
 from cryptography.hazmat.primitives.asymmetric import ec

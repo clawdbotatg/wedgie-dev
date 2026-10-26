@@ -5,7 +5,7 @@ description: Talk to a plugged-in wedgie over USB - find its port, hello, wedgie
 
 # Talk to a wedgie over USB
 
-Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.66**; if `hello`
+Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.67**; if `hello`
 says older, run `wedgie.py update` first.
 
 ## Talk to it directly
@@ -68,7 +68,7 @@ One file: `curl -O https://wedgie.dev/wedgie.py`, then `python3 wedgie.py <comma
     python3 wedgie.py saves [backup f.json | restore f.json]                                           A
     python3 wedgie.py debug                a report: firmware, files, free space and RAM, error.log     A
     python3 wedgie.py unlock               full control until it restarts (mpremote, the REPL, the chip) A, red screen
-    python3 wedgie.py net [folder]         stay plugged in and be its app's internet (below); Ctrl-C stops
+    python3 wedgie.py net [folder]         stay plugged in and be its app's internet (below; sites straight from here); Ctrl-C stops
 
 `--port /dev/cu.usbmodemXXXX` or `--id A1B2C3` picks one when several are plugged in. The person can
 also do all of it by clicking at https://wedgie.dev/connect (Chrome or Edge).
@@ -130,7 +130,7 @@ from answering. Hold **Y**: no WEDGIE drive this time (debugging only).
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.66","fw":"wedgie-0.3.66","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.67","fw":"wedgie-0.3.67","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":3,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -153,17 +153,29 @@ from answering. Hold **Y**: no WEDGIE drive this time (debugging only).
     {"id":13,"type":"remount"}           -> {"type":"remount"}, then USB off for 2 s and back, still writable
                                             (phone mode only, 0.3.45+: a host whose view of the drive is stale)
 
-**From the wedgie: its app's internet** (0.3.61+, the app's `import net`; wedgie.dev/code.md). The app sends,
-and the host holding its port answers (its page on wedgie.dev, or `wedgie.py net`):
+**From the wedgie: its app's internet** (0.3.61+, the app's `import net`; wedgie.dev/code.md). The host holding
+its port (its page on wedgie.dev, or `wedgie.py net`) carries it, only for what the running app's wedgie.json
+lists in `"net"` (its sites, `"chain"` for chain reads).
 
-    {"type":"net","rid":1,"url":"https://api.coinbase.com/v2/prices/ETH-USD/spot","pick":"data.amount"}
+A site (0.3.67+): the wedgie runs TLS 1.3 with the site itself, the host only carries the encrypted bytes:
+
+    {"type":"tcp","rid":1,"host":"api.coinbase.com"}            open the site's port 443
+    {"type":"tcp","rid":1,"d":"<base64>"}                       bytes, both ways (to the wedgie: 3000 a line at most)
+    {"type":"tcp","rid":1,"end":true}                           closed (either way)
+    {"type":"tcp","rid":1,"error":"api.x.com isn't in the app's \"net\""}   to the wedgie: won't, or can't
+
+A browser can't open TCP, so the page uses wedgie.dev's relay: a WebSocket to
+`wss://relay.wedgie.dev/?host=<site>` (binary frames; pages on wedgie.dev only, port 443 only).
+
+A chain read, and a site on 0.3.61-0.3.66 (plain answers from wedgie.dev, which the host could change):
+
     {"type":"net","rid":2,"chain":8453,"method":"eth_blockNumber","params":[]}
-    -> {"type":"net","rid":1,"data":"3412.10"}   or   {"type":"net","rid":1,"error":"..."}
+    {"type":"net","rid":3,"url":"https://api.coinbase.com/v2/prices/ETH-USD/spot","pick":"data.amount"}
+    -> {"type":"net","rid":2,"data":"0x1a2b3c"}   or   {"type":"net","rid":2,"error":"..."}
 
-A host fetches only what the running app's wedgie.json lists in `"net"` (its sites, `"chain"` for chain
-reads) and goes through wedgie.dev: `POST https://wedgie.dev/api/net {"url","pick","max"}` -> `{data}` for a
-site, `POST https://wedgie.dev/api/rpc?chain=<id>` (JSON-RPC, read methods only, `wedgie_prices` for the ETH
-price, `wedgie_symbols` for any coins by symbol) for a chain. Answers are plain ASCII JSON, under 5 KB.
+The host asks wedgie.dev: `POST https://wedgie.dev/api/rpc?chain=<id>` (JSON-RPC, read methods only,
+`wedgie_prices` for the ETH price, `wedgie_symbols` for any coins by symbol), `POST https://wedgie.dev/api/net
+{"url","pick","max"}` -> `{data}` for an old wedgie's site. Answers are plain ASCII JSON, under 5 KB.
 
 hello's fields: `version` the firmware, `running` the app on screen (null: none), `chip` the secure
 chip found, `sealed` locked, `open` let in right now, `ram` bytes of free RAM, `free` bytes of free

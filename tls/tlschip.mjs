@@ -27,7 +27,7 @@ const py = (b) => "b'" + [...b].map((c) => "\\x" + c.toString(16).padStart(2, "0
 async function put(name, data) { let code = `f=open('${name}','wb')\n`; for (let o = 0; o < data.length; o += 256) code += `f.write(${py(data.subarray(o, o + 256))})\n`; await exec(code + "f.close()\n"); }
 
 if (!await until(() => chip.connected && buf.includes(">>> "), 30000)) { write("\r\n"); await until(() => buf.includes(">>> "), 5000); }
-for (const f of ["tls.mpy", "roots.bin"]) await put(f, readFileSync(new URL("./" + f, import.meta.url)));
+for (const f of ["tls.mpy", "roots.bin"]) await put(f, readFileSync(new URL("../firmware/" + f, import.meta.url)));
 for (const f of ["trustm.mpy"]) await put(f, readFileSync(new URL("../firmware/" + f, import.meta.url)));
 console.log("files on, chip ms", Math.round(chip.ms));
 

@@ -8,6 +8,8 @@
 //     (tools/chipprobe.mjs: onto Buttons, off Buttons, each with an update from an older core)
 //   - checked installs against a hostile host (tools/test_job.py), the memory and style rules
 //   - the guides match the firmware, and the WEDGIE drive's SKILL.md matches them (tools/test_docs.py)
+//   - net.get's own TLS against a computer that attacks it: bad chains, flipped/cut/dropped bytes (tls/test_tls.py;
+//     the live sites on a virtual RP2040 are tools/netchip.mjs, not here: a site's outage isn't a bad release)
 //   - Safe Signer's key is made once and locked for good, never replaced (tools/test_safekey.py, a fake Trust M and ATECC608)
 //     and its signing runs in the shelf copy's memory (tools/safechip.mjs)
 // Not covered: the virtual chip has no computer reading the WEDGIE drive at boot (macOS does: that's
@@ -37,6 +39,7 @@ const jobs = [
   ["test_memory", ["python3", "tools/test_memory.py"]],
   ["test_style", ["python3", "tools/test_style.py"]],
   ["test_docs", ["python3", "tools/test_docs.py"]],
+  ["test_tls", ["uv", "run", "-q", "--with", "cryptography", "python3", "tls/test_tls.py"]],
   ["test_safekey", ["uv", "run", "-q", "--with", "cryptography", "python3", "tools/test_safekey.py"]],
   ["safechip", ["node", "tools/safechip.mjs"]],
   ["mpy --check", [...UV, "tools/mpy.py", "--check"]],

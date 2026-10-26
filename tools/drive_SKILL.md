@@ -15,14 +15,14 @@ or an ATECC608) **wedged** between the boards on I2C. It runs MicroPython plus t
 into one app, and asks on its own screen before anything that matters. Games, tools, and a hardware signer for a
 Safe multisig. Everything is MIT. Home: https://wedgie.dev
 
-**The current firmware is 0.3.66.** If a wedgie's `hello` says older, update it first: everything here assumes
+**The current firmware is 0.3.67.** If a wedgie's `hello` says older, update it first: everything here assumes
 current firmware.
 
 ```yaml
 name: wedgie
 site: https://wedgie.dev
 skill_index: https://wedgie.dev/skill.md          # this file
-firmware: 0.3.66
+firmware: 0.3.67
 license: MIT (hardware design, case, firmware, site, art)
 source: https://github.com/clawdbotatg/wedgie-dev
 made_by: Austin Griffith and Gus Griffith, with @ClawdBotATG; sold by BuidlGuidl DAO LLC
@@ -130,8 +130,9 @@ https://github.com/clawdbotatg/wedgie-starter. Get it on the shelf: email the re
 
 **The internet** (firmware 0.3.61+): a wedgie has none, but an app can use its computer's. It lists the sites in
 wedgie.json (`"net"`) and calls `net.get(url)`, `net.chain(...)` or `net.price()`; the wedgie's page on wedgie.dev
-(open in a tab) or `python3 wedgie.py net` fetches them through wedgie.dev. Only the listed sites; chain reads use
-wedgie.dev's Alchemy key, read-only. How: code.md, "The internet".
+(open in a tab) or `python3 wedgie.py net` carries them. `net.get` (0.3.67+) is the wedgie's own TLS with the site:
+the computer and wedgie.dev can block it, never change it (ECDSA sites only, answers up to 6 KB, 5-8 s). Chain
+reads are wedgie.dev's (its Alchemy key, read-only), so those could be changed. How: code.md, "The internet".
 
 ## wedgie.dev, every page
 
@@ -221,7 +222,7 @@ https://instantwallet.io. Details: safe.md.
 
 # Talk to a wedgie over USB
 
-Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.66**; if `hello`
+Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.67**; if `hello`
 says older, run `wedgie.py update` first.
 
 ## Talk to it directly
@@ -284,7 +285,7 @@ One file: `curl -O https://wedgie.dev/wedgie.py`, then `python3 wedgie.py <comma
     python3 wedgie.py saves [backup f.json | restore f.json]                                           A
     python3 wedgie.py debug                a report: firmware, files, free space and RAM, error.log     A
     python3 wedgie.py unlock               full control until it restarts (mpremote, the REPL, the chip) A, red screen
-    python3 wedgie.py net [folder]         stay plugged in and be its app's internet (below); Ctrl-C stops
+    python3 wedgie.py net [folder]         stay plugged in and be its app's internet (below; sites straight from here); Ctrl-C stops
 
 `--port /dev/cu.usbmodemXXXX` or `--id A1B2C3` picks one when several are plugged in. The person can
 also do all of it by clicking at https://wedgie.dev/connect (Chrome or Edge).
@@ -346,7 +347,7 @@ from answering. Hold **Y**: no WEDGIE drive this time (debugging only).
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.66","fw":"wedgie-0.3.66","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.67","fw":"wedgie-0.3.67","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":3,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -369,17 +370,29 @@ from answering. Hold **Y**: no WEDGIE drive this time (debugging only).
     {"id":13,"type":"remount"}           -> {"type":"remount"}, then USB off for 2 s and back, still writable
                                             (phone mode only, 0.3.45+: a host whose view of the drive is stale)
 
-**From the wedgie: its app's internet** (0.3.61+, the app's `import net`; wedgie.dev/code.md). The app sends,
-and the host holding its port answers (its page on wedgie.dev, or `wedgie.py net`):
+**From the wedgie: its app's internet** (0.3.61+, the app's `import net`; wedgie.dev/code.md). The host holding
+its port (its page on wedgie.dev, or `wedgie.py net`) carries it, only for what the running app's wedgie.json
+lists in `"net"` (its sites, `"chain"` for chain reads).
 
-    {"type":"net","rid":1,"url":"https://api.coinbase.com/v2/prices/ETH-USD/spot","pick":"data.amount"}
+A site (0.3.67+): the wedgie runs TLS 1.3 with the site itself, the host only carries the encrypted bytes:
+
+    {"type":"tcp","rid":1,"host":"api.coinbase.com"}            open the site's port 443
+    {"type":"tcp","rid":1,"d":"<base64>"}                       bytes, both ways (to the wedgie: 3000 a line at most)
+    {"type":"tcp","rid":1,"end":true}                           closed (either way)
+    {"type":"tcp","rid":1,"error":"api.x.com isn't in the app's \"net\""}   to the wedgie: won't, or can't
+
+A browser can't open TCP, so the page uses wedgie.dev's relay: a WebSocket to
+`wss://relay.wedgie.dev/?host=<site>` (binary frames; pages on wedgie.dev only, port 443 only).
+
+A chain read, and a site on 0.3.61-0.3.66 (plain answers from wedgie.dev, which the host could change):
+
     {"type":"net","rid":2,"chain":8453,"method":"eth_blockNumber","params":[]}
-    -> {"type":"net","rid":1,"data":"3412.10"}   or   {"type":"net","rid":1,"error":"..."}
+    {"type":"net","rid":3,"url":"https://api.coinbase.com/v2/prices/ETH-USD/spot","pick":"data.amount"}
+    -> {"type":"net","rid":2,"data":"0x1a2b3c"}   or   {"type":"net","rid":2,"error":"..."}
 
-A host fetches only what the running app's wedgie.json lists in `"net"` (its sites, `"chain"` for chain
-reads) and goes through wedgie.dev: `POST https://wedgie.dev/api/net {"url","pick","max"}` -> `{data}` for a
-site, `POST https://wedgie.dev/api/rpc?chain=<id>` (JSON-RPC, read methods only, `wedgie_prices` for the ETH
-price, `wedgie_symbols` for any coins by symbol) for a chain. Answers are plain ASCII JSON, under 5 KB.
+The host asks wedgie.dev: `POST https://wedgie.dev/api/rpc?chain=<id>` (JSON-RPC, read methods only,
+`wedgie_prices` for the ETH price, `wedgie_symbols` for any coins by symbol), `POST https://wedgie.dev/api/net
+{"url","pick","max"}` -> `{data}` for an old wedgie's site. Answers are plain ASCII JSON, under 5 KB.
 
 hello's fields: `version` the firmware, `running` the app on screen (null: none), `chip` the secure
 chip found, `sealed` locked, `open` let in right now, `ram` bytes of free RAM, `free` bytes of free
@@ -867,7 +880,11 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md
   presses.
 - **The internet (0.3.61+):** an app can fetch from the sites its wedgie.json lists (`"net"`), through its open
   wedgie.dev page or `wedgie.py net`. The page and wedgie.py refuse any other site, so a reviewed app can only
-  talk to what the review saw. Chain reads are read-only; wedgie.dev's Alchemy key never leaves wedgie.dev.
+  talk to what the review saw. A site (`net.get`, 0.3.67+) is the wedgie's own TLS 1.3: it checks the site's
+  certificate against Mozilla's roots, and the computer and wedgie.dev's relay carry only encrypted bytes (they
+  can block, not read or change). Not checked: certificate dates (no clock) and revocation. Chain reads
+  (`net.chain`, `net.price`) are wedgie.dev's answers: the computer or wedgie.dev could change them.
+  wedgie.dev's Alchemy key never leaves wedgie.dev.
 - **Not an audited hardware wallet.** Don't keep more on it than you can afford to lose.
 - No secp256k1 in either chip: a wedgie owns smart accounts (Safe) through P-256, never a plain Ethereum key.
 
@@ -980,14 +997,14 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md. Or build one your
 
 | Item | List price | What it is |
 |---|---|---|
-| **wedgie** | **$67** shipped (US) | Assembled: Pico, screen hat, Trust M secure chip, printed case. Firmware and the Welcome app already on. Plug it in and go. |
-| **wedgie kit** | **$57** shipped (US) | Every part and the case, with assembly instructions (also in 3D at wedgie.dev/assemble/3d). No soldering. You need a wire stripper, electrical tape, tweezers, a stiff wire or pin, and a USB data cable that fits the Pico (USB-C or micro USB). |
+| **wedgie** | **$67** shipped (US) | Assembled: Pico, screen hat, Trust M secure chip, printed case. Firmware and the Welcome app already on. Comes with a USB cable (USB-C and USB-A). Plug it in and go. |
+| **wedgie kit** | **$57** shipped (US) | Every part and the case, with assembly instructions (also in 3D at wedgie.dev/assemble/3d). Comes with a USB cable (USB-C and USB-A). No soldering. You need a wire stripper, electrical tape, tweezers, and a stiff wire or pin. |
 
 - Order: https://wedgie.dev/order. Up to 3 boxes per order (wedgies and kits together). Stock is shown; "Sold out"
   when it's gone.
 - **Give someone a wedgie:** the same order, with their address as the shipping address.
 - Built by hand by Austin and Gus Griffith. **Ships within a week**, by USPS.
-- No USB cable in the box: use your own **data** cable (charge-only cables don't work).
+- A USB cable (USB-C and USB-A) is in the box. Using your own? It must be a **data** cable (charge-only cables don't work).
 - Want other parts or colors? https://wedgie.dev/build makes a link for any combination (Pico, chips, every
   printed part's color) to build yourself.
 
@@ -1061,7 +1078,7 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md. Or build one your
 
 You are writing a game or app for a **wedgie**: a Raspberry Pi Pico (RP2040 or RP2350) under a
 240x240 color screen, with a 5-way joystick on the left and four buttons A B X Y down the right. It
-runs MicroPython plus the wedgie firmware (current: 0.3.65), which boots straight into one app. You
+runs MicroPython plus the wedgie firmware (current: 0.3.67), which boots straight into one app. You
 write that app.
 
 What you hand back is a **folder** (later a GitHub repo) with a `wedgie.json` at its top and the app's
@@ -1157,7 +1174,7 @@ https://wedgie.dev/virtual.md
 - `fw`: the oldest firmware it runs on. Using the whole `ui` kit below (`ui.say`, `{g}` squares,
   `lcd.tint`): `"0.3.36"`. Older floors: `"0.2.3"` `show(y0, y1)`/`show_rect`, `"0.2.4"` `wedgie.rand`,
   `"0.2.5"` `Keys(physical=True)`, `"0.3.5"` `ui`, `"0.3.17"` `optiga`, `"0.3.23"` `lcd.art`,
-  `"0.3.28"` `ui.right`, `"0.3.61"` `net`.
+  `"0.3.28"` `ui.right`, `"0.3.61"` `net`, `"0.3.67"` `net.get` over its own TLS.
 - `name` up to 14 characters (it's printed on the cartridge), Title Case. `about` one line, up to 140
   characters. `label` the cartridge color (`#rrggbb`). `icon` 12 rows of 12 characters: `.` clear,
   `k` black, `w` white, `g` green, `r` red, `y` yellow, `b` blue, `s` grey.
@@ -1442,30 +1459,39 @@ A wedgie has no network, but the computer it's plugged into does. List the sites
 
 ```python
 import net
+amt = net.get("https://api.coinbase.com/v2/prices/ETH-USD/spot", pick="data.amount")   # "3412.10"
+rows = net.get("https://example.com/list.json", pick="0:5.{title,amount}")             # [{title, amount}] x 5
 p = net.price()                                      # ETH in dollars (a float)
 ps = net.chain(1, "wedgie_symbols", ["BTC", "SOL"])  # {"BTC": 80449.85, "SOL": 101.46}: any coin by symbol (25 max)
 t = net.chain(8453, "wedgie_prices", ["0x4ed4...efed"])["tokens"]   # tokens on that chain by address: {address: usd}
 n = int(net.chain(8453, "eth_blockNumber"), 16)      # a chain read: eth_call, eth_getBalance, eth_blockNumber, ...
-amt = net.get("https://api.coinbase.com/v2/prices/ETH-USD/spot", pick="data.amount")   # "3412.10"
-rows = net.get("https://example.com/list.json", pick="0:5.{title,amount}")             # [{title, amount}] x 5
 ```
 
-- Who fetches: **the wedgie's page on wedgie.dev, open in a tab** (wedgie.dev/connect, pick it; Chrome or
-  Edge), or `python3 wedgie.py net` in a terminal. Nothing open: `net.Error("no internet: ...")` after 15 s.
-  Say so on your screen and in your README.
+- **`net.get` can't be changed on the way (firmware 0.3.67+).** The wedgie runs TLS 1.3 with the site itself
+  (its Trust M does the math) and checks the site's certificate. The computer and wedgie.dev only carry
+  encrypted bytes: they can block an answer, never read or change it. Every error is a `net.Error`.
+- **`net.chain` and `net.price` can.** They are wedgie.dev's answers (its Alchemy key), so the computer or
+  wedgie.dev could change them. Don't let money move on them alone.
+- Who carries it: **the wedgie's page on wedgie.dev, open in a tab** (wedgie.dev/connect, pick it; Chrome or
+  Edge; it sends the bytes through wedgie.dev's relay), or `python3 wedgie.py net` in a terminal (straight to
+  the site). Nothing open: `net.Error("no internet: ...")` after 15 s. Say so on your screen and in your README.
+- Sites: https only, GET only, only what `"net"` lists (a name covers its subdomains). The site needs an ECDSA
+  certificate (P-256 or P-384) from a CA Mozilla trusts: Coinbase, CoinGecko, GitHub, Kraken, Cloudflare and
+  DefiLlama work; sites with RSA certificates (Binance, Alchemy, Firebase, mempool.space) give
+  `net.Error("not an ECDSA chain")`. Try yours on wedgie.dev/virtual first.
+- **The whole answer must fit in 6 KB** (it's all in RAM before `pick` runs). Ask the site for less (query
+  parameters), then `pick` what you need. A path is steps split by `.`: a field name, `3` an item (`-1` the
+  last), `2:5` items 2-4, `*` every item, `{a,b}` just those fields; each list step applies the rest of the
+  path to every item. On text, `0:500` is its first 500 characters (`"items.3.description.0:500"`). Or a dict
+  of paths: `pick={"price": "data.amount", "base": "data.base"}`. A page that isn't JSON comes back as text.
+- A site takes **5-8 s** (the wedgie checks the site's certificate each time): draw your loading screen first
+  (`ui.progress("Getting the price", "coinbase.com", bar=False)`). It uses ~30 KB of RAM while it runs and
+  gives it all back after.
 - `net.chain(chain, method, params)` is any read-only JSON-RPC call on that chain; wedgie.dev makes it. No URL.
-- Only what `"net"` lists, through wedgie.dev. `"chain"` uses wedgie.dev's Alchemy key (it never reaches the
-  app or the page); read methods only, no sending transactions. Chains: 1 Ethereum, 8453 Base, 10 Optimism,
-  42161 Arbitrum, 137 Polygon, and more. Sites: https only, GET only, rate-limited.
-- **The answer must fit in 5 KB** (RAM). Use `pick` to take only what you need from a JSON answer. A path
-  is steps split by `.`: a field name, `3` an item (`-1` the last), `2:5` items 2-4, `*` every item,
-  `{a,b}` just those fields; each list step applies the rest of the path to every item. On text, `0:500`
-  is its first 500 characters (`"items.3.description.0:500"`). Or a dict of
-  paths: `pick={"price": "data.amount", "base": "data.base"}`. A text page comes back as a string.
-- Each call waits for its answer (usually under a second): draw your loading screen first
-  (`ui.progress("Getting the price", "wedgie.dev", bar=False)`). Not waiting: `rid = net.ask({"url": ...})`,
-  then `net.answer(rid)` each frame (None till it's in).
-- Errors raise `net.Error` with a short reason: catch it and show it.
+  `"chain"` uses wedgie.dev's Alchemy key (it never reaches the app or the page); read methods only. Chains: 1
+  Ethereum, 8453 Base, 10 Optimism, 42161 Arbitrum, 137 Polygon, and more. Each waits for its answer (usually
+  under a second). Not waiting: `rid = net.ask({"chain": 1, "method": "eth_blockNumber"})`, then
+  `net.answer(rid)` each frame (None till it's in). A url ask does the whole fetch before it returns.
 - Full examples: https://github.com/clawdbotatg/wedgie-ethprice, https://github.com/clawdbotatg/wedgie-ticker
 
 ## The rest of the hardware

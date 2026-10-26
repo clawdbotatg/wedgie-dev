@@ -21,7 +21,8 @@
   python3 wedgie.py unlock                    full control (mpremote, Ctrl-C, its chip) until it restarts; asks on its screen, in red
   python3 wedgie.py debug                     a report (firmware, files, free space and RAM, error.log); asks on its screen
   python3 wedgie.py net [folder]              stay plugged in and be its app's internet (the sites its wedgie.json
-                                              "net" lists, through wedgie.dev; folder: an app you put on from there)
+                                              "net" lists: the wedgie's own TLS, straight to the site; chain
+                                              calls through wedgie.dev; folder: an app you put on from there)
 
   --port /dev/cu.usbmodemXXXX  (or --id A1B2C3) picks one when several are plugged in.
 
@@ -709,7 +710,66 @@ def net_answer(v, net):
     return {"error": "a url, or a chain and method"}
 
 
+_tcp = {}                       # rid -> the socket to a site, for the wedgie's own TLS (firmware 0.3.67+)
+_wlock = None
+
+
+def net_put(wg, obj):
+    """One line to the wedgie; the socket threads and the main loop take turns."""
+    with _wlock:
+        wg.s.write((json.dumps(obj) + "\n").encode())
+
+
+def net_tcp(wg, v, net):
+    """A "tcp" line from the app: open a site (its port 443), its encrypted bytes, or the end. This only carries
+    bytes: the wedgie runs TLS with the site itself (firmware tls.py), so nothing here can read or change them."""
+    import socket, threading, ipaddress
+    rid = v["rid"]
+    if isinstance(v.get("host"), str):
+        old = _tcp.pop(rid, None)
+        if old:
+            old.close()
+        host = v["host"].lower()
+        if not net_allows(net, "https://%s/" % host):
+            return net_put(wg, {"type": "tcp", "rid": rid, "error": "%s isn't in the app's \"net\" (wedgie.json)" % host[:40]})
+        try:
+            ips = [a[4][0] for a in socket.getaddrinfo(host, 443, proto=socket.IPPROTO_TCP)]
+            ip = next(a for a in ips if ipaddress.ip_address(a).is_global)
+            s = socket.create_connection((ip, 443), timeout=10)
+        except (OSError, StopIteration):
+            return net_put(wg, {"type": "tcp", "rid": rid, "error": "can't reach " + host[:40]})
+        s.settimeout(60)
+        _tcp[rid] = s
+        print("  %s: the wedgie's own TLS" % host)
+
+        def pump():
+            try:
+                while True:
+                    b = s.recv(3000)
+                    if not b:
+                        break
+                    net_put(wg, {"type": "tcp", "rid": rid, "d": base64.b64encode(b).decode()})
+            except OSError:
+                pass
+            if _tcp.get(rid) is s:
+                del _tcp[rid]
+                net_put(wg, {"type": "tcp", "rid": rid, "end": True})
+        threading.Thread(target=pump, daemon=True).start()
+    elif v.get("end"):
+        s = _tcp.pop(rid, None)
+        if s:
+            s.close()
+    elif isinstance(v.get("d"), str) and rid in _tcp:
+        try:
+            _tcp[rid].sendall(base64.b64decode(v["d"]))
+        except OSError:
+            pass
+
+
 def cmd_net(wg, args):
+    global _wlock
+    import threading
+    _wlock = threading.Lock()
     h = need_firmware(wg)
     mod, net = h.get("running"), None
     if args.rest:
@@ -724,20 +784,24 @@ def cmd_net(wg, args):
     while True:
         try:
             for line in wg._lines(lambda l: False, 10 ** 9):
-                if not line.startswith("{") or '"net"' not in line:
+                if not line.startswith("{") or ('"net"' not in line and '"tcp"' not in line):
                     continue
                 try:
                     v = json.loads(line)
                 except ValueError:
                     continue
-                if not isinstance(v, dict) or v.get("type") != "net" or not isinstance(v.get("rid"), int):
+                if not isinstance(v, dict) or v.get("type") not in ("net", "tcp") or not isinstance(v.get("rid"), int):
+                    continue
+                if v["type"] == "tcp":
+                    net_tcp(wg, v, net)
                     continue
                 a = net_answer(v, net)
                 print(("  %s: %s" % (v.get("url") or "chain %s %s" % (v.get("chain"), v.get("method")), a["error"] if "error" in a else "ok"))[:160])
                 out = json.dumps(dict(a, type="net", rid=v["rid"]))
                 if len(out) > 5000:
                     out = json.dumps({"type": "net", "rid": v["rid"], "error": "the answer is too big for a wedgie: pick fewer parts"})
-                wg.s.write((out + "\n").encode())
+                with _wlock:
+                    wg.s.write((out + "\n").encode())
         except (serial.SerialException, OSError):
             print("its port dropped; waiting for it")
             if not wg.reopen(60):

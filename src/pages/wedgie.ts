@@ -17,7 +17,7 @@ import { place3D, idScreen as idCanvas, colorScreen, baseColor } from "../ui/pla
 import type { Wedgie3D } from "../ui/wedgie3d";
 import * as W from "../serial/wedgies";
 import { pyStr, traceStart, traceEnd, type Repl } from "../serial/repl";
-import { answerNet } from "../serial/net";
+import { answerNet, answerTcp } from "../serial/net";
 import { installCore, useApp, appVer, removeApp, takeOver, setAskHint, askHint, firmwareManifest, lastAsk, type Cart, type Manifest } from "../serial/install";
 import * as FS from "../serial/files";
 import { cartHtml } from "../ui/cart";
@@ -296,7 +296,11 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     W.withRepl(x, async (r) => {
       if (x !== w) return;
       link = r;
-      r.onJson = (v) => { if (v?.type === "net") answerNet(r, v, netOf(), (what) => { netUsed = what; paint(); }); };
+      r.onJson = (v) => {
+        const seen = (what: string) => { netUsed = what; paint(); };
+        if (v?.type === "net") answerNet(r, v, netOf(), seen);
+        else if (v?.type === "tcp") answerTcp(r, v, netOf(), seen);
+      };
       setScreen(home());
       paint();
       if (liveFs()) loadSaves();

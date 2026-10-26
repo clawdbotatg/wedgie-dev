@@ -2,10 +2,11 @@
 #   uv run --with websockets --with cryptography python3 relaytest.py api.coinbase.com /v2/prices/ETH-USD/spot [relay url]
 import sys, os, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "firmware"))
 import tls
 from soft import Soft
 from websockets.sync.client import connect
-tls.ROOTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "roots.bin")
+tls.ROOTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "firmware", "roots.bin")
 host, path = sys.argv[1], sys.argv[2]
 relay = sys.argv[3] if len(sys.argv) > 3 else "wss://relay.wedgie.dev"
 t = time.time()

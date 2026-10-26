@@ -1,7 +1,7 @@
-// A wedgie app's internet (firmware/net.py). The app sends {"type": "net", "rid", url | chain+method+params} on
-// USB; the page holding its port (its /connect/<ID> page) fetches through wedgie.dev (api/net.ts for a site,
-// api/rpc.ts for a chain read, Alchemy's key staying there) and writes back {"type": "net", "rid", data | error}.
-// Only for what the running app's wedgie.json lists in "net" (sites, and "chain"). public/usb.md has the wire.
+// A wedgie app's internet (firmware/net.py). Only for what the running app's wedgie.json lists in "net" (sites,
+// and "chain"); public/usb.md has the wire. A site (firmware 0.3.67+): the wedgie's own TLS, carried by answerTcp
+// below. A chain read (and a site for 0.3.61-0.3.66): {"type": "net", "rid", url | chain+method+params}, fetched
+// through wedgie.dev (api/net.ts, api/rpc.ts: Alchemy's key stays there), answered {"type": "net", "rid", data | error}.
 import type { Repl } from "./repl";
 import { netAllows } from "../apps/appjson.mjs";
 
@@ -44,5 +44,53 @@ export async function answerNet(r: Repl, v: any, net: string[] | undefined, seen
     await r.write(line + "\n");
   } catch {
     send({ error: "no internet" });
+  }
+}
+
+// ---- a site, over the wedgie's own TLS (firmware 0.3.67+: net.py, tls.py) ----------------------------------
+// The wedgie sends {"type": "tcp", "rid", "host"}, then its encrypted bytes as {"type": "tcp", "rid", "d": base64};
+// this carries them over wedgie.dev's relay (relay/: a WebSocket in, the site's port 443 out) and the site's
+// bytes back the same way, then {"end": true} or {"error"}. Only encrypted bytes pass here: this page and the
+// relay can block them, never read or change them.
+const RELAY = "wss://relay.wedgie.dev";
+const PART = 3000;          // site bytes per line: 4 KB of base64, under the wedgie's 6 KB line
+const socks = new Map<number, { ws: WebSocket; held: Uint8Array<ArrayBuffer>[] }>();
+const b64 = (b: Uint8Array) => { let s = ""; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000)); return btoa(s); };
+const unb64 = (s: string) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+
+/** One "tcp" line from the app. net: its wedgie.json "net". */
+export function answerTcp(r: Repl, v: any, net: string[] | undefined, seen?: (what: string) => void) {
+  const rid = v?.rid;
+  if (!Number.isInteger(rid)) return;
+  const send = (o: Record<string, unknown>) => r.write(JSON.stringify({ type: "tcp", rid, ...o }) + "\n").catch(() => {});
+  const s = socks.get(rid);
+  if (typeof v.host === "string") {
+    s?.ws.close();
+    const host = v.host.toLowerCase();
+    if (!netAllows(net, `https://${host}/`)) return send({ error: `${host.slice(0, 40)} isn't in the app's "net" (wedgie.json)` });
+    seen?.(host);
+    const ws = new WebSocket(`${RELAY}/?host=${encodeURIComponent(host)}`);
+    ws.binaryType = "arraybuffer";
+    const me = { ws, held: [] as Uint8Array<ArrayBuffer>[] };
+    socks.set(rid, me);
+    ws.onopen = () => { for (const b of me.held.splice(0)) ws.send(b); };
+    ws.onmessage = (e) => {
+      const b = new Uint8Array(e.data as ArrayBuffer);
+      for (let o = 0; o < b.length; o += PART) send({ d: b64(b.subarray(o, o + PART)) });
+    };
+    ws.onclose = (e) => {
+      if (socks.get(rid) !== me) return;
+      socks.delete(rid);
+      send(e.code === 1000 || e.code === 1005 ? { end: true } : { error: e.reason || "the relay closed" });
+    };
+    return;
+  }
+  if (!s) return;
+  if (v.end) {
+    socks.delete(rid);
+    s.ws.close();
+  } else if (typeof v.d === "string") {
+    const b = unb64(v.d);
+    if (s.ws.readyState === WebSocket.OPEN) s.ws.send(b); else s.held.push(b);
   }
 }

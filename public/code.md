@@ -7,7 +7,7 @@ description: Make games and apps for a wedgie (a Raspberry Pi Pico with a 240x24
 
 You are writing a game or app for a **wedgie**: a Raspberry Pi Pico (RP2040 or RP2350) under a
 240x240 color screen, with a 5-way joystick on the left and four buttons A B X Y down the right. It
-runs MicroPython plus the wedgie firmware (current: 0.3.65), which boots straight into one app. You
+runs MicroPython plus the wedgie firmware (current: 0.3.67), which boots straight into one app. You
 write that app.
 
 What you hand back is a **folder** (later a GitHub repo) with a `wedgie.json` at its top and the app's
@@ -103,7 +103,7 @@ https://wedgie.dev/virtual.md
 - `fw`: the oldest firmware it runs on. Using the whole `ui` kit below (`ui.say`, `{g}` squares,
   `lcd.tint`): `"0.3.36"`. Older floors: `"0.2.3"` `show(y0, y1)`/`show_rect`, `"0.2.4"` `wedgie.rand`,
   `"0.2.5"` `Keys(physical=True)`, `"0.3.5"` `ui`, `"0.3.17"` `optiga`, `"0.3.23"` `lcd.art`,
-  `"0.3.28"` `ui.right`, `"0.3.61"` `net`.
+  `"0.3.28"` `ui.right`, `"0.3.61"` `net`, `"0.3.67"` `net.get` over its own TLS.
 - `name` up to 14 characters (it's printed on the cartridge), Title Case. `about` one line, up to 140
   characters. `label` the cartridge color (`#rrggbb`). `icon` 12 rows of 12 characters: `.` clear,
   `k` black, `w` white, `g` green, `r` red, `y` yellow, `b` blue, `s` grey.
@@ -388,30 +388,39 @@ A wedgie has no network, but the computer it's plugged into does. List the sites
 
 ```python
 import net
+amt = net.get("https://api.coinbase.com/v2/prices/ETH-USD/spot", pick="data.amount")   # "3412.10"
+rows = net.get("https://example.com/list.json", pick="0:5.{title,amount}")             # [{title, amount}] x 5
 p = net.price()                                      # ETH in dollars (a float)
 ps = net.chain(1, "wedgie_symbols", ["BTC", "SOL"])  # {"BTC": 80449.85, "SOL": 101.46}: any coin by symbol (25 max)
 t = net.chain(8453, "wedgie_prices", ["0x4ed4...efed"])["tokens"]   # tokens on that chain by address: {address: usd}
 n = int(net.chain(8453, "eth_blockNumber"), 16)      # a chain read: eth_call, eth_getBalance, eth_blockNumber, ...
-amt = net.get("https://api.coinbase.com/v2/prices/ETH-USD/spot", pick="data.amount")   # "3412.10"
-rows = net.get("https://example.com/list.json", pick="0:5.{title,amount}")             # [{title, amount}] x 5
 ```
 
-- Who fetches: **the wedgie's page on wedgie.dev, open in a tab** (wedgie.dev/connect, pick it; Chrome or
-  Edge), or `python3 wedgie.py net` in a terminal. Nothing open: `net.Error("no internet: ...")` after 15 s.
-  Say so on your screen and in your README.
+- **`net.get` can't be changed on the way (firmware 0.3.67+).** The wedgie runs TLS 1.3 with the site itself
+  (its Trust M does the math) and checks the site's certificate. The computer and wedgie.dev only carry
+  encrypted bytes: they can block an answer, never read or change it. Every error is a `net.Error`.
+- **`net.chain` and `net.price` can.** They are wedgie.dev's answers (its Alchemy key), so the computer or
+  wedgie.dev could change them. Don't let money move on them alone.
+- Who carries it: **the wedgie's page on wedgie.dev, open in a tab** (wedgie.dev/connect, pick it; Chrome or
+  Edge; it sends the bytes through wedgie.dev's relay), or `python3 wedgie.py net` in a terminal (straight to
+  the site). Nothing open: `net.Error("no internet: ...")` after 15 s. Say so on your screen and in your README.
+- Sites: https only, GET only, only what `"net"` lists (a name covers its subdomains). The site needs an ECDSA
+  certificate (P-256 or P-384) from a CA Mozilla trusts: Coinbase, CoinGecko, GitHub, Kraken, Cloudflare and
+  DefiLlama work; sites with RSA certificates (Binance, Alchemy, Firebase, mempool.space) give
+  `net.Error("not an ECDSA chain")`. Try yours on wedgie.dev/virtual first.
+- **The whole answer must fit in 6 KB** (it's all in RAM before `pick` runs). Ask the site for less (query
+  parameters), then `pick` what you need. A path is steps split by `.`: a field name, `3` an item (`-1` the
+  last), `2:5` items 2-4, `*` every item, `{a,b}` just those fields; each list step applies the rest of the
+  path to every item. On text, `0:500` is its first 500 characters (`"items.3.description.0:500"`). Or a dict
+  of paths: `pick={"price": "data.amount", "base": "data.base"}`. A page that isn't JSON comes back as text.
+- A site takes **5-8 s** (the wedgie checks the site's certificate each time): draw your loading screen first
+  (`ui.progress("Getting the price", "coinbase.com", bar=False)`). It uses ~30 KB of RAM while it runs and
+  gives it all back after.
 - `net.chain(chain, method, params)` is any read-only JSON-RPC call on that chain; wedgie.dev makes it. No URL.
-- Only what `"net"` lists, through wedgie.dev. `"chain"` uses wedgie.dev's Alchemy key (it never reaches the
-  app or the page); read methods only, no sending transactions. Chains: 1 Ethereum, 8453 Base, 10 Optimism,
-  42161 Arbitrum, 137 Polygon, and more. Sites: https only, GET only, rate-limited.
-- **The answer must fit in 5 KB** (RAM). Use `pick` to take only what you need from a JSON answer. A path
-  is steps split by `.`: a field name, `3` an item (`-1` the last), `2:5` items 2-4, `*` every item,
-  `{a,b}` just those fields; each list step applies the rest of the path to every item. On text, `0:500`
-  is its first 500 characters (`"items.3.description.0:500"`). Or a dict of
-  paths: `pick={"price": "data.amount", "base": "data.base"}`. A text page comes back as a string.
-- Each call waits for its answer (usually under a second): draw your loading screen first
-  (`ui.progress("Getting the price", "wedgie.dev", bar=False)`). Not waiting: `rid = net.ask({"url": ...})`,
-  then `net.answer(rid)` each frame (None till it's in).
-- Errors raise `net.Error` with a short reason: catch it and show it.
+  `"chain"` uses wedgie.dev's Alchemy key (it never reaches the app or the page); read methods only. Chains: 1
+  Ethereum, 8453 Base, 10 Optimism, 42161 Arbitrum, 137 Polygon, and more. Each waits for its answer (usually
+  under a second). Not waiting: `rid = net.ask({"chain": 1, "method": "eth_blockNumber"})`, then
+  `net.answer(rid)` each frame (None till it's in). A url ask does the whole fetch before it returns.
 - Full examples: https://github.com/clawdbotatg/wedgie-ethprice, https://github.com/clawdbotatg/wedgie-ticker
 
 ## The rest of the hardware

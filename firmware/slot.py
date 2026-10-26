@@ -255,7 +255,7 @@ def _handle(m):
             W.send({"id": mid, "type": "ok", "free": W.free()})
         except OSError as e:
             W.send({"id": mid, "type": "error", "error": "can't delete it: %s" % e})
-    elif t == "net":                    # the computer's answer to the app's net.get (net.py)
+    elif t in ("net", "tcp"):           # the computer's answer to the app's net calls, or a site's bytes (net.py)
         n = sys.modules.get("net")
         if n:
             n.got(m)

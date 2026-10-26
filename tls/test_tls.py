@@ -4,6 +4,7 @@
 #   python3 test_tls.py --live     also real sites
 import os, sys, ssl, socket, threading, tempfile, random, hashlib, datetime, traceback
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "firmware"))
 import tls
 from soft import Soft
 from cryptography import x509
@@ -359,7 +360,7 @@ def main():
     per_record(lambda i, n, r: [r[:5] + bytes(len(r) - 5)] if i == n else [r], "each record's body zeroed")
 
     if "--live" in sys.argv:
-        tls.ROOTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "roots.bin")
+        tls.ROOTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "firmware", "roots.bin")
         for host, path in [("api.coinbase.com", "/v2/prices/ETH-USD/spot"), ("api.coingecko.com", "/api/v3/ping"),
                            ("api.github.com", "/zen"), ("www.cloudflare.com", "/cdn-cgi/trace"), ("poidh.xyz", "/robots.txt"),
                            ("api.kraken.com", "/0/public/Time"), ("api.binance.com", "/api/v3/time"),

@@ -42,7 +42,11 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md
   presses.
 - **The internet (0.3.61+):** an app can fetch from the sites its wedgie.json lists (`"net"`), through its open
   wedgie.dev page or `wedgie.py net`. The page and wedgie.py refuse any other site, so a reviewed app can only
-  talk to what the review saw. Chain reads are read-only; wedgie.dev's Alchemy key never leaves wedgie.dev.
+  talk to what the review saw. A site (`net.get`, 0.3.67+) is the wedgie's own TLS 1.3: it checks the site's
+  certificate against Mozilla's roots, and the computer and wedgie.dev's relay carry only encrypted bytes (they
+  can block, not read or change). Not checked: certificate dates (no clock) and revocation. Chain reads
+  (`net.chain`, `net.price`) are wedgie.dev's answers: the computer or wedgie.dev could change them.
+  wedgie.dev's Alchemy key never leaves wedgie.dev.
 - **Not an audited hardware wallet.** Don't keep more on it than you can afford to lose.
 - No secp256k1 in either chip: a wedgie owns smart accounts (Safe) through P-256, never a plain Ethereum key.
 

@@ -1,7 +1,7 @@
-# tls: a wedgie's own TLS connection (test, not shipped)
+# tls: a wedgie's own TLS connection (tests)
 
-Today `net` (firmware/net.py) is plain JSON through the computer and wedgie.dev: either one can change an
-answer. With this, the wedgie runs TLS 1.3 to the site itself. The computer only carries the bytes, so it
+`net.get` (firmware/net.py, 0.3.67+) runs `firmware/tls.py`: the wedgie's own TLS 1.3 to the site. Before 0.3.67
+it was plain JSON through the computer and wedgie.dev, and either one could change an answer. The computer only carries the bytes, so it
 can block or slow them, never read or change them.
 
 Only what a wedgie can check fast: P-256 key exchange, AES-128-GCM, ECDSA P-256/P-384 certificates chained
@@ -48,10 +48,18 @@ uv run --with pyserial python3 tlsboard.py api.coinbase.com/v2/prices/ETH-USD/sp
 
 New roots: `uv run --with certifi --with cryptography python3 mkroots.py roots.bin`.
 
-## To ship it
+## How it ships
 
-1. A pipe for the bytes: a browser can't open a TCP connection, so the page needs a relay (WebSocket in,
-   TCP out) that only sees encrypted bytes. `wedgie.py net` can open TCP itself.
-2. `net.get` uses this for https sites; remove the plain path.
-3. Chain reads: Alchemy has no ECC certificate, and its key would sit on the wedgie. Needs another answer.
-4. One handshake per fetch (~6 s): keep the connection for repeat calls.
+- `firmware/tls.py` + `firmware/roots.bin` (core files; `net.get` imports tls and drops it after).
+- The bytes: the wedgie's page (`src/serial/net.ts` answerTcp) over relay.wedgie.dev (`relay/`), or `wedgie.py
+  net` straight to the site. Wire: public/usb.md, "its app's internet".
+- `node tools/netchip.mjs [--relay]`: the firmware on a virtual RP2040 gets live sites through an app; a site not
+  in its "net" refused; a flipped bit caught.
+
+## Still open
+
+1. Chain reads (`net.chain`, `net.price`) are still wedgie.dev's answers: Alchemy has no ECDSA certificate, and
+   its key would sit on the wedgie.
+2. A handshake per fetch (5-8 s): keep the connection for repeat calls.
+3. Answers over 6 KB fail: pick while the records come in, not after.
+4. RSA chains (Binance, Firebase): the Trust M can check RSA signatures too.

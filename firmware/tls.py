@@ -4,6 +4,8 @@
 # Trust M (ECDH, signature checks); AES on cryptolib; GHASH, HKDF and SHA-384 in Python.
 #   c = tls.Conn("api.coinbase.com", send, recv)    # send(bytes); recv() -> bytes (b"" = closed)
 #   body = c.get("/v2/prices/ETH-USD/spot")         # the HTTP/1.1 body (bytes); raises tls.Error
+# net.get uses it (0.3.67+); the computer carries the bytes (wedgie.dev's relay, relay/, or wedgie.py net).
+# Tests: tls/ (test_tls.py: a computer that attacks; tlschip.mjs; tlsboard.py).
 # RAM: each record is decrypted in place and read through memoryviews (no copies), the transcript is hashed
 # as it comes, roots.bin is read one root at a time. Import it to fetch, then drop it from sys.modules.
 # Not checked: a certificate's dates (a wedgie has no clock) and revocation.
@@ -19,7 +21,7 @@ class Error(Exception):
     pass
 
 
-ROOTS = "roots.bin"     # per root: sha256(subject DER)[:12], curve (3 P-256, 4 P-384), its key (04 X Y). mkroots.py
+ROOTS = "/roots.bin"    # per root: sha256(subject DER)[:12], curve (3 P-256, 4 P-384), its key (04 X Y). mkroots.py
 P256, P384 = 3, 4
 _CURVES = {b"\x2a\x86\x48\xce\x3d\x03\x01\x07": P256, b"\x2b\x81\x04\x00\x22": P384}
 _ECDSA256 = b"\x2a\x86\x48\xce\x3d\x04\x03\x02"

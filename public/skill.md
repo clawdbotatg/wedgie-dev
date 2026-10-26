@@ -11,14 +11,14 @@ or an ATECC608) **wedged** between the boards on I2C. It runs MicroPython plus t
 into one app, and asks on its own screen before anything that matters. Games, tools, and a hardware signer for a
 Safe multisig. Everything is MIT. Home: https://wedgie.dev
 
-**The current firmware is 0.3.66.** If a wedgie's `hello` says older, update it first: everything here assumes
+**The current firmware is 0.3.67.** If a wedgie's `hello` says older, update it first: everything here assumes
 current firmware.
 
 ```yaml
 name: wedgie
 site: https://wedgie.dev
 skill_index: https://wedgie.dev/skill.md          # this file
-firmware: 0.3.66
+firmware: 0.3.67
 license: MIT (hardware design, case, firmware, site, art)
 source: https://github.com/clawdbotatg/wedgie-dev
 made_by: Austin Griffith and Gus Griffith, with @ClawdBotATG; sold by BuidlGuidl DAO LLC
@@ -126,8 +126,9 @@ https://github.com/clawdbotatg/wedgie-starter. Get it on the shelf: email the re
 
 **The internet** (firmware 0.3.61+): a wedgie has none, but an app can use its computer's. It lists the sites in
 wedgie.json (`"net"`) and calls `net.get(url)`, `net.chain(...)` or `net.price()`; the wedgie's page on wedgie.dev
-(open in a tab) or `python3 wedgie.py net` fetches them through wedgie.dev. Only the listed sites; chain reads use
-wedgie.dev's Alchemy key, read-only. How: code.md, "The internet".
+(open in a tab) or `python3 wedgie.py net` carries them. `net.get` (0.3.67+) is the wedgie's own TLS with the site:
+the computer and wedgie.dev can block it, never change it (ECDSA sites only, answers up to 6 KB, 5-8 s). Chain
+reads are wedgie.dev's (its Alchemy key, read-only), so those could be changed. How: code.md, "The internet".
 
 ## wedgie.dev, every page
 

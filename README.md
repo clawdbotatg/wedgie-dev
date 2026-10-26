@@ -32,10 +32,11 @@ its ID, not its port, and don't soft-reset it just to restart its app. Details: 
   `node tools/sign.mjs` signs them with the firmware, and `tools/fw.mjs` publishes them first on the
   site. Every app is its own repo (ours: `clawdbotatg/wedgie-*`); the steps are in `docs/APPS.md`.
   Starter: github.com/clawdbotatg/wedgie-starter.
-- An app's internet (firmware 0.3.61+): `firmware/net.py` (`net.get`, `net.chain`, `net.price`) asks the
-  computer over USB; its wedgie.dev page (`src/serial/net.ts`) or `wedgie.py net` fetches through
-  `api/net.ts` (sites, trimmed by `pick`) and `api/rpc.ts` (chain reads, Alchemy key stays server-side),
-  only for what the app's wedgie.json lists in `"net"`. Test: `node tools/test_net.mjs`.
+- An app's internet (firmware 0.3.61+): `firmware/net.py` (`net.get`, `net.chain`, `net.price`), only for what
+  the app's wedgie.json lists in `"net"`. A site (0.3.67+) is the wedgie's own TLS 1.3 (`firmware/tls.py`,
+  `tls/README.md`): its wedgie.dev page (`src/serial/net.ts` answerTcp) carries the encrypted bytes through
+  relay.wedgie.dev (`relay/`), `wedgie.py net` straight to the site. Chain reads go through `api/rpc.ts`
+  (Alchemy key stays server-side). Tests: `node tools/test_net.mjs`, `node tools/netchip.mjs`, `python3 tls/test_tls.py`.
 - `art/` + `tools/art.py` — source renders and the web images made from them.
 
 ```

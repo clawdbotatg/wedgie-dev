@@ -11,7 +11,7 @@ wg = WG.Wedgie(glob.glob("/dev/cu.usbmodem*")[0])
 print("press GREEN on the wedgie")
 WG.take_over(wg, "TLS test")
 for name in ("tls.mpy", "roots.bin"):
-    wg.put(name, open(os.path.join(here, name), "rb").read())
+    wg.put(name, open(os.path.join(here, "..", "firmware", name), "rb").read())
 wg.exec("import gc\nfor _n in list(globals()):\n    if not _n.startswith('__') and _n != 'gc': del globals()[_n]\ngc.collect()")
 print("files on")
 s = wg.s
