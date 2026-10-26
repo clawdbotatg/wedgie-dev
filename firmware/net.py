@@ -128,16 +128,25 @@ def _serve():
     return slot.serve if slot.state != "entry" or slot._own_usb() else None    # an entry app's USB has its own timer
 
 
+def _deep(n):
+    import slot
+    slot.deep += n
+
+
 def wait(rid, ms=MS):
     serve = _serve()
     t = time.ticks_ms()
-    while rid not in _got:
-        if time.ticks_diff(time.ticks_ms(), t) > ms:
-            _out.pop(rid, None)
-            raise Error("no internet: open its page on wedgie.dev")
-        if serve:
-            serve()
-        time.sleep_ms(20)
+    _deep(1)
+    try:
+        while rid not in _got:
+            if time.ticks_diff(time.ticks_ms(), t) > ms:
+                _out.pop(rid, None)
+                raise Error("no internet: open its page on wedgie.dev")
+            if serve:
+                serve()
+            time.sleep_ms(20)
+    finally:
+        _deep(-1)
     return answer(rid)
 
 
@@ -184,7 +193,10 @@ def get(url, pick=None, ms=MS, body=None):
         return x or b""
     import sys
     import gc
-    try:
+    import trustm
+    _deep(1)                            # a job waits till this is done (slot._later)
+    trustm.busy[0] += 1                 # the whole fetch: the host's chip check (wedgie.chip) resets the chip, which
+    try:                                # wipes this connection's key and fails both (10-26: "No chip" on the page)
         import tls
         try:
             body = tls.Conn(host, send, recv).get("/" + path, most=MOST, body=body)
@@ -193,6 +205,8 @@ def get(url, pick=None, ms=MS, body=None):
         except OSError as e:            # no Trust M to do the math
             raise Error("needs the Trust M chip (%s)" % e)
     finally:
+        trustm.busy[0] -= 1
+        _deep(-1)
         del _tcp[rid]
         _out.pop(rid, None)
         W.send({"type": "tcp", "rid": rid, "end": True})

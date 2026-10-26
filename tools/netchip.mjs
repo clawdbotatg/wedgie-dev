@@ -67,7 +67,7 @@ function tcp(v) {
 }
 
 const t0 = Date.now();
-let done = false, lost = 0, hereAt = null;     // hereAt: chip ms the late computer shows up
+let done = false, lost = 0, hereAt = null, chipAsked = false, chipSaid = null;     // hereAt: chip ms the late computer shows up
 while (!done && Date.now() - t0 < 600_000) {
   chip.run(20);
   if (hereAt !== null && chip.ms >= hereAt && hereAt > 0) { write({ type: "net" }); hereAt = -1; }
@@ -82,13 +82,19 @@ while (!done && Date.now() - t0 < 600_000) {
     try { v = JSON.parse(line); } catch { continue; }
     if (v.type === "tcp" && hereAt === null) { lost++; hereAt = chip.ms + 3000; }
     else if (v.type === "tcp" && chip.ms < hereAt) lost++;
-    else if (v.type === "tcp") tcp(v);
+    else if (v.type === "tcp") {
+      tcp(v);
+      // the page's chip check mid-fetch (on the second site): busy, never a reset under the fetch (0.3.71+)
+      if (!chipAsked && results.length === 1 && typeof v.d === "string") { chipAsked = true; write({ id: 99, type: "chip" }); }
+    }
+    else if (v.id === 99) chipSaid = v;
     else if (v.type === "nettest" && v.done) done = true;
     else if (v.type === "nettest") { results.push(v); console.log("     ", JSON.stringify(v).slice(0, 150)); }
     else if (v.type === "nettest_free") console.log(`      free ${v.before} before, ${v.after} after`);
   }
 }
 check(done, "the app got through every site");
+check(chipSaid?.busy === 1, `a chip check mid-fetch says busy: ${JSON.stringify(chipSaid)?.slice(0, 80)}`);
 check(lost >= 2, `a late computer: ${lost} lines went nowhere, then net.ready sent them again`);
 const [cb, cg, gh, kr, mp, ex, flip, px, blk] = results;
 check(cb && /^\d+\.\d+$/.test(cb.v), `Coinbase: ${cb?.v ?? cb?.error} (${cb?.ms} ms)`);

@@ -223,13 +223,26 @@ async function prove(w: Wedgie, r: Repl) {
   w.proof = { state: "checking", pass: false, detail: "checking the chip", facts: [] };
   emit();
   try {
-    let d = await r.request({ type: "chip" }, 15000);
-    // 0.3.53+: busy while its app is mid-command on the chip (this check would reset it under the app)
-    for (let i = 0; d.busy && i < 40; i++) {
-      await new Promise((res) => setTimeout(res, 250));
-      d = await r.request({ type: "chip" }, 15000);
+    // 0.3.53+: busy while its app is using the chip (this check would reset it under the app; 0.3.71+: a whole
+    // net fetch, 5-8 s, and an app may fetch several in a row). Wait it out: never call a busy chip broken.
+    // An error: ask again a few times before saying "no chip" (10-26: one check caught mid-fetch said wires swapped).
+    const ask = async () => {
+      let d = await r.request({ type: "chip" }, 15000);
+      for (let i = 0; d.busy && i < 240; i++) {
+        await new Promise((res) => setTimeout(res, 500));
+        d = await r.request({ type: "chip" }, 15000);
+      }
+      return d;
+    };
+    let d = await ask();
+    for (let i = 0; !d.busy && !d.kind && d.error && i < 3; i++) {
+      await new Promise((res) => setTimeout(res, 2000));
+      d = await ask();
     }
-    if (d.busy) throw new Error("its app kept the chip busy");
+    if (d.busy) {
+      w.proof = { state: "unknown", pass: false, facts: [], detail: "Its app is using the chip: check again in a minute" };
+      return;
+    }
     w.chip = d.chip ? { type: d.chip, serial: d.serial, configLocked: d.configLocked } : { type: "none" };
     if (!d.kind) {
       w.proof = { state: "done", pass: false, facts: [], detail: d.error ? `No chip answered, but the I2C lines have power: a data wire and the power wire are probably swapped` :

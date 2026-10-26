@@ -15,14 +15,14 @@ or an ATECC608) **wedged** between the boards on I2C. It runs MicroPython plus t
 into one app, and asks on its own screen before anything that matters. Games, tools, and a hardware signer for a
 Safe multisig. Everything is MIT. Home: https://wedgie.dev
 
-**The current firmware is 0.3.70.** If a wedgie's `hello` says older, update it first: everything here assumes
+**The current firmware is 0.3.71.** If a wedgie's `hello` says older, update it first: everything here assumes
 current firmware.
 
 ```yaml
 name: wedgie
 site: https://wedgie.dev
 skill_index: https://wedgie.dev/skill.md          # this file
-firmware: 0.3.70
+firmware: 0.3.71
 license: MIT (hardware design, case, firmware, site, art)
 source: https://github.com/clawdbotatg/wedgie-dev
 made_by: Austin Griffith and Gus Griffith, with @ClawdBotATG; sold by BuidlGuidl DAO LLC
@@ -223,7 +223,7 @@ https://instantwallet.io. Details: safe.md.
 
 # Talk to a wedgie over USB
 
-Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.70**; if `hello`
+Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.71**; if `hello`
 says older, run `wedgie.py update` first.
 
 ## Talk to it directly
@@ -348,7 +348,7 @@ from answering. Hold **Y**: no WEDGIE drive this time (debugging only).
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.70","fw":"wedgie-0.3.70","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.71","fw":"wedgie-0.3.71","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":3,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n

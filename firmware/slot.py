@@ -35,6 +35,8 @@ keys = None
 app = None          # the active app's apps.json entry (None: nothing on it yet)
 mod = None          # its module, once imported
 state = "empty"     # empty | running | entry (an entry to call) | ended | error
+deep = 0            # net calls under way (net.py): a job/open/rm waits in _later till the app is back out of them.
+_later = []         # Run inside a fetch's stack, an install's question hit "maximum recursion depth" (10-26)
 _poll = None
 _rx = 0             # ticks_ms when the line being handled arrived
 _serve_t = None     # the background Timer that answers USB while an entry app owns the CPU
@@ -539,6 +541,8 @@ def serve(_=None):
     and the app keeps running (it never reaches main.py's "wedgie broke")."""
     global _breath, _kbd
     _breath = True
+    if _later and not deep:
+        handle(_later.pop(0))
     R = W.lines()
     for _ in range(8):
         line = R.pump(_poll)
@@ -561,6 +565,10 @@ def serve(_=None):
                 gc.collect()
                 continue
             line = None                 # a job runs inside handle: don't keep its line alive under it
+            if deep and m.get("type") in ("job", "open", "rm"):
+                if len(_later) < 4:
+                    _later.append(m)
+                continue
             handle(m)
 
 
