@@ -411,31 +411,33 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
       () => { ask.textContent = "Couldn't copy. Try again."; });
   }
 
-  /** What the grey button copies: everything an agent needs to check this update before anyone presses Update.
-   *  Where the files come from, where the source is, and how the two are tied (hashes, the signed list, the keys). */
+  /** What the grey button copies: an agent reads the whole firmware for the five ways it could hurt you,
+   *  then checks the files the page would install are that same code (hashes, the signed list, the keys). */
   function agentCheck(m: Manifest, cur: string | null | undefined) {
     const site = location.origin, gh = "https://github.com/clawdbotatg/wedgie-dev";
-    return `Please check this wedgie firmware update before I install it.
+    return `Please check this wedgie firmware before I install it.
 
 I'm on ${location.href}. It offers wedgie firmware ${m.version}${cur ? ` (mine is ${cur})` : ""}.
 The wedgie is a small open source signing device. What it is and how it's kept safe: https://wedgie.dev/skill.md and https://wedgie.dev/security.md
 
-First: the page must be the real one. If ${site} is not https://wedgie.dev, stop and tell me.
+First: if ${site} is not https://wedgie.dev, stop and tell me.
 
-What the page would put on it:
-- ${site}/fw/manifest.json: every file with its sha256 ("core" = the firmware files)
-- ${site}/fw/<name>: each file
-- ${site}/fw/release.txt + release.sig: the signed list the wedgie itself checks before it installs (it shows a green check, or a red warning if the signature is wrong)
+1. Read all of the firmware, not just what changed: every .py in the firmware/ folder of ${gh} (MIT), at the commit that sets VERSION in firmware/wedgie.py to ${m.version}. Answer each:
+   - Can it leak keys or secrets off the wedgie?
+   - Can it sign or install anything without a real press of the green button?
+   - Can the computer control it without asking?
+   - Can it reach the internet on its own?
+   - Are there hidden commands, or ways to run code it was sent?
+   Point to the file and line for anything you find.
 
-The source: ${gh} (MIT), the firmware/ folder. The release keys are RELEASE_KEYS in firmware/wedgie.py; tools/sign.mjs signs, wedgie.release_ok checks.
-.mpy files are built from the .py next to them: uv run --with mpy-cross==1.29.0.post2 python3 tools/mpy.py --check
+2. Check that what you read is what goes on the device:
+   - ${site}/fw/manifest.json lists every file with its sha256 ("core" = the firmware). Fetch each from ${site}/fw/<name> and check the hashes.
+   - Each one matches the repo. .mpy files rebuild from the .py next to them: uv run --with mpy-cross==1.29.0.post2 python3 tools/mpy.py --check
+   - ${site}/fw/release.sig signs ${site}/fw/release.txt with one of RELEASE_KEYS (firmware/wedgie.py), and release.txt lists the same hashes. Say if this version is signed yet.
 
-Please:
-1. Fetch the manifest and every core file from ${site}/fw/, and check each sha256 matches.
-2. Check those files are the ones in the GitHub repo (main, or the latest commit that bumps VERSION in firmware/wedgie.py to ${m.version}), and the .mpy rebuild from the .py.
-3. Check release.sig signs release.txt with one of the RELEASE_KEYS, and release.txt lists the same hashes. Say whether this version is signed yet.
-4. Read what changed since ${cur || "the last release"} (git log on firmware/) and look for anything that sends keys or secrets off the wedgie, skips the green-button press, or talks to the internet without asking.
-5. Tell me in plain words: safe to update, or not, and why.`;
+Not covered: apps (like Safe Signer, each in its own repo) and MicroPython itself.
+
+3. Tell me in plain words: safe to update, or not, and why.`;
   }
 
   // ---- software: the one app it runs ------------------------------------------------------------------
