@@ -745,7 +745,7 @@ def net_tcp(wg, v, net):
         def pump():
             try:
                 while True:
-                    b = s.recv(3000)
+                    b = s.recv(1000)
                     if not b:
                         break
                     net_put(wg, {"type": "tcp", "rid": rid, "d": base64.b64encode(b).decode()})

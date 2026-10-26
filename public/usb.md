@@ -160,7 +160,7 @@ lists in `"net"` (its sites, `"chain"` for chain reads).
 A site (0.3.67+): the wedgie runs TLS 1.3 with the site itself, the host only carries the encrypted bytes:
 
     {"type":"tcp","rid":1,"host":"api.coinbase.com"}            open the site's port 443
-    {"type":"tcp","rid":1,"d":"<base64>"}                       bytes, both ways (to the wedgie: 3000 a line at most)
+    {"type":"tcp","rid":1,"d":"<base64>"}                       bytes, both ways (to the wedgie: 1000 a line at most)
     {"type":"tcp","rid":1,"end":true}                           closed (either way)
     {"type":"tcp","rid":1,"error":"api.x.com isn't in the app's \"net\""}   to the wedgie: won't, or can't
 

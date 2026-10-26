@@ -37,7 +37,7 @@ function tcp(v) {
     const fromSite = (b) => {
       if (flip && n < 1500 && n + b.length > 1500) { b = Buffer.from(b); b[1500 - n] ^= 4; }
       n += b.length;
-      for (let o = 0; o < b.length; o += 3000) write({ type: "tcp", rid, d: b.subarray(o, o + 3000).toString("base64") });
+      for (let o = 0; o < b.length; o += 1000) write({ type: "tcp", rid, d: b.subarray(o, o + 1000).toString("base64") });
     };
     if (relay) {
       const ws = new WebSocket(`wss://relay.wedgie.dev/?host=${v.host}`, { headers: { Origin: "https://wedgie.dev" } });

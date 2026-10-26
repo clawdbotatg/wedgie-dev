@@ -53,7 +53,7 @@ export async function answerNet(r: Repl, v: any, net: string[] | undefined, seen
 // bytes back the same way, then {"end": true} or {"error"}. Only encrypted bytes pass here: this page and the
 // relay can block them, never read or change them.
 const RELAY = "wss://relay.wedgie.dev";
-const PART = 3000;          // site bytes per line: 4 KB of base64, under the wedgie's 6 KB line
+const PART = 1000;          // site bytes per line. 3000 (4 KB lines) got lost on a wedgie running its app: the TLS stalled (10-25)
 const socks = new Map<number, { ws: WebSocket; held: Uint8Array<ArrayBuffer>[] }>();
 const b64 = (b: Uint8Array) => { let s = ""; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000)); return btoa(s); };
 const unb64 = (s: string) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
