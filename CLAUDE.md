@@ -14,7 +14,8 @@ Push to main = deploy (Vercel). **Before every push that touches `src/`: `node t
 
 ## Accounts
 
-X [@wedgiedev](https://x.com/wedgiedev) (log in with Google), Gmail wedgie@buidlguidl.com, ENS wedgie.eth.
+X [@wedgiedev](https://x.com/wedgiedev) (log in with Google), Gmail wedgie@buidlguidl.com, ENS wedgie.eth,
+Cloudflare (log in with Google; API token in `.env`; unused: Workers can't reach sites on Cloudflare). The TLS relay: `relay/`.
 Passwords: `.env` here and `~/.wedgie-credentials.env`. Never in git. New account: add to both.
 The inbox: `python3 tools/mail.py list|read|send` (Gmail app password). Google 2-Step code: `python3 ~/.wedgie-totp.py`.
 
