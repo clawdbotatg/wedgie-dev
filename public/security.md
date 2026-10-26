@@ -44,7 +44,9 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md
   wedgie.dev page or `wedgie.py net`. The page and wedgie.py refuse any other site, so a reviewed app can only
   talk to what the review saw. A site (`net.get`, 0.3.67+) is the wedgie's own TLS 1.3: it checks the site's
   certificate against Mozilla's roots, and the computer and wedgie.dev's relay carry only encrypted bytes (they
-  can block, not read or change). Not checked: certificate dates (no clock) and revocation. Chain reads
+  can block, not read or change). Not checked: certificate dates (no clock) and revocation. The request goes
+  out while the certificate is still being checked (0.3.68+: sites hang up on a slow one), so a fake site could
+  see the path asked for; nothing it sends is read until every check passes. Chain reads
   (`net.chain`, `net.price`) are wedgie.dev's answers: the computer or wedgie.dev could change them.
   wedgie.dev's Alchemy key never leaves wedgie.dev.
 - **Not an audited hardware wallet.** Don't keep more on it than you can afford to lose.

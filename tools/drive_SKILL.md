@@ -15,14 +15,14 @@ or an ATECC608) **wedged** between the boards on I2C. It runs MicroPython plus t
 into one app, and asks on its own screen before anything that matters. Games, tools, and a hardware signer for a
 Safe multisig. Everything is MIT. Home: https://wedgie.dev
 
-**The current firmware is 0.3.67.** If a wedgie's `hello` says older, update it first: everything here assumes
+**The current firmware is 0.3.68.** If a wedgie's `hello` says older, update it first: everything here assumes
 current firmware.
 
 ```yaml
 name: wedgie
 site: https://wedgie.dev
 skill_index: https://wedgie.dev/skill.md          # this file
-firmware: 0.3.67
+firmware: 0.3.68
 license: MIT (hardware design, case, firmware, site, art)
 source: https://github.com/clawdbotatg/wedgie-dev
 made_by: Austin Griffith and Gus Griffith, with @ClawdBotATG; sold by BuidlGuidl DAO LLC
@@ -222,7 +222,7 @@ https://instantwallet.io. Details: safe.md.
 
 # Talk to a wedgie over USB
 
-Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.67**; if `hello`
+Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.68**; if `hello`
 says older, run `wedgie.py update` first.
 
 ## Talk to it directly
@@ -347,7 +347,7 @@ from answering. Hold **Y**: no WEDGIE drive this time (debugging only).
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.67","fw":"wedgie-0.3.67","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.68","fw":"wedgie-0.3.68","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":3,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -882,7 +882,9 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md
   wedgie.dev page or `wedgie.py net`. The page and wedgie.py refuse any other site, so a reviewed app can only
   talk to what the review saw. A site (`net.get`, 0.3.67+) is the wedgie's own TLS 1.3: it checks the site's
   certificate against Mozilla's roots, and the computer and wedgie.dev's relay carry only encrypted bytes (they
-  can block, not read or change). Not checked: certificate dates (no clock) and revocation. Chain reads
+  can block, not read or change). Not checked: certificate dates (no clock) and revocation. The request goes
+  out while the certificate is still being checked (0.3.68+: sites hang up on a slow one), so a fake site could
+  see the path asked for; nothing it sends is read until every check passes. Chain reads
   (`net.chain`, `net.price`) are wedgie.dev's answers: the computer or wedgie.dev could change them.
   wedgie.dev's Alchemy key never leaves wedgie.dev.
 - **Not an audited hardware wallet.** Don't keep more on it than you can afford to lose.
@@ -1078,7 +1080,7 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md. Or build one your
 
 You are writing a game or app for a **wedgie**: a Raspberry Pi Pico (RP2040 or RP2350) under a
 240x240 color screen, with a 5-way joystick on the left and four buttons A B X Y down the right. It
-runs MicroPython plus the wedgie firmware (current: 0.3.67), which boots straight into one app. You
+runs MicroPython plus the wedgie firmware (current: 0.3.68), which boots straight into one app. You
 write that app.
 
 What you hand back is a **folder** (later a GitHub repo) with a `wedgie.json` at its top and the app's
@@ -1469,7 +1471,8 @@ n = int(net.chain(8453, "eth_blockNumber"), 16)      # a chain read: eth_call, e
 
 - **`net.get` can't be changed on the way (firmware 0.3.67+).** The wedgie runs TLS 1.3 with the site itself
   (its Trust M does the math) and checks the site's certificate. The computer and wedgie.dev only carry
-  encrypted bytes: they can block an answer, never read or change it. Every error is a `net.Error`.
+  encrypted bytes: they can block an answer, never read or change it. Every error is a `net.Error`. Don't put
+  secrets in the URL: it goes out while the certificate is still being checked.
 - **`net.chain` and `net.price` can.** They are wedgie.dev's answers (its Alchemy key), so the computer or
   wedgie.dev could change them. Don't let money move on them alone.
 - Who carries it: **the wedgie's page on wedgie.dev, open in a tab** (wedgie.dev/connect, pick it; Chrome or

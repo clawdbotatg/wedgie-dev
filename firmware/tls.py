@@ -351,6 +351,7 @@ class Conn:
         self.rb = bytearray(4096)
         self.pend, self.pi = b"", 0
         self.rd = self.wr = None
+        self.checks = []                    # signatures to check (_checks) before reading the answer
         _sure(self._handshake)
 
     def _read(self, mv):
@@ -497,11 +498,14 @@ class Conn:
                 scheme = int.from_bytes(m[4:6], "big")
                 content = b" " * 64 + b"TLS 1.3, server CertificateVerify\x00" + th
                 d = sha256(content) if scheme == 0x0403 else sha384(content) if scheme == 0x0503 else None
-                if d is None or not self._ok(leaf[0], d, m[8:], leaf[1]):
+                if d is None:
                     raise Error("the site's signature is wrong")
+                st, e = _tlv(m, 8)
+                rs = _kids(m, st, e)
+                r, s_ = int.from_bytes(m[rs[0][2]:rs[0][3]], "big"), int.from_bytes(m[rs[1][2]:rs[1][3]], "big")
+                self.checks.append((leaf[0], d, r, s_, leaf[1], "signed", "the site's signature is wrong"))
                 tr(m)
                 th = hs.pop(0).digest()
-                self.log("signed")
             elif typ == 20:                                   # Finished
                 if leaf is None or hmac256(_label(ss, b"finished", b"", 32), th) != bytes(m[4:]):
                     raise Error("bad Finished")
@@ -517,12 +521,6 @@ class Conn:
         self.wr = _Gcm(_label(cap, b"key", b"", 16), _label(cap, b"iv", b"", 12))
         self.rd = _Gcm(_label(sap, b"key", b"", 16), _label(sap, b"iv", b"", 12))
         self.log("open")
-
-    def _ok(self, curve, digest, sig, pub):
-        s, e = _tlv(sig, 0)
-        k = _kids(sig, s, e)
-        r, s = int.from_bytes(sig[k[0][2]:k[0][3]], "big"), int.from_bytes(sig[k[1][2]:k[1][3]], "big")
-        return self.chip.verify(curve, digest, r, s, pub)
 
     def _chain(self, m):
         """(curve, key) of the leaf, once it names this host and the chain from it to a root checks out. One
@@ -540,11 +538,11 @@ class Conn:
             if prev is not None:            # the one before, signed by this one
                 if prev[0] != subject:
                     raise Error("broken chain")
-                self._check(prev[1:], (curve, key), k - 1)
+                self._later(prev[1:], (curve, key), "cert %d" % (k - 1))
                 prev = None
             got = root(issuer)
             if got:
-                self._check((sigalg, r, s, self._digest(sigalg, tbs)), got, k)
+                self._later((sigalg, r, s, self._digest(sigalg, tbs)), got, "cert %d" % k)
                 return leaf
             prev = (issuer, sigalg, r, s, self._digest(sigalg, tbs))
             k += 1
@@ -552,15 +550,25 @@ class Conn:
 
     @staticmethod
     def _digest(sigalg, tbs):
-        return sha256(tbs) if sigalg == _ECDSA256 else sha384(tbs) if sigalg == _ECDSA384 else None
+        """SHA-256 now (hashlib); for SHA-384 (Python, ~1 s) a copy of the bytes, hashed in _checks."""
+        return sha256(tbs) if sigalg == _ECDSA256 else bytes(tbs) if sigalg == _ECDSA384 else None
 
-    def _check(self, signed, key, k):
+    def _later(self, signed, key, what, why="certificate signature is wrong"):
         sigalg, r, s, d = signed
         if d is None or key[0] is None:
             raise Error("not an ECDSA chain")
-        if not self.chip.verify(key[0], d, r, s, key[1]):
-            raise Error("certificate signature is wrong")
-        self.log("cert %d" % k)
+        self.checks.append((key[0], d, r, s, key[1], what, why))
+
+    def _checks(self):
+        """The signatures (the Trust M's ~0.2 s each, SHA-384 ~1 s): run while the site's answer is on its way.
+        Nothing the site sent is read before they all pass."""
+        while self.checks:
+            curve, d, r, s, key, what, why = self.checks.pop(0)
+            if len(d) > 48:
+                d = sha384(d)
+            if not self.chip.verify(curve, d, r, s, key):
+                raise Error(why)
+            self.log(what)
 
     def get(self, path, headers=b"", most=8192):
         return _sure(self._get, path, headers, most)
@@ -568,8 +576,12 @@ class Conn:
     def _get(self, path, headers, most):
         """GET path over this connection; the body (bytes, up to `most`). Closes it. Only a whole answer: its
         Content-Length, its last chunk, or the site's close_notify; cut short by the computer, it's an Error."""
+        # The request goes before the signatures are checked: sites hang up ~10 s after connecting without one, and a
+        # virtual wedgie at half speed took longer than that. The cost: a fake site would see the path asked for.
+        # It can't change the answer: nothing is read until every check passes.
         self._write(23, b"GET " + path.encode() + b" HTTP/1.1\r\nHost: " + self.host.encode()
                     + b"\r\nConnection: close\r\nAccept-Encoding: identity\r\nUser-Agent: wedgie\r\n" + headers + b"\r\n")
+        self._checks()
         out, hl, cl, chunked, closed = bytearray(), -1, None, False, False
         while True:
             try:

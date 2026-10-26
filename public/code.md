@@ -7,7 +7,7 @@ description: Make games and apps for a wedgie (a Raspberry Pi Pico with a 240x24
 
 You are writing a game or app for a **wedgie**: a Raspberry Pi Pico (RP2040 or RP2350) under a
 240x240 color screen, with a 5-way joystick on the left and four buttons A B X Y down the right. It
-runs MicroPython plus the wedgie firmware (current: 0.3.67), which boots straight into one app. You
+runs MicroPython plus the wedgie firmware (current: 0.3.68), which boots straight into one app. You
 write that app.
 
 What you hand back is a **folder** (later a GitHub repo) with a `wedgie.json` at its top and the app's
@@ -398,7 +398,8 @@ n = int(net.chain(8453, "eth_blockNumber"), 16)      # a chain read: eth_call, e
 
 - **`net.get` can't be changed on the way (firmware 0.3.67+).** The wedgie runs TLS 1.3 with the site itself
   (its Trust M does the math) and checks the site's certificate. The computer and wedgie.dev only carry
-  encrypted bytes: they can block an answer, never read or change it. Every error is a `net.Error`.
+  encrypted bytes: they can block an answer, never read or change it. Every error is a `net.Error`. Don't put
+  secrets in the URL: it goes out while the certificate is still being checked.
 - **`net.chain` and `net.price` can.** They are wedgie.dev's answers (its Alchemy key), so the computer or
   wedgie.dev could change them. Don't let money move on them alone.
 - Who carries it: **the wedgie's page on wedgie.dev, open in a tab** (wedgie.dev/connect, pick it; Chrome or
