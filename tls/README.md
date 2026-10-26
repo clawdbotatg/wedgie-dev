@@ -5,38 +5,47 @@ answer. With this, the wedgie runs TLS 1.3 to the site itself. The computer only
 can block or slow them, never read or change them.
 
 Only what a wedgie can check fast: P-256 key exchange, AES-128-GCM, ECDSA P-256/P-384 certificates chained
-to an ECC root in `roots.bin` (44 from the Mac's system store, 4.7 KB, read one at a time). The Trust M does ECDH and the signature
+to an ECC root in `roots.bin`. The Trust M does ECDH and the signature
 checks; cryptolib does AES; GHASH, HKDF and SHA-384 are Python.
 
-## Results (10-25)
+## Tests (10-25)
 
-| | time | lowest free RAM |
-|---|---|---|
-| real wedgie (0.3.57, Safe loaded, Trust M), api.coinbase.com | 6.0 s | 36 KB |
-| virtual RP2040, api.coinbase.com (Google CA) | 3.0 s | 165 KB (bare MicroPython) |
-| virtual, api.coingecko.com (Let's Encrypt, P-384) | 4.3 s | 161 KB |
-| virtual, api.github.com (Sectigo) | 3.0 s | 166 KB |
-| virtual, one bit flipped by the computer | "tampered with" | |
+`python3 test_tls.py` (`--live`: real sites too): a site we control (Python's ssl) and a computer in the middle
+that attacks. The rule: the site's exact answer or a tls.Error, nothing else. All pass:
 
-Works: Coinbase, CoinGecko, GitHub, Cloudflare, DefiLlama, poidh. Fails: Alchemy and wedgie.dev (RSA
-certificates only).
+- **Certificates refused:** unknown CA; self-signed; a root's name with another key; another site's
+  certificate; wildcards one level off; a longer host; **a leaf used as a CA to sign one for our host**; an
+  intermediate with no basicConstraints or without keyCertSign; email-only and code-signing-only certificates;
+  a leaf that can't sign; a bad CertificateVerify; RSA; TLS 1.2.
+- **Taken:** P-384 root to P-256 intermediate; a leaf straight from a root; a P-384 leaf key; 6 KB over several
+  records; chunked; no length but a close_notify.
+- **The computer attacks, 0 changed answers:** one bit flipped at 588 places from the site and 134 from the
+  wedgie; cut off at 274 places; each record dropped, sent twice, swapped, zeroed. An answer cut short (its
+  Content-Length, last chunk, or close_notify missing) is an Error.
+- **Live:** Coinbase, CoinGecko, GitHub, Cloudflare, poidh, Kraken, DefiLlama. Refused cleanly (RSA in the
+  chain): Binance, Firebase, Blockstream, mempool.space, Alchemy, wedgie.dev.
 
-Not checked: certificate dates (no clock) and revocation.
+Virtual RP2040 (`tlschip.mjs`): Coinbase 2.8 s, CoinGecko (P-384) 4.1 s, GitHub 2.8 s, Kraken 2.6 s; a flipped
+bit: "tampered with"; Binance refused. Real wedgie (0.3.57, Safe loaded): Coinbase 6.0 s, 36 KB left.
 
-RAM (10-25, virtual RP2040, trustm already loaded as on a wedgie with a Trust M): a fetch needs ~34 KB free
-(13 KB of it is tls.mpy's code, 4 KB the record buffer); after it, drop `tls` from sys.modules and it's 0.
-Tighter than ~34 KB it runs out, or garbage collection slows it till the site gives up.
+RAM: a fetch needs ~34 KB free (11 KB is tls.mpy's code, 4 KB the record buffer, trustm already loaded); drop
+`tls` from sys.modules after and it's 0. Below ~45 KB free, garbage collection slows the emulated chip enough
+that Coinbase hangs up (it closes ~12 s after connecting); a real chip runs ~5x faster than the emulator.
+
+Roots: Mozilla's (certifi), ECC only: 38, 4 KB, read one at a time. Not checked: certificate dates (no clock),
+revocation, name constraints, path lengths.
 
 ## Run
 
 ```
 uv run --with mpy-cross==1.29.0.post2 python3 -c "import mpy_cross,subprocess;subprocess.run([mpy_cross.mpy_cross,'-s','tls.py','-o','tls.mpy','tls.py'],check=True)"
+python3 test_tls.py [--live]                                             # attacks + real sites
 python3 desk.py api.coinbase.com /v2/prices/ETH-USD/spot                 # the computer, Trust M played by `cryptography`
 node tlschip.mjs api.coinbase.com /v2/prices/ETH-USD/spot [--tamper] [--leave <bytes free>]   # virtual RP2040 + software Trust M
-uv run --with pyserial python3 tlsboard.py api.coinbase.com /v2/prices/ETH-USD/spot   # a real wedgie: press green
+uv run --with pyserial python3 tlsboard.py api.coinbase.com/v2/prices/ETH-USD/spot '!api.github.com/zen'   # a real wedgie: press green
 ```
 
-New roots: `security find-certificate -a -p /System/Library/Keychains/SystemRootCertificates.keychain > r.pem; python3 mkroots.py r.pem roots.bin`.
+New roots: `uv run --with certifi --with cryptography python3 mkroots.py roots.bin`.
 
 ## To ship it
 

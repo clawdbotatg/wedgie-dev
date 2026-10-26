@@ -32,7 +32,9 @@ for (const f of ["trustm.mpy"]) await put(f, readFileSync(new URL("../firmware/"
 console.log("files on, chip ms", Math.round(chip.ms));
 
 // the run: the chip asks for bytes with \x1eR, sends with \x1eS<hex>
+const wall0 = Date.now();
 const sock = net.connect(443, host);
+sock.on("close", () => console.log("  (site closed the connection after", ((Date.now() - wall0) / 1000).toFixed(1), "s of real time)"));
 let inq = Buffer.alloc(0), closed = false, flipped = false;
 sock.on("data", (d) => { inq = Buffer.concat([inq, d]); });
 sock.on("end", () => { closed = true; }); sock.on("error", (e) => { console.log("sock", e.message); closed = true; });

@@ -1,27 +1,10 @@
-# tls.py on the computer: real sockets, the Trust M played by `cryptography`.
+# tls.py on the computer: a real socket to the site, the Trust M played by `cryptography` (soft.py).
+#   python3 desk.py api.coinbase.com /v2/prices/ETH-USD/spot
 import socket, sys, time, os
-sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import tls
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature, Prehashed
-from cryptography.hazmat.primitives import hashes
-tls.ROOTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'roots.bin')
-
-class Soft:
-    def random(self, n): return os.urandom(n)
-    def keyshare(self):
-        self.k = ec.generate_private_key(ec.SECP256R1())
-        from cryptography.hazmat.primitives import serialization as s
-        return self.k.public_key().public_bytes(s.Encoding.X962, s.PublicFormat.UncompressedPoint)
-    def shared(self, peer):
-        return self.k.exchange(ec.ECDH(), ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), bytes(peer)))
-    def verify(self, curve, d, r, s, pub):
-        c = ec.SECP256R1() if curve == 3 else ec.SECP384R1()
-        h = hashes.SHA256() if len(d) == 32 else hashes.SHA384()
-        try:
-            ec.EllipticCurvePublicKey.from_encoded_point(c, bytes(pub)).verify(encode_dss_signature(r, s), bytes(d), ec.ECDSA(Prehashed(h)))
-            return True
-        except Exception: return False
+from soft import Soft
+tls.ROOTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "roots.bin")
 
 host, path = sys.argv[1], sys.argv[2]
 s = socket.create_connection((host, 443))

@@ -25,6 +25,8 @@ _CURVES = {b"\x2a\x86\x48\xce\x3d\x03\x01\x07": P256, b"\x2b\x81\x04\x00\x22": P
 _ECDSA256 = b"\x2a\x86\x48\xce\x3d\x04\x03\x02"
 _ECDSA384 = b"\x2a\x86\x48\xce\x3d\x04\x03\x03"
 _SAN = b"\x55\x1d\x11"
+_BC, _KU, _EKU = b"\x55\x1d\x13", b"\x55\x1d\x0f", b"\x55\x1d\x25"
+_SERVER_AUTH, _ANY_EKU = b"\x2b\x06\x01\x05\x05\x07\x03\x01", b"\x55\x1d\x25\x00"
 _KEYLEN = {P256: 65, P384: 97}
 
 
@@ -228,8 +230,9 @@ def _kids(b, s, e):
 
 
 def _cert(der, host=None):
-    """One certificate (a memoryview) -> (tbs view, sigalg, r, s, issuer, subject, curve, key). host: its SAN must
-    name it."""
+    """One certificate (a memoryview) -> (tbs view, sigalg, r, s, issuer, subject, curve, key). host: the leaf, whose
+    SAN must name host; None: a CA, which must say so (basicConstraints cA, keyUsage keyCertSign). Either way, if it
+    lists what it's for (extendedKeyUsage), websites must be one."""
     s, e = _tlv(der, 0)
     tbs, alg, sig = _kids(der, s, e)
     t = _kids(der, tbs[2], tbs[3])
@@ -238,22 +241,38 @@ def _cert(der, host=None):
     salg, bits = _kids(der, spki[2], spki[3])
     a = _kids(der, salg[2], salg[3])
     curve = _CURVES.get(bytes(der[a[1][2]:a[1][3]])) if len(a) > 1 else None
+    ca, named, web, ku = False, False, True, None
+    for x in t[k + 6:]:
+        if x[0] != 0xA3:                          # [3] extensions
+            continue
+        seq = _kids(der, x[2], x[3])[0]
+        for ext in _kids(der, seq[2], seq[3]):
+            f = _kids(der, ext[2], ext[3])
+            oid, v = bytes(der[f[0][2]:f[0][3]]), f[-1]       # v: the OCTET STRING around the value
+            inner = _kids(der, v[2], v[3])[0]
+            if oid == _SAN and host is not None:
+                for n in _kids(der, inner[2], inner[3]):
+                    if n[0] == 0x82 and _host_ok(host, der[n[2]:n[3]]):
+                        named = True
+            elif oid == _BC:
+                f = _kids(der, inner[2], inner[3])
+                ca = bool(f) and f[0][0] == 0x01 and der[f[0][2]] != 0
+            elif oid == _KU:
+                ku = der[inner[2] + 1] if inner[3] - inner[2] > 1 else 0
+            elif oid == _EKU:
+                web = False
+                for o in _kids(der, inner[2], inner[3]):
+                    if bytes(der[o[2]:o[3]]) in (_SERVER_AUTH, _ANY_EKU):
+                        web = True
+    if not web:
+        raise Error("a certificate that isn't for websites")
     if host is not None:
-        ok = False
-        for x in t[k + 6:]:
-            if x[0] != 0xA3 or ok:                # [3] extensions
-                continue
-            seq = _kids(der, x[2], x[3])[0]
-            for ext in _kids(der, seq[2], seq[3]):
-                f = _kids(der, ext[2], ext[3])
-                if bytes(der[f[0][2]:f[0][3]]) == _SAN:
-                    s2 = _kids(der, f[-1][2], f[-1][3])[0]
-                    for n in _kids(der, s2[2], s2[3]):
-                        if n[0] == 0x82 and _host_ok(host, der[n[2]:n[3]]):
-                            ok = True
-                            break
-        if not ok:
+        if not named:
             raise Error("certificate isn't for " + host)
+        if ku is not None and not ku & 0x80:
+            raise Error("certificate can't sign")
+    elif not ca or (ku is not None and not ku & 0x04):
+        raise Error("a certificate in the chain isn't a CA")
     a = _kids(der, alg[2], alg[3])
     sigalg, r, s = bytes(der[a[0][2]:a[0][3]]), None, None
     if sigalg in (_ECDSA256, _ECDSA384):            # (an RSA one past the root is never checked)
@@ -312,6 +331,16 @@ class Chip:
 
 
 # ---- the connection ----
+def _sure(f, *a):
+    """f(*a), where anything that goes wrong (garbled bytes: a bad key, a short message) is an Error."""
+    try:
+        return f(*a)
+    except (Error, MemoryError):
+        raise
+    except Exception as e:
+        raise Error("garbled (%s)" % (type(e).__name__,))
+
+
 class Conn:
     def __init__(self, host, send, recv, chip=None, log=None):
         self.host, self.send, self.recv = host, send, recv
@@ -320,7 +349,7 @@ class Conn:
         self.rb = bytearray(4096)
         self.pend, self.pi = b"", 0
         self.rd = self.wr = None
-        self._handshake()
+        _sure(self._handshake)
 
     def _read(self, mv):
         """Fill mv (a memoryview) from the computer."""
@@ -428,14 +457,18 @@ class Conn:
             raise Error("cipher %s" % bytes(sh[i:i + 2]).hex())
         i += 3
         end, i = i + 2 + int.from_bytes(sh[i:i + 2], "big"), i + 2
-        peer = None
+        peer, v13 = None, False
         while i < end:
             t, n = int.from_bytes(sh[i:i + 2], "big"), int.from_bytes(sh[i + 2:i + 4], "big")
-            if t == 51:
-                peer = sh[i + 8:i + 4 + n]
+            if t == 51 and bytes(sh[i + 4:i + 8]) == b"\x00\x17\x00\x41" and n == 69 and sh[i + 8] == 4:
+                peer = sh[i + 8:i + 73]
+            elif t == 43 and bytes(sh[i + 4:i + 4 + n]) == b"\x03\x04":
+                v13 = True
             i += 4 + n
+        if not v13:
+            raise Error("not TLS 1.3")
         if not peer:
-            raise Error("no key share")
+            raise Error("no P-256 key share")
         dhs = c.shared(peer)
         tr(sh)
         del sh, peer
@@ -528,10 +561,14 @@ class Conn:
         self.log("cert %d" % k)
 
     def get(self, path, headers=b"", most=8192):
-        """GET path over this connection; the body (bytes, up to `most`). Closes it."""
+        return _sure(self._get, path, headers, most)
+
+    def _get(self, path, headers, most):
+        """GET path over this connection; the body (bytes, up to `most`). Closes it. Only a whole answer: its
+        Content-Length, its last chunk, or the site's close_notify; cut short by the computer, it's an Error."""
         self._write(23, b"GET " + path.encode() + b" HTTP/1.1\r\nHost: " + self.host.encode()
                     + b"\r\nConnection: close\r\nAccept-Encoding: identity\r\nUser-Agent: wedgie\r\n" + headers + b"\r\n")
-        out = bytearray()
+        out, hl, cl, chunked, closed = bytearray(), -1, None, False, False
         while True:
             try:
                 typ, data = self._record()
@@ -539,26 +576,46 @@ class Conn:
                 if str(e) == "closed":
                     break
                 raise
-            if typ == 23:
-                if len(out) + len(data) > most + 1024:
-                    raise Error("answer too big")
-                out += data
-            elif typ == 21:
+            if typ == 21:                     # close_notify
+                closed = True
                 break
-            # 22: NewSessionTicket and the like: ignored
-        i = out.find(b"\r\n\r\n")
-        if i < 0:
+            if typ != 23:
+                continue                      # 22: NewSessionTicket and the like
+            if len(out) + len(data) > most + 2048:
+                raise Error("answer too big")
+            out += data
+            if hl < 0:
+                hl = out.find(b"\r\n\r\n")
+                if hl >= 0:
+                    for line in bytes(out[:hl]).lower().split(b"\r\n")[1:]:
+                        if line.startswith(b"content-length:"):
+                            cl = int(line[15:])
+                        elif line.startswith(b"transfer-encoding:"):
+                            chunked = b"chunked" in line
+            if hl >= 0 and cl is not None and not chunked and len(out) - hl - 4 >= cl:
+                break
+            if hl >= 0 and chunked and out.endswith(b"\r\n0\r\n\r\n"):
+                break
+        if hl < 0:
             raise Error("no answer")
-        head, body = bytes(out[:i]), memoryview(out)[i + 4:]
-        self.status = int(head.split(b" ", 2)[1])
-        if b"transfer-encoding: chunked" in head.lower():
+        self.status = int(bytes(out[:hl]).split(b" ", 2)[1])
+        body = memoryview(out)[hl + 4:]
+        if chunked:
             got, j = bytearray(), 0
-            while j < len(body):
+            while True:
                 e = bytes(body[j:j + 12]).find(b"\r\n")
+                if e < 0:
+                    raise Error("cut short")
                 n = int(bytes(body[j:j + e]).split(b";")[0], 16)
                 if not n:
-                    break
+                    return bytes(got)
+                if j + e + 4 + n > len(body):
+                    raise Error("cut short")
                 got += body[j + e + 2:j + e + 2 + n]
                 j += e + 4 + n
-            return bytes(got)
+        if cl is not None:
+            if len(body) != cl:
+                raise Error("cut short")
+        elif not closed:
+            raise Error("cut short")
         return bytes(body)
