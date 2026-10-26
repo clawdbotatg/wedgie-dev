@@ -26,7 +26,8 @@ that attacks. The rule: the site's exact answer or a tls.Error, nothing else. Al
   chain): Binance, Firebase, Blockstream, mempool.space, Alchemy, wedgie.dev.
 
 Virtual RP2040 (`tlschip.mjs`): Coinbase 2.8 s, CoinGecko (P-384) 4.1 s, GitHub 2.8 s, Kraken 2.6 s; a flipped
-bit: "tampered with"; Binance refused. Real wedgie (0.3.57, Safe loaded): Coinbase 6.0 s, 36 KB left.
+bit: "tampered with"; Binance refused. Real wedgie (0.3.57, real Trust M, one green press): Coinbase 5.0 s, CoinGecko (P-384) 7.7 s, GitHub 5.5 s; a bit
+flipped in the handshake or in the answer: "tampered with"; Binance refused. ~14 KB used on top of the code.
 
 RAM: a fetch needs ~34 KB free (11 KB is tls.mpy's code, 4 KB the record buffer, trustm already loaded); drop
 `tls` from sys.modules after and it's 0. Below ~45 KB free, garbage collection slows the emulated chip enough
