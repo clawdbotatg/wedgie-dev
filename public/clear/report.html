@@ -53,6 +53,9 @@ table { width: 100%; border-collapse: collapse; font-size: 14px; }
 td, th { text-align: left; padding: 5px 8px 5px 0; vertical-align: top; }
 th { color: var(--muted); font-weight: 700; font-size: 12px; }
 td.num { width: 3.5em; }
+td.bf { font-size: 13px; word-break: break-all; min-width: 12em; } td.bf code { font-family: var(--mono); font-size: 14px; font-weight: 700; }
+td.bf a { font-weight: 500; }
+#busy td.num { width: 6em; text-align: right; padding-right: 16px; }
 td.nm { font-family: var(--mono); font-size: 13px; white-space: nowrap; }
 .tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 6px; }
 input[type=search] { flex: 1 1 220px; font: inherit; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); }
@@ -82,6 +85,13 @@ input[type=search] { flex: 1 1 220px; font: inherit; padding: 10px 14px; border-
       <span><b>A</b> true and clear</span><span><b>B</b> true, mostly clear</span><span><b>C</b> true, hard to read</span>
       <span><b>D</b> leaves things out</span><span><b>F</b> wrong</span>
     </div>
+  </section>
+
+  <section class="card" id="busy">
+    <h2>Fix first</h2>
+    <p class="sub" id="busySub"></p>
+    <div id="busyList"></div>
+    <button class="chip more" id="busyMore" hidden>Show all</button>
   </section>
 
   <section class="card" id="confirmed">
@@ -184,7 +194,19 @@ function render() {
   $("filters").innerHTML = [["all", "All"], ["fail", "Fail"], ["incomplete", "Couldn't check"], ["pass", "Pass"], ...[...GRADES].map((g) => [g, g])]
     .map(([k, l]) => `<button class="chip" data-f="${k}" aria-pressed="${k === filter}">${l}</button>`).join(" ");
   renderList();
+  renderBusy(false);
 }
+
+function renderBusy(all) {
+  if (!data.busy || !data.busy.length) { $("busy").hidden = true; return; }
+  const w = data.usageWindow, rows = all ? data.busy : data.busy.slice(0, 20);
+  $("busySub").innerHTML = `Mainnet functions people use, with a bad screen. Ranked by transactions × how bad (F counts full, D half, C a fifth). Last 7 days to ${esc(w.toIso.slice(0, 10))}, from <a href="https://erc7730.sourcify.dev/">Kaan's dashboard</a>. Signed messages (permits, Safe, orders) aren't transactions, so they aren't here.`;
+  $("busyList").innerHTML = `<table><tr><th></th><th>Function</th><th>Tx / week</th><th class="hide-s">Worst</th></tr>${rows.map(([f, n, g, t, c, wst, tx, a]) =>
+    `<tr><td>${badge(g)}</td><td class="bf"><code>${esc(n)}</code><br><a href="https://etherscan.io/address/${esc(a)}">${esc(f)}</a></td><td class="num">${tx.toLocaleString()}</td><td class="hide-s">${code(wst)}</td></tr>`).join("")}</table>`;
+  $("busyMore").hidden = all || data.busy.length <= 20;
+  $("busyMore").textContent = `Show all ${data.busy.length}`;
+}
+$("busyMore").addEventListener("click", () => renderBusy(true));
 
 $("filters").addEventListener("click", (e) => {
   const b = e.target.closest("[data-f]"); if (!b) return;
