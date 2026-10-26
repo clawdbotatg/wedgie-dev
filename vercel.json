@@ -282,6 +282,10 @@
       "destination": "/dollar/seven.html"
     },
     {
+      "source": "/clear/report",
+      "destination": "/clear/report.html"
+    },
+    {
       "source": "/telegram",
       "destination": "/index.html"
     }
