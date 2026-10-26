@@ -75,6 +75,9 @@ export function buildFirmware() {
     signed = txt === releaseText() && (!txt.includes("\n@apps  ") || apps === appsText());
     if (!signed) console.warn("fw: release/firmware.txt is out of date: run node tools/sign.mjs");
   } catch {}
+  // Austin 10-25: unsigned firmware went live (0.3.67) and the update asked FULL CONTROL. A deploy with
+  // unsigned firmware or apps fails; the last signed one stays live.
+  if (process.env.VERCEL && !signed) throw new Error("fw: firmware or apps changed but aren't signed. Run node tools/sign.mjs, commit, push");
   writeFileSync(join(out, "manifest.json"), JSON.stringify({ version, files, core, carts, known, signed }, null, 1));
   copyFileSync(join(root, "LORE.md"), join(root, "public/lore.md")); // served at wedgie.dev/lore.md
   return { version, core: core.length, carts: carts.length };
