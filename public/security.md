@@ -46,8 +46,9 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md
   certificate (ECDSA, or RSA 0.3.69+) against Mozilla's roots, and the computer and wedgie.dev's relay carry only encrypted bytes (they
   can block, not read or change). Not checked: certificate dates (no clock) and revocation. The request goes
   out while the certificate is still being checked (0.3.68+: sites hang up on a slow one), so a fake site could
-  see the path asked for; nothing it sends is read until every check passes. Chain reads
-  (`net.chain`, `net.price`) are wedgie.dev's answers: the computer or wedgie.dev could change them.
+  see the path asked for; nothing it sends is read until every check passes. Ethereum reads
+  (`net.chain(1, ...)`, `net.price`, 0.3.70+) go the same way to BuidlGuidl's node (only it could change them).
+  Other chains are wedgie.dev's answers: the computer or wedgie.dev could change them.
   wedgie.dev's Alchemy key never leaves wedgie.dev.
 - **Not an audited hardware wallet.** Don't keep more on it than you can afford to lose.
 - No secp256k1 in either chip: a wedgie owns smart accounts (Safe) through P-256, never a plain Ethereum key.

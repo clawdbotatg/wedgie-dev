@@ -5,7 +5,7 @@ description: Talk to a plugged-in wedgie over USB - find its port, hello, wedgie
 
 # Talk to a wedgie over USB
 
-Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.69**; if `hello`
+Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.70**; if `hello`
 says older, run `wedgie.py update` first.
 
 ## Talk to it directly
@@ -130,7 +130,7 @@ from answering. Hold **Y**: no WEDGIE drive this time (debugging only).
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.69","fw":"wedgie-0.3.69","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.70","fw":"wedgie-0.3.70","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":3,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -155,7 +155,8 @@ from answering. Hold **Y**: no WEDGIE drive this time (debugging only).
 
 **From the wedgie: its app's internet** (0.3.61+, the app's `import net`; wedgie.dev/code.md). The host holding
 its port (its page on wedgie.dev, or `wedgie.py net`) carries it, only for what the running app's wedgie.json
-lists in `"net"` (its sites, `"chain"` for chain reads).
+lists in `"net"` (its sites, `"chain"` for chain reads: wedgie.dev's, plus a site, `mainnet.rpc.buidlguidl.com`,
+0.3.70+, where the wedgie makes its own Ethereum reads).
 
 A site (0.3.67+): the wedgie runs TLS 1.3 with the site itself, the host only carries the encrypted bytes:
 
@@ -170,7 +171,7 @@ line nothing has answered yet: an app that asked while no host was there (right 
 A browser can't open TCP, so the page uses wedgie.dev's relay: a WebSocket to
 `wss://relay.wedgie.dev/?host=<site>` (binary frames; pages on wedgie.dev only, port 443 only).
 
-A chain read, and a site on 0.3.61-0.3.66 (plain answers from wedgie.dev, which the host could change):
+A chain read (on 0.3.70+ not Ethereum's), and a site on 0.3.61-0.3.66 (plain answers from wedgie.dev, which the host could change):
 
     {"type":"net","rid":2,"chain":8453,"method":"eth_blockNumber","params":[]}
     {"type":"net","rid":3,"url":"https://api.coinbase.com/v2/prices/ETH-USD/spot","pick":"data.amount"}

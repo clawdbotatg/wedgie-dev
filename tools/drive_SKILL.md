@@ -15,14 +15,14 @@ or an ATECC608) **wedged** between the boards on I2C. It runs MicroPython plus t
 into one app, and asks on its own screen before anything that matters. Games, tools, and a hardware signer for a
 Safe multisig. Everything is MIT. Home: https://wedgie.dev
 
-**The current firmware is 0.3.69.** If a wedgie's `hello` says older, update it first: everything here assumes
+**The current firmware is 0.3.70.** If a wedgie's `hello` says older, update it first: everything here assumes
 current firmware.
 
 ```yaml
 name: wedgie
 site: https://wedgie.dev
 skill_index: https://wedgie.dev/skill.md          # this file
-firmware: 0.3.69
+firmware: 0.3.70
 license: MIT (hardware design, case, firmware, site, art)
 source: https://github.com/clawdbotatg/wedgie-dev
 made_by: Austin Griffith and Gus Griffith, with @ClawdBotATG; sold by BuidlGuidl DAO LLC
@@ -131,8 +131,9 @@ https://github.com/clawdbotatg/wedgie-starter. Get it on the shelf: email the re
 **The internet** (firmware 0.3.61+): a wedgie has none, but an app can use its computer's. It lists the sites in
 wedgie.json (`"net"`) and calls `net.get(url)`, `net.chain(...)` or `net.price()`; the wedgie's page on wedgie.dev
 (open in a tab) or `python3 wedgie.py net` carries them. `net.get` (0.3.67+) is the wedgie's own TLS with the site:
-the computer and wedgie.dev can block it, never change it (answers up to 6 KB, 5-8 s a site). Chain
-reads are wedgie.dev's (its Alchemy key, read-only), so those could be changed. How: code.md, "The internet".
+the computer and wedgie.dev can block it, never change it (answers up to 6 KB, 5-8 s a site). Ethereum
+reads and `net.price()` (0.3.70+) go the same way to BuidlGuidl's node; other chains are wedgie.dev's (its Alchemy
+key), so those could be changed. How: code.md, "The internet".
 
 ## wedgie.dev, every page
 
@@ -222,7 +223,7 @@ https://instantwallet.io. Details: safe.md.
 
 # Talk to a wedgie over USB
 
-Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.69**; if `hello`
+Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.70**; if `hello`
 says older, run `wedgie.py update` first.
 
 ## Talk to it directly
@@ -347,7 +348,7 @@ from answering. Hold **Y**: no WEDGIE drive this time (debugging only).
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.69","fw":"wedgie-0.3.69","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.70","fw":"wedgie-0.3.70","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":3,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -372,7 +373,8 @@ from answering. Hold **Y**: no WEDGIE drive this time (debugging only).
 
 **From the wedgie: its app's internet** (0.3.61+, the app's `import net`; wedgie.dev/code.md). The host holding
 its port (its page on wedgie.dev, or `wedgie.py net`) carries it, only for what the running app's wedgie.json
-lists in `"net"` (its sites, `"chain"` for chain reads).
+lists in `"net"` (its sites, `"chain"` for chain reads: wedgie.dev's, plus a site, `mainnet.rpc.buidlguidl.com`,
+0.3.70+, where the wedgie makes its own Ethereum reads).
 
 A site (0.3.67+): the wedgie runs TLS 1.3 with the site itself, the host only carries the encrypted bytes:
 
@@ -387,7 +389,7 @@ line nothing has answered yet: an app that asked while no host was there (right 
 A browser can't open TCP, so the page uses wedgie.dev's relay: a WebSocket to
 `wss://relay.wedgie.dev/?host=<site>` (binary frames; pages on wedgie.dev only, port 443 only).
 
-A chain read, and a site on 0.3.61-0.3.66 (plain answers from wedgie.dev, which the host could change):
+A chain read (on 0.3.70+ not Ethereum's), and a site on 0.3.61-0.3.66 (plain answers from wedgie.dev, which the host could change):
 
     {"type":"net","rid":2,"chain":8453,"method":"eth_blockNumber","params":[]}
     {"type":"net","rid":3,"url":"https://api.coinbase.com/v2/prices/ETH-USD/spot","pick":"data.amount"}
@@ -748,8 +750,8 @@ The page sends the transaction's fields. The wedgie works out the Safe tx hash i
 few big words per page, and signs only on **green (A)**. **Red (Y)**, or no answer in 2 minutes, is a no.
 
 - Every page shows **which Safe** at the top (a dark card: its blockie and address) and the chain at the bottom.
-  Every address is in full with its blockie. The first page shows a blockie of the Safe tx hash, so a computer and
-  a phone can be compared by eye.
+  Every address is in full with its blockie. The Safe tx hash itself is never shown: the wedgie works it out
+  from the fields and signs that.
 - Read in plain words: ETH and token sends (each chain's own coin: 0.5 POL on Polygon), owner and threshold
   changes, modules on/off, Candide recovery (guardians, cancel), Instant Wallet's daily budget (Zodiac Roles),
   exact approvals, Uniswap swaps (Universal Router V3/V4: pay, get at least, to this Safe, fee), MultiSend
@@ -887,8 +889,9 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md
   certificate (ECDSA, or RSA 0.3.69+) against Mozilla's roots, and the computer and wedgie.dev's relay carry only encrypted bytes (they
   can block, not read or change). Not checked: certificate dates (no clock) and revocation. The request goes
   out while the certificate is still being checked (0.3.68+: sites hang up on a slow one), so a fake site could
-  see the path asked for; nothing it sends is read until every check passes. Chain reads
-  (`net.chain`, `net.price`) are wedgie.dev's answers: the computer or wedgie.dev could change them.
+  see the path asked for; nothing it sends is read until every check passes. Ethereum reads
+  (`net.chain(1, ...)`, `net.price`, 0.3.70+) go the same way to BuidlGuidl's node (only it could change them).
+  Other chains are wedgie.dev's answers: the computer or wedgie.dev could change them.
   wedgie.dev's Alchemy key never leaves wedgie.dev.
 - **Not an audited hardware wallet.** Don't keep more on it than you can afford to lose.
 - No secp256k1 in either chip: a wedgie owns smart accounts (Safe) through P-256, never a plain Ethereum key.
@@ -1466,22 +1469,26 @@ A wedgie has no network, but the computer it's plugged into does. List the sites
 import net
 amt = net.get("https://api.coinbase.com/v2/prices/ETH-USD/spot", pick="data.amount")   # "3412.10"
 rows = net.get("https://example.com/list.json", pick="0:5.{title,amount}")             # [{title, amount}] x 5
-p = net.price()                                      # ETH in dollars (a float)
+r = net.post("https://example.com/api", {"q": "eth"}, pick="data")                     # a POST of JSON (0.3.70+)
+p = net.price()                                      # ETH in dollars (a float): Chainlink's ETH/USD feed
+b = int(net.chain(1, "eth_blockNumber"), 16)         # an Ethereum read
 ps = net.chain(1, "wedgie_symbols", ["BTC", "SOL"])  # {"BTC": 80449.85, "SOL": 101.46}: any coin by symbol (25 max)
 t = net.chain(8453, "wedgie_prices", ["0x4ed4...efed"])["tokens"]   # tokens on that chain by address: {address: usd}
 n = int(net.chain(8453, "eth_blockNumber"), 16)      # a chain read: eth_call, eth_getBalance, eth_blockNumber, ...
 ```
 
-- **`net.get` can't be changed on the way (firmware 0.3.67+).** The wedgie runs TLS 1.3 with the site itself
+- **`net.get` and `net.post` can't be changed on the way (firmware 0.3.67+, post 0.3.70+).** The wedgie runs TLS 1.3 with the site itself
   (its Trust M does the math) and checks the site's certificate. The computer and wedgie.dev only carry
   encrypted bytes: they can block an answer, never read or change it. Every error is a `net.Error`. Don't put
   secrets in the URL: it goes out while the certificate is still being checked.
-- **`net.chain` and `net.price` can.** They are wedgie.dev's answers (its Alchemy key), so the computer or
-  wedgie.dev could change them. Don't let money move on them alone.
+- **Ethereum reads can't either (0.3.70+):** `net.chain(1, ...)` and `net.price()` go the same way to
+  BuidlGuidl's Ethereum node (mainnet.rpc.buidlguidl.com); the price is Chainlink's ETH/USD feed on it.
+- **Other chains and `wedgie_*` methods can be changed.** They are wedgie.dev's answers (its Alchemy key), so
+  the computer or wedgie.dev could change them. Don't let money move on them alone.
 - Who carries it: **the wedgie's page on wedgie.dev, open in a tab** (wedgie.dev/connect, pick it; Chrome or
   Edge; it sends the bytes through wedgie.dev's relay), or `python3 wedgie.py net` in a terminal (straight to
   the site). Nothing open: `net.Error("no internet: ...")` after 15 s. Say so on your screen and in your README.
-- Sites: https only, GET only, only what `"net"` lists (a name covers its subdomains). Its certificate must come
+- Sites: https only, GET (POST JSON 0.3.70+, 1500 bytes at most), only what `"net"` lists (a name covers its subdomains). Its certificate must come
   from a CA Mozilla trusts: ECDSA (P-256, P-384) or, 0.3.69+, RSA (2048 bits or more). Coinbase, CoinGecko,
   GitHub, Kraken, Binance, mempool.space, Firebase, DefiLlama and wedgie.dev all work. Try yours on
   wedgie.dev/virtual first.
@@ -1493,11 +1500,11 @@ n = int(net.chain(8453, "eth_blockNumber"), 16)      # a chain read: eth_call, e
 - A site takes **5-8 s** (the wedgie checks the site's certificate each time): draw your loading screen first
   (`ui.progress("Getting the price", "coinbase.com", bar=False)`). It uses ~30 KB of RAM while it runs and
   gives it all back after.
-- `net.chain(chain, method, params)` is any read-only JSON-RPC call on that chain; wedgie.dev makes it. No URL.
-  `"chain"` uses wedgie.dev's Alchemy key (it never reaches the app or the page); read methods only. Chains: 1
-  Ethereum, 8453 Base, 10 Optimism, 42161 Arbitrum, 137 Polygon, and more. Each waits for its answer (usually
-  under a second). Not waiting: `rid = net.ask({"chain": 1, "method": "eth_blockNumber"})`, then
-  `net.answer(rid)` each frame (None till it's in). A url ask does the whole fetch before it returns.
+- `net.chain(chain, method, params)` is any read-only JSON-RPC call on that chain. No URL. Chain 1: the wedgie
+  asks BuidlGuidl's node itself (5-8 s, like a site). The rest: wedgie.dev asks with its Alchemy key (it never
+  reaches the app or the page); read methods only; usually under a second. Chains: 1 Ethereum, 8453 Base, 10
+  Optimism, 42161 Arbitrum, 137 Polygon, and more. Not waiting: `rid = net.ask({"chain": 1, "method": "eth_blockNumber"})`, then
+  `net.answer(rid)` each frame (None till it's in). A url ask (and chain 1) does the whole fetch before it returns.
 - Full examples: https://github.com/clawdbotatg/wedgie-ethprice, https://github.com/clawdbotatg/wedgie-ticker
 
 ## The rest of the hardware

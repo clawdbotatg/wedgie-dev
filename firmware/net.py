@@ -1,17 +1,20 @@
 # net: the internet for an app, through the computer it's plugged into (0.3.61+). A wedgie has no internet:
 # its page on wedgie.dev (/connect/<ID>, open in a tab) or `wedgie.py net` carries it. Only the sites the app
 # lists in its wedgie.json are reached:
-#   "net": ["poidh.xyz", "chain"]          ("chain": read-only chain calls and prices, Alchemy's key stays on wedgie.dev)
+#   "net": ["poidh.xyz", "chain"]          ("chain": read-only chain calls and prices)
 #
 #   import net
 #   net.get("https://poidh.xyz/bounties/data", pick="0:5.{title,amount}")   -> the JSON (or text), trimmed
+#   net.post("https://poidh.xyz/api", {"q": 1}, pick="data")                 -> the same, for a POST of JSON
 #   net.chain(8453, "eth_getBalance", ["0x...", "latest"])                    -> the call's result
 #   net.price()                                                               -> ETH in dollars (a float)
 #
-# net.get (0.3.67+) is the wedgie's own TLS 1.3 to the site (tls.py, the Trust M does the math): the computer
-# and wedgie.dev's relay carry encrypted bytes, so they can block an answer but never read or change it. The
-# whole answer must fit in MOST bytes; pick runs here. net.chain and net.price are wedgie.dev's answers (its
-# Alchemy key): the computer or wedgie.dev could change those.
+# net.get and net.post (0.3.67+, post 0.3.70+) are the wedgie's own TLS 1.3 to the site (tls.py, the Trust M
+# does the math): the computer and wedgie.dev's relay carry encrypted bytes, so they can block an answer but
+# never read or change it. The whole answer must fit in MOST bytes; pick runs here.
+# net.chain(1, ...) and net.price() (0.3.70+) are the same: Ethereum's RPC node at BuidlGuidl (RPC1), the price
+# from Chainlink's ETH/USD feed. Other chains and the wedgie_* methods are wedgie.dev's answers (its Alchemy
+# key): the computer or wedgie.dev could change those.
 # Each waits for its answer (up to ms) and raises net.Error if none comes: draw your loading screen first.
 # Not waiting (chain calls): rid = net.ask({...}); then net.answer(rid) each tick (None until it's in). A url
 # ask does the whole fetch before it returns.
@@ -25,6 +28,8 @@ import wedgie as W
 
 MS = 15000
 MOST = 6000         # the biggest answer a site may send (bytes, the body): it's all in RAM before pick
+RPC1 = "https://mainnet.rpc.buidlguidl.com/"    # Ethereum reads, over the wedgie's own TLS
+FEED = "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"     # Chainlink ETH/USD on Ethereum (8 decimals)
 
 
 class Error(Exception):
@@ -54,9 +59,9 @@ def ask(req):
     """Send one request; returns its rid. The answer comes back through slot.py (got). A url: fetched now."""
     global _rid
     _rid += 1
-    if "url" in req:
+    if "url" in req or _own(req):
         try:
-            _got[_rid] = {"data": get(req["url"], req.get("pick"))}
+            _got[_rid] = {"data": get(req["url"], req.get("pick")) if "url" in req else _rpc(req["method"], req.get("params") or [])}
         except Error as e:
             _got[_rid] = {"error": str(e)}
         return _rid
@@ -66,6 +71,22 @@ def ask(req):
         del _out[min(_out)]
     _send(_rid, req)
     return _rid
+
+
+def _own(req):
+    """An Ethereum read the wedgie makes itself (RPC1), not through wedgie.dev."""
+    return req.get("chain") == 1 and not str(req.get("method", "")).startswith("wedgie_")
+
+
+def _rpc(method, params, ms=MS):
+    import json
+    v = post(RPC1, json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": list(params)}), ms=ms)
+    if not isinstance(v, dict):
+        raise Error("not JSON-RPC")
+    if "error" in v:
+        e = v["error"]
+        raise Error(str(e.get("message", e) if isinstance(e, dict) else e)[:120])
+    return v.get("result")
 
 
 def got(m):
@@ -120,7 +141,17 @@ def wait(rid, ms=MS):
     return answer(rid)
 
 
-def get(url, pick=None, ms=MS):
+def post(url, data, pick=None, ms=MS):
+    """POST JSON (a dict or list, or a str already JSON) to an https site over the wedgie's own TLS."""
+    if not isinstance(data, str):
+        import json
+        data = json.dumps(data)
+    if len(data) > 1500:
+        raise Error("too much to send")
+    return get(url, pick, ms, data.encode())
+
+
+def get(url, pick=None, ms=MS, body=None):
     """GET an https site over the wedgie's own TLS; its JSON (or text), with pick applied."""
     if not url.startswith("https://"):
         raise Error("https only")
@@ -156,7 +187,7 @@ def get(url, pick=None, ms=MS):
     try:
         import tls
         try:
-            body = tls.Conn(host, send, recv).get("/" + path, most=MOST)
+            body = tls.Conn(host, send, recv).get("/" + path, most=MOST, body=body)
         except tls.Error as e:
             raise Error(said[0] if said else str(e))
         except OSError as e:            # no Trust M to do the math
@@ -225,8 +256,11 @@ def _walk(v, steps):
 
 
 def chain(chain_id, method, params=(), ms=MS):
+    if _own({"chain": chain_id, "method": method}):
+        return _rpc(method, params, ms)
     return wait(ask({"chain": chain_id, "method": method, "params": list(params)}), ms)
 
 
 def price(ms=MS):
-    return chain(1, "wedgie_prices", (), ms)["eth"]
+    """ETH in dollars: Chainlink's feed on Ethereum (latestAnswer), read over the wedgie's own TLS."""
+    return int(_rpc("eth_call", ({"to": FEED, "data": "0x50d25bcd"}, "latest"), ms), 16) / 1e8

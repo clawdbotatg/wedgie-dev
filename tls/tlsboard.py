@@ -1,6 +1,6 @@
 # tls.py on a REAL wedgie: asks for full control (press green once), puts tls.mpy + roots.bin on, runs each
 # GET with this computer carrying the TCP bytes, then deletes the two files. A case is host/path; "!" first:
-# the computer flips a bit in the handshake, "!!": in the answer.
+# the computer flips a bit in the handshake, "!!": in the answer. "host/path@{json}": a POST of that JSON.
 #   uv run --with pyserial python3 tlsboard.py api.coinbase.com/v2/prices/ETH-USD/spot '!api.github.com/zen' ...
 import sys, time, json, glob, socket, serial, os
 cases = sys.argv[1:]
@@ -26,7 +26,7 @@ def read_until(pat, t):
 for case in cases:
     tamper = len(case) - len(case.lstrip("!"))
     host, _, path = case.lstrip("!").partition("/")
-    path = "/" + path
+    path, _, body = ("/" + path).partition("@")
     print("==", case)
     sock = socket.create_connection((host, 443))
     sock.settimeout(0.05)
@@ -49,13 +49,13 @@ for case in cases:
     print("start free", gc.mem_free())
     try:
         c = tls.Conn(%r, send, recv, log=log)
-        b = c.get(%r)
+        b = c.get(%r, body=%r)
         log("got %%d bytes, status %%d" %% (len(b), c.status))
         print("BODY", b[:200])
     except tls.Error as e:
         print("TLS ERROR", e)
     print("lowest free", low[0])
-    ''' % (host, path)
+    ''' % (host, path, body.encode() or None)
     code = "\n".join(l[4:] if l.startswith("    ") else l for l in code.split("\n"))
     wg.buf = b""
     cb = code.encode()

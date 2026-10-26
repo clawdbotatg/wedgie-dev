@@ -678,7 +678,10 @@ def net_allows(net, url):
     except ValueError:
         return False
     h = (u.hostname or "").lower()
-    return not bad and any(s != "chain" and (h == s or h.endswith("." + s)) for s in net or [])
+    return not bad and any(h == CHAIN_HOST if s == "chain" else h == s or h.endswith("." + s) for s in net or [])
+
+
+CHAIN_HOST = "mainnet.rpc.buidlguidl.com"      # "chain" also reaches Ethereum's RPC node (firmware 0.3.70+: net.py RPC1)
 
 
 def site_post(path, body):

@@ -13,7 +13,7 @@ import { trustM, newTrustM } from "../src/chip/trustm.ts";
 import { firmware, image } from "./rp2040/image.mjs";
 
 const relay = process.argv.includes("--relay");
-const NET = ["api.coinbase.com", "api.coingecko.com", "api.github.com", "api.kraken.com", "mempool.space"];
+const NET = ["api.coinbase.com", "api.coingecko.com", "api.github.com", "api.kraken.com", "mempool.space", "mainnet.rpc.buidlguidl.com"];  // the last: "chain"
 const F = firmware();
 F.app({ mod: "nettest", name: "Net Test", files: ["nettest.py"], entry: "run", net: NET }, { "nettest.py": readFileSync(new URL("./fixtures/nettest.py", import.meta.url)) });
 const flash = flashFromUf2(readFileSync(new URL("../public/mp/RPI_PICO.uf2", import.meta.url)));
@@ -90,7 +90,7 @@ while (!done && Date.now() - t0 < 600_000) {
 }
 check(done, "the app got through every site");
 check(lost >= 2, `a late computer: ${lost} lines went nowhere, then net.ready sent them again`);
-const [cb, cg, gh, kr, mp, ex, flip] = results;
+const [cb, cg, gh, kr, mp, ex, flip, px, blk] = results;
 check(cb && /^\d+\.\d+$/.test(cb.v), `Coinbase: ${cb?.v ?? cb?.error} (${cb?.ms} ms)`);
 check(cg && typeof cg.v?.usd === "number", `CoinGecko (P-384 root): ${JSON.stringify(cg?.v ?? cg?.error)} (${cg?.ms} ms)`);
 check(gh && typeof gh.v === "string" && gh.v.length > 3, `GitHub, text: ${gh?.v ?? gh?.error} (${gh?.ms} ms)`);
@@ -98,5 +98,7 @@ check(kr && typeof kr.v === "number", `Kraken: ${kr?.v ?? kr?.error} (${kr?.ms} 
 check(mp && typeof mp.v === "number", `mempool.space (RSA): ${mp?.v ?? mp?.error} (${mp?.ms} ms)`);
 check(ex && /isn't in the app's "net"/.test(ex.error || ""), `a site not in "net": ${ex?.error}`);
 check(flip && /tampered/.test(flip.error || ""), `a bit flipped by the computer: ${flip?.error}`);
+check(px && typeof px.v === "number" && px.v > 100, `net.price (Chainlink, BuidlGuidl's node): ${px?.v ?? px?.error} (${px?.ms} ms)`);
+check(blk && /^0x[0-9a-f]+$/.test(blk.v || ""), `net.chain(1) (BuidlGuidl's node): ${blk?.v ?? blk?.error} (${blk?.ms} ms)`);
 console.log(failed ? `${failed} FAILED` : "all passed");
 process.exit(failed ? 1 : 0);

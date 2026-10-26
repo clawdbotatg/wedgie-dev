@@ -26,8 +26,10 @@ export function netAllows(net, url) {
   try { u = new URL(url); } catch { return false; }
   if (u.protocol !== "https:" || u.port || u.username || u.password) return false;
   const h = u.hostname.toLowerCase();
-  return (net || []).some((s) => s !== "chain" && (h === s || h.endsWith("." + s)));
+  return (net || []).some((s) => s === "chain" ? h === CHAIN_HOST : h === s || h.endsWith("." + s));
 }
+// "chain" also lets an app reach Ethereum's RPC node over its own TLS (firmware 0.3.70+: net.py RPC1)
+export const CHAIN_HOST = "mainnet.rpc.buidlguidl.com";
 export const DEFAULT_ICON = ["............", ".kkkkkkkkkk.", ".k........k.", ".k.k....k.k.", ".k........k.", ".k........k.",
   ".k.k....k.k.", ".k..kkkk..k.", ".k........k.", ".kkkkkkkkkk.", "............", "............"];
 

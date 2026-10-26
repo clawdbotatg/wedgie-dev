@@ -660,17 +660,21 @@ class Conn:
         a = _kids(sig, *_tlv(sig, 0))
         return self.chip.verify(kind, d, int.from_bytes(sig[a[0][2]:a[0][3]], "big"), int.from_bytes(sig[a[1][2]:a[1][3]], "big"), pub)
 
-    def get(self, path, headers=b"", most=8192):
-        return _sure(self._get, path, headers, most)
+    def get(self, path, headers=b"", most=8192, body=None):
+        return _sure(self._get, path, headers, most, body)
 
-    def _get(self, path, headers, most):
-        """GET path over this connection; the body (bytes, up to `most`). Closes it. Only a whole answer: its
-        Content-Length, its last chunk, or the site's close_notify; cut short by the computer, it's an Error."""
+    def _get(self, path, headers, most, body):
+        """GET path over this connection (POST `body`, JSON bytes, if given); the answer's body (bytes, up to
+        `most`). Closes it. Only a whole answer: its Content-Length, its last chunk, or the site's close_notify;
+        cut short by the computer, it's an Error."""
         # The request goes before the signatures are checked: sites hang up ~10 s after connecting without one, and a
         # virtual wedgie at half speed took longer than that. The cost: a fake site would see the path asked for.
         # It can't change the answer: nothing is read until every check passes.
-        self._write(23, b"GET " + path.encode() + b" HTTP/1.1\r\nHost: " + self.host.encode()
-                    + b"\r\nConnection: close\r\nAccept-Encoding: identity\r\nUser-Agent: wedgie\r\n" + headers + b"\r\n")
+        if body is not None:
+            headers += b"Content-Type: application/json\r\nContent-Length: %d\r\n" % len(body)
+        self._write(23, (b"POST " if body is not None else b"GET ") + path.encode() + b" HTTP/1.1\r\nHost: " + self.host.encode()
+                    + b"\r\nConnection: close\r\nAccept-Encoding: identity\r\nUser-Agent: wedgie\r\n" + headers + b"\r\n"
+                    + (body or b""))
         self._checks()
         out, hl, cl, chunked, closed = bytearray(), -1, None, False, False
         while True:

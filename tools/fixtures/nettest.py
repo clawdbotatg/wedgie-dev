@@ -14,6 +14,8 @@ SITES = (
     ("https://mempool.space/api/blocks/tip/height", None),            # RSA (0.3.69+)
     ("https://example.com/", None),                      # not in its "net": the computer says no
     ("https://api.coinbase.com/v2/prices/ETH-USD/spot", "data.amount"),     # the computer flips a bit (netchip)
+    ("price", None),                                     # net.price: Chainlink over its own TLS (0.3.70+)
+    ("block", None),                                     # net.chain(1, ...): BuidlGuidl's node, the same
 )
 
 
@@ -23,7 +25,7 @@ def run():
         gc.collect()
         f0, t = gc.mem_free(), time.ticks_ms()
         try:
-            v = net.get(url, pick)
+            v = net.price() if url == "price" else net.chain(1, "eth_blockNumber") if url == "block" else net.get(url, pick)
             W.send({"type": "nettest", "url": url, "v": v, "ms": time.ticks_diff(time.ticks_ms(), t)})
         except net.Error as e:
             W.send({"type": "nettest", "url": url, "error": str(e)})

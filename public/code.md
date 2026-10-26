@@ -390,22 +390,26 @@ A wedgie has no network, but the computer it's plugged into does. List the sites
 import net
 amt = net.get("https://api.coinbase.com/v2/prices/ETH-USD/spot", pick="data.amount")   # "3412.10"
 rows = net.get("https://example.com/list.json", pick="0:5.{title,amount}")             # [{title, amount}] x 5
-p = net.price()                                      # ETH in dollars (a float)
+r = net.post("https://example.com/api", {"q": "eth"}, pick="data")                     # a POST of JSON (0.3.70+)
+p = net.price()                                      # ETH in dollars (a float): Chainlink's ETH/USD feed
+b = int(net.chain(1, "eth_blockNumber"), 16)         # an Ethereum read
 ps = net.chain(1, "wedgie_symbols", ["BTC", "SOL"])  # {"BTC": 80449.85, "SOL": 101.46}: any coin by symbol (25 max)
 t = net.chain(8453, "wedgie_prices", ["0x4ed4...efed"])["tokens"]   # tokens on that chain by address: {address: usd}
 n = int(net.chain(8453, "eth_blockNumber"), 16)      # a chain read: eth_call, eth_getBalance, eth_blockNumber, ...
 ```
 
-- **`net.get` can't be changed on the way (firmware 0.3.67+).** The wedgie runs TLS 1.3 with the site itself
+- **`net.get` and `net.post` can't be changed on the way (firmware 0.3.67+, post 0.3.70+).** The wedgie runs TLS 1.3 with the site itself
   (its Trust M does the math) and checks the site's certificate. The computer and wedgie.dev only carry
   encrypted bytes: they can block an answer, never read or change it. Every error is a `net.Error`. Don't put
   secrets in the URL: it goes out while the certificate is still being checked.
-- **`net.chain` and `net.price` can.** They are wedgie.dev's answers (its Alchemy key), so the computer or
-  wedgie.dev could change them. Don't let money move on them alone.
+- **Ethereum reads can't either (0.3.70+):** `net.chain(1, ...)` and `net.price()` go the same way to
+  BuidlGuidl's Ethereum node (mainnet.rpc.buidlguidl.com); the price is Chainlink's ETH/USD feed on it.
+- **Other chains and `wedgie_*` methods can be changed.** They are wedgie.dev's answers (its Alchemy key), so
+  the computer or wedgie.dev could change them. Don't let money move on them alone.
 - Who carries it: **the wedgie's page on wedgie.dev, open in a tab** (wedgie.dev/connect, pick it; Chrome or
   Edge; it sends the bytes through wedgie.dev's relay), or `python3 wedgie.py net` in a terminal (straight to
   the site). Nothing open: `net.Error("no internet: ...")` after 15 s. Say so on your screen and in your README.
-- Sites: https only, GET only, only what `"net"` lists (a name covers its subdomains). Its certificate must come
+- Sites: https only, GET (POST JSON 0.3.70+, 1500 bytes at most), only what `"net"` lists (a name covers its subdomains). Its certificate must come
   from a CA Mozilla trusts: ECDSA (P-256, P-384) or, 0.3.69+, RSA (2048 bits or more). Coinbase, CoinGecko,
   GitHub, Kraken, Binance, mempool.space, Firebase, DefiLlama and wedgie.dev all work. Try yours on
   wedgie.dev/virtual first.
@@ -417,11 +421,11 @@ n = int(net.chain(8453, "eth_blockNumber"), 16)      # a chain read: eth_call, e
 - A site takes **5-8 s** (the wedgie checks the site's certificate each time): draw your loading screen first
   (`ui.progress("Getting the price", "coinbase.com", bar=False)`). It uses ~30 KB of RAM while it runs and
   gives it all back after.
-- `net.chain(chain, method, params)` is any read-only JSON-RPC call on that chain; wedgie.dev makes it. No URL.
-  `"chain"` uses wedgie.dev's Alchemy key (it never reaches the app or the page); read methods only. Chains: 1
-  Ethereum, 8453 Base, 10 Optimism, 42161 Arbitrum, 137 Polygon, and more. Each waits for its answer (usually
-  under a second). Not waiting: `rid = net.ask({"chain": 1, "method": "eth_blockNumber"})`, then
-  `net.answer(rid)` each frame (None till it's in). A url ask does the whole fetch before it returns.
+- `net.chain(chain, method, params)` is any read-only JSON-RPC call on that chain. No URL. Chain 1: the wedgie
+  asks BuidlGuidl's node itself (5-8 s, like a site). The rest: wedgie.dev asks with its Alchemy key (it never
+  reaches the app or the page); read methods only; usually under a second. Chains: 1 Ethereum, 8453 Base, 10
+  Optimism, 42161 Arbitrum, 137 Polygon, and more. Not waiting: `rid = net.ask({"chain": 1, "method": "eth_blockNumber"})`, then
+  `net.answer(rid)` each frame (None till it's in). A url ask (and chain 1) does the whole fetch before it returns.
 - Full examples: https://github.com/clawdbotatg/wedgie-ethprice, https://github.com/clawdbotatg/wedgie-ticker
 
 ## The rest of the hardware
