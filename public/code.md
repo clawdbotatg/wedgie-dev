@@ -405,10 +405,10 @@ n = int(net.chain(8453, "eth_blockNumber"), 16)      # a chain read: eth_call, e
 - Who carries it: **the wedgie's page on wedgie.dev, open in a tab** (wedgie.dev/connect, pick it; Chrome or
   Edge; it sends the bytes through wedgie.dev's relay), or `python3 wedgie.py net` in a terminal (straight to
   the site). Nothing open: `net.Error("no internet: ...")` after 15 s. Say so on your screen and in your README.
-- Sites: https only, GET only, only what `"net"` lists (a name covers its subdomains). The site needs an ECDSA
-  certificate (P-256 or P-384) from a CA Mozilla trusts: Coinbase, CoinGecko, GitHub, Kraken, Cloudflare and
-  DefiLlama work; sites with RSA certificates (Binance, Alchemy, Firebase, mempool.space) give
-  `net.Error("not an ECDSA chain")`. Try yours on wedgie.dev/virtual first.
+- Sites: https only, GET only, only what `"net"` lists (a name covers its subdomains). Its certificate must come
+  from a CA Mozilla trusts: ECDSA (P-256, P-384) or, 0.3.69+, RSA (2048 bits or more). Coinbase, CoinGecko,
+  GitHub, Kraken, Binance, mempool.space, Firebase, DefiLlama and wedgie.dev all work. Try yours on
+  wedgie.dev/virtual first.
 - **The whole answer must fit in 6 KB** (it's all in RAM before `pick` runs). Ask the site for less (query
   parameters), then `pick` what you need. A path is steps split by `.`: a field name, `3` an item (`-1` the
   last), `2:5` items 2-4, `*` every item, `{a,b}` just those fields; each list step applies the rest of the

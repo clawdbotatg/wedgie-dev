@@ -313,6 +313,8 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
         if (v?.type === "net") answerNet(r, v, netOf(), seen);
         else if (v?.type === "tcp") answerTcp(r, v, netOf(), seen);
       };
+      // 0.3.69+: we carry its net now; what its app asked before we had it goes out again (net.ready)
+      if (x.kind === "wedgie" && x.version && cmpVersion(x.version, "0.3.69") >= 0) r.write('{"type":"net"}\n').catch(() => {});
       setScreen(home());
       paint();
       if (liveFs()) loadSaves();

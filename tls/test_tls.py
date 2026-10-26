@@ -61,6 +61,10 @@ def roots(*certs):
     out = b""
     for c in certs:
         k = c.public_key()
+        if isinstance(k, rsa.RSAPublicKey):
+            der = k.public_bytes(serialization.Encoding.DER, serialization.PublicFormat.PKCS1)
+            out += hashlib.sha256(c.subject.public_bytes()).digest()[:12] + b"\x10" + len(der).to_bytes(2, "big") + der
+            continue
         out += hashlib.sha256(c.subject.public_bytes()).digest()[:12] + bytes([3 if k.curve.name == "secp256r1" else 4])
         out += k.public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
     open(p, "wb").write(out)
@@ -73,7 +77,13 @@ interk = p256()
 inter = cert("Test CA", interk, "Test Root P-384", rootk, ca=True, ku="cert")
 root256k = p256()
 root256 = cert("Test Root P-256", root256k, ca=True, ku="cert")
-ROOTS = roots(root, root256)
+rsa_rootk = rsa.generate_private_key(public_exponent=65537, key_size=4096)
+rsa_root = cert("Test Root RSA", rsa_rootk, ca=True, ku="cert")
+rsa_interk = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+rsa_inter = cert("Test RSA CA", rsa_interk, "Test Root RSA", rsa_rootk, ca=True, ku="cert")
+small_rootk = rsa.generate_private_key(public_exponent=65537, key_size=1024)
+small_root = cert("Test Root RSA 1024", small_rootk, ca=True, ku="cert")
+ROOTS = roots(root, root256, rsa_root, small_root)
 tls.ROOTS = ROOTS
 
 
@@ -280,11 +290,61 @@ def main():
     except tls.Error as e:
         check(True, "a bad CertificateVerify -> %s" % e)
     rk = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    must_fail(Site(rk, [cert("leaf", rk, "Test CA", interk, ca=False, san=[HOST], ku="sig"), inter]), "an RSA certificate")
     must_fail(Site(k, [c, inter], tls12=True), "a TLS 1.2 site")
     k16 = p384()
     check(fetch(Site(k16, [cert("leaf", k16, "Test CA", interk, ca=False, san=[HOST], ku="sig"), inter]))[0] == "ok",
           "a P-384 leaf key")
+
+    # RSA (0.3.69+): an RSA root and intermediate, RSA or EC leaves; PSS for the site's own signature
+    rk1 = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    rleaf = cert("leaf", rk1, "Test RSA CA", rsa_interk, ca=False, san=[HOST], ku="sig")
+    check(fetch(Site(rk1, [rleaf, rsa_inter])) == ("ok", b"hello"), "an RSA chain (4096 root, 2048 CA) and an RSA leaf (PSS)")
+    ek1 = p256()
+    check(fetch(Site(ek1, [cert("leaf", ek1, "Test RSA CA", rsa_interk, ca=False, san=[HOST], ku="sig"), rsa_inter]))[0] == "ok",
+          "an EC leaf under an RSA CA")
+    rk2 = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    check(fetch(Site(rk2, [cert("leaf", rk2, "Test CA", interk, ca=False, san=[HOST], ku="sig"), inter]))[0] == "ok",
+          "an RSA leaf under an EC CA")
+    rk3 = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    check(fetch(Site(rk3, [cert("leaf", rk3, "Test RSA CA", rsa_interk, ca=False, san=[HOST], ku="sig", h=hashes.SHA384()), rsa_inter]))[0] == "ok",
+          "an RSA leaf signed with SHA-384")
+    evil_rsak = rsa.generate_private_key(public_exponent=65537, key_size=4096)
+    evil_rsa_inter = cert("Test RSA CA", rsa_interk, "Test Root RSA", evil_rsak, ca=True, ku="cert")   # the root's name, another key
+    must_fail(Site(rk1, [rleaf, evil_rsa_inter]), "an RSA CA signed by a fake RSA root (same name)")
+    must_fail(Site(rk1, [cert("leaf", rk1, "Test RSA CA", rsa_interk, ca=False, san=["other.wedgie.test"], ku="sig"), rsa_inter]),
+              "an RSA certificate for another site")
+    rk4 = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    must_fail(Site(rk4, [cert("leaf", rk4, "Test Root RSA 1024", small_rootk, ca=False, san=[HOST], ku="sig")]),
+              "a leaf from a 1024-bit RSA root (too small)")
+    ak2 = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    ac2 = cert("leaf", ak2, "Test RSA CA", rsa_interk, ca=False, san=["attacker.wedgie.test"], ku="sig")
+    fk2 = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    must_fail(Site(fk2, [cert("leaf", fk2, "leaf", ak2, ca=False, san=[HOST], ku="sig"), ac2, rsa_inter]),
+              "an RSA leaf signed by another site's RSA leaf (not a CA)")
+    real_pss = tls.rsa_pss
+    tls.rsa_pss = lambda *a: False          # the site's own RSA signature (PSS) doesn't check out
+    must_fail(Site(rk1, [rleaf, rsa_inter]), "a bad RSA CertificateVerify")
+    tls.rsa_pss = real_pss
+    real_pk = tls.rsa_pkcs1
+    tls.rsa_pkcs1 = lambda *a: False        # a chain signature doesn't check out
+    must_fail(Site(rk1, [rleaf, rsa_inter]), "a bad RSA chain signature")
+    tls.rsa_pkcs1 = real_pk
+    flipped = bytearray(rleaf.signature)    # check rsa_pkcs1 itself with a real signature and a flipped one
+    from cryptography.hazmat.primitives.asymmetric import padding
+    der = rsa_interk.public_key().public_bytes(serialization.Encoding.DER, serialization.PublicFormat.PKCS1)
+    d = hashlib.sha256(rleaf.tbs_certificate_bytes).digest()
+    check(tls.rsa_pkcs1(der, rleaf.signature, 256, d), "rsa_pkcs1: a real signature")
+    flipped[100] ^= 1
+    check(not tls.rsa_pkcs1(der, bytes(flipped), 256, d), "rsa_pkcs1: one bit flipped")
+    for bits, h in ((256, hashes.SHA256()), (384, hashes.SHA384())):
+        m = os.urandom(50)
+        sg = rk1.sign(m, padding.PSS(mgf=padding.MGF1(h), salt_length=h.digest_size), h)
+        der1 = rk1.public_key().public_bytes(serialization.Encoding.DER, serialization.PublicFormat.PKCS1)
+        dd = hashlib.new(h.name, m).digest()
+        check(tls.rsa_pss(der1, sg, bits, dd) and not tls.rsa_pss(der1, sg[:-1] + bytes([sg[-1] ^ 1]), bits, dd),
+              "rsa_pss SHA-%d: real signature yes, flipped no" % bits)
+    check(tls.sha512(b"abc") == hashlib.sha512(b"abc").digest() and tls.sha384(bytes(300)) == hashlib.sha384(bytes(300)).digest(),
+          "SHA-384/512 in Python")
 
     # the answer
     big = bytes(random.getrandbits(8) for _ in range(6000))
@@ -363,7 +423,7 @@ def main():
         tls.ROOTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "firmware", "roots.bin")
         for host, path in [("api.coinbase.com", "/v2/prices/ETH-USD/spot"), ("api.coingecko.com", "/api/v3/ping"),
                            ("api.github.com", "/zen"), ("www.cloudflare.com", "/cdn-cgi/trace"), ("poidh.xyz", "/robots.txt"),
-                           ("api.kraken.com", "/0/public/Time"), ("api.binance.com", "/api/v3/time"),
+                           ("api.kraken.com", "/0/public/Time"), ("api.binance.com", "/api/v3/time"), ("wedgie.dev", "/robots.txt"),
                            ("hacker-news.firebaseio.com", "/v0/maxitem.json"), ("api.llama.fi", "/v2/chains"),
                            ("blockstream.info", "/api/blocks/tip/height"), ("mempool.space", "/api/blocks/tip/height")]:
             try:

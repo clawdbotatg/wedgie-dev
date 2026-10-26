@@ -43,7 +43,7 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md
 - **The internet (0.3.61+):** an app can fetch from the sites its wedgie.json lists (`"net"`), through its open
   wedgie.dev page or `wedgie.py net`. The page and wedgie.py refuse any other site, so a reviewed app can only
   talk to what the review saw. A site (`net.get`, 0.3.67+) is the wedgie's own TLS 1.3: it checks the site's
-  certificate against Mozilla's roots, and the computer and wedgie.dev's relay carry only encrypted bytes (they
+  certificate (ECDSA, or RSA 0.3.69+) against Mozilla's roots, and the computer and wedgie.dev's relay carry only encrypted bytes (they
   can block, not read or change). Not checked: certificate dates (no clock) and revocation. The request goes
   out while the certificate is still being checked (0.3.68+: sites hang up on a slow one), so a fake site could
   see the path asked for; nothing it sends is read until every check passes. Chain reads

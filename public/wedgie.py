@@ -783,6 +783,8 @@ def cmd_net(wg, args):
     print("its app (%s) gets the internet from here: %s. Ctrl-C to stop." % (mod, ", ".join(net) if net else "nothing (no \"net\" in its wedgie.json)"))
     while True:
         try:
+            with _wlock:                        # 0.3.69+: what its app asked before we were here goes out again
+                wg.s.write(b'{"type":"net"}\n')
             for line in wg._lines(lambda l: False, 10 ** 9):
                 if not line.startswith("{") or ('"net"' not in line and '"tcp"' not in line):
                     continue

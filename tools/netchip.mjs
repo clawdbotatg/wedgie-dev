@@ -2,7 +2,9 @@
 // tools/fixtures/nettest.py gets real sites over the wedgie's own TLS, and this plays its computer the way its
 // wedgie.dev page does (src/serial/net.ts answerTcp), with the site's bytes over a plain TCP socket (or through
 // relay.wedgie.dev: --relay). Each site must come back right; one not in the app's "net" must be refused; a bit
-// the computer flips must be caught ("tampered with"); no traceback, no memory error.
+// the computer flips must be caught ("tampered with"); no traceback, no memory error. The computer comes late,
+// as after an install: the first site's lines go nowhere for 3 s, then it says {"type":"net"} (0.3.69+, net.ready)
+// and the wedgie sends them again.
 //   node tools/netchip.mjs [--relay]        (needs uv: the flash image)
 import { readFileSync } from "node:fs";
 import net from "node:net";
@@ -11,7 +13,7 @@ import { trustM, newTrustM } from "../src/chip/trustm.ts";
 import { firmware, image } from "./rp2040/image.mjs";
 
 const relay = process.argv.includes("--relay");
-const NET = ["api.coinbase.com", "api.coingecko.com", "api.github.com", "api.kraken.com"];
+const NET = ["api.coinbase.com", "api.coingecko.com", "api.github.com", "api.kraken.com", "mempool.space"];
 const F = firmware();
 F.app({ mod: "nettest", name: "Net Test", files: ["nettest.py"], entry: "run", net: NET }, { "nettest.py": readFileSync(new URL("./fixtures/nettest.py", import.meta.url)) });
 const flash = flashFromUf2(readFileSync(new URL("../public/mp/RPI_PICO.uf2", import.meta.url)));
@@ -30,7 +32,7 @@ function tcp(v) {
   if (typeof v.host === "string") {
     opened++;
     if (!NET.includes(v.host)) return write({ type: "tcp", rid, error: `${v.host} isn't in the app's "net" (wedgie.json)` });
-    const flip = opened === 6;          // the last site: the computer changes one bit of what the site sent
+    const flip = opened === 7;          // the last site: the computer changes one bit of what the site sent
     let n = 0;
     const s = relay ? null : net.connect(443, v.host);
     const me = { s, ws: null, held: [] };
@@ -65,9 +67,10 @@ function tcp(v) {
 }
 
 const t0 = Date.now();
-let done = false;
+let done = false, lost = 0, hereAt = null;     // hereAt: chip ms the late computer shows up
 while (!done && Date.now() - t0 < 600_000) {
   chip.run(20);
+  if (hereAt !== null && chip.ms >= hereAt && hereAt > 0) { write({ type: "net" }); hereAt = -1; }
   await new Promise((r) => setImmediate(r));
   let i;
   while ((i = out.indexOf("\n", seen)) >= 0) {
@@ -77,18 +80,22 @@ while (!done && Date.now() - t0 < 600_000) {
     if (!line.startsWith("{")) continue;
     let v;
     try { v = JSON.parse(line); } catch { continue; }
-    if (v.type === "tcp") tcp(v);
+    if (v.type === "tcp" && hereAt === null) { lost++; hereAt = chip.ms + 3000; }
+    else if (v.type === "tcp" && chip.ms < hereAt) lost++;
+    else if (v.type === "tcp") tcp(v);
     else if (v.type === "nettest" && v.done) done = true;
     else if (v.type === "nettest") { results.push(v); console.log("     ", JSON.stringify(v).slice(0, 150)); }
     else if (v.type === "nettest_free") console.log(`      free ${v.before} before, ${v.after} after`);
   }
 }
 check(done, "the app got through every site");
-const [cb, cg, gh, kr, ex, flip] = results;
+check(lost >= 2, `a late computer: ${lost} lines went nowhere, then net.ready sent them again`);
+const [cb, cg, gh, kr, mp, ex, flip] = results;
 check(cb && /^\d+\.\d+$/.test(cb.v), `Coinbase: ${cb?.v ?? cb?.error} (${cb?.ms} ms)`);
 check(cg && typeof cg.v?.usd === "number", `CoinGecko (P-384 root): ${JSON.stringify(cg?.v ?? cg?.error)} (${cg?.ms} ms)`);
 check(gh && typeof gh.v === "string" && gh.v.length > 3, `GitHub, text: ${gh?.v ?? gh?.error} (${gh?.ms} ms)`);
 check(kr && typeof kr.v === "number", `Kraken: ${kr?.v ?? kr?.error} (${kr?.ms} ms)`);
+check(mp && typeof mp.v === "number", `mempool.space (RSA): ${mp?.v ?? mp?.error} (${mp?.ms} ms)`);
 check(ex && /isn't in the app's "net"/.test(ex.error || ""), `a site not in "net": ${ex?.error}`);
 check(flip && /tampered/.test(flip.error || ""), `a bit flipped by the computer: ${flip?.error}`);
 console.log(failed ? `${failed} FAILED` : "all passed");

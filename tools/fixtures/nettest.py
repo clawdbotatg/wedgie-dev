@@ -11,6 +11,7 @@ SITES = (
     ("https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd", {"usd": "ethereum.usd"}),
     ("https://api.github.com/zen", None),
     ("https://api.kraken.com/0/public/Time", "result.unixtime"),
+    ("https://mempool.space/api/blocks/tip/height", None),            # RSA (0.3.69+)
     ("https://example.com/", None),                      # not in its "net": the computer says no
     ("https://api.coinbase.com/v2/prices/ETH-USD/spot", "data.amount"),     # the computer flips a bit (netchip)
 )

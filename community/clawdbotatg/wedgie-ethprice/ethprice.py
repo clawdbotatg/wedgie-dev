@@ -46,10 +46,22 @@ def draw(d, got):
     d.show()
 
 
+def page():
+    """Right after an install the wedgie restarts, and its page takes a few seconds to come back: a request
+    sent before then is lost. Ask every 3 s (up to 45 s) before the first real try."""
+    t = time.ticks_ms()
+    while time.ticks_diff(time.ticks_ms(), t) < 45000:
+        try:
+            return net.price(3000)
+        except net.Error:
+            pass
+
+
 def run():
     d = L.LCD()
     keys = L.Keys()
     ui.progress("Getting the price", "wedgie.dev", bar=False)
+    page()
     while True:
         try:
             got = fetch()

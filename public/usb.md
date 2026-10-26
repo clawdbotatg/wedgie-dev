@@ -5,7 +5,7 @@ description: Talk to a plugged-in wedgie over USB - find its port, hello, wedgie
 
 # Talk to a wedgie over USB
 
-Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.68**; if `hello`
+Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.69**; if `hello`
 says older, run `wedgie.py update` first.
 
 ## Talk to it directly
@@ -130,7 +130,7 @@ from answering. Hold **Y**: no WEDGIE drive this time (debugging only).
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.68","fw":"wedgie-0.3.68","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.69","fw":"wedgie-0.3.69","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":3,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -163,6 +163,9 @@ A site (0.3.67+): the wedgie runs TLS 1.3 with the site itself, the host only ca
     {"type":"tcp","rid":1,"d":"<base64>"}                       bytes, both ways (to the wedgie: 1000 a line at most)
     {"type":"tcp","rid":1,"end":true}                           closed (either way)
     {"type":"tcp","rid":1,"error":"api.x.com isn't in the app's \"net\""}   to the wedgie: won't, or can't
+
+Once a host is answering these, it sends `{"type":"net"}` (no rid, 0.3.69+). The wedgie sends again every
+line nothing has answered yet: an app that asked while no host was there (right after a restart) gets its answer.
 
 A browser can't open TCP, so the page uses wedgie.dev's relay: a WebSocket to
 `wss://relay.wedgie.dev/?host=<site>` (binary frames; pages on wedgie.dev only, port 443 only).

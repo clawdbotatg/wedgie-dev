@@ -468,12 +468,21 @@
     },
     {
       "repo": "clawdbotatg/wedgie-ethprice",
-      "sha": "54dbcd56ff411bb2e987e494cff28be33720be6c",
-      "at": "2026-10-24T21:00:00Z",
-      "approved": "2026-10-24",
+      "sha": "05db4c2571fb029b2bfbf2854cd6d2cf3c3f0ac1",
+      "at": "2026-10-26T04:12:02Z",
+      "approved": "2026-10-26",
       "v": {
-        "ethprice": "7bf5790f34a8"
-      }
+        "ethprice": "23772ca5e9b8"
+      },
+      "past": [
+        {
+          "sha": "54dbcd56ff411bb2e987e494cff28be33720be6c",
+          "at": "2026-10-24T21:00:00Z",
+          "v": {
+            "ethprice": "7bf5790f34a8"
+          }
+        }
+      ]
     }
   ]
 }

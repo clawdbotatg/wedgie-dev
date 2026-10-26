@@ -18,6 +18,8 @@
 # Wire (public/usb.md): a site: {"type": "tcp", "rid": 7, "host": ...}, then {"type": "tcp", "rid": 7, "d": <base64>}
 # both ways, {..., "end": true} or {..., "error": "..."} to close. A chain call: {"type": "net", "rid": 7, "chain":
 # 1, "method": ..., "params": [...]}; the answer {"type": "net", "rid": 7, "data": ...} or {..., "error": "..."}.
+# {"type": "net"} with no rid (0.3.69+): a host carries net from now on. Lines nobody answered yet go out again
+# (after an install the app asks before its page has found it: those were lost, and it said No internet).
 import time
 import wedgie as W
 
@@ -32,6 +34,20 @@ class Error(Exception):
 _rid = 0
 _got = {}           # rid -> its answer line (a dict), till the app takes it
 _tcp = {}           # rid -> what the computer sent on that connection, not read yet: [bytes | None (end) | str (error)]
+_out = {}           # rid -> the lines sent on it that nothing has answered yet (ready sends them again)
+
+
+def _send(rid, line):
+    W.send(line)
+    if rid in _out:
+        _out[rid].append(line)
+
+
+def ready():
+    """A host just started carrying net: everything nobody answered goes out again, in order."""
+    for rid in sorted(_out):
+        for line in _out[rid]:
+            W.send(line)
 
 
 def ask(req):
@@ -45,15 +61,21 @@ def ask(req):
             _got[_rid] = {"error": str(e)}
         return _rid
     req["type"], req["rid"] = "net", _rid
-    W.send(req)
+    _out[_rid] = []
+    while len(_out) > 4:            # asks nobody waits for any more
+        del _out[min(_out)]
+    _send(_rid, req)
     return _rid
 
 
 def got(m):
     """slot.py: a "net" or "tcp" line from the computer."""
     rid = m.get("rid")
+    if rid is None:
+        return ready()
     if not (isinstance(rid, int) and 0 < rid <= _rid):
         return
+    _out.pop(rid, None)             # a host has it
     if m.get("type") == "tcp":
         q = _tcp.get(rid)
         if q is not None:
@@ -90,6 +112,7 @@ def wait(rid, ms=MS):
     t = time.ticks_ms()
     while rid not in _got:
         if time.ticks_diff(time.ticks_ms(), t) > ms:
+            _out.pop(rid, None)
             raise Error("no internet: open its page on wedgie.dev")
         if serve:
             serve()
@@ -108,11 +131,12 @@ def get(url, pick=None, ms=MS):
     _rid += 1
     rid, serve = _rid, _serve()
     q, said = _tcp.setdefault(rid, []), []
-    W.send({"type": "tcp", "rid": rid, "host": host})
+    _out[rid] = []
+    _send(rid, {"type": "tcp", "rid": rid, "host": host})
 
     def send(b):
         import binascii
-        W.send({"type": "tcp", "rid": rid, "d": binascii.b2a_base64(b, newline=False).decode()})
+        _send(rid, {"type": "tcp", "rid": rid, "d": binascii.b2a_base64(b, newline=False).decode()})
 
     def recv():
         t = time.ticks_ms()
@@ -139,6 +163,7 @@ def get(url, pick=None, ms=MS):
             raise Error("needs the Trust M chip (%s)" % e)
     finally:
         del _tcp[rid]
+        _out.pop(rid, None)
         W.send({"type": "tcp", "rid": rid, "end": True})
         sys.modules.pop("tls", None)    # ~11 KB of code: back as soon as it's done
         gc.collect()

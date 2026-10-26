@@ -4,8 +4,9 @@
 it was plain JSON through the computer and wedgie.dev, and either one could change an answer. The computer only carries the bytes, so it
 can block or slow them, never read or change them.
 
-Only what a wedgie can check fast: P-256 key exchange, AES-128-GCM, ECDSA P-256/P-384 certificates chained
-to an ECC root in `roots.bin`. The Trust M does ECDH and the signature
+P-256 key exchange, AES-128-GCM, certificates ECDSA (P-256/P-384) or RSA (0.3.69+: PKCS#1 v1.5 in the chain,
+PSS for the site's own signature; one pow() in C, 0.15 s for 2048 bits, 0.5 s for 4096) chained to a root in
+`roots.bin` (Mozilla's, 117 roots, 41 KB, read one at a time). The Trust M does ECDH and the signature
 checks; cryptolib does AES; GHASH, HKDF and SHA-384 are Python.
 
 ## Tests (10-25)
@@ -22,8 +23,11 @@ that attacks. The rule: the site's exact answer or a tls.Error, nothing else. Al
 - **The computer attacks, 0 changed answers:** one bit flipped at 588 places from the site and 134 from the
   wedgie; cut off at 274 places; each record dropped, sent twice, swapped, zeroed. An answer cut short (its
   Content-Length, last chunk, or close_notify missing) is an Error.
-- **Live:** Coinbase, CoinGecko, GitHub, Cloudflare, poidh, Kraken, DefiLlama. Refused cleanly (RSA in the
-  chain): Binance, Firebase, Blockstream, mempool.space, Alchemy, wedgie.dev.
+- **Live:** Coinbase, CoinGecko, GitHub, Cloudflare, poidh, Kraken, DefiLlama, and (RSA, 0.3.69+) Binance,
+  Firebase, Blockstream, mempool.space, wedgie.dev.
+- **RSA (0.3.69+):** RSA chains (4096 root, 2048 CA), RSA leaves (PSS) and mixed EC/RSA chains taken; a fake RSA
+  root, a 1024-bit root, an RSA leaf used as a CA, bad PKCS#1 and PSS signatures refused. On the chip: 20 known
+  signatures (2048/4096, SHA-256/384/512, real and flipped) all right.
 
 Virtual RP2040 (`tlschip.mjs`): Coinbase 2.8 s, CoinGecko (P-384) 4.1 s, GitHub 2.8 s, Kraken 2.6 s; a flipped
 bit: "tampered with"; Binance refused. Real wedgie (0.3.57, real Trust M, one green press): Coinbase 5.0 s, CoinGecko (P-384) 7.7 s, GitHub 5.5 s; a bit
@@ -62,4 +66,3 @@ New roots: `uv run --with certifi --with cryptography python3 mkroots.py roots.b
    its key would sit on the wedgie.
 2. A handshake per fetch (5-8 s): keep the connection for repeat calls.
 3. Answers over 6 KB fail: pick while the records come in, not after.
-4. RSA chains (Binance, Firebase): the Trust M can check RSA signatures too.

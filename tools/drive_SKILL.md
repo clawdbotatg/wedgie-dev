@@ -15,14 +15,14 @@ or an ATECC608) **wedged** between the boards on I2C. It runs MicroPython plus t
 into one app, and asks on its own screen before anything that matters. Games, tools, and a hardware signer for a
 Safe multisig. Everything is MIT. Home: https://wedgie.dev
 
-**The current firmware is 0.3.68.** If a wedgie's `hello` says older, update it first: everything here assumes
+**The current firmware is 0.3.69.** If a wedgie's `hello` says older, update it first: everything here assumes
 current firmware.
 
 ```yaml
 name: wedgie
 site: https://wedgie.dev
 skill_index: https://wedgie.dev/skill.md          # this file
-firmware: 0.3.68
+firmware: 0.3.69
 license: MIT (hardware design, case, firmware, site, art)
 source: https://github.com/clawdbotatg/wedgie-dev
 made_by: Austin Griffith and Gus Griffith, with @ClawdBotATG; sold by BuidlGuidl DAO LLC
@@ -131,7 +131,7 @@ https://github.com/clawdbotatg/wedgie-starter. Get it on the shelf: email the re
 **The internet** (firmware 0.3.61+): a wedgie has none, but an app can use its computer's. It lists the sites in
 wedgie.json (`"net"`) and calls `net.get(url)`, `net.chain(...)` or `net.price()`; the wedgie's page on wedgie.dev
 (open in a tab) or `python3 wedgie.py net` carries them. `net.get` (0.3.67+) is the wedgie's own TLS with the site:
-the computer and wedgie.dev can block it, never change it (ECDSA sites only, answers up to 6 KB, 5-8 s). Chain
+the computer and wedgie.dev can block it, never change it (answers up to 6 KB, 5-8 s a site). Chain
 reads are wedgie.dev's (its Alchemy key, read-only), so those could be changed. How: code.md, "The internet".
 
 ## wedgie.dev, every page
@@ -222,7 +222,7 @@ https://instantwallet.io. Details: safe.md.
 
 # Talk to a wedgie over USB
 
-Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.68**; if `hello`
+Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.69**; if `hello`
 says older, run `wedgie.py update` first.
 
 ## Talk to it directly
@@ -347,7 +347,7 @@ from answering. Hold **Y**: no WEDGIE drive this time (debugging only).
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.68","fw":"wedgie-0.3.68","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.69","fw":"wedgie-0.3.69","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":3,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -377,9 +377,12 @@ lists in `"net"` (its sites, `"chain"` for chain reads).
 A site (0.3.67+): the wedgie runs TLS 1.3 with the site itself, the host only carries the encrypted bytes:
 
     {"type":"tcp","rid":1,"host":"api.coinbase.com"}            open the site's port 443
-    {"type":"tcp","rid":1,"d":"<base64>"}                       bytes, both ways (to the wedgie: 3000 a line at most)
+    {"type":"tcp","rid":1,"d":"<base64>"}                       bytes, both ways (to the wedgie: 1000 a line at most)
     {"type":"tcp","rid":1,"end":true}                           closed (either way)
     {"type":"tcp","rid":1,"error":"api.x.com isn't in the app's \"net\""}   to the wedgie: won't, or can't
+
+Once a host is answering these, it sends `{"type":"net"}` (no rid, 0.3.69+). The wedgie sends again every
+line nothing has answered yet: an app that asked while no host was there (right after a restart) gets its answer.
 
 A browser can't open TCP, so the page uses wedgie.dev's relay: a WebSocket to
 `wss://relay.wedgie.dev/?host=<site>` (binary frames; pages on wedgie.dev only, port 443 only).
@@ -881,7 +884,7 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md
 - **The internet (0.3.61+):** an app can fetch from the sites its wedgie.json lists (`"net"`), through its open
   wedgie.dev page or `wedgie.py net`. The page and wedgie.py refuse any other site, so a reviewed app can only
   talk to what the review saw. A site (`net.get`, 0.3.67+) is the wedgie's own TLS 1.3: it checks the site's
-  certificate against Mozilla's roots, and the computer and wedgie.dev's relay carry only encrypted bytes (they
+  certificate (ECDSA, or RSA 0.3.69+) against Mozilla's roots, and the computer and wedgie.dev's relay carry only encrypted bytes (they
   can block, not read or change). Not checked: certificate dates (no clock) and revocation. The request goes
   out while the certificate is still being checked (0.3.68+: sites hang up on a slow one), so a fake site could
   see the path asked for; nothing it sends is read until every check passes. Chain reads
@@ -1478,10 +1481,10 @@ n = int(net.chain(8453, "eth_blockNumber"), 16)      # a chain read: eth_call, e
 - Who carries it: **the wedgie's page on wedgie.dev, open in a tab** (wedgie.dev/connect, pick it; Chrome or
   Edge; it sends the bytes through wedgie.dev's relay), or `python3 wedgie.py net` in a terminal (straight to
   the site). Nothing open: `net.Error("no internet: ...")` after 15 s. Say so on your screen and in your README.
-- Sites: https only, GET only, only what `"net"` lists (a name covers its subdomains). The site needs an ECDSA
-  certificate (P-256 or P-384) from a CA Mozilla trusts: Coinbase, CoinGecko, GitHub, Kraken, Cloudflare and
-  DefiLlama work; sites with RSA certificates (Binance, Alchemy, Firebase, mempool.space) give
-  `net.Error("not an ECDSA chain")`. Try yours on wedgie.dev/virtual first.
+- Sites: https only, GET only, only what `"net"` lists (a name covers its subdomains). Its certificate must come
+  from a CA Mozilla trusts: ECDSA (P-256, P-384) or, 0.3.69+, RSA (2048 bits or more). Coinbase, CoinGecko,
+  GitHub, Kraken, Binance, mempool.space, Firebase, DefiLlama and wedgie.dev all work. Try yours on
+  wedgie.dev/virtual first.
 - **The whole answer must fit in 6 KB** (it's all in RAM before `pick` runs). Ask the site for less (query
   parameters), then `pick` what you need. A path is steps split by `.`: a field name, `3` an item (`-1` the
   last), `2:5` items 2-4, `*` every item, `{a,b}` just those fields; each list step applies the rest of the

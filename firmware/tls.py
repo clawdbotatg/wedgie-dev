@@ -1,7 +1,8 @@
 # tls: a wedgie's own TLS 1.3 connection to a site. The computer (and wedgie.dev) only carry the bytes: they
-# can block them, never read or change them. Only what a wedgie can check fast: key exchange P-256, the cipher
-# AES-128-GCM, certificates ECDSA P-256 or P-384, chained to a root in roots.bin. The heavy math runs on the
-# Trust M (ECDH, signature checks); AES on cryptolib; GHASH, HKDF and SHA-384 in Python.
+# can block them, never read or change them. Key exchange P-256, the cipher AES-128-GCM, certificates ECDSA
+# (P-256, P-384) or RSA (PKCS#1 v1.5 in the chain, PSS for the site's own signature; 0.3.69+), chained to a root in
+# roots.bin. The Trust M does ECDH and the ECDSA checks; an RSA check is one pow() (MicroPython's C bigints: 0.1 s
+# for 2048 bits, 0.5 s for 4096 on an RP2040); AES on cryptolib; GHASH, HKDF and SHA-384/512 in Python.
 #   c = tls.Conn("api.coinbase.com", send, recv)    # send(bytes); recv() -> bytes (b"" = closed)
 #   body = c.get("/v2/prices/ETH-USD/spot")         # the HTTP/1.1 body (bytes); raises tls.Error
 # net.get uses it (0.3.67+); the computer carries the bytes (wedgie.dev's relay, relay/, or wedgie.py net).
@@ -21,11 +22,17 @@ class Error(Exception):
     pass
 
 
-ROOTS = "/roots.bin"    # per root: sha256(subject DER)[:12], curve (3 P-256, 4 P-384), its key (04 X Y). mkroots.py
-P256, P384 = 3, 4
+# per root: sha256(subject DER)[:12], its kind (3 P-256, 4 P-384: the key 04 X Y; 16 RSA: 2 bytes of length, then
+# the RSAPublicKey DER). tls/mkroots.py makes it.
+ROOTS = "/roots.bin"
+P256, P384, RSA = 3, 4, 16
 _CURVES = {b"\x2a\x86\x48\xce\x3d\x03\x01\x07": P256, b"\x2b\x81\x04\x00\x22": P384}
+_RSAKEY = b"\x2a\x86\x48\x86\xf7\x0d\x01\x01\x01"
 _ECDSA256 = b"\x2a\x86\x48\xce\x3d\x04\x03\x02"
 _ECDSA384 = b"\x2a\x86\x48\xce\x3d\x04\x03\x03"
+# a certificate's signature algorithm -> (ECDSA or not, its hash)
+_SIGALGS = {_ECDSA256: (True, 256), _ECDSA384: (True, 384), b"\x2a\x86\x48\x86\xf7\x0d\x01\x01\x0b": (False, 256),
+            b"\x2a\x86\x48\x86\xf7\x0d\x01\x01\x0c": (False, 384), b"\x2a\x86\x48\x86\xf7\x0d\x01\x01\x0d": (False, 512)}
 _SAN = b"\x55\x1d\x11"
 _BC, _KU, _EKU = b"\x55\x1d\x13", b"\x55\x1d\x0f", b"\x55\x1d\x25"
 _SERVER_AUTH, _ANY_EKU = b"\x2b\x06\x01\x05\x05\x07\x03\x01", b"\x55\x1d\x25\x00"
@@ -33,16 +40,17 @@ _KEYLEN = {P256: 65, P384: 97}
 
 
 def root(issuer):
-    """(curve, key) of the root whose subject is issuer (DER), or None."""
+    """(kind, key) of the root whose subject is issuer (DER), or None."""
     want = hashlib.sha256(issuer).digest()[:12]
     with open(ROOTS, "rb") as f:
         while True:
             h = f.read(13)
             if len(h) < 13:
                 return None
-            k = f.read(_KEYLEN[h[12]])
+            n = _KEYLEN.get(h[12]) or int.from_bytes(f.read(2), "big")
             if h[:12] == want:
-                return h[12], k
+                return h[12], f.read(n)
+            f.seek(n, 1)
 
 
 # ---- hashes ----
@@ -79,11 +87,24 @@ _M64 = 0xFFFFFFFFFFFFFFFF
 
 
 def sha384(msg):
-    """SHA-384 in Python (a Pico's hashlib has none): one certificate signature, ~1 KB. msg: any buffer."""
+    return _sha512(msg, (0xcbbb9d5dc1059ed8, 0x629a292a367cd507, 0x9159015a3070dd17, 0x152fecd8f70e5939,
+                         0x67332667ffc00b31, 0x8eb44a8768581511, 0xdb0c2e0d64f98fa7, 0x47b5481dbefa4fa4), 6)
+
+
+def sha512(msg):
+    return _sha512(msg, (0x6a09e667f3bcc908, 0xbb67ae8584caa73b, 0x3c6ef372fe94f82b, 0xa54ff53a5f1d36f1,
+                         0x510e527fade682d1, 0x9b05688c2b3e6c1f, 0x1f83d9abfb41bd6b, 0x5be0cd19137e2179), 8)
+
+
+def digest(bits, msg):
+    return sha256(msg) if bits == 256 else sha384(msg) if bits == 384 else sha512(msg)
+
+
+def _sha512(msg, h, words):
+    """SHA-384/512 in Python (a Pico's hashlib has none): a certificate signature, ~1 KB. msg: any buffer."""
     import binascii
     K = binascii.unhexlify(_K512)           # 640 bytes; each constant read as it's used (a list of 80 would be 3 KB)
-    h = [0xcbbb9d5dc1059ed8, 0x629a292a367cd507, 0x9159015a3070dd17, 0x152fecd8f70e5939,
-         0x67332667ffc00b31, 0x8eb44a8768581511, 0xdb0c2e0d64f98fa7, 0x47b5481dbefa4fa4]
+    h = list(h)
     n = len(msg)
     full = n - n % 128
     tail = bytes(msg[full:]) + b"\x80" + bytes((111 - n) % 128) + (n * 8).to_bytes(16, "big")
@@ -101,7 +122,68 @@ def sha384(msg):
             t2 = ((r(a, 28) ^ r(a, 34) ^ r(a, 39)) + ((a & b) ^ (a & c) ^ (b & c))) & _M64
             hh, g, f, e, d, c, b, a = g, f, e, (d + t1) & _M64, c, b, a, (t1 + t2) & _M64
         h = [(x + y) & _M64 for x, y in zip(h, (a, b, c, d, e, f, g, hh))]
-    return b"".join(x.to_bytes(8, "big") for x in h[:6])
+    return b"".join(x.to_bytes(8, "big") for x in h[:words])
+
+
+# ---- RSA (software: pow() is C) ----
+_INFO = {256: b"\x30\x31\x30\x0d\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x01\x05\x00\x04\x20",
+         384: b"\x30\x41\x30\x0d\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x02\x05\x00\x04\x30",
+         512: b"\x30\x51\x30\x0d\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x03\x05\x00\x04\x40"}
+
+
+def _rsa(key, sig):
+    """sig^e mod n as bytes (the modulus's length), or None. key: RSAPublicKey DER."""
+    a = _kids(key, *_tlv(key, 0))
+    nb = bytes(key[a[0][2]:a[0][3]]).lstrip(b"\x00")
+    n, e = int.from_bytes(nb, "big"), int.from_bytes(key[a[1][2]:a[1][3]], "big")
+    k = len(nb)
+    bits = 8 * k - 8 + len(bin(nb[0])) - 2          # (MicroPython's int has no bit_length)
+    s = int.from_bytes(sig, "big")
+    if len(sig) != k or s >= n or bits < 2048 or e < 3:
+        return None
+    return pow(s, e, n).to_bytes(k, "big"), bits
+
+
+def rsa_pkcs1(key, sig, bits, d):
+    """PKCS#1 v1.5 (a certificate's signature): True if sig signs the digest d (SHA-bits)."""
+    r = _rsa(key, sig)
+    if not r:
+        return False
+    em, _ = r
+    want = _INFO[bits] + d
+    return em == b"\x00\x01" + b"\xff" * (len(em) - len(want) - 3) + b"\x00" + want
+
+
+def rsa_pss(key, sig, bits, d):
+    """RSASSA-PSS, salt as long as the hash (TLS 1.3's rsa_pss_rsae_*): True if sig signs the digest d."""
+    r = _rsa(key, sig)
+    if not r:
+        return False
+    em, nbits = r
+    hl, embits = bits // 8, nbits - 1
+    emlen = (embits + 7) // 8
+    if len(em) > emlen:
+        if em[0]:
+            return False
+        em = em[1:]
+    if em[-1] != 0xBC or emlen < 2 * hl + 2:
+        return False
+    db, h = bytearray(em[:emlen - hl - 1]), em[emlen - hl - 1:-1]
+    top = 0xFF >> (8 * emlen - embits)
+    if db[0] & ~top & 0xFF:
+        return False
+    c, o = 0, 0
+    while o < len(db):                      # MGF1
+        m = digest(bits, h + c.to_bytes(4, "big"))
+        for x in m[:len(db) - o]:
+            db[o] ^= x
+            o += 1
+        c += 1
+    db[0] &= top
+    z = emlen - 2 * hl - 2
+    if any(db[:z]) or db[z] != 1:
+        return False
+    return digest(bits, bytes(8) + d + bytes(db[-hl:])) == h
 
 
 # ---- the key schedule (RFC 8446 7.1) ----
@@ -232,7 +314,8 @@ def _kids(b, s, e):
 
 
 def _cert(der, host=None):
-    """One certificate (a memoryview) -> (tbs view, sigalg, r, s, issuer, subject, curve, key). host: the leaf, whose
+    """One certificate (a memoryview) -> (tbs view, (ECDSA?, hash bits), signature, issuer, subject, key kind, key).
+    host: the leaf, whose
     SAN must name host; None: a CA, which must say so (basicConstraints cA, keyUsage keyCertSign). Either way, if it
     lists what it's for (extendedKeyUsage), websites must be one."""
     s, e = _tlv(der, 0)
@@ -242,7 +325,7 @@ def _cert(der, host=None):
     issuer, subject, spki = t[k + 2], t[k + 4], t[k + 5]
     salg, bits = _kids(der, spki[2], spki[3])
     a = _kids(der, salg[2], salg[3])
-    curve = _CURVES.get(bytes(der[a[1][2]:a[1][3]])) if len(a) > 1 else None
+    kind = RSA if bytes(der[a[0][2]:a[0][3]]) == _RSAKEY else _CURVES.get(bytes(der[a[1][2]:a[1][3]])) if len(a) > 1 else None
     ca, named, web, ku = False, False, True, None
     for x in t[k + 6:]:
         if x[0] != 0xA3:                          # [3] extensions
@@ -276,13 +359,10 @@ def _cert(der, host=None):
     elif not ca or (ku is not None and not ku & 0x04):
         raise Error("a certificate in the chain isn't a CA")
     a = _kids(der, alg[2], alg[3])
-    sigalg, r, s = bytes(der[a[0][2]:a[0][3]]), None, None
-    if sigalg in (_ECDSA256, _ECDSA384):            # (an RSA one past the root is never checked)
-        rs = _kids(der, sig[2] + 1, sig[3])         # BIT STRING: skip the unused-bits byte
-        rs = _kids(der, rs[0][2], rs[0][3])
-        r, s = int.from_bytes(der[rs[0][2]:rs[0][3]], "big"), int.from_bytes(der[rs[1][2]:rs[1][3]], "big")
-    return (der[tbs[1]:tbs[3]], sigalg, r, s, bytes(der[issuer[1]:issuer[3]]), bytes(der[subject[1]:subject[3]]),
-            curve, bytes(der[bits[2] + 1:bits[3]]))
+    how = _SIGALGS.get(bytes(der[a[0][2]:a[0][3]]))   # None: one we can't check (fine past the root: never checked)
+    sig = bytes(der[sig[2] + 1:sig[3]])             # BIT STRING: skip the unused-bits byte
+    return (der[tbs[1]:tbs[3]], how, sig, bytes(der[issuer[1]:issuer[3]]), bytes(der[subject[1]:subject[3]]),
+            kind, bytes(der[bits[2] + 1:bits[3]]))
 
 
 def _host_ok(host, name):
@@ -435,7 +515,7 @@ class Conn:
         ext = lambda t, d: t.to_bytes(2, "big") + len(d).to_bytes(2, "big") + d
         exts = (ext(0, (len(host) + 3).to_bytes(2, "big") + b"\x00" + len(host).to_bytes(2, "big") + host)  # server_name
                 + ext(10, b"\x00\x02\x00\x17")                                              # groups: P-256
-                + ext(13, b"\x00\x04\x04\x03\x05\x03")                                      # ECDSA P-256 / P-384
+                + ext(13, b"\x00\x0e\x04\x03\x05\x03\x08\x04\x08\x05\x04\x01\x05\x01\x06\x01")   # ECDSA, RSA-PSS, RSA (certs)
                 + ext(43, b"\x02\x03\x04")                                                  # TLS 1.3
                 + ext(51, (len(pub) + 4).to_bytes(2, "big") + b"\x00\x17" + len(pub).to_bytes(2, "big") + pub))
         body = b"\x03\x03" + c.random(32) + b"\x20" + c.random(32) + b"\x00\x02\x13\x01\x01\x00" + len(exts).to_bytes(2, "big") + exts
@@ -495,15 +575,12 @@ class Conn:
             elif typ == 15:                                   # CertificateVerify
                 if leaf is None:
                     raise Error("no certificate")
-                scheme = int.from_bytes(m[4:6], "big")
-                content = b" " * 64 + b"TLS 1.3, server CertificateVerify\x00" + th
-                d = sha256(content) if scheme == 0x0403 else sha384(content) if scheme == 0x0503 else None
-                if d is None:
+                # ECDSA P-256/SHA-256 or P-384/SHA-384 by an EC key, RSA-PSS SHA-256/384 by an RSA key; nothing else
+                how = {0x0403: (True, 256), 0x0503: (True, 384), 0x0804: (False, 256), 0x0805: (False, 384)}.get(int.from_bytes(m[4:6], "big"))
+                if how is None or how[0] != (leaf[0] != RSA):
                     raise Error("the site's signature is wrong")
-                st, e = _tlv(m, 8)
-                rs = _kids(m, st, e)
-                r, s_ = int.from_bytes(m[rs[0][2]:rs[0][3]], "big"), int.from_bytes(m[rs[1][2]:rs[1][3]], "big")
-                self.checks.append((leaf[0], d, r, s_, leaf[1], "signed", "the site's signature is wrong"))
+                content = b" " * 64 + b"TLS 1.3, server CertificateVerify\x00" + th
+                self.checks.append((how, digest(how[1], content), True, bytes(m[8:]), leaf, "signed", "the site's signature is wrong"))
                 tr(m)
                 th = hs.pop(0).digest()
             elif typ == 20:                                   # Finished
@@ -530,45 +607,58 @@ class Conn:
         leaf, prev, k = None, None, 0
         while i < end:
             n = int.from_bytes(m[i:i + 3], "big")
-            tbs, sigalg, r, s, issuer, subject, curve, key = _cert(m[i + 3:i + 3 + n], self.host if leaf is None else None)
+            tbs, how, sig, issuer, subject, kind, key = _cert(m[i + 3:i + 3 + n], self.host if leaf is None else None)
             i += 3 + n
             i += 2 + int.from_bytes(m[i:i + 2], "big")     # its extensions
             if leaf is None:
-                leaf = (curve, key)
+                leaf = (kind, key)
             if prev is not None:            # the one before, signed by this one
                 if prev[0] != subject:
                     raise Error("broken chain")
-                self._later(prev[1:], (curve, key), "cert %d" % (k - 1))
+                self._later(prev[1:], (kind, key), "cert %d" % (k - 1))
                 prev = None
             got = root(issuer)
             if got:
-                self._later((sigalg, r, s, self._digest(sigalg, tbs)), got, "cert %d" % k)
+                self._later((how, sig, tbs), got, "cert %d" % k)
                 return leaf
-            prev = (issuer, sigalg, r, s, self._digest(sigalg, tbs))
+            if how and how[1] == 256:       # SHA-256 now (hashlib); SHA-384/512 (Python, ~1 s) in _checks
+                prev = (issuer, how, sig, sha256(tbs), True)
+            else:
+                prev = (issuer, how, sig, bytes(tbs), False)
             k += 1
         raise Error("no known root")
 
-    @staticmethod
-    def _digest(sigalg, tbs):
-        """SHA-256 now (hashlib); for SHA-384 (Python, ~1 s) a copy of the bytes, hashed in _checks."""
-        return sha256(tbs) if sigalg == _ECDSA256 else bytes(tbs) if sigalg == _ECDSA384 else None
-
-    def _later(self, signed, key, what, why="certificate signature is wrong"):
-        sigalg, r, s, d = signed
-        if d is None or key[0] is None:
-            raise Error("not an ECDSA chain")
-        self.checks.append((key[0], d, r, s, key[1], what, why))
+    def _later(self, signed, key, what):
+        how, sig, data = signed[:3]
+        done = signed[3] if len(signed) > 3 else False
+        if how is None or key[0] is None:
+            raise Error("a certificate signature a wedgie can't check")
+        if how[1] == 256 and not done:
+            data, done = sha256(data), True
+        elif not done:
+            data = bytes(data)
+        self.checks.append((how, data, done, sig, key, what, "certificate signature is wrong"))
 
     def _checks(self):
-        """The signatures (the Trust M's ~0.2 s each, SHA-384 ~1 s): run while the site's answer is on its way.
-        Nothing the site sent is read before they all pass."""
+        """The signatures (ECDSA on the Trust M ~0.2 s, RSA 0.1-0.5 s, SHA-384 ~1 s): run while the site's answer is
+        on its way. Nothing the site sent is read before they all pass."""
         while self.checks:
-            curve, d, r, s, key, what, why = self.checks.pop(0)
-            if len(d) > 48:
-                d = sha384(d)
-            if not self.chip.verify(curve, d, r, s, key):
+            how, d, done, sig, key, what, why = self.checks.pop(0)
+            ecdsa, bits = how
+            if not done:
+                d = digest(bits, d)
+            kind, pub = key
+            if ecdsa:
+                ok = kind in (P256, P384) and self._ecdsa(kind, d, sig, pub)
+            else:
+                ok = kind == RSA and (rsa_pss if what == "signed" else rsa_pkcs1)(pub, sig, bits, d)
+            if not ok:
                 raise Error(why)
             self.log(what)
+
+    def _ecdsa(self, kind, d, sig, pub):
+        a = _kids(sig, *_tlv(sig, 0))
+        return self.chip.verify(kind, d, int.from_bytes(sig[a[0][2]:a[0][3]], "big"), int.from_bytes(sig[a[1][2]:a[1][3]], "big"), pub)
 
     def get(self, path, headers=b"", most=8192):
         return _sure(self._get, path, headers, most)
