@@ -12,8 +12,9 @@ https://github.com/ZKNoxHQ/eth-universal-signer/blob/7730-wire-format-implementa
 - **Used by Safe Signer safe-24** (clawdbotatg/wedgie-safe): `safe_wire.py` is a copy of `wire.py` (keep them the
   same), `safe_7730.py` turns a descriptor into the screen. On the shelf since 10-22 (firmware 0.3.58).
   Uniswap's Universal Router stays hand-read (`safe_ur.py`) until ERC-8362 lands: 7730 can't describe it yet.
-- **The data** wedgie.dev serves: `release.py` builds `public/clear/<tag>/` from the registry and a token list,
-  every structure with a Merkle proof (algorithm 4) to two roots built into the app (`safe_roots.py`). See below.
+- **The data** wedgie.dev serves: `release.py` builds `public/clear/<tag>/` from the registry and token lists
+  (Uniswap's, then CoinGecko's top 1,000 coins, minus any ticker another address has on that chain; safe-28: tag
+  38476364, registry 171b6b5), every structure with a Merkle proof (algorithm 4) to two roots built into the app (`safe_roots.py`). See below.
 - **Tests:** `tools/test_clear.py` runs the app's reader on the registry's own test transactions (1,510 on chains
   the app does: 1,367 show exactly what the registry expects, 125 differ on purpose, 18 explained in the test);
   `tools/safechip.mjs` signs four of them on a virtual RP2040.

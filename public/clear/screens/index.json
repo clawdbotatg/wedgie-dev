@@ -2,7 +2,7 @@
  {
   "slug": "uniswap-v2",
   "title": "Uniswap V2",
-  "note": "The Router02 descriptor, with the registry's 18 test transactions. Not on wedgies yet: it came after our last data release. Not audited yet. Tokens outside the Uniswap list show as unknown, in red.",
+  "note": "The Router02 descriptor, with the registry's 18 test transactions. On wedgies with Safe Signer safe-28. Not audited yet. Tokens outside the Uniswap list and CoinGecko's top 1,000 show as unknown, in red.",
   "cases": [
    {
     "name": "addLiquidity",

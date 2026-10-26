@@ -1,0 +1,15 @@
+{
+ "tag": "38476364",
+ "registry": "171b6b5bf137e2433a4bde35cffd64d4d7fe25bd",
+ "issued": 1792979732,
+ "roots": {
+  "a": "b78fe2b4b7dfe9c793cd9a84c55c4221da60823b4e2cc7f1e99d0a37ec0abf62",
+  "b": "bc00459134361fa409924cb498e3dfe68dbe1263c6ba0718eb83b3f5ed54757c"
+ },
+ "audited": 752,
+ "notAudited": 6541,
+ "tokens": 2475,
+ "auditors": [
+  "Cyfrin"
+ ]
+}

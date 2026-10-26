@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# The clear-signing data wedgie.dev serves, made from the public ERC-7730 registry (and a token list), for the Safe
+# The clear-signing data wedgie.dev serves, made from the public ERC-7730 registry (and token lists), for the Safe
 # Signer app (clawdbotatg/wedgie-safe safe_7730.py). Runs on the computer, never on a wedgie.
 #
 # Every descriptor (transaction-info) and token (token-information) is a wire-format structure signed with
@@ -25,6 +25,12 @@ AUDITORS = {"0x3846c3a30e62075fa916216b35ef04b8f53931f6": "Cyfrin"}     # regist
 EAS_SCHEMA = "0xe023eef113c1670774801c34b377fdf612dd8a4d2fa92fe382e15bd91fafb5c2"   # ERC-8176's EAS schema id, public (gitleaks:allow)
 CHAINS = {1, 10, 56, 100, 137, 146, 999, 4663, 5042, 8453, 9745, 42161, 42220, 43114, 84532, 11155111}   # wedgie-safe's
 TOKEN_LIST = "https://tokens.uniswap.org"
+# then CoinGecko's top 1,000 coins by market cap, on the chains it lists (decimals from its per-chain token lists).
+# A ticker already taken on that chain by another address is left out: no second "USDC".
+GECKO = "https://api.coingecko.com/api/v3"
+GECKO_TOP = 1000
+GECKO_CHAINS = {"ethereum": 1, "optimistic-ethereum": 10, "binance-smart-chain": 56, "xdai": 100, "polygon-pos": 137,
+                "sonic": 146, "base": 8453, "arbitrum-one": 42161, "celo": 42220, "avalanche": 43114}
 TOKENS = [          # the token list's gaps: test networks /safe uses, and staking/stable tokens the registry's
     (84532, "0x036CbD53842c5426634e7929541eC2318f3dCF7e", "USDC", 6, "USD Coin"),          # descriptors name
     (11155111, "0x1c7D4B196Cb0C7B01d743fbc6116a902379C7238", "USDC", 6, "USD Coin"),       # (symbol(), decimals()
@@ -126,13 +132,46 @@ def descriptors(reg):
     return out, skipped
 
 
+def get(url, tries=4):
+    for i in range(tries):
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "wedgie.dev release"}), timeout=60) as r:
+                return json.load(r)
+        except Exception:
+            if i == tries - 1:
+                raise
+            time.sleep(20)                  # CoinGecko's free API: a few calls a minute
+
+
+def gecko():
+    """[(chain, address, ticker, decimals, name)] of CoinGecko's top GECKO_TOP coins, biggest first."""
+    top = []
+    for page in range(1, GECKO_TOP // 250 + 1):
+        top += get("%s/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=%d" % (GECKO, page))
+    where = {x["id"]: x.get("platforms") or {} for x in get(GECKO + "/coins/list?include_platform=true")}
+    lists = {c: {t["address"].lower(): t for t in get("https://tokens.coingecko.com/%s/all.json" % p)["tokens"]}
+             for p, c in GECKO_CHAINS.items()}
+    out = []
+    for coin in top:
+        for p, a in where.get(coin["id"], {}).items():
+            t = lists.get(GECKO_CHAINS.get(p), {}).get((a or "").lower())
+            if t:
+                out.append((GECKO_CHAINS[p], t["address"], t["symbol"], t["decimals"], t.get("name")))
+    return out
+
+
 def tokens(extra=()):
-    """[(chain, address bytes, ticker, decimals, name)] from the Uniswap token list and TOKENS."""
-    with urllib.request.urlopen(urllib.request.Request(TOKEN_LIST, headers={"User-Agent": "wedgie.dev release"}), timeout=60) as r:
-        lst = json.load(r)["tokens"]
+    """[(chain, address bytes, ticker, decimals, name)] from the Uniswap token list, TOKENS, then CoinGecko's top."""
+    lst = get(TOKEN_LIST)["tokens"]
     seen, out = set(), []
-    for t in [(x["chainId"], x["address"], x["symbol"], x["decimals"], x.get("name")) for x in lst] + TOKENS + list(extra):
+    first = [(x["chainId"], x["address"], x["symbol"], x["decimals"], x.get("name")) for x in lst] + TOKENS + list(extra)
+    taken = {(t[0], t[2].lower()): t[1].lower() for t in reversed(first)}
+    for t in first + [(None,) + g for g in gecko()]:
+        late = t[0] is None
+        t = t[1:] if late else t
         k = (t[0], t[1].lower())
+        if late and taken.setdefault((t[0], t[2].lower()), k[1]) != k[1]:
+            continue                        # a ticker another address already has on this chain
         if t[0] in CHAINS and k not in seen and len(t[2]) <= 16:
             seen.add(k)
             out.append((t[0], bytes.fromhex(t[1][2:]), t[2], int(t[3]), t[4]))

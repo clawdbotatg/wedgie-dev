@@ -24,8 +24,13 @@ for i, t in enumerate(json.load(open(txs))):
         cases.append({"name": re.sub(r" - chain \d+$", "", t["name"]), "chainId": t["chainId"], "to": t["to"],
                       "pages": pages})
 idx = os.path.join(root, "index.json")
-sections = [s for s in (json.load(open(idx)) if os.path.exists(idx) else []) if s["slug"] != slug]
-sections.append({"slug": slug, "title": title, "note": note, "cases": cases})
+sections = json.load(open(idx)) if os.path.exists(idx) else []
+new = {"slug": slug, "title": title, "note": note, "cases": cases}
+at = [i for i, s in enumerate(sections) if s["slug"] == slug]
+if at:
+    sections[at[0]] = new                   # in its place
+else:
+    sections.append(new)
 json.dump(sections, open(idx, "w"), indent=1)
 page = os.path.join(root, "..", slug.split("-")[0], "index.html")
 if not os.path.exists(page):

@@ -60,7 +60,12 @@ sys.path.insert(0, app)
 sys.modules["safe_roots"] = types.SimpleNamespace(TAG="test", ROOTS=roots)
 sys.modules["ui"] = types.SimpleNamespace(INK="INK", MUTED="MUTED", GREEN_D="GREEN", RED="RED")
 NAT = {56: "BNB", 100: "XDAI", 137: "POL", 146: "S", 999: "HYPE", 5042: "USDC", 9745: "XPL", 42220: "CELO", 43114: "AVAX"}
-sys.modules["safe"] = types.SimpleNamespace(BIG="big", ADDR="addr", CHAINS={1: "Ethereum"},
+import ast                                  # the app's own amount(), out of safe.py (which needs a screen to load)
+_m = ast.Module([f for f in ast.parse(open(os.path.join(app, "safe.py")).read()).body
+                 if isinstance(f, ast.FunctionDef) and f.name == "amount"], [])
+_ns = {}
+exec(compile(_m, "safe.py", "exec"), _ns)
+sys.modules["safe"] = types.SimpleNamespace(BIG="big", ADDR="addr", CHAINS={1: "Ethereum"}, amount=_ns["amount"],
                                             coin=lambda tx: NAT.get(tx["chainId"], "ETH"))
 import safe_7730 as R
 
@@ -142,6 +147,10 @@ def ok_diff(label, got, want):
     if " of 0x" in got and got.startswith("#") and want.endswith(got.split(" of ")[0]):
         return True
     if got == want + " (unknown token)" or got.split(" of 0x")[0] == want:
+        return True
+    g, w = got.split(" ", 1), want.split(" ", 1)          # an amount cut short: "0.0009026 WETH" for 0.000902656..
+    if len(g) == 2 and len(w) == 2 and g[1] == w[1] and "." in w[0] and w[0].startswith(g[0]) and \
+            w[0].split(".")[0] == g[0].split(".")[0]:
         return True
     return want.isdigit() and got.split(" ")[0].replace(".", "").lstrip("0") == want.rstrip("0").lstrip("0")
 
