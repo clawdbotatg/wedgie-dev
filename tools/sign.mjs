@@ -2,11 +2,11 @@
 // puts in the manifest), as "sha256  name" lines, signed with a release key (P-256). A wedgie checks
 // the signature with RELEASE_KEYS in firmware/wedgie.py (wedgie.release_ok) before it trusts a file list,
 // so a computer can't pass off other files as "Buttons" or "firmware 0.2.9" (docs/SECURITY-ROADMAP.md).
-//   node tools/sign.mjs        runs the release gate (tools/gate.mjs), then writes release/firmware.txt +
+//   node tools/sign.mjs        signs (Touch ID at once) files that passed the gate, then writes release/firmware.txt +
 //                              release/firmware.sig + release/apps.txt (the app list, named by its hash); run before every push
 //                              that changes firmware/ (fw.mjs marks the manifest unsigned otherwise)
-//   node tools/sign.mjs --gate-only   the gate alone, ahead of time: then signing these same files goes
-//                              straight to Touch ID (Austin, 10-24: never make him wait 13 min for the prompt)
+//   node tools/sign.mjs --gate-only   the gate (tools/gate.mjs, ~13 min), always first: signing needs its pass
+//                              (Austin, 10-24: never make him wait 13 min for the prompt)
 // The keys (firmware/wedgie.py RELEASE_KEYS) can't be copied: 0 is this Mac's Secure Enclave (Touch ID;
 // ~/.wedgie/sekey + release-se.key, tools/sekey.swift), 1 the YubiKey (PIN + touch, tools/yksign.py).
 // Either signs:  node tools/sign.mjs  (the Mac)   node tools/sign.mjs --yubikey
@@ -26,12 +26,17 @@ const pubOf = ([x, y]) => createPublicKey({ key: { kty: "EC", crv: "P-256", x: B
 
 // The gate (tools/gate.mjs) first: no signature for firmware that hasn't passed it (Austin, 2026-10-03: no more
 // memory errors reaching a wedgie). A pass is kept for the exact bytes it passed (every file the list signs, and
-// the gate itself) for a day, in ~/.wedgie/gate-pass: signing those same bytes doesn't run it again. Any change
-// to them, and it runs. No flag skips it.
+// the gate itself) for a day, one line per release in ~/.wedgie/gate-pass (several sessions gate side by side: one
+// slot let another release's pass wipe this one). Signing never runs the gate itself: with no pass it stops at
+// once, so Touch ID only ever comes up seconds after Austin says ready, never 13 minutes later (Austin, 10-24,
+// 10-26). Run --gate-only first. No flag skips the gate.
 const passFile = join(se, "gate-pass");
 const fp = createHash("sha256").update(releaseText(0)).update(readFileSync(join(root, "tools/gate.mjs"))).digest("hex");
-const passed = (() => { try { const [h, t] = readFileSync(passFile, "utf8").trim().split(" "); return h === fp && Date.now() - Number(t) < 86400_000; } catch { return false; } })();
-if (passed) console.log("the gate already passed on exactly these files (sign.mjs --gate-only): straight to signing");
+const passes = (() => { try { return readFileSync(passFile, "utf8").trim().split("\n").map((l) => l.split(" ")).filter(([, t]) => Date.now() - Number(t) < 86400_000); } catch { return []; } })();
+const passed = passes.some(([h]) => h === fp);
+const gateOnly = process.argv.includes("--gate-only");
+if (passed) console.log(gateOnly ? "the gate already passed on exactly these files" : "the gate already passed on exactly these files: straight to signing");
+else if (!gateOnly) { console.error("not signed: no gate pass for these files. Run `node tools/sign.mjs --gate-only` (~13 min) first, then this goes straight to Touch ID"); process.exit(1); }
 else {
   console.log("running the release gate (tools/gate.mjs, ~13 min); nothing is signed unless it passes");
   const g = spawnSync("node", [join(root, "tools/gate.mjs")], { cwd: root, stdio: "inherit" });
@@ -39,7 +44,8 @@ else {
   if (fp !== createHash("sha256").update(releaseText(0)).update(readFileSync(join(root, "tools/gate.mjs"))).digest("hex")) {
     console.error("not signed: the files changed while the gate ran; run it again"); process.exit(1);
   }
-  writeFileSync(passFile, `${fp} ${Date.now()}\n`);
+  let now = []; try { now = readFileSync(passFile, "utf8").trim().split("\n").map((l) => l.split(" ")).filter(([, t]) => Date.now() - Number(t) < 86400_000); } catch {}
+  writeFileSync(passFile, [...now.filter(([h]) => h !== fp), [fp, Date.now()]].map((x) => x.join(" ")).join("\n") + "\n");
 }
 if (process.argv.includes("--gate-only")) { console.log("gate passed; `node tools/sign.mjs` now goes straight to Touch ID"); process.exit(0); }
 const text = releaseText(signedSerial() + 1);     // one more every signing: wedgies refuse a lower one (job.py)
