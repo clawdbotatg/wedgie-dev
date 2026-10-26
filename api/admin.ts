@@ -1,5 +1,7 @@
 // /api/admin: the shipping computer's door (wedgie-shipping orders.py on omen), Bearer SHOP_ADMIN_TOKEN.
 //   GET                          every paid, unshipped order with its sealed address (only omen can open it)
+//   POST {id, boxed: tracking}   boxed: label bought and packed, not mailed yet. Keeps the sealed address (a spoiled
+//                                label can be bought again); the tracking number is saved for the ship POST
 //   POST {id, tracking}          shipped: the sealed address, payer, transaction and Stripe session are wiped, the buyer
 //                                gets an email with the tracking number, and only once it's sent is their locked email
 //                                wiped (mailed: false = it failed; the same POST again retries it)
@@ -51,7 +53,7 @@ export async function GET(req: Request) {
     const r = await settleDeposit(sql, o).catch(() => null);
     if (r?.paid) await mailPaid(sql, o.id, new URL(req.url).origin).catch(() => {});
   }));
-  const orders = await sql`select id, cart, cents, pay, chain, sealed, paid_at, created from orders where status = 'paid' order by paid_at`;
+  const orders = await sql`select id, cart, cents, pay, chain, sealed, paid_at, created, boxed_at, tracking from orders where status = 'paid' order by paid_at`;
   return json({ orders, left: await stockLeft(sql) });
 }
 
@@ -78,6 +80,11 @@ export async function POST(req: Request) {
       ? await sql`update orders set delivered_at = coalesce(delivered_at, ${at.toISOString()}), moving_at = coalesce(moving_at, ${at.toISOString()}) where id = ${b.id} and status = 'shipped' returning id`
       : await sql`update orders set moving_at = coalesce(moving_at, ${at.toISOString()}) where id = ${b.id} and status = 'shipped' returning id`;
     return r.length ? json({ ok: true }) : oops("No shipped order with that id.", 404);
+  }
+  if (b.boxed !== undefined) {
+    if (typeof b.boxed !== "string" || !/^[A-Z0-9]{10,40}$/i.test(b.boxed.replace(/\s/g, ""))) return oops("That isn't a tracking number.");
+    const r = await sql`update orders set boxed_at = now(), tracking = ${b.boxed.replace(/\s/g, "")} where id = ${b.id} and status = 'paid' returning id`;
+    return r.length ? json({ ok: true }) : oops("No paid, unshipped order with that id.", 404);
   }
   if (b.cancel === true) {
     // An open card checkout is ended first, so Stripe can't take money for a canceled order.
