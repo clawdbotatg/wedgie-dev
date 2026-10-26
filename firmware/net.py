@@ -128,25 +128,16 @@ def _serve():
     return slot.serve if slot.state != "entry" or slot._own_usb() else None    # an entry app's USB has its own timer
 
 
-def _deep(n):
-    import slot
-    slot.deep += n
-
-
 def wait(rid, ms=MS):
     serve = _serve()
     t = time.ticks_ms()
-    _deep(1)
-    try:
-        while rid not in _got:
-            if time.ticks_diff(time.ticks_ms(), t) > ms:
-                _out.pop(rid, None)
-                raise Error("no internet: open its page on wedgie.dev")
-            if serve:
-                serve()
-            time.sleep_ms(20)
-    finally:
-        _deep(-1)
+    while rid not in _got:
+        if time.ticks_diff(time.ticks_ms(), t) > ms:
+            _out.pop(rid, None)
+            raise Error("no internet: open its page on wedgie.dev")
+        if serve:
+            serve()
+        time.sleep_ms(20)
     return answer(rid)
 
 
@@ -194,7 +185,11 @@ def get(url, pick=None, ms=MS, body=None):
     import sys
     import gc
     import trustm
-    _deep(1)                            # a job waits till this is done (slot._later)
+    import slot
+    # A job, open or rm waits till the fetch is done: run inside the TLS's stack, an install's question hit "maximum
+    # recursion depth" (wedgie-dev-bd, 10-26). Here, not in slot.py: its every byte stays in RAM (safechip).
+    h, later = slot.handle, []
+    slot.handle = lambda m: later.append(m) if m.get("type") in ("job", "open", "rm") and len(later) < 4 else h(m)
     trustm.busy[0] += 1                 # the whole fetch: the host's chip check (wedgie.chip) resets the chip, which
     try:                                # wipes this connection's key and fails both (10-26: "No chip" on the page)
         import tls
@@ -206,12 +201,15 @@ def get(url, pick=None, ms=MS, body=None):
             raise Error("needs the Trust M chip (%s)" % e)
     finally:
         trustm.busy[0] -= 1
-        _deep(-1)
+        slot.handle = h
         del _tcp[rid]
         _out.pop(rid, None)
         W.send({"type": "tcp", "rid": rid, "end": True})
         sys.modules.pop("tls", None)    # ~11 KB of code: back as soon as it's done
         gc.collect()
+        import micropython
+        for m in later:                 # as the USB Timer runs it: nothing else reads USB under its question
+            micropython.schedule(h, m)
     try:
         import json
         v = json.loads(body)
