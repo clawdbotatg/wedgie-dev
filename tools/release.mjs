@@ -1,10 +1,11 @@
 // The text a release signature covers (tools/sign.mjs) and a wedgie checks (wedgie.release_ok):
 //   wedgie-release 1
 //   version 0.2.9
-//   <sha256>  <name>        one line per file tools/fw.mjs publishes, sorted by name
-//   @app  <json>            one per app in firmware/carts.json and per app on the shelf (community.json) (0.3.12+): mod, name, entry, usb, files. A checked job's apps.json is built from these (firmware/job.py check),
-//                           and it may write only the core and its app's files. Older firmware reads the
-//                           line as a file named by the JSON, which nothing ever writes.
+//   <sha256>  <name>        one line per core file (firmwareNames), sorted by name
+//   @apps  <sha256>         (0.3.66+) the hash of the app list, appsText() (release/apps.txt, /fw/apps.txt):
+//                           the apps are out of this list. All of it rides one USB line to a wedgie's job (6 KB,
+//                           wedgie.lines), and on 0.3.65 it was 176 bytes short of that. Firmware before 0.3.66
+//                           sees no apps in it: it gets the firmware update, then installs apps.
 //   @serial  <n>            (0.3.54+) one more at every signing (tools/sign.mjs): a wedgie keeps the highest it
 //                           installed and refuses a list with a lower one, so a same-version re-signing can't be
 //                           rolled back (audit 10-18: 0.3.52 was signed 7 times). releaseText() alone keeps the signed one.
@@ -26,22 +27,27 @@ export function signedSerial() {
   catch { return 0; }
 }
 
+const sha = (buf) => createHash("sha256").update(buf).digest("hex");
+
 export function releaseText(serial = signedSerial()) {
   const src = join(root, "firmware");
   const version = (readFileSync(join(src, "wedgie.py"), "utf8").match(/VERSION = "([^"]+)"/) || [])[1] || "0";
-  const lines = [];
-  for (const name of readdirSync(src).sort()) {
-    const p = join(src, name);
-    if (!published(name, p)) continue;
-    lines.push(`${createHash("sha256").update(readFileSync(p)).digest("hex")}  ${name}\n`);
-  }
-  const carts = JSON.parse(readFileSync(join(src, "carts.json"), "utf8"));
-  for (const { app, files } of shelf(firmwareNames(), carts.map((c) => c.mod))) {
-    for (const f of files) lines.push(`${createHash("sha256").update(f.buf).digest("hex")}  ${f.name}\n`);
-    carts.push(app);
-  }
-  return `wedgie-release 1\nversion ${version}\n` + lines.sort((a, b) => (a.slice(66) < b.slice(66) ? -1 : 1)).join("") + appLines(carts) +
+  const lines = firmwareNames().sort().map((name) => `${sha(readFileSync(join(src, name)))}  ${name}\n`);
+  return `wedgie-release 1\nversion ${version}\n` + lines.join("") + `@apps  ${sha(appsText())}\n` +
     (serial ? `@serial  ${serial}\n` : "");
+}
+
+/** The app list (0.3.66+): per app, sorted by mod, its "@app  <json>" line (mod, name, entry, usb, files: a checked
+ *  job's apps.json is built from it, firmware/job.py check; it may write only the core and its app's files), then
+ *  a "<sha256>  <name>" line per file. Every app in firmware/carts.json and on the shelf (community.json). A wedgie
+ *  takes it in pieces (job.Apps) and keeps only the apps its job is about: it has no size limit. */
+export function appsText() {
+  const src = join(root, "firmware");
+  const carts = JSON.parse(readFileSync(join(src, "carts.json"), "utf8"));
+  const apps = carts.map((c) => ({ app: c, files: c.files.map((name) => ({ name, buf: readFileSync(join(src, name)) })) }));
+  apps.push(...shelf(firmwareNames(), carts.map((c) => c.mod)));
+  return apps.sort((a, b) => (a.app.mod < b.app.mod ? -1 : 1))
+    .map(({ app, files }) => appLines([app]) + files.map((f) => `${sha(f.buf)}  ${f.name}\n`).join("")).join("");
 }
 
 /** The core: published firmware files no firmware cart claims. */
@@ -68,8 +74,7 @@ export function shelf(core, mods) {
   return out;
 }
 
-/** The "@app" lines for carts (firmware/carts.json entries). No double space can occur in them. Short:
- *  the whole list rides one USB line to the wedgie (6 KB, wedgie.lines). */
+/** The "@app" lines for carts (firmware/carts.json entries). No double space can occur in them. */
 export function appLines(carts) {
   return [...carts].sort((a, b) => (a.mod < b.mod ? -1 : 1)).map((c) => "@app  " + JSON.stringify({
     mod: c.mod, name: c.name, ...(c.entry ? { entry: c.entry } : {}), ...(c.usb ? { usb: true } : {}), files: c.files,

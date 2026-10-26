@@ -3,7 +3,7 @@
 // the signature with RELEASE_KEYS in firmware/wedgie.py (wedgie.release_ok) before it trusts a file list,
 // so a computer can't pass off other files as "Buttons" or "firmware 0.2.9" (docs/SECURITY-ROADMAP.md).
 //   node tools/sign.mjs        runs the release gate (tools/gate.mjs), then writes release/firmware.txt +
-//                              release/firmware.sig; run before every push
+//                              release/firmware.sig + release/apps.txt (the app list, named by its hash); run before every push
 //                              that changes firmware/ (fw.mjs marks the manifest unsigned otherwise)
 //   node tools/sign.mjs --gate-only   the gate alone, ahead of time: then signing these same files goes
 //                              straight to Touch ID (Austin, 10-24: never make him wait 13 min for the prompt)
@@ -15,7 +15,7 @@ import { createPublicKey, verify, createHash } from "node:crypto";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
-import { releaseText, root, signedSerial } from "./release.mjs";
+import { releaseText, appsText, root, signedSerial } from "./release.mjs";
 
 const yk = process.argv.includes("--yubikey");
 const se = join(homedir(), ".wedgie"), seKey = join(se, "release-se.key");
@@ -51,7 +51,8 @@ if (run.status !== 0 || !r || !s || !verify("sha256", Buffer.from(text), { key: 
   console.error("not signed: the key didn't sign, or its signature doesn't match firmware/wedgie.py"); process.exit(1);
 }
 writeFileSync(join(root, "release/firmware.txt"), text);
+writeFileSync(join(root, "release/apps.txt"), appsText());
 writeFileSync(join(root, "release/firmware.sig"), `${r} ${s}${k ? " " + k : ""}\n`);
-console.log(`signed ${text.split("\n").length - 2} files, ${text.split("\n")[1]}`);
+console.log(`signed ${text.split("\n").length - 4} core files and the app list, ${text.split("\n")[1]}`);
 // the virtual wedgie's starting flash, from what was just signed (tools/emuimage.mjs)
 spawnSync("node", [join(root, "tools/emuimage.mjs")], { cwd: root, stdio: "inherit" });

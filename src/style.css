@@ -506,6 +506,13 @@ body.test-mode .top, body.test-mode .foot { display: none; }
 #d-body[hidden] { display: none; }
 .wd-head { display: flex; align-items: center; }
 .wd-sec h3 { margin-bottom: 14px; }
+/* firmware behind: only the update shows, one big pulsing button (src/pages/wedgie.ts paintFw) */
+.need-fw #d-body > :not(.wd-fw), .need-fw .wd-report { display: none; }
+.need-fw .fwrow { flex-direction: column; text-align: center; gap: 18px; padding: 22px 16px; }
+.btn-pulse { animation: ring 1.8s ease-out infinite; outline: 0 solid rgba(34,196,82,.6); }
+.btn-pulse:disabled { animation: none; }
+@keyframes ring { to { outline: 22px solid rgba(34,196,82,0); } }
+@media (prefers-reduced-motion: reduce) { .btn-pulse { animation: none; } }
 .wd-sec .kv { margin: 0 0 16px; }
 .wd-sec .kv details { margin-top: 4px; }
 .wd-sec .kv summary { cursor: pointer; font-weight: 800; }

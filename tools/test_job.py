@@ -3,8 +3,10 @@
 CPython (the board's modules stubbed), a throwaway release key, a scratch flash folder. Each case sends
 what a host could send and checks what ends up on the flash. codex (2026-10-02) found these by hand:
 a re-upload after a file checked out, an app whose entry was wedgie.set_open, ./main.py deleted.
+Every case runs twice: the apps in the signed list (before 0.3.66), and on their own (SPLIT: the app list, sent
+in pieces before the signed list, which names it by its hash).
     python3 tools/test_job.py"""
-import sys, os, json, hashlib, binascii, base64, tempfile, shutil, types, time
+import sys, os, json, hashlib, binascii, base64, tempfile, shutil, types, time, subprocess
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FW = os.path.join(HERE, "..", "firmware")
@@ -50,17 +52,33 @@ names = sorted([n for n in os.listdir(FW) if n.endswith((".py", ".mpy", ".bin"))
 
 VER = ["9.9.9"]                          # the signed list's version: older than W.VERSION is refused
 SER = [0]                                # its "@serial" (0: none): lower than the one on the flash is refused
+SPLIT = bool(os.environ.get("SPLIT"))
+APPS_TEXT = [""]                         # SPLIT: the app list the last release() names
 
 
-def release(apps=True):
-    t = "wedgie-release 1\nversion %s\n" % VER[0] + "".join("%s  %s\n" % (sha(read(n)), n) for n in names)
-    if apps:
-        for c in sorted(carts, key=lambda c: c["mod"]):
-            a = {"mod": c["mod"], "name": c["name"], "files": c["files"]}
-            for k in ("entry", "usb"):
-                if c.get(k):
-                    a[k] = c[k]
-            t += "@app  " + json.dumps(a, separators=(",", ":")) + "\n"
+def app_line(c):
+    a = {"mod": c["mod"], "name": c["name"], "files": c["files"]}
+    for k in ("entry", "usb"):
+        if c.get(k):
+            a[k] = c[k]
+    return "@app  " + json.dumps(a, separators=(",", ":")) + "\n"
+
+
+def apps_text(extra=None):
+    return "".join(app_line(c) + "".join("%s  %s\n" % ((extra or {}).get(n) or sha(read(n)), n) for n in c["files"])
+                   for c in sorted(carts, key=lambda c: c["mod"]))
+
+
+def release(apps=True, extra=None):
+    appf = set(APPS)
+    if SPLIT and apps:
+        APPS_TEXT[0] = apps_text(extra)
+        t = "wedgie-release 1\nversion %s\n" % VER[0] + "".join("%s  %s\n" % (sha(read(n)), n) for n in names if n not in appf)
+        t += "@apps  %s\n" % sha(APPS_TEXT[0].encode())
+    else:
+        t = "wedgie-release 1\nversion %s\n" % VER[0] + "".join("%s  %s\n" % (sha(read(n)), n) for n in names)
+        if apps:
+            t += "".join(app_line(c) for c in sorted(carts, key=lambda c: c["mod"]))
     if SER[0]:
         t += "@serial  %d\n" % SER[0]
     r, s = p256.sign(D, hashlib.sha256(t.encode()).digest())
@@ -94,8 +112,19 @@ def puts(name, data, chunk=1024):
             for o in range(0, max(len(data), 1), chunk)]
 
 
-def run(job_msg, msgs, rel_apps=True, app="hello", flash=None, version=None):
-    """One job on a fresh flash running `app`. (answers, {file: bytes} after)."""
+def pieces(text, n=120):
+    out, o = [], 0
+    while o < len(text):
+        e = text.find("\n", o + n)
+        e = len(text) if e < 0 else e + 1
+        out.append({"type": "apps", "t": text[o:e]})
+        o = e
+    return out
+
+
+def run(job_msg, msgs, rel_apps=True, app="hello", flash=None, version=None, apps=None, extra=None):
+    """One job on a fresh flash running `app`. (answers, {file: bytes} after). SPLIT: the app list goes first
+    (apps: these pieces instead)."""
     d = tempfile.mkdtemp()
     old = os.getcwd()
     os.chdir(d)
@@ -110,10 +139,12 @@ def run(job_msg, msgs, rel_apps=True, app="hello", flash=None, version=None):
         open("apps.json", "w").write(json.dumps([{"mod": app, "name": c["name"]}]))
         for n, data in (flash or {}).items():
             open(n, "wb").write(data)
-        rel, sig = release(rel_apps)
+        rel, sig = release(rel_apps, extra)
         if job_msg.get("release") is True:      # embedded: this run's own list
             job_msg = dict(job_msg, release=rel, sig=sig)
         first = [] if "release" in job_msg else [{"type": "release", "release": rel, "sig": sig}]
+        if SPLIT and rel_apps and "release" not in job_msg:
+            first = (pieces(APPS_TEXT[0]) if apps is None else apps) + first
         h = Host(first + msgs)
         W.lines = lambda size=6144: h
         W.send = lambda o: h.out.append(o)
@@ -317,7 +348,7 @@ for embedded in (False, True):
     if embedded:
         m.update(release=rel, sig=sig)
     out, f = run(m, puts("keytest.py", kt) + [second, {"type": "commit"}])
-    check("done" not in types_(out) and "keytest.py" not in f and "one signed list" in str(out),
+    check("done" not in types_(out) and "keytest.py" not in f and ("one signed list" in str(out) or SPLIT and embedded),
           "a job cannot switch signed lists (embedded=%s)" % embedded)
 
 # The question shows the host's version: an embedded list of another version never goes in (audit 10-18).
@@ -368,5 +399,33 @@ try:
 finally:
     os.chdir(o); shutil.rmtree(d); W.SEALED = False; W._open = False
 
-print("all ok" if not fails else "%d FAILED" % fails)
+# 0.3.66+: the app list on its own, named by its hash in the signed list
+if SPLIT:
+    good = puts("keytest.py", kt) + [{"type": "commit"}]
+    inst = {"job": "Install Buttons", "write": ["keytest.py"], "delete": ["hello.py"], "apps": json.dumps(buttons)}
+    release()
+    al = APPS_TEXT[0]
+    out, f = run(inst, good, apps=pieces(al.replace("Buttons", "Buttonz")))
+    check("done" not in types_(out) and "keytest.py" not in f and "isn't the signed one" in str(out), "an app list that isn't the signed one: refused (%s)" % out[-1:])
+    out, f = run(inst, good, apps=pieces(al)[:-1])
+    check("done" not in types_(out) and "keytest.py" not in f, "half the app list: refused (%s)" % out[-1:])
+    out, f = run(inst, good, apps=[])
+    check("done" not in types_(out) and "keytest.py" not in f, "no app list for an install: refused (%s)" % out[-1:])
+    out, f = run(inst, [{"type": "apps", "t": al}] + good)
+    check("done" not in types_(out) and "keytest.py" not in f and "comes before" in str(out), "the app list after the signed list: refused (%s)" % out[-1:])
+    out, f = run(inst, good, apps=[{"type": "apps", "t": al[:-1]}])
+    check("done" not in types_(out) and "whole line" in str(out), "a piece that ends mid-line: refused (%s)" % out[-1:])
+    carts[1]["files"].append("slot.mpy")         # a signed app list that names a core file with other bytes
+    try:
+        out, f = run(inst, good, extra={"slot.mpy": "0" * 64})
+        check("done" not in types_(out) and "twice" in str(out), "an app list naming a core file again: refused (%s)" % out[-1:])
+    finally:
+        carts[1]["files"].remove("slot.mpy")
+    out, f = run({"job": "Update firmware", "write": ["slot.mpy"], "delete": [], "apps": json.dumps([{"mod": "hello"}])},
+                 puts("slot.mpy", read("slot.mpy")) + [{"type": "commit"}], apps=[])
+    check("done" in types_(out) and json.loads(f["apps.json"])[0]["mod"] == "hello", "'Update firmware' with no app list keeps its app (%s)" % out[-1:])
+
+print(("SPLIT: " if SPLIT else "") + ("all ok" if not fails else "%d FAILED" % fails))
+if not SPLIT and not os.environ.get("ONE"):     # again, the app list on its own
+    fails += subprocess.run([sys.executable, __file__], env=dict(os.environ, SPLIT="1")).returncode != 0
 sys.exit(1 if fails else 0)

@@ -15,14 +15,14 @@ or an ATECC608) **wedged** between the boards on I2C. It runs MicroPython plus t
 into one app, and asks on its own screen before anything that matters. Games, tools, and a hardware signer for a
 Safe multisig. Everything is MIT. Home: https://wedgie.dev
 
-**The current firmware is 0.3.65.** If a wedgie's `hello` says older, update it first: everything here assumes
+**The current firmware is 0.3.66.** If a wedgie's `hello` says older, update it first: everything here assumes
 current firmware.
 
 ```yaml
 name: wedgie
 site: https://wedgie.dev
 skill_index: https://wedgie.dev/skill.md          # this file
-firmware: 0.3.65
+firmware: 0.3.66
 license: MIT (hardware design, case, firmware, site, art)
 source: https://github.com/clawdbotatg/wedgie-dev
 made_by: Austin Griffith and Gus Griffith, with @ClawdBotATG; sold by BuidlGuidl DAO LLC
@@ -221,7 +221,7 @@ https://instantwallet.io. Details: safe.md.
 
 # Talk to a wedgie over USB
 
-Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.65**; if `hello`
+Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.66**; if `hello`
 says older, run `wedgie.py update` first.
 
 ## Talk to it directly
@@ -317,6 +317,8 @@ wedgie's own screen answered by a **real press** (a `press` request can't answer
   green check (signed by wedgie.dev) or a red warning sign (not signed: a yes changes nothing). No check
   mark means it wasn't checked yet; it always is after the yes, before anything is written. 0.3.57+: yes is
   grey and does nothing until the check is done; no works at any time.
+  0.3.66+: the apps are in their own list (`/fw/apps.txt`); the signed list names it by its hash (`@apps`).
+  Older firmware sees no apps in a 0.3.66+ list: update its firmware first, then install apps.
 - **A no to FULL CONTROL holds until it's unplugged** (0.3.54+): every `open` after it is `refused` without
   asking, so a computer can't ask until the person gives in. A question takes no press in its first 0.6 s.
 - **A no restarts the wedgie.** The question is drawn straight over the app's screen without saving it
@@ -344,7 +346,7 @@ from answering. Hold **Y**: no WEDGIE drive this time (debugging only).
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.65","fw":"wedgie-0.3.65","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.66","fw":"wedgie-0.3.66","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":3,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -789,7 +791,13 @@ One JSON line each way, on the same serial port as the firmware (usb.md). The pa
 {"id":4,"type":"safe_remove","tx":{...,"dataHash":"0x..","nonce":15},"totp":497960} -> safe_sig + "deleteHash"
 {"id":5,"type":"safe_list"}                          -> {"type":"safe_list","safes":["8453:0x..", ...]}
 {"id":6,"type":"safe_note","chainId":8453,"safe":"0x.."} -> {"type":"ok","safes":3}
+{"id":7,"type":"safe_prove","text":"Join Telegram","code":".."} -> {"type":"safe_proof","text","code","x","y","r","s","cert","fr","fs"}
 ```
+
+- `safe_prove` (safe-27+, Trust M only): "Prove it" shows the text; on A the key signs
+  `sha256("wedgie prove\0" + sha256(text + "\n" + code))` (r, s), and the chip's factory key signs
+  `sha256("wedgie safe key\0" + X + Y)` (fr, fs; its Infineon certificate in `cert`). Check both and the
+  certificate's chain: this wedgie, this key, just now. wedgie.dev/telegram uses it (`api/_prove.ts`).
 
 - `hello` adds `"safe": {"x","y","chip"}`, `"signer"` (its owner address), `"safe_state"` (`ok`, `none` = no key
   yet, `lock` = an old key waiting to be locked, `swap` = someone else's key), `"safe_chunk"`, `"safe_clear"`
@@ -894,6 +902,7 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md
 | 0.3.56 | Signature checked while the question is up (green check / red warning); red border after full control |
 | 0.3.57 | Yes is grey until the check ends; installs end in a hard reset |
 | 0.3.64 | Release signatures checked on the Trust M (0.2 s, was 2.4 s); pure Python only without one, or if it says no |
+| 0.3.66 | Apps in their own list, named by its hash in the signed one (no size limit) |
 
 Report a problem: wedgie@buidlguidl.com, or **Send a bug report** on a wedgie's page at wedgie.dev/connect.
 

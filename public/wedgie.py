@@ -554,15 +554,31 @@ def job(wg, title, write, delete, apps):
     # mark): whole lines, ~512 bytes a piece (it hashes each and drops it), then the signature. After the
     # yes the list goes again, whole, to install mode (its clean heap). Older: the list rides with the job.
     late = (h0.get("jobs") or 0) >= 3
+    # 0.3.66+: the apps are in their own list (/fw/apps.txt), named by its hash in the signed one ("@apps"); the
+    # wedgie takes it in pieces. Older firmware sees no apps in such a list: it can only update its firmware.
+    al = urllib.request.urlopen(SITE + "/fw/apps.txt").read().decode() if "\n@apps  " in rel else ""
+    own = tuple(int(x) for x in (h0.get("version") or "0").split(".")[:3] if x.isdigit()) >= (0, 3, 66)
+    if al and not own:
+        if title != "Update firmware":
+            sys.exit("update its firmware first: wedgie.py update")
+        apps = None
+
+    def pieces(text):
+        o, out = 0, []
+        while o < len(text):
+            e = text.rfind("\n", o, o + 513)
+            e = (text.find("\n", o) if e < o else e)
+            e = len(text) if e < 0 else e + 1
+            out.append(text[o:e])
+            o = e
+        return out
 
     def send_list():
-        o = 0
-        while o < len(rel):
-            e = rel.rfind("\n", o, o + 513)
-            e = (rel.find("\n", o) if e < o else e)
-            e = len(rel) if e < 0 else e + 1
-            wg.s.write((json.dumps({"type": "rel", "t": rel[o:e]}) + "\n").encode())
-            o = e
+        if al and own and title.startswith("Install "):
+            for t in pieces(al):
+                wg.s.write((json.dumps({"type": "apps", "t": t}) + "\n").encode())
+        for t in pieces(rel):
+            wg.s.write((json.dumps({"type": "rel", "t": t}) + "\n").encode())
         wg.s.write((json.dumps({"type": "rel", "sig": sig}) + "\n").encode())
 
     try:
@@ -589,6 +605,10 @@ def job(wg, title, write, delete, apps):
     if v.get("type") != "go":
         sys.exit("the wedgie said: %s" % (v.get("error") or v))
     if late:
+        for t in (pieces(al) if al and own else []):
+            r = wg.request({"type": "apps", "t": t}, 30)
+            if r.get("type") != "ok":
+                sys.exit("the wedgie stopped: %s" % (r.get("error") or r))
         r = wg.request({"type": "release", "release": rel, "sig": sig}, 60)
         if r.get("type") != "ok":
             sys.exit("the wedgie stopped: %s" % (r.get("error") or r))

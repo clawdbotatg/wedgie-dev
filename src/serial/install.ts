@@ -225,6 +225,7 @@ async function checkedHave(r: Repl, m: Manifest, hash?: string[], late: boolean 
   if (h.bin) binOf.set(r, h.bin);
   listOf.set(r, h.jobs >= 3);
   oneThing.set(r, !!h.version && cmpVersion(h.version, ONE_THING) >= 0);
+  appList.set(r, !!h.version && cmpVersion(h.version, APP_LIST) >= 0);
   // Before 0.3.12 a job ran on the app's chopped-up heap and job.py grew each USB line a char at a time:
   // installs ran out of memory on real boards (0.3.6, 0.3.11). They get there once through full access
   // (Austin, 2026-10-02: one "full access" question is fine); 0.3.12+ installs on a clean heap.
@@ -255,12 +256,30 @@ function mineOf(m: Manifest, have: Have) {
   const names = m.carts.find((c) => c.mod === act)?.files || (Array.isArray(a?.files) ? a.files : act ? [act + ".py"] : []);
   return withTwins(names).filter((n) => have.hashes[n]);
 }
+/** 0.3.66+: the apps aren't in the signed list; it names the app list (/fw/apps.txt) by its hash, and the
+ *  wedgie takes that in pieces (job.Apps). Older firmware reads a list from 0.3.66 on as having no apps: it
+ *  can only update its firmware (apps.json left as it is), then install apps. */
+export const APP_LIST = "0.3.66";
+export const UPDATE_FIRST = "Update the firmware first.";
+const appList = new WeakMap<Repl, boolean>();
 const uidOf = new WeakMap<Repl, string>();     // its board ID, to find it again if a job's restart drops the port
 const binOf = new WeakMap<Repl, number>();      // 0.3.16+: the most raw bytes one put takes (hello "bin")
 const listOf = new WeakMap<Repl, boolean>();    // 0.3.56+ (hello "jobs" 3): checks the signed list while its question is up
-let release: Promise<{ text: string; sig: string }> | null = null;
-const signedList = () => release ||= Promise.all(["release.txt", "release.sig"].map((n) => fetch("/fw/" + n, { cache: "no-cache" }).then((x) => x.text())))
-  .then(([text, sig]) => ({ text, sig: sig.trim() }));
+let release: Promise<{ text: string; sig: string; apps: string }> | null = null;
+const signedList = () => release ||= Promise.all(["release.txt", "release.sig", "apps.txt"].map((n) => fetch("/fw/" + n, { cache: "no-cache" }).then((x) => x.ok ? x.text() : "")))
+  .then(([text, sig, apps]) => ({ text, sig: sig.trim(), apps }));
+/** A list in pieces of whole lines, ~512 bytes each: the wedgie hashes each and drops it. */
+function pieces(text: string) {
+  const out: string[] = [];
+  for (let o = 0; o < text.length;) {
+    let e = text.lastIndexOf("\n", o + 512);
+    if (e < o) e = text.indexOf("\n", o);
+    e = e < 0 ? text.length : e + 1;
+    out.push(text.slice(o, e));
+    o = e;
+  }
+  return out;
+}
 
 /** Run one checked job: the number of files sent, or false (nothing asked, nothing changed) when a file
  *  isn't in the signed list. late (0.3.10+): the job carries only its name, version and files, so the
@@ -272,6 +291,11 @@ async function job(r: Repl, m: Manifest, title: string, write: string[], del: st
   // jobs). Not in delete: 0.3.12-0.3.13 refuse to delete their core names (wedgie.py, slot.py, ...).
   const relP = signedList();
   relP.catch(() => {});
+  const own = !!appList.get(r);         // takes the app list on its own
+  if (!own && cmpVersion(m.version, APP_LIST) >= 0) {
+    if (title !== "Update firmware") throw new Error(UPDATE_FIRST);
+    apps = null;                        // it sees no apps in the list: it keeps its apps.json
+  }
   const list = !!listOf.get(r);
   late ||= list;                        // its check gets the list in pieces (slot._sig); the job carries none
   const listed = late ? new Set(m.files.map((f) => f.name)) : new Set((await relP).text.split("\n").slice(2).map((l) => l.split("  ")[1]).filter(Boolean));
@@ -290,15 +314,11 @@ async function job(r: Repl, m: Manifest, title: string, write: string[], del: st
   const asked = r.request({ type: "job", job: title, ...(rel ? { release: rel.text, sig: rel.sig } : { version: m.version }), write, delete: del, apps: apps && JSON.stringify(apps),
     bytes: write.reduce((t, n) => t + (m.files.find((f) => f.name === n)?.size || 0), 0),    // the wedgie's bar weighs the file part by it
     ...(binOf.get(r) ? { raw: true } : {}), ...(list ? { list: 1 } : {}), ...(ver ? { ver } : {}) }, 120000,
-    // its question asks for the signed list: whole lines, ~512 bytes a piece (it hashes each and drops it), then the signature
-    list ? () => relP.then(async ({ text, sig }) => {
-      for (let o = 0; o < text.length;) {
-        let e = text.lastIndexOf("\n", o + 512);
-        if (e < o) e = text.indexOf("\n", o);
-        e = e < 0 ? text.length : e + 1;
-        await r.write(JSON.stringify({ type: "rel", t: text.slice(o, e) }) + "\n");
-        o = e;
-      }
+    // its question asks for the signed list: whole lines, ~512 bytes a piece (it hashes each and drops it), then the
+    // signature. "Install X" on 0.3.66+: the app list first, which must name X
+    list ? () => relP.then(async ({ text, sig, apps: al }) => {
+      if (own && title.startsWith("Install ")) for (const t of pieces(al)) await r.write(JSON.stringify({ type: "apps", t }) + "\n");
+      for (const t of pieces(text)) await r.write(JSON.stringify({ type: "rel", t }) + "\n");
       await r.write(JSON.stringify({ type: "rel", sig }) + "\n");
     }).catch(() => {}) : undefined);
   asked.catch(() => {});
@@ -339,6 +359,10 @@ async function job(r: Repl, m: Manifest, title: string, write: string[], del: st
     if (late) {
       onProgress(0, "checking the signature");
       const sl = await relP;
+      if (own) for (const t of pieces(sl.apps)) {
+        const a = await r.request({ type: "apps", t }, 30000);
+        if (a.type !== "ok") throw new Error(`the wedgie stopped: ${a.error || a.type}`);
+      }
       const a = await r.request({ type: "release", release: sl.text, sig: sl.sig }, 60000);
       if (a.type !== "ok") throw new Error(`the wedgie stopped: ${a.error || a.type}`);
       onProgress(0, "looking at what's on it");
@@ -430,7 +454,7 @@ export async function installCore(r: Repl, onProgress: (p: number, what: string)
     const j = await job(r, m, "Update firmware", write, del, apps, (p, w) => onProgress(0.02 + 0.96 * p, w), !!ch.late);
     if (j) {
       onProgress(1, j.sent ? `${j.sent} files updated` : "already up to date");
-      return { version: m.version, written: j.sent, outdated: one ? stale : m.carts.filter((c) => apps.some((a) => a.mod === c.mod && a.v !== c.v)), restarted: true, untouched: false };
+      return { version: m.version, written: j.sent, outdated: one ? stale : m.carts.filter((c) => apps?.some((a) => a.mod === c.mod && a.v !== c.v)), restarted: true, untouched: false };
     }
   }
   onProgress(0, "stopping what it runs");

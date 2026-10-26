@@ -16,7 +16,7 @@ import { createHash } from "node:crypto";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { published, releaseText, shelf } from "./release.mjs";
+import { published, releaseText, appsText, shelf } from "./release.mjs";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const sha = (buf) => createHash("sha256").update(buf).digest("hex");
 /** A cart's version: the same function as cartV in src/serial/install.ts. */
@@ -70,7 +70,9 @@ export function buildFirmware() {
     const txt = readFileSync(join(root, "release/firmware.txt"), "utf8");
     copyFileSync(join(root, "release/firmware.txt"), join(out, "release.txt"));
     copyFileSync(join(root, "release/firmware.sig"), join(out, "release.sig"));
-    signed = txt === releaseText();
+    const apps = existsSync(join(root, "release/apps.txt")) ? readFileSync(join(root, "release/apps.txt"), "utf8") : "";
+    writeFileSync(join(out, "apps.txt"), apps);     // the app list the signed one names by its hash (0.3.66+)
+    signed = txt === releaseText() && (!txt.includes("\n@apps  ") || apps === appsText());
     if (!signed) console.warn("fw: release/firmware.txt is out of date: run node tools/sign.mjs");
   } catch {}
   writeFileSync(join(out, "manifest.json"), JSON.stringify({ version, files, core, carts, known, signed }, null, 1));

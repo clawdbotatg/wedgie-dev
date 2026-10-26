@@ -352,7 +352,6 @@ def _older(v):
 
 
 SIG_RAM = 16000     # free heap the check needs beside an app (p256 and its numbers, one piece of the list)
-SIG_WAIT = 8000     # ms with nothing from the host: it stopped sending the list
 
 
 def _sig(mid, m, v):
@@ -360,6 +359,7 @@ def _sig(mid, m, v):
     "list": 1; it saw hello "jobs" 3, 0.3.56+). It asks for the job's signed list ({"type": "list"}); the host sends it in pieces of
     whole lines, {"type": "rel", "t": <text>}, then {"type": "rel", "sig": <sig>}. Each piece is hashed and
     dropped: the whole list (4.5 KB) in one line ran out of memory beside Crystal Grove (chipprobe, 10-19).
+    The check itself is listcheck.py (0.3.66+: the app list too).
     True: a release key signed it, for the version or the app the question names. False: it didn't.
     None: no list came, or too little memory beside the app; job.py checks it after the yes either way,
     on a clean heap, before anything is written."""
@@ -367,45 +367,22 @@ def _sig(mid, m, v):
     app = title[8:] if title.startswith("Install ") else None
 
     def check(tick):
-        import gc, hashlib
+        import gc
         gc.collect()
         if gc.mem_free() < SIG_RAM:
             print("slot: signed None %d low" % gc.mem_free())
             return None
-        W.send({"id": mid, "type": "list"})
-        h, n, named, sg, ok = hashlib.sha256(), 0, app is None, None, None
-        R, t0 = W.lines(), time.ticks_ms()
+        import sys
         try:
-            while sg is None:
-                tick()
-                line = R.pump(_poll, 20)
-                if line is None:
-                    if time.ticks_diff(time.ticks_ms(), t0) > SIG_WAIT:
-                        raise StopIteration
-                    continue
-                t0 = time.ticks_ms()
-                q = json.loads(line) if line else {}
-                line = None
-                if q.get("type") != "rel":
-                    raise StopIteration
-                t = q.get("t") or ""
-                if t and t[-1] != "\n":
-                    raise ValueError("a piece ends in a whole line")
-                h.update(t)
-                for l in t.split("\n")[:-1]:
-                    if n == 0 and l != "wedgie-release 1" or n == 1 and l != "version %s" % v:
-                        raise ValueError("not this release")
-                    if app and l.startswith("@app  ") and json.loads(l[6:]).get("name") == app:
-                        named = True
-                    n += 1
-                sg = q.get("sig")
-            ok = n > 1 and named and W.release_ok(None, sg, tick, h.digest())
+            import listcheck            # its own file, loaded only now: slot.py stays beside every app
+            ok = listcheck.run(mid, app, v, tick, _poll)
         except StopIteration:
             ok = None
         except MemoryError:
             ok = None
         except ValueError:
             ok = False
+        sys.modules.pop("listcheck", None)
         gc.collect()
         print("slot: signed %s %d" % (ok, gc.mem_free()))    # tools/chipprobe.mjs reads it
         return ok

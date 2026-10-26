@@ -43,7 +43,21 @@ execFileSync("uv", ["run", "-q", "--with", "mpy-cross==1.29.0.post2", "python3",
 const wedgieMpy = readFileSync(join(KD, "wedgie.mpy"));
 const fileOf = (n) => (n === "wedgie.py" ? wedgiePy : n === "wedgie.mpy" ? wedgieMpy : F.file(n));
 const sha = (b) => createHash("sha256").update(b).digest("hex");
-const relText = `wedgie-release 1\nversion ${version}\n` + F.all.map((n) => `${sha(fileOf(n))}  ${n}\n`).join("") + appLines(F.carts);
+// as tools/release.mjs: the core in the signed list, the apps in their own list it names by its hash (0.3.66+)
+const appsText = [...F.carts].sort((a, b) => (a.mod < b.mod ? -1 : 1)).map((c) => appLines([c]) + c.files.map((n) => `${sha(fileOf(n))}  ${n}\n`).join("")).join("");
+const relText = `wedgie-release 1\nversion ${version}\n` + F.core.map((n) => `${sha(fileOf(n))}  ${n}\n`).join("") + `@apps  ${sha(appsText)}\n`;
+/** A list in pieces as install.ts sends it: whole lines, ~512 bytes each. */
+const pieces = (text) => {
+  const out = [];
+  for (let o = 0; o < text.length;) {
+    let e = text.lastIndexOf("\n", o + 512);
+    if (e < o) e = text.indexOf("\n", o);
+    e = e < 0 ? text.length : e + 1;
+    out.push(text.slice(o, e));
+    o = e;
+  }
+  return out;
+};
 const sg = sign("sha256", Buffer.from(relText), { key: privateKey, dsaEncoding: "ieee-p1363" }).toString("hex");
 const relSig = sg.slice(0, 64) + " " + sg.slice(64);
 
@@ -94,13 +108,8 @@ function job(w, title, write, del, apps, where) {
   w.h.chip.write(JSON.stringify({ type: "job", job: title, version, write, delete: del, apps: apps && JSON.stringify(apps), bytes: write.reduce((t, n) => t + fileOf(n).length, 0), raw: !!bin, id: 900, ...(first ? { list: 1 } : {}) }) + "\n");
   if (first) {                      // as install.ts: whole lines, ~512 bytes a piece, then the signature
     if (!w.h.until((b) => /"type": "list"/.test(b), 20000, 20)) return `its question didn't ask for the list: ${JSON.stringify(w.h.out.slice(-300))}`;
-    for (let o = 0; o < relText.length;) {
-      let e = relText.lastIndexOf("\n", o + 512);
-      if (e < o) e = relText.indexOf("\n", o);
-      e = e < 0 ? relText.length : e + 1;
-      w.h.chip.write(JSON.stringify({ type: "rel", t: relText.slice(o, e) }) + "\n");
-      o = e;
-    }
+    if (title.startsWith("Install ")) for (const t of pieces(appsText)) w.h.chip.write(JSON.stringify({ type: "apps", t }) + "\n");
+    for (const t of pieces(relText)) w.h.chip.write(JSON.stringify({ type: "rel", t }) + "\n");
     w.h.chip.write(JSON.stringify({ type: "rel", sig: relSig }) + "\n");
     if (!w.h.until((b) => /slot: signed \S+ \d+/.test(b), 60000, 20)) return `no check while the question was up: ${JSON.stringify(w.h.out.slice(-300))}`;
     const m = w.all.match(/slot: signed (\S+) (\d+)/);
@@ -112,6 +121,11 @@ function job(w, title, write, del, apps, where) {
   w.h.until((b) => { const m = [...b.matchAll(/\{[^\n]*"id": 900[,}][^\n]*\n/g)].map((x) => JSON.parse(x[0])).find((x) => x.type !== "list"); if (m) g = m; return !!m; }, 20000);
   if (g?.type !== "go") return `job: ${JSON.stringify(g)}`;
   w.ram(where + ", after the yes");
+  for (const t of pieces(appsText)) {
+    const p = w.req({ type: "apps", t }, 30000);
+    if (p?.type !== "ok") return `apps: ${JSON.stringify(p)}`;
+  }
+  w.ram(where + ", after the app list");
   const a = w.req({ type: "release", release: relText, sig: relSig }, 240000);    // checked again, on install mode's clean heap
   if (a?.type !== "ok") return `release: ${JSON.stringify(a)}`;
   w.ram(where + ", after the signature");
@@ -182,13 +196,8 @@ for (const [a, b] of pairs) {
 if (!args.includes("--late") && !from) {
   const a = carts[0], b = carts[1];
   const send = (w, sig) => {
-    for (let o = 0; o < relText.length;) {
-      let e = relText.lastIndexOf("\n", o + 512);
-      if (e < o) e = relText.indexOf("\n", o);
-      e = e < 0 ? relText.length : e + 1;
-      w.h.chip.write(JSON.stringify({ type: "rel", t: relText.slice(o, e) }) + "\n");
-      o = e;
-    }
+    for (const t of pieces(appsText)) w.h.chip.write(JSON.stringify({ type: "apps", t }) + "\n");
+    for (const t of pieces(relText)) w.h.chip.write(JSON.stringify({ type: "rel", t }) + "\n");
     w.h.chip.write(JSON.stringify({ type: "rel", sig }) + "\n");
   };
   const ask = (w) => {

@@ -37,8 +37,9 @@ const done = await page.waitForFunction(() => /Restarting it on the new firmware
 check(/Restarting/.test(done), `the update went through with the old Safe Signer on it (${((Date.now() - t0) / 1000).toFixed(0)} s): ${done}`);
 const puts = await page.evaluate(() => window.__ports[0]._st.rawPuts || 0);
 check(puts > 30, `it was sent in raw 4 KB puts (${puts})`);
-const sent = await page.evaluate(() => (window.__ports[0]._st.jobLog || []).map((j) => j.msg.job + ": " + (JSON.parse(j.msg.apps || "[]").map((a) => a.mod).join() || "none")));
-check(sent[0] === "Update firmware: safe", `the update keeps Safe Signer (${sent.join(" | ")})`);
+// apps null: it keeps its apps.json (firmware before 0.3.66 reads today's signed list as naming no apps, install.ts APP_LIST)
+const sent = await page.evaluate(() => (window.__ports[0]._st.jobLog || []).map((j) => j.msg.job + ": " + (j.msg.apps == null ? "kept" : JSON.parse(j.msg.apps).map((a) => a.mod).join() || "none")));
+check(sent[0] === "Update firmware: kept", `the update keeps Safe Signer (${sent.join(" | ")})`);
 check(!errs.length, "no page errors" + (errs.length ? ": " + errs.join(" | ") : ""));
 console.log(bad ? `${bad} FAILED` : "all ok");
 await browser.close();

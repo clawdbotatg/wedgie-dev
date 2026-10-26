@@ -16,6 +16,7 @@ a = ap.parse_args()
 get = lambda n: urllib.request.urlopen(a.site + "/fw/" + n).read()
 man = json.loads(get("manifest.json"))
 rel, sig = get("release.txt").decode(), get("release.sig").decode().strip()
+al = get("apps.txt").decode() if "\n@apps  " in rel else ""     # 0.3.66+: the apps in their own list
 
 
 def port():
@@ -112,6 +113,10 @@ def install(mod):
     if not g or g.get("type") != "go":
         return "job: %s" % g
     print("   yes (question up in %s ms)" % g.get("asked_ms"))
+    for l in al.splitlines(True):      # a line a piece: the wedgie hashes each (job.Apps)
+        r = w.req({"type": "apps", "t": l}, 30)
+        if not r or r.get("type") != "ok":
+            return "apps: %s" % r
     r = w.req({"type": "release", "release": rel, "sig": sig}, 120)
     if not r or r.get("type") != "ok":
         return "release: %s" % r

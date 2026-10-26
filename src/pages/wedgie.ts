@@ -100,7 +100,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
             <dl class="kv" id="d-hw"></dl>
             <div class="status recess" id="d-status" hidden></div>
           </div>
-          <div class="card wd-sec">
+          <div class="card wd-sec wd-fw">
             <h3>Firmware</h3>
             <div id="d-fw"></div>
             <div class="meter" id="d-meter" hidden><div class="meter-track"><div class="meter-fill"></div></div><span id="d-meter-t"></span></div>
@@ -363,11 +363,15 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     const cur = x.kind === "wedgie" ? x.version : null, fresh = !!cur && cmpVersion(cur, m.version) >= 0;   // newer (a test build) is never "updated" back
     const what = x.kind === "wallet" ? "The Wallet is running, so its firmware version isn't known here. Update puts on the latest; the Wallet stays."
       : fresh ? "Up to date." : cur ? `wedgie ${esc(m.version)} is ready.` : `This board has MicroPython but no wedgie firmware yet.`;
+    // Behind (or none): the update is all the page shows, one big button. Apps can't go on till then (0.3.66+
+    // takes the app list on its own; older firmware sees no apps in today's signed list: install.ts APP_LIST).
+    const need = !fresh && (x.kind === "wedgie" || x.kind === "micropython");
+    main.querySelector(".wd")!.classList.toggle("need-fw", need);
     const sig = `${cur}|${m.version}|${x.kind}|${!!link}|${!!busy}`;
     if (box.dataset.sig === sig) return;
     box.dataset.sig = sig;
     box.innerHTML = `<div class="fwrow"><div><h4>${cur ? `wedgie ${esc(cur)}` : x.kind === "wallet" ? "wedgie" : "No wedgie firmware"}</h4><p>${what}</p></div>` +
-      `<button class="btn btn-sm ${fresh ? "" : "btn-green"}" data-fw ${!link || busy ? "disabled" : ""}>${fresh ? "Reinstall" : cur || x.kind === "wallet" ? "Update" : "Install"}</button>` + `</div>` +
+      `<button class="btn ${need ? "btn-lg btn-pulse" : "btn-sm"} ${fresh ? "" : "btn-green"}" data-fw ${!link || busy ? "disabled" : ""}>${fresh ? "Reinstall" : cur || x.kind === "wallet" ? "Update" : "Install"}</button>` + `</div>` +
       (fresh ? "" : `<p class="fine">Takes a minute. Its app and its saves stay on it.</p>`);
     box.querySelector<HTMLButtonElement>("[data-fw]")?.addEventListener("click", updateFw);
   }

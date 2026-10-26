@@ -6,6 +6,9 @@
 # The question goes up the moment that arrives ("Install Buttons?"). Nothing before it reads the flash
 # or checks a signature: the person sees it in milliseconds. A no answers {"type":"refused"}. A yes
 # answers {"type":"go"}, and until the job ends nothing else runs (under the boot bar):
+#   {"type":"apps","t":<whole lines>}                   -> {"type":"ok"}   (0.3.66+, before the release: the app
+#        list, release/apps.txt, in pieces. Hashed whole; only the blocks of the app it puts on and the one it runs are
+#        kept. The signed list names its hash, "@apps": a list of every app's files no longer has to fit one USB line)
 #   {"type":"release","release":<release.txt>,"sig":"<r> <s>"} -> {"type":"ok"}  the signed list (our key,
 #        wedgie.release_ok: 0.2 s on a Trust M, else 2.4 s of pure-Python P-256) must name every file to write and be that version
 #   {"type":"sums","names":[..],"exists":[..]}           -> {"type":"sums"}  what's on it already
@@ -88,6 +91,56 @@ def _files_of(a, signed):
     return out
 
 
+class Apps:
+    """The app list (release/apps.txt, 0.3.66+) as it comes, in pieces of whole lines: each app's "@app  <json>",
+    then its "<sha256>  <name>" lines. All of it is hashed (check holds it to the signed list's "@apps"); only
+    the apps in keep are kept, and of their lines only the files they name."""
+    def __init__(self, keep):
+        self.h, self.keep, self.cur, self.apps, self.files, self.sum = hashlib.sha256(), keep, None, {}, {}, None
+
+    def feed(self, t):
+        if self.sum or t and t[-1] != "\n":
+            raise ValueError("a piece ends in a whole line")
+        self.h.update(t.encode())
+        for l in t.split("\n")[:-1]:
+            if l.startswith("@app  "):
+                a = json.loads(l[6:])
+                self.cur = a if a.get("mod") in self.keep else None
+                if self.cur:
+                    self.apps[a["mod"]] = a
+            elif self.cur:
+                h, n = l.split("  ", 1)
+                if n in (self.cur.get("files") or ()):
+                    self.files[n] = h
+
+    def done(self):
+        self.sum = self.sum or binascii.hexlify(self.h.digest()).decode()
+        return self.sum
+
+
+def release_sum(text):
+    """The signed list's "@apps  <sha256>" (0.3.66+; tools/release.mjs): the hash of the app list, which comes on
+    its own (Apps). The apps' lines filled the one 6 KB USB line the list rides. None: an older list, its apps in it.
+    Here, not in wedgie.py: that one stays loaded beside every app (Safe Signer's heap, tools/safechip.mjs)."""
+    for l in text.split("\n")[2:]:
+        if l.startswith("@apps  "):
+            return l[7:]
+    return None
+
+
+def keep(m):
+    """The apps a job's app list keeps: the one it puts on and the one it runs."""
+    out = set()
+    try:
+        out.update(a.get("mod") for a in json.loads(m["apps"]))
+    except Exception:
+        pass
+    a = W.active()
+    if a:
+        out.add(a.get("mod"))
+    return out
+
+
 def check(m, sig=True, tick=None):
     """The job against its signed list: (version, {name: sha}, required names) or raises ValueError. sig=False skips the
     signature (0.2 s on a Trust M, else pure-Python P-256: 2.4 s on an RP2040), which run() checks after the yes.
@@ -108,8 +161,19 @@ def check(m, sig=True, tick=None):
         raise ValueError("the signed list is %s, not %s" % (version, m["version"]))
     rules(m)
     signed = W.release_apps(rel)
+    tag = release_sum(rel)
+    if tag is not None:                 # 0.3.66+: the apps came on their own (Apps), named by their hash
+        al = m.get("_apps")
+        if al is not None:
+            if al.done() != tag:
+                raise ValueError("the app list isn't the signed one")
+            signed.update(al.apps)
+            for n, h in al.files.items():
+                if files.get(n, h) != h:
+                    raise ValueError("%s is in the list twice" % n)
+                files[n] = h
     required = set(m.get("write") or ())
-    if signed:                          # (a list from before 0.3.12 has none: files only, as then)
+    if signed or tag is not None:       # (a list from before 0.3.12 has none: files only, as then)
         appf = set()
         for a in signed.values():
             appf.update(a.get("files") or ())
@@ -338,7 +402,19 @@ def run(mid, m, ask, show=None):
                 continue
             line = None
             qid, t = q.get("id"), q.get("type")
-            if t == "release":
+            if t == "apps":
+                if files is not None:
+                    _err(qid, "the app list comes before the signed list")
+                    return
+                try:
+                    m.setdefault("_apps", Apps(keep(m))).feed(q.get("t") or "")
+                except ValueError as e:
+                    _err(qid, str(e))
+                    return
+                q = None
+                last = time.ticks_ms()
+                W.send({"id": qid, "type": "ok"})
+            elif t == "release":
                 if files is not None:
                     _err(qid, "one signed list per job")
                     return
@@ -350,7 +426,8 @@ def run(mid, m, ask, show=None):
                 except ValueError as e:
                     _nope(qid, e)
                     return
-                m.pop("release", None)      # the 2.6 KB list: files has what's needed from it
+                m.pop("release", None)      # the list: files has what's needed from it
+                m.pop("_apps", None)
                 gc.collect()
                 show(title, "looking at what's on it", plan.at("sums"))
                 last = time.ticks_ms()

@@ -11,8 +11,9 @@ history before commit 020765c.
 - `community.json` lists the repos on the site, each pinned to one commit we read.
 - `tools/community.mjs` copies that commit's app files into `community/<owner>/<repo>/`, so a review
   is a normal `git diff`, and the site never fetches from GitHub at build time.
-- `tools/release.mjs shelf()` adds those apps to the signed list (a hash of each file, plus an `@app`
-  line: mod, name, entry, usb, files). The release keys sign the firmware and the apps together.
+- `tools/release.mjs appsText()` lists those apps (an `@app` line: mod, name, entry, usb, files, then a hash
+  of each file) in `release/apps.txt`. The signed list names it by its hash (`@apps`), so one signature covers
+  the firmware and the apps, and adding apps never grows the signed list (it rides one 6 KB USB line).
 - `tools/fw.mjs` publishes them to `/fw/` beside the core, first in the manifest, so they're first on
   the site. A wedgie installs them with a checked install (`firmware/job.py`): every file must match
   the signed hash, and the person presses A.

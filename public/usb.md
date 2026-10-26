@@ -5,7 +5,7 @@ description: Talk to a plugged-in wedgie over USB - find its port, hello, wedgie
 
 # Talk to a wedgie over USB
 
-Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.65**; if `hello`
+Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.66**; if `hello`
 says older, run `wedgie.py update` first.
 
 ## Talk to it directly
@@ -101,6 +101,8 @@ wedgie's own screen answered by a **real press** (a `press` request can't answer
   green check (signed by wedgie.dev) or a red warning sign (not signed: a yes changes nothing). No check
   mark means it wasn't checked yet; it always is after the yes, before anything is written. 0.3.57+: yes is
   grey and does nothing until the check is done; no works at any time.
+  0.3.66+: the apps are in their own list (`/fw/apps.txt`); the signed list names it by its hash (`@apps`).
+  Older firmware sees no apps in a 0.3.66+ list: update its firmware first, then install apps.
 - **A no to FULL CONTROL holds until it's unplugged** (0.3.54+): every `open` after it is `refused` without
   asking, so a computer can't ask until the person gives in. A question takes no press in its first 0.6 s.
 - **A no restarts the wedgie.** The question is drawn straight over the app's screen without saving it
@@ -128,7 +130,7 @@ from answering. Hold **Y**: no WEDGIE drive this time (debugging only).
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.65","fw":"wedgie-0.3.65","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.66","fw":"wedgie-0.3.66","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":3,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n

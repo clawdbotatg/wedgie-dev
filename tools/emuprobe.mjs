@@ -285,11 +285,12 @@ try {
   await page.evaluate(() => window.vw.exec("import slot, sys\n_a = slot.ask\ndef _ask2(*a, **k):\n    print('@asked', 'job' in sys.modules)\n    return _a(*a, **k)\nslot.ask = _ask2"));
   const exi = await req({ id: 69, type: "sums", names: [], exists: ["hello.py", "buttons.py", "nope.py"] });
   check(exi?.sums?.["hello.py"] === 1 && exi.sums["nope.py"] === null && exi.apps?.[0]?.mod === "hello", `sums (exists only) before the question: ${JSON.stringify(exi?.sums)}`);
-  const rel = await page.evaluate(() => Promise.all(["release.txt", "release.sig", "buttons.py"].map((n) => fetch("/fw/" + n).then((r) => r.text()))));
+  const rel = await page.evaluate(() => Promise.all(["release.txt", "release.sig", "buttons.py", "apps.txt"].map((n) => fetch("/fw/" + n).then((r) => r.text()))));
+  const split = /^@apps {2}/m.test(rel[0]);       // 0.3.66+: the apps in their own list
   const ver = rel[0].split("\n")[1].slice(8);
   const asking = page.evaluate(() => new Promise((res) => { const t0 = performance.now(); const off = window.vw.onOutput((l) => { if (l.includes("@asked")) { off(); res([performance.now() - t0, l]); } }); setTimeout(() => { off(); res([-1, ""]); }, 10000); }));
   // the title is the signed app's name (job.py check); a list from before 0.3.12 names no apps, so no apps then
-  const go = req({ id: 70, type: "job", job: "Install Buttons", version: ver, write: ["buttons.py"], delete: ["hello.py"], ver: "ea626bc Oct 22", apps: /^@app {2}/m.test(rel[0]) ? JSON.stringify([{ mod: "buttons", v: "x" }]) : null }, 30000);
+  const go = req({ id: 70, type: "job", job: "Install Buttons", version: ver, write: ["buttons.py"], delete: ["hello.py"], ver: "ea626bc Oct 22", apps: split || /^@app {2}/m.test(rel[0]) ? JSON.stringify([{ mod: "buttons", v: "x" }]) : null }, 30000);
   const [askedMs, askedLine] = await asking;
   await page.waitForTimeout(800);
   await page.locator(".vw").screenshot({ path: `${out}/emu-job-ask.png` });
@@ -298,6 +299,7 @@ try {
   check(askedMs >= 0 && askedMs < 300 && g?.type === "go", `job: the question is up ${Math.round(askedMs)} ms after the job arrives, A says go (${JSON.stringify(g)})`);
   check(typeof g?.asked_ms === "number" && g.asked_ms < 200, `job: the wedgie says how long its question took (${g?.asked_ms} ms)`);
   check(/@asked False/.test(askedLine), `job: asked before job.py was even loaded (${askedLine.trim()})`);
+  if (split) for (const [i, t] of (rel[3].match(/[^]*?\n/g) || []).entries()) await req({ id: 200 + i, type: "apps", t });
   const rok = await req({ id: 71, type: "release", release: rel[0], sig: rel[1].trim() }, 120000);
   check(rok?.type === "ok" && rok.version === ver, `job: the signed list checks out after the yes (${JSON.stringify(rok)})`);
   const sm = await req({ id: 72, type: "sums", names: ["buttons.py"] });

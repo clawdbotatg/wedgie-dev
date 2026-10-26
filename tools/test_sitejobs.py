@@ -22,6 +22,7 @@ import job           # noqa: E402
 
 ver = lambda v: tuple(int(x) for x in v.split("."))
 rel = open(os.path.join(HERE, "..", "dist", "fw", "release.txt")).read()
+al = open(os.path.join(HERE, "..", "dist", "fw", "apps.txt")).read() if "\n@apps  " in rel else ""    # 0.3.66+
 logs = sys.argv[1:] or [os.path.join(HERE, "..", "shots", n) for n in ("sitejobs-prepare.json", "sitejobs-update.json")]
 n = bad = 0
 for path in logs:
@@ -37,6 +38,9 @@ for path in logs:
                     open(f, "wb").write(b"x")
             open("apps.json", "w").write(json.dumps(e["apps"]))
             m = dict(e["msg"], release=rel)
+            if al:                      # as the site sends it: the app list first (job.Apps)
+                m["_apps"] = job.Apps(job.keep(m))
+                m["_apps"].feed(al)
             n += 1
             try:
                 job.check(m, sig=False)
