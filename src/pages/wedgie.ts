@@ -89,10 +89,12 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
   main.innerHTML = `
   <section class="sec wd">
     <a class="back" href="/connect">‹ All wedgies</a>
-    <div class="wd-grid">
-      <div class="wd-dev"><div class="wd-3d"></div><p class="fine wd-hint" id="d-hint"></p></div>
+    <div class="wd-col">
+      <div class="wd-dev"><div class="wd-3d"></div>
+        <div class="wd-tags"><span class="light" id="d-light"></span><a class="vtag" id="d-virtual" href="/virtual" target="_blank" hidden title="Not hardware: a virtual wedgie running in a wedgie.dev/virtual tab">virtual</a></div>
+        <p class="fine wd-hint" id="d-hint"></p></div>
       <div class="wd-main">
-        <div class="wd-head"><span class="light" id="d-light"></span><span class="idtag big">${esc(id)}</span><a class="vtag" id="d-virtual" href="/virtual" target="_blank" hidden title="Not hardware: a virtual wedgie running in a wedgie.dev/virtual tab">virtual</a></div>
+        <div class="beta-warn"><b>Beta.</b> We're making it delightful, and it changes every day, often every few hours. Keep only small amounts on your wedgie for now.</div>
         <div class="wd-missing card" id="d-missing" hidden></div>
         <div id="d-body">
           <div class="card wd-sec">

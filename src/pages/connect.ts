@@ -43,7 +43,6 @@ function list(main: HTMLElement, go: (path: string) => void) {
     </div>
     <div id="setup"></div>
     <div class="rows" id="rows"></div>
-    <div class="beta-warn"><b>Beta.</b> New firmware and software ship every few hours. Keep only small amounts on your wedgie for now.</div>
     <div class="row center" id="plug-actions"></div>
   </section>
   <a class="tg-sticker" id="tg-sticker" href="/telegram" hidden><img src="/img/telegram-sticker.webp" alt="Join the Wedgies Telegram"></a>`;
