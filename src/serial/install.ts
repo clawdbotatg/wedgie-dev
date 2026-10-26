@@ -261,6 +261,7 @@ function mineOf(m: Manifest, have: Have) {
  *  can only update its firmware (apps.json left as it is), then install apps. */
 export const APP_LIST = "0.3.66";
 export const UPDATE_FIRST = "Update the firmware first.";
+export const NOT_SIGNED = "this firmware isn't signed yet. Your wedgie stays as it is";
 const appList = new WeakMap<Repl, boolean>();
 const uidOf = new WeakMap<Repl, string>();     // its board ID, to find it again if a job's restart drops the port
 const binOf = new WeakMap<Repl, number>();      // 0.3.16+: the most raw bytes one put takes (hello "bin")
@@ -456,6 +457,12 @@ export async function installCore(r: Repl, onProgress: (p: number, what: string)
       onProgress(1, j.sent ? `${j.sent} files updated` : "already up to date");
       return { version: m.version, written: j.sent, outdated: one ? stale : m.carts.filter((c) => apps?.some((a) => a.mod === c.mod && a.v !== c.v)), restarted: true, untouched: false };
     }
+  }
+  // 0.3.12+ updates only through its signed question: never the red FULL CONTROL one (Austin 10-25: "I should
+  // not see this when I go to update my firmware"). An unsigned release on the site isn't for it yet.
+  if (opts.launcher !== false) {
+    const h = await r.hello(700).catch(() => null);
+    if (h?.version && cmpVersion(h.version, "0.3.12") >= 0) throw new Error(m.signed ? "the wedgie didn't take the signed update. Unplug it, plug it in, try again" : NOT_SIGNED);
   }
   onProgress(0, "stopping what it runs");
   if (opts.launcher === false) { await r.enter({ reset: false }); await busy(r, "Installing firmware"); }   // a board already in the raw REPL (/test's bench)

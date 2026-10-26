@@ -364,7 +364,8 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
   function paintFw(x: W.Wedgie) {
     const box = $("#d-fw");
     if (!m) { box.innerHTML = ""; return; }
-    const cur = x.kind === "wedgie" ? x.version : null, fresh = !!cur && cmpVersion(cur, m.version) >= 0;   // newer (a test build) is never "updated" back
+    const cur = x.kind === "wedgie" ? x.version : null, fresh = !!cur && (cmpVersion(cur, m.version) >= 0
+      || (!m.signed && cmpVersion(cur, "0.3.12") >= 0));   // newer (a test build) is never "updated" back; an unsigned release isn't offered to one that only takes signed
     const what = x.kind === "wallet" ? "The Wallet is running, so its firmware version isn't known here. Update puts on the latest; the Wallet stays."
       : fresh ? "Up to date." : cur ? `wedgie ${esc(m.version)} is ready.` : `This board has MicroPython but no wedgie firmware yet.`;
     // Behind (or none): the update is all the page shows, one big button. Apps can't go on till then (0.3.66+
