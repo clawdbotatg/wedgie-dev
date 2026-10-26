@@ -43,8 +43,8 @@ The page sends the transaction's fields. The wedgie works out the Safe tx hash i
 few big words per page, and signs only on **green (A)**. **Red (Y)**, or no answer in 2 minutes, is a no.
 
 - Every page shows **which Safe** at the top (a dark card: its blockie and address) and the chain at the bottom.
-  Every address is in full with its blockie. The first page shows a blockie of the Safe tx hash, so a computer and
-  a phone can be compared by eye.
+  Every address is in full with its blockie. The Safe tx hash itself is never shown: the wedgie works it out
+  from the fields and signs that.
 - Read in plain words: ETH and token sends (each chain's own coin: 0.5 POL on Polygon), owner and threshold
   changes, modules on/off, Candide recovery (guardians, cancel), Instant Wallet's daily budget (Zodiac Roles),
   exact approvals, Uniswap swaps (Universal Router V3/V4: pay, get at least, to this Safe, fee), MultiSend
