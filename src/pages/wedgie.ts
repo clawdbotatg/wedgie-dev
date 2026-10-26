@@ -218,12 +218,13 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
   let alive = true;
   let release: (() => void) | null = null;
   let stopFn: (() => void) | null = null;
-  // It restarted on purpose (an install, an update): its USB drops for a few seconds. Till it's back (or
-  // BACK_MS runs out) the page shows "Restarting" with a bar, not "isn't plugged in".
-  const BACK_MS = 15000;
-  let backBy = 0, backTimer = 0;
-  const expectBack = () => {
-    backBy = Date.now() + BACK_MS;
+  // Its USB drops for a few seconds whenever it restarts (an install, an update, on its own), and at page
+  // open it takes a moment to be found. Till it's back (or the time runs out) the page shows a bar
+  // ("Restarting" / "Looking for"), never "isn't plugged in".
+  const BACK_MS = 15000, FIND_MS = 6000;
+  let backBy = 0, backTimer = 0, wasHere = false, seenOnce = false;
+  const expectBack = (ms = BACK_MS) => {
+    backBy = Date.now() + ms;
     clearInterval(backTimer);
     backTimer = setInterval(() => { if (Date.now() > backBy) clearInterval(backTimer); paint(); }, 500) as unknown as number;
   };
@@ -331,18 +332,21 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
   };
   function paint() {
     if (!alive) return;                 // left the page while something was still finishing
-    if (w?.state === "ready") { backBy = 0; clearInterval(backTimer); }
-    const coming = !busy && backBy > Date.now(), late = !!backBy && !coming && !busy;
-    const here = !!w && w.state !== "gone" && !coming;
+    const there = !!w && w.state !== "gone";
+    if (there && w!.state !== "identifying") { backBy = 0; clearInterval(backTimer); wasHere = seenOnce = true; }
+    else if (!there && wasHere) { wasHere = false; expectBack(); }      // it dropped: give it time to come back
+    const coming = backBy > Date.now(), late = !!backBy && !coming && seenOnce;
+    const here = there && !coming;
     $("#d-missing").hidden = here && w!.state !== "error";
     $("#d-body").hidden = !here || w!.state === "error";
     if (!here || w!.state === "error") {
-      const html = coming ? `<p><b>Restarting ${esc(id)}</b></p><div class="meter back-meter" style="--back:${backBy - Date.now()}ms"><div class="meter-track"><div class="meter-fill"></div></div></div>`
+      const html = coming ? `<p><b>${seenOnce ? "Restarting" : "Looking for"} ${esc(id)}</b></p><div class="meter back-meter" style="--back:${backBy - Date.now()}ms"><div class="meter-track"><div class="meter-fill"></div></div></div>`
         : w?.state === "error" ? `<p class="bad">${esc(w.error || "Can't talk to it.")}</p>`
         : `<p><b>${esc(id)} ${late ? "didn't come back" : "isn't plugged in"}.</b> ${late ? "Unplug it and plug it back in." : "Plug it in and it shows up here by itself."} ${busy ? "" : `<a href="/connect" data-back>See all wedgies</a>`}</p>`;
       const box = $("#d-missing");
-      if (box.dataset.k !== (coming ? "back" : html)) {     // the bar's fill runs on its own; don't restart it every frame
-        box.dataset.k = coming ? "back" : html;
+      const k = coming ? `back ${backBy} ${seenOnce}` : html;   // the bar's fill runs on its own; don't restart it every frame
+      if (box.dataset.k !== k) {
+        box.dataset.k = k;
         box.innerHTML = html;
         box.querySelector<HTMLElement>("[data-back]")?.addEventListener("click", (e) => { e.preventDefault(); go("/connect"); });
       }
@@ -791,6 +795,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
 
   // Last: attach() paints, and painting reads everything declared above.
   const off = W.onChange(attach);
+  expectBack(FIND_MS);
   attach();
   mirror();
 
