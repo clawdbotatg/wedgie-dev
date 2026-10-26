@@ -217,6 +217,8 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 22px; }
   box-shadow: inset 0 3px 3px rgba(70,70,72,.45), 0 0 0 5px #fff, 0 0 0 6px #e1e2e4, 0 6px 14px -4px rgba(0,0,0,.25); }
 .meter-fill { height: 100%; width: 8%; border-radius: 999px; background: var(--grey-fill); transition: width .25s;
   box-shadow: inset 0 -2px 0 rgba(40,40,42,.47), inset 0 4px 4px -2px rgba(255,255,255,.25); }
+.back-meter .meter-fill { animation: back-fill var(--back) linear forwards; }
+@keyframes back-fill { to { width: 100%; } }
 .meter.done .meter-fill { background: var(--green-fill); }
 #d-meter-t { font-size: 14px; color: var(--muted); font-family: var(--mono); }
 .name { border: 0; height: 44px; padding: 0 14px; font: 700 15px var(--font); color: var(--ink); width: 150px; outline: none; }

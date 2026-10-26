@@ -216,6 +216,15 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
   let alive = true;
   let release: (() => void) | null = null;
   let stopFn: (() => void) | null = null;
+  // It restarted on purpose (an install, an update): its USB drops for a few seconds. Till it's back (or
+  // BACK_MS runs out) the page shows "Restarting" with a bar, not "isn't plugged in".
+  const BACK_MS = 15000;
+  let backBy = 0, backTimer = 0;
+  const expectBack = () => {
+    backBy = Date.now() + BACK_MS;
+    clearInterval(backTimer);
+    backTimer = setInterval(() => { if (Date.now() > backBy) clearInterval(backTimer); paint(); }, 500) as unknown as number;
+  };
   const wedgie = () => w?.kind === "wedgie";
   // its app's wedgie.json "net": the sites this page fetches for it (serial/net.ts), by the version it has
   const netOf = () => {
@@ -320,13 +329,21 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
   };
   function paint() {
     if (!alive) return;                 // left the page while something was still finishing
-    const here = !!w && w.state !== "gone";
+    if (w?.state === "ready") { backBy = 0; clearInterval(backTimer); }
+    const coming = !busy && backBy > Date.now(), late = !!backBy && !coming && !busy;
+    const here = !!w && w.state !== "gone" && !coming;
     $("#d-missing").hidden = here && w!.state !== "error";
     $("#d-body").hidden = !here || w!.state === "error";
     if (!here || w!.state === "error") {
-      $("#d-missing").innerHTML = w?.state === "error" ? `<p class="bad">${esc(w.error || "Can't talk to it.")}</p>`
-        : `<p><b>${esc(id)} isn't plugged in.</b> Plug it in and it shows up here by itself. ${busy ? "" : `<a href="/connect" data-back>See all wedgies</a>`}</p>`;
-      $("#d-missing").querySelector<HTMLElement>("[data-back]")?.addEventListener("click", (e) => { e.preventDefault(); go("/connect"); });
+      const html = coming ? `<p><b>Restarting ${esc(id)}</b></p><div class="meter back-meter" style="--back:${backBy - Date.now()}ms"><div class="meter-track"><div class="meter-fill"></div></div></div>`
+        : w?.state === "error" ? `<p class="bad">${esc(w.error || "Can't talk to it.")}</p>`
+        : `<p><b>${esc(id)} ${late ? "didn't come back" : "isn't plugged in"}.</b> ${late ? "Unplug it and plug it back in." : "Plug it in and it shows up here by itself."} ${busy ? "" : `<a href="/connect" data-back>See all wedgies</a>`}</p>`;
+      const box = $("#d-missing");
+      if (box.dataset.k !== (coming ? "back" : html)) {     // the bar's fill runs on its own; don't restart it every frame
+        box.dataset.k = coming ? "back" : html;
+        box.innerHTML = html;
+        box.querySelector<HTMLElement>("[data-back]")?.addEventListener("click", (e) => { e.preventDefault(); go("/connect"); });
+      }
       $("#d-light").className = "light wait";
       $("#d-hint").textContent = "";
       return;
@@ -480,6 +497,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
       // The soft reset: a fresh heap for the new app (a checked install restarts itself). The port may drop;
       // attach() finds it by ID either way.
       if (!res.restarted) await r.leave();
+      expectBack();
       W.reidentify(x);
       release?.(); release = null; link = null;
       setTimeout(() => status(""), 6000);
@@ -501,7 +519,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     const x = w;
     let restarted = false;
     try { restarted = (await removeApp(r, { manifest: view() })).restarted; } catch (e: any) { status(`<b class="bad">Couldn't uninstall it:</b> ${esc(e?.message || e)}`); }
-    if (restarted) { W.reidentify(x); release?.(); release = null; link = null; }   // it restarted itself (a checked job)
+    if (restarted) { expectBack(); W.reidentify(x); release?.(); release = null; link = null; }   // it restarted itself (a checked job)
     else await backToApp(r).catch(() => {});
     busy = ""; paint(); W.touch();
   }
@@ -663,6 +681,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
       // new port (the drive re-enumerates USB on firmware older than 0.1.3); attach() finds it by its ID.
       // A checked install (0.3.0+) restarts itself.
       if (!res.restarted) await r.leave();
+      expectBack();
       status("Restarting it on the new firmware. It comes back here in a few seconds." + askTime());
       // Identify it again (queued behind this session, so it starts once the port is let go). On 0.1.3+ the
       // port survives a soft reset; if it doesn't, the disconnect marks it gone and the replug is a new one.
@@ -776,6 +795,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
   return () => {
     alive = false;
     off();
+    clearInterval(backTimer);
     clearInterval(logTimer);
     stopFn?.();
     release?.();
