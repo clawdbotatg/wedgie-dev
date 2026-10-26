@@ -1,0 +1,41 @@
+@app  {"mod":"blackjack","name":"Blackjack","entry":"run","files":["blackjack.py"]}
+9afe5f025fc1c6a559587dadfa1b59fdba605466fa2551b3d01bf3fc7fa1ea10  blackjack.py
+@app  {"mod":"blocks","name":"Blocks","entry":"run","files":["blocks.py"]}
+a3d8149f23d8c267e60da2e2d14cf42438b095f187c6f34c8486882a23a3f3b3  blocks.py
+@app  {"mod":"bunker","name":"Demon Bunker","entry":"run","files":["bunker.py","bunker_draw.py","bunker_art.mpy","bunker_game.mpy"]}
+d96481539fd09093781b3ffbd987375673ffc77c6188e9bce31af410a474638e  bunker.py
+42688335337e67532924c86df2d9fdf0e05a82083728985ea43429cc5dcb5f32  bunker_draw.py
+e8f645382cc4d21e5d58168101e7f3891cd0f3921c26205e153393ff78f5c309  bunker_art.mpy
+79f2fd80c3f2954497e463309a039707c95eb354da61bd59d5b7cb414c3c9d5c  bunker_game.mpy
+@app  {"mod":"buttons","name":"Buttons","entry":"run","files":["buttons.py"]}
+8e228f1f9d15dcc6210319e1034ad59afa21b92c1661cd4b88a3653ea59ff132  buttons.py
+@app  {"mod":"ethprice","name":"ETH Price","entry":"run","files":["ethprice.py"]}
+3920438a54d5d023808d1622251640c9476aa10d3b4583dfd0c3e997c65a792c  ethprice.py
+@app  {"mod":"frog","name":"Frog","entry":"run","files":["frog.py"]}
+cf5456e981f7230c0e2b3e1e6a1658c7482159708047d44f89e490aad1891d66  frog.py
+@app  {"mod":"g2048","name":"2048","entry":"run","files":["g2048.py"]}
+73267cc4d9bcc4cd5bd31117476f67ee7817db055e39274c5636df5a563169c0  g2048.py
+@app  {"mod":"grove","name":"Crystal Grove","entry":"run","files":["grove.py"]}
+f0224e865a8f55c77b0c13d353b4663e6d9642e99439d98c3045dea3f594ef91  grove.py
+@app  {"mod":"keypad","name":"Keypad","entry":"run","files":["keypad.py"]}
+0cf9561df639b610056d896dbf503f37d4df3c1ef59eab58dfd3118913be23aa  keypad.py
+@app  {"mod":"poidh","name":"Poidh Bounties","entry":"run","usb":true,"files":["poidh.py"]}
+9333052151fee99ff38ba0bd4d696f10707f3837abcf019d057fb7740c54e0a1  poidh.py
+@app  {"mod":"safe","name":"Safe Signer","entry":"run","usb":true,"files":["safe.py","safe_read.py","safe_ur.py","safe_7730.py","safe_wire.py","safe_roots.py","safe_keccak.py","safe_addr.py","safe_blockie.py","safe_key.py","safe_icons.py","safe_icons.bin"]}
+57e3095bf625040fef24a223b351c638055442856422951836a9978d4ac030a6  safe.py
+ddcd0d3e270aea9c908148d86702ca2b7a26572cca09e4ff801b610673ddcf07  safe_read.py
+5d43d337db03ac4f1b35946b50d7027e38fadd892f0b85c538f809d4447fd03c  safe_ur.py
+ed2cca455411fc7cfd3ef6a8c333a4a7a895e529e182568867c54cc2b346f4d6  safe_7730.py
+66d84d7ecfddba61aaaeec4887242674954c03816ac1bd6b8d9b5e7e1f8bb042  safe_wire.py
+e77cb9d919f1a418a57cac0af8e156ae5bef7eadb02544a9ee8ed637e79f956c  safe_roots.py
+f5465cbfa72b6ea201d7993d09d0c4c163cf40fa1313f7938204bc32c12c94f5  safe_keccak.py
+ebb05bac073a564d54741c5ff029132e66ca2001260c080fb9c171481901304e  safe_addr.py
+44e2ec64f5e7c9acd8c50a293ffa16d19f45deaf2201d88bc7dc4c3a5996bb1e  safe_blockie.py
+ab9451389273acdc9f9e41795cb3d2039bd9e108f41446876abd75c502e30fe6  safe_key.py
+8039de5fb6b0250004ae979a417a65527180c6fbf7e332543309d4aa1f1e33d9  safe_icons.py
+5103284e98ba1298532b0b5a1f9bb74d1882544795678726c88dda69f63cc012  safe_icons.bin
+@app  {"mod":"secret","name":"Secrets","entry":"run","usb":true,"files":["secret.py","secret_box.py"]}
+ca324e0a4598275f90d016e04322efea2c4c9b47a8602a143ce6524fc57adb95  secret.py
+0dab883dbbf4b484759911880face307a66e1226474a95d47a29bc723972cab1  secret_box.py
+@app  {"mod":"welcome","name":"Welcome","entry":"run","files":["welcome.py"]}
+5178bde1e2c81e1c14f11630911499f7cfd202306e880588de6d6c23bfed0280  welcome.py
