@@ -425,6 +425,13 @@ export function safe(main: HTMLElement) {
   const setFull = (c: number, a: string, i: Info, usd: number) => {
     fullUsd[fk(c, a)] = { usd, b: String(i.balance), u: String(i.usdc) };
     try { localStorage.setItem(FULL, JSON.stringify(fullUsd)); } catch {}
+    // the saved list's row too: its old balances wouldn't match the new dollars, and the top bar would guess from them
+    const r = rows.find((r) => r.chain === c && eqA(r.addr, a));
+    if (r?.info) r.info = { ...r.info, balance: i.balance, usdc: i.usdc };
+    try {
+      const l = JSON.parse(localStorage.getItem(LAST) || "null"), s = l?.rows?.find((r: any) => r.chain === c && eqA(r.addr, a));
+      if (s?.info) { s.info.balance = String(i.balance); s.info.usdc = i.usdc === null ? null : String(i.usdc); localStorage.setItem(LAST, JSON.stringify(l)); }
+    } catch {}
     dispatchEvent(new Event("wedgie-safes"));     // the top bar's Safes (main.ts)
   };
   const priced = new Set<string>();     // read in full on this visit
