@@ -38,7 +38,7 @@ import save
 import ui
 from ui import WHITE, INK, MUTED, GREY, GREEN_D, RED
 
-FW = "safe-27"
+FW = "safe-28"
 RP_ID = b"wedgie.dev"
 FIELDS = '"origin":"https://wedgie.dev"'
 ASK_MS = 120000
@@ -121,12 +121,16 @@ def short(a):
 
 
 def amount(n, dec):
+    """n / 10**dec, cut (not rounded) to 6 decimals, or to 4 digits past the zeros when under 1 (0.0009026)."""
+    s = "-" if n < 0 else ""
+    n = abs(n)
     if not dec:
-        return str(n)
-    w, f = n // 10 ** dec, n % 10 ** dec
+        return s + str(n)
+    w, f = divmod(n, 10 ** dec)
     f = ("%0" + str(dec) + "d") % f
-    f = f[:6].rstrip("0")
-    return "%d.%s" % (w, f) if f else str(w)
+    k = 6 if w else max(6, len(f) - len(f.lstrip("0")) + 4)
+    f = f[:k].rstrip("0")
+    return s + ("%d.%s" % (w, f) if f else str(w))
 
 
 def hx(b):
