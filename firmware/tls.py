@@ -671,7 +671,7 @@ class Conn:
         # virtual wedgie at half speed took longer than that. The cost: a fake site would see the path asked for.
         # It can't change the answer: nothing is read until every check passes.
         if body is not None:
-            headers += b"Content-Type: application/json\r\nContent-Length: %d\r\n" % len(body)
+            headers += b"Content-Type: application/json\r\nContent-Length: %d\r\n" % len(body)    # small: once, ~50 bytes
         self._write(23, (b"POST " if body is not None else b"GET ") + path.encode() + b" HTTP/1.1\r\nHost: " + self.host.encode()
                     + b"\r\nConnection: close\r\nAccept-Encoding: identity\r\nUser-Agent: wedgie\r\n" + headers + b"\r\n"
                     + (body or b""))
