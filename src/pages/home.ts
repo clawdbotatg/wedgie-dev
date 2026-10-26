@@ -233,7 +233,7 @@ export function home(main: HTMLElement): Promise<unknown> {
     main.querySelectorAll<HTMLButtonElement>(".seg button").forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-checked", String(x === b)); });
     const kit = b.dataset.for === "kit";
     main.querySelector("#order-what")!.innerHTML = kit
-      ? `All the parts, and <a href="/assemble">how to build it</a>.`
+      ? "All the parts, and how to build it."
       : "One wedgie: pico, screen, chip, and case.";
     item = kit ? "kit" : "wedgie";
     showPrice(); sold();
