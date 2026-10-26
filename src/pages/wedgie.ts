@@ -399,9 +399,41 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     if (box.dataset.sig === sig) return;
     box.dataset.sig = sig;
     box.innerHTML = `<div class="fwrow"><div><h4>${cur ? `wedgie ${esc(cur)}` : x.kind === "wallet" ? "wedgie" : "No wedgie firmware"}</h4><p>${what}</p></div>` +
-      `<button class="btn ${need ? "btn-lg btn-pulse" : "btn-sm"} ${fresh ? "" : "btn-green"}" data-fw ${!link || busy ? "disabled" : ""}>${fresh ? "Reinstall" : cur || x.kind === "wallet" ? "Update" : "Install"}</button>` + `</div>` +
+      `<div class="fwbtns"><button class="btn ${need ? "btn-lg btn-pulse" : "btn-sm"} ${fresh ? "" : "btn-green"}" data-fw ${!link || busy ? "disabled" : ""}>${fresh ? "Reinstall" : cur || x.kind === "wallet" ? "Update" : "Install"}</button>` +
+      (fresh ? "" : `<button class="btn btn-xs fwask" data-fwask>Let your agent check it first</button>`) + `</div></div>` +
       (fresh ? "" : `<p class="fine">Takes a minute. Its app and its saves stay on it.</p>`);
     box.querySelector<HTMLButtonElement>("[data-fw]")?.addEventListener("click", updateFw);
+    const ask = box.querySelector<HTMLButtonElement>("[data-fwask]");
+    if (ask) ask.onclick = () => navigator.clipboard.writeText(agentCheck(m!, cur)).then(
+      () => { ask.textContent = "Copied. Paste it to your agent."; setTimeout(() => (ask.textContent = "Let your agent check it first"), 4000); },
+      () => { ask.textContent = "Couldn't copy. Try again."; });
+  }
+
+  /** What the grey button copies: everything an agent needs to check this update before anyone presses Update.
+   *  Where the files come from, where the source is, and how the two are tied (hashes, the signed list, the keys). */
+  function agentCheck(m: Manifest, cur: string | null | undefined) {
+    const site = location.origin, gh = "https://github.com/clawdbotatg/wedgie-dev";
+    return `Please check this wedgie firmware update before I install it.
+
+I'm on ${location.href}. It offers wedgie firmware ${m.version}${cur ? ` (mine is ${cur})` : ""}.
+The wedgie is a small open source signing device. What it is and how it's kept safe: https://wedgie.dev/skill.md and https://wedgie.dev/security.md
+
+First: the page must be the real one. If ${site} is not https://wedgie.dev, stop and tell me.
+
+What the page would put on it:
+- ${site}/fw/manifest.json: every file with its sha256 ("core" = the firmware files)
+- ${site}/fw/<name>: each file
+- ${site}/fw/release.txt + release.sig: the signed list the wedgie itself checks before it installs (it shows a green check, or a red warning if the signature is wrong)
+
+The source: ${gh} (MIT), the firmware/ folder. The release keys are RELEASE_KEYS in firmware/wedgie.py; tools/sign.mjs signs, wedgie.release_ok checks.
+.mpy files are built from the .py next to them: uv run --with mpy-cross==1.29.0.post2 python3 tools/mpy.py --check
+
+Please:
+1. Fetch the manifest and every core file from ${site}/fw/, and check each sha256 matches.
+2. Check those files are the ones in the GitHub repo (main, or the latest commit that bumps VERSION in firmware/wedgie.py to ${m.version}), and the .mpy rebuild from the .py.
+3. Check release.sig signs release.txt with one of the RELEASE_KEYS, and release.txt lists the same hashes. Say whether this version is signed yet.
+4. Read what changed since ${cur || "the last release"} (git log on firmware/) and look for anything that sends keys or secrets off the wedgie, skips the green-button press, or talks to the internet without asking.
+5. Tell me in plain words: safe to update, or not, and why.`;
   }
 
   // ---- software: the one app it runs ------------------------------------------------------------------

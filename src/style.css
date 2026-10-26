@@ -211,6 +211,9 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 22px; }
 .fwrow h4 { margin: 0; font-size: 18px; font-weight: 900; }
 .fwrow p { margin: 2px 0 0; font-size: 15px; color: #555855; }
 .fwrow { margin-bottom: 14px; }
+.fwbtns { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.need-fw .fwbtns { align-items: center; gap: 12px; }
+.fwask { color: #6b6e6b; font-weight: 700; }
 .meter { display: grid; gap: 8px; margin-top: 6px; }
 .meter[hidden] { display: none; }
 .meter-track { height: 30px; border-radius: 999px; padding: 6px; background: linear-gradient(#c0c1c3, #dadbdd);
