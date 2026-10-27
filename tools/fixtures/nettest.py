@@ -16,6 +16,7 @@ SITES = (
     ("https://api.coinbase.com/v2/prices/ETH-USD/spot", "data.amount"),     # the computer flips a bit (netchip)
     ("price", None),                                     # net.price: Chainlink over its own TLS (0.3.70+)
     ("block", None),                                     # net.chain(1, ...): BuidlGuidl's node, the same
+    ("price", None),                                     # an rm comes mid-fetch: it stops the fetch (0.3.73+)
 )
 
 

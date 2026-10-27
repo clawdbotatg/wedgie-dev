@@ -67,7 +67,7 @@ function tcp(v) {
 }
 
 const t0 = Date.now();
-let done = false, lost = 0, hereAt = null, chipAsked = false, chipSaid = null;     // hereAt: chip ms the late computer shows up
+let done = false, lost = 0, hereAt = null, chipAsked = false, chipSaid = null, rmAt = null, rmMs = null;     // hereAt: chip ms the late computer shows up
 while (!done && Date.now() - t0 < 600_000) {
   chip.run(20);
   if (hereAt !== null && chip.ms >= hereAt && hereAt > 0) { write({ type: "net" }); hereAt = -1; }
@@ -86,8 +86,12 @@ while (!done && Date.now() - t0 < 600_000) {
       tcp(v);
       // the page's chip check mid-fetch (on the second site): busy, never a reset under the fetch (0.3.71+)
       if (!chipAsked && results.length === 1 && typeof v.d === "string") { chipAsked = true; write({ id: 99, type: "chip" }); }
+      // an install (here an rm) mid-fetch on the last site: the fetch stops and it's answered at once (0.3.73+;
+      // 10-27: an install waited 41 s on ETH Price's 4 fetches in a row)
+      if (rmAt === null && results.length === 9 && typeof v.d === "string") { rmAt = chip.ms; write({ id: 98, type: "rm", path: "/x.py" }); }
     }
     else if (v.id === 99) chipSaid = v;
+    else if (v.id === 98) rmMs = chip.ms - rmAt;
     else if (v.type === "nettest" && v.done) done = true;
     else if (v.type === "nettest") { results.push(v); console.log("     ", JSON.stringify(v).slice(0, 150)); }
     else if (v.type === "nettest_free") console.log(`      free ${v.before} before, ${v.after} after`);
@@ -96,7 +100,7 @@ while (!done && Date.now() - t0 < 600_000) {
 check(done, "the app got through every site");
 check(chipSaid?.busy === 1, `a chip check mid-fetch says busy: ${JSON.stringify(chipSaid)?.slice(0, 80)}`);
 check(lost >= 2, `a late computer: ${lost} lines went nowhere, then net.ready sent them again`);
-const [cb, cg, gh, kr, mp, ex, flip, px, blk] = results;
+const [cb, cg, gh, kr, mp, ex, flip, px, blk, cut] = results;
 check(cb && /^\d+\.\d+$/.test(cb.v), `Coinbase: ${cb?.v ?? cb?.error} (${cb?.ms} ms)`);
 check(cg && typeof cg.v?.usd === "number", `CoinGecko (P-384 root): ${JSON.stringify(cg?.v ?? cg?.error)} (${cg?.ms} ms)`);
 check(gh && typeof gh.v === "string" && gh.v.length > 3, `GitHub, text: ${gh?.v ?? gh?.error} (${gh?.ms} ms)`);
@@ -106,5 +110,7 @@ check(ex && /isn't in the app's "net"/.test(ex.error || ""), `a site not in "net
 check(flip && /tampered/.test(flip.error || ""), `a bit flipped by the computer: ${flip?.error}`);
 check(px && typeof px.v === "number" && px.v > 100, `net.price (Chainlink, BuidlGuidl's node): ${px?.v ?? px?.error} (${px?.ms} ms)`);
 check(blk && /^0x[0-9a-f]+$/.test(blk.v || ""), `net.chain(1) (BuidlGuidl's node): ${blk?.v ?? blk?.error} (${blk?.ms} ms)`);
+check(cut && /stopped/.test(cut.error || ""), `an rm mid-fetch stops it: ${cut?.v ?? cut?.error}`);
+check(rmMs !== null && rmMs < 3000, `and is answered in ${rmMs} ms of chip time`);
 console.log(failed ? `${failed} FAILED` : "all passed");
 process.exit(failed ? 1 : 0);

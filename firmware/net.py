@@ -176,7 +176,10 @@ def get(url, pick=None, ms=MS, body=None, log=None):
 
     def recv():
         t = time.ticks_ms()
-        while not q:
+        while not q or later:
+            if later:                   # an install is waiting: stop this fetch now (10-27: an install waited 41 s
+                said.append("stopped: an install came")   # on 4 fetches in a row)
+                return b""
             if time.ticks_diff(time.ticks_ms(), t) > ms:
                 raise Error("no internet: open its page on wedgie.dev")
             if serve:
@@ -191,7 +194,7 @@ def get(url, pick=None, ms=MS, body=None, log=None):
     import gc
     import trustm
     import slot
-    # A job, open or rm waits till the fetch is done: run inside the TLS's stack, an install's question hit "maximum
+    # A job, open or rm stops the fetch (recv), then runs: run inside the TLS's stack, an install's question hit "maximum
     # recursion depth" (wedgie-dev-bd, 10-26). Here, not in slot.py: its every byte stays in RAM (safechip).
     h, later = slot.handle, []
     slot.handle = lambda m: later.append(m) if m.get("type") in ("job", "open", "rm") and len(later) < 4 else h(m)
