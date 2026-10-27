@@ -56,10 +56,9 @@ export async function bundle(tag: string, chain: number, t: { to: string; data?:
     const to = c.to.toLowerCase().slice(2), f = await file(tag, chain, "0x" + to);
     const d = f?.["0x" + c.data.slice(0, 8)];
     if (d && !seen.has(d)) { seen.add(d); top.push(d); }
-    // a call inside the call (multicall, permitAndCall, a Safe setup): any contract the calldata names whose
-    // selector the calldata carries
-    for (const a of addresses(c.data)) {
-      if (a === to) continue;
+    // a call inside the call (multicall, permitAndCall, a Safe setup): any contract the calldata names, or this one
+    // (a multicall into itself), whose selector the calldata carries
+    for (const a of new Set([to, ...addresses(c.data)])) {
       const g = await file(tag, chain, "0x" + a);
       if (!g) continue;
       for (const [sel, s] of Object.entries(g)) if (!seen.has(s) && c.data.slice(8).includes(sel.slice(2))) { seen.add(s); inner.push(s); }
