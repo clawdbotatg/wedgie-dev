@@ -30,7 +30,7 @@
 #   (EIP-712, what Safe's Transaction Service asks a proposer to sign) for it. Hosts drop it from their list; it
 #   can still run (only a tx at its nonce stops it), and the screen says so.
 #   {"type":"safe_prove","text":"Join Telegram","code":".."} -> "Prove it" on screen; on A, safe_proof: the key signs
-#   the code and the chip's factory key vouches for the key (safe_key.prove; wedgie.dev/telegram).
+#   the code and the chip's factory key vouches for the key (safe_msg.prove; wedgie.dev/telegram).
 import sys, select, json, time, gc, binascii, hashlib
 import lcd as L
 import wedgie as W
@@ -38,7 +38,7 @@ import save
 import ui
 from ui import WHITE, INK, MUTED, GREY, GREEN_D, RED
 
-FW = "safe-28"
+FW = "safe-29"
 RP_ID = b"wedgie.dev"
 FIELDS = '"origin":"https://wedgie.dev"'
 ASK_MS = 120000
@@ -677,11 +677,13 @@ def handle(m):
     elif t == "safe_remove":
         on_remove(mid, m.get("tx"), m.get("totp"))
         dirty = True
-    elif t == "safe_prove":            # rare: in safe_key.py, loaded only for it
+    elif t == "safe_prove" or t == "safe_message":    # rare: in safe_msg.py, loaded only for one
         try:
-            key_module().prove(sys.modules[__name__], mid, m.get("text"), m.get("code"))
+            import safe_msg
+            safe_msg.rare(sys.modules[__name__], mid, m)
         finally:
-            drop_key_module()
+            sys.modules.pop("safe_msg", None)
+            _unload()
         dirty = True
     elif t == "safe_list":
         W.send({"id": mid, "type": "safe_list", "safes": save.load("safes", [])})

@@ -15,6 +15,7 @@
         "safe_addr.py",
         "safe_blockie.py",
         "safe_key.py",
+        "safe_msg.py",
         "safe_icons.py",
         "safe_icons.bin"
       ],

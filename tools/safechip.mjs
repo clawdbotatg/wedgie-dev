@@ -241,6 +241,20 @@ if (hi?.app && hi.app >= "safe-23") {     // safe_remove: the delete request for
   check(no.got?.type === "refused" && no.got.safeTxHash === E.safeTxHash(rm.chainId, rm.safe, { ...rm, data: data || "0x" }),
     `safe_remove Y: refused, with the Safe tx hash it worked out (${no.got?.safeTxHash?.slice(0, 10)}…)`);
 }
+if (hi?.app && hi.app >= "safe-29") {     // safe_message: a site's text (sign-in), its SafeMessage hash worked out on the wedgie
+  const { hashMessage, hashTypedData, toHex } = await import("viem");
+  const text = "opensea.io wants you to sign in with your Ethereum account:\n" + safe + "\n\nClick to sign in and accept the Platform Terms of Service (https://opensea.io/tos) and Privacy Policy (https://opensea.io/privacy).\n\nURI: https://opensea.io/\nVersion: 1\nChain ID: 1\nNonce: qbtt8jjjgo32tbk977cu01e9e\nIssued At: 2026-10-27T04:04:28.135Z";
+  const m = { type: "safe_message", chainId: 1, safe, hex: toHex(text) }, before = all.length;
+  const want = hashTypedData({ domain: { chainId: 1, verifyingContract: safe }, types: { SafeMessage: [{ name: "message", type: "bytes" }] }, primaryType: "SafeMessage", message: { message: hashMessage(text) } });
+  const { got, secs } = ask(null, "A", m, null, shots && join(shots, "safe-message"));
+  const r = ram("safe_message");
+  const chipStep = got?.type === "safe_sig" || /trustm|ATECC608/.test(got?.error || "");
+  check(chipStep && !crash(all.slice(before)), `safe_message: a sign-in text, A through its pages, ${secs} s: answered ${got ? got.type + (got.error ? " (" + got.error.slice(0, 40) + ")" : "") : "nothing"} · ${r?.ram} B free`);
+  const no = ask(null, "Y", m);
+  check(no.got?.type === "refused" && no.got.safeMessageHash === want, `safe_message Y: refused, with the SafeMessage hash viem gets (${no.got?.safeMessageHash?.slice(0, 10)}…)`);
+  const bad = h.req({ id: ++id, type: "safe_message", chainId: 1, safe, hex: toHex("h\u00e9llo") }, 8000);
+  check(bad?.type === "error" && /plain text/.test(bad.error || ""), `safe_message: not plain ASCII refused (${bad?.error?.slice(0, 30)})`);
+}
 { // and a no
   const before = all.length;
   const { got, secs } = ask(cases[0][1], "Y");

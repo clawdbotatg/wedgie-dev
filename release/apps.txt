@@ -21,8 +21,8 @@ f0224e865a8f55c77b0c13d353b4663e6d9642e99439d98c3045dea3f594ef91  grove.py
 0cf9561df639b610056d896dbf503f37d4df3c1ef59eab58dfd3118913be23aa  keypad.py
 @app  {"mod":"poidh","name":"Poidh Bounties","entry":"run","usb":true,"files":["poidh.py"]}
 9333052151fee99ff38ba0bd4d696f10707f3837abcf019d057fb7740c54e0a1  poidh.py
-@app  {"mod":"safe","name":"Safe Signer","entry":"run","usb":true,"files":["safe.py","safe_read.py","safe_ur.py","safe_7730.py","safe_wire.py","safe_roots.py","safe_keccak.py","safe_addr.py","safe_blockie.py","safe_key.py","safe_icons.py","safe_icons.bin"]}
-a53ab770fc004653592f75dbd8346b7fa7d1311a6d266d45f9aa1c47d115438b  safe.py
+@app  {"mod":"safe","name":"Safe Signer","entry":"run","usb":true,"files":["safe.py","safe_read.py","safe_ur.py","safe_7730.py","safe_wire.py","safe_roots.py","safe_keccak.py","safe_addr.py","safe_blockie.py","safe_key.py","safe_msg.py","safe_icons.py","safe_icons.bin"]}
+6d947472b31e1517ed9e8634d328d8489c9c42572548c82402870b8591bbf325  safe.py
 ddcd0d3e270aea9c908148d86702ca2b7a26572cca09e4ff801b610673ddcf07  safe_read.py
 5d43d337db03ac4f1b35946b50d7027e38fadd892f0b85c538f809d4447fd03c  safe_ur.py
 3b0bc9109420cbe4f9fcfe37b9bb71eb72d9c97cbe61eed3347fa52f7f3388f4  safe_7730.py
@@ -31,7 +31,8 @@ fc168f3eadc5cc6e988b9a430a88ac3bd500f75e9f77baad7c5187010494da70  safe_roots.py
 f5465cbfa72b6ea201d7993d09d0c4c163cf40fa1313f7938204bc32c12c94f5  safe_keccak.py
 ebb05bac073a564d54741c5ff029132e66ca2001260c080fb9c171481901304e  safe_addr.py
 44e2ec64f5e7c9acd8c50a293ffa16d19f45deaf2201d88bc7dc4c3a5996bb1e  safe_blockie.py
-ab9451389273acdc9f9e41795cb3d2039bd9e108f41446876abd75c502e30fe6  safe_key.py
+c94e3e1188f0e7a6fbf8df03066a9b6f63be336d9f81b7279a1cdcfc784e288f  safe_key.py
+dccf2509eed6af1bc18b5d2e4a8b4a40c130c40e2977e80cf69ffcd39b0aaf4e  safe_msg.py
 8039de5fb6b0250004ae979a417a65527180c6fbf7e332543309d4aa1f1e33d9  safe_icons.py
 5103284e98ba1298532b0b5a1f9bb74d1882544795678726c88dda69f63cc012  safe_icons.bin
 @app  {"mod":"secret","name":"Secrets","entry":"run","usb":true,"files":["secret.py","secret_box.py"]}
