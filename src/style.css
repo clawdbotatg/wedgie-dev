@@ -929,6 +929,9 @@ body.sx-sheet-open #s-msg { display: none; }
 .signin-page .order-fields input { font-size: 18px; padding: 14px 16px; border-radius: 14px; }
 .signin-page .btn-green { width: 100%; height: 58px; margin-top: 8px; }
 .signin-page .signin-note { margin: 4px 0 0; }
+.claim-clawd { display: block; width: 160px; height: 160px; margin: 0 auto 16px; border-radius: 50%; object-fit: cover; box-shadow: 0 6px 20px rgba(0, 0, 0, .18); }
+#c-who { text-align: center; }
+.claim-pitch { font-size: 20px; }
 .signin-mail { font-size: 56px; line-height: 1; margin: 0 0 12px !important; }
 .signin-page .order-sent h2 { margin: 0 0 10px; }
 .signin-to { display: inline-block; max-width: 100%; box-sizing: border-box; padding: 8px 16px; border-radius: 999px; background: var(--card); font-weight: 800; word-break: break-all; margin: 4px 0 14px !important; }

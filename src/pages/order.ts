@@ -306,7 +306,8 @@ function claim(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
   const cart: Cart = { wedgie: 1, kit: 0 };
   box.innerHTML = `
     <div class="safe-box recess" id="c-who">
-      <p>Staked CLAWD on <a href="https://larv.ai" target="_blank" rel="noopener">larv.ai</a>? Burn <b id="c-cost">500,000,000</b> CV for a free wedgie, shipped. One per wallet.</p>
+      <img class="claim-clawd" src="/img/clawd.jpg" alt="Clawd" width="160" height="160">
+      <p class="claim-pitch">Staked CLAWD on <a href="https://larv.ai" target="_blank" rel="noopener">larv.ai</a>? Burn <b id="c-cost">500,000,000</b> CV for a free wedgie, shipped. One per wallet.</p>
       <p class="fine" id="c-left">&nbsp;</p>
       <p><button class="btn btn-green" id="c-connect" disabled>Connect wallet</button></p>
       <p id="c-bal" hidden></p>
