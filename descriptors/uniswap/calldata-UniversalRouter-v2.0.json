@@ -54,7 +54,12 @@
           {
             "path": "@.value",
             "label": "Send",
-            "format": "amount"
+            "format": "amount",
+            "visible": {
+              "ifNotIn": [
+                "0"
+              ]
+            }
           },
           {
             "path": "commands",
@@ -1137,7 +1142,12 @@
           {
             "path": "@.value",
             "label": "Send",
-            "format": "amount"
+            "format": "amount",
+            "visible": {
+              "ifNotIn": [
+                "0"
+              ]
+            }
           },
           {
             "path": "commands",

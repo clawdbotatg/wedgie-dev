@@ -1,0 +1,16 @@
+{
+ "tag": "a95dfc10",
+ "registry": "171b6b5bf137e2433a4bde35cffd64d4d7fe25bd",
+ "issued": 1793139152,
+ "roots": {
+  "a": "a6b674e9a49f6c16bfa02ab6d8f49a92f7a70b0728f7f531f5610065c4e0d912",
+  "b": "669e2b65e9fe13d0c936804517d561d28b77c7c8d04d88dbec5f77d3a2afc1b2"
+ },
+ "audited": 901,
+ "notAudited": 6535,
+ "tokens": 2471,
+ "auditors": [
+  "Cyfrin"
+ ],
+ "clearMax": 10000
+}

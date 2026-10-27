@@ -12,4 +12,10 @@ Goal: every Safe Signer screen comes from a descriptor (the registry's or ours);
   switch. v2.0 and v2.1 differ only in V4 multi-hop swaps (`minHopPriceX36`). Made from Safe Signer's old
   `safe_ur.py` address list.
 
+- `uniswap/calldata-SwapRouter02.json`: the router before it. The registry's swaps (our words), plus `multicall`
+  with each call in it, unwrap/sweep (and their fee versions), refund, wrap, on 5 chains.
+
+The 0x..01 and 0x..02 recipients are Uniswap's "the caller" (this Safe) and "the router" (a step in the middle,
+hidden). Fields a small screen can skip are `"visible": "optional"`.
+
 A new or changed descriptor ships with a new data release (new roots), so a new Safe Signer version.

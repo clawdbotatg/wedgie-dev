@@ -1,0 +1,593 @@
+{
+  "$schema": "../../specs/erc7730-v2.schema.json",
+  "context": {
+    "$id": "Uniswap SwapRouter02",
+    "contract": {
+      "deployments": [
+        {
+          "chainId": 1,
+          "address": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45"
+        },
+        {
+          "chainId": 10,
+          "address": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45"
+        },
+        {
+          "chainId": 137,
+          "address": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45"
+        },
+        {
+          "chainId": 42161,
+          "address": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45"
+        },
+        {
+          "chainId": 8453,
+          "address": "0x2626664c2603336E57B271c5C0b26F421741e481"
+        }
+      ]
+    }
+  },
+  "metadata": {
+    "owner": "Uniswap Labs",
+    "contractName": "SwapRouter02",
+    "info": {
+      "url": "https://docs.uniswap.org/contracts/v3/reference/deployments/"
+    }
+  },
+  "display": {
+    "formats": {
+      "exactInput((bytes path,address recipient,uint256 amountIn,uint256 amountOutMinimum) params)": {
+        "intent": "Swap",
+        "fields": [
+          {
+            "path": "params.amountIn",
+            "label": "Pay",
+            "format": "tokenAmount",
+            "params": {
+              "tokenPath": "params.path.[0:20]"
+            }
+          },
+          {
+            "path": "params.amountOutMinimum",
+            "label": "Get at least",
+            "format": "tokenAmount",
+            "params": {
+              "tokenPath": "params.path.[-20:]"
+            }
+          },
+          {
+            "path": "params.recipient",
+            "label": "To",
+            "format": "addressName",
+            "params": {
+              "types": [
+                "eoa",
+                "contract",
+                "wallet"
+              ],
+              "senderAddress": [
+                "0x0000000000000000000000000000000000000001"
+              ]
+            },
+            "visible": {
+              "ifNotIn": [
+                "0x0000000000000000000000000000000000000002"
+              ]
+            }
+          }
+        ]
+      },
+      "exactInputSingle((address tokenIn,address tokenOut,uint24 fee,address recipient,uint256 amountIn,uint256 amountOutMinimum,uint160 sqrtPriceLimitX96) params)": {
+        "intent": "Swap",
+        "fields": [
+          {
+            "path": "params.amountIn",
+            "label": "Pay",
+            "format": "tokenAmount",
+            "params": {
+              "tokenPath": "params.tokenIn"
+            }
+          },
+          {
+            "path": "params.amountOutMinimum",
+            "label": "Get at least",
+            "format": "tokenAmount",
+            "params": {
+              "tokenPath": "params.tokenOut"
+            }
+          },
+          {
+            "path": "params.recipient",
+            "label": "To",
+            "format": "addressName",
+            "params": {
+              "types": [
+                "eoa",
+                "contract",
+                "wallet"
+              ],
+              "senderAddress": [
+                "0x0000000000000000000000000000000000000001"
+              ]
+            },
+            "visible": {
+              "ifNotIn": [
+                "0x0000000000000000000000000000000000000002"
+              ]
+            }
+          }
+        ]
+      },
+      "exactOutput((bytes path,address recipient,uint256 amountOut,uint256 amountInMaximum) params)": {
+        "intent": "Swap",
+        "fields": [
+          {
+            "path": "params.amountOut",
+            "label": "Get",
+            "format": "tokenAmount",
+            "params": {
+              "tokenPath": "params.path.[0:20]"
+            }
+          },
+          {
+            "path": "params.amountInMaximum",
+            "label": "Pay at most",
+            "format": "tokenAmount",
+            "params": {
+              "tokenPath": "params.path.[-20:]",
+              "threshold": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+              "message": "Unlimited"
+            }
+          },
+          {
+            "path": "params.recipient",
+            "label": "To",
+            "format": "addressName",
+            "params": {
+              "types": [
+                "eoa",
+                "contract",
+                "wallet"
+              ],
+              "senderAddress": [
+                "0x0000000000000000000000000000000000000001"
+              ]
+            },
+            "visible": {
+              "ifNotIn": [
+                "0x0000000000000000000000000000000000000002"
+              ]
+            }
+          }
+        ]
+      },
+      "exactOutputSingle((address tokenIn,address tokenOut,uint24 fee,address recipient,uint256 amountOut,uint256 amountInMaximum,uint160 sqrtPriceLimitX96) params)": {
+        "intent": "Swap",
+        "fields": [
+          {
+            "path": "params.amountOut",
+            "label": "Get",
+            "format": "tokenAmount",
+            "params": {
+              "tokenPath": "params.tokenOut"
+            }
+          },
+          {
+            "path": "params.amountInMaximum",
+            "label": "Pay at most",
+            "format": "tokenAmount",
+            "params": {
+              "tokenPath": "params.tokenIn",
+              "threshold": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+              "message": "Unlimited"
+            }
+          },
+          {
+            "path": "params.recipient",
+            "label": "To",
+            "format": "addressName",
+            "params": {
+              "types": [
+                "eoa",
+                "contract",
+                "wallet"
+              ],
+              "senderAddress": [
+                "0x0000000000000000000000000000000000000001"
+              ]
+            },
+            "visible": {
+              "ifNotIn": [
+                "0x0000000000000000000000000000000000000002"
+              ]
+            }
+          }
+        ]
+      },
+      "swapExactTokensForTokens(uint256 amountIn,uint256 amountOutMin,address[] path,address to)": {
+        "intent": "Swap (v2)",
+        "fields": [
+          {
+            "path": "amountIn",
+            "label": "Pay",
+            "format": "tokenAmount",
+            "params": {
+              "tokenPath": "path.[0]"
+            }
+          },
+          {
+            "path": "amountOutMin",
+            "label": "Get at least",
+            "format": "tokenAmount",
+            "params": {
+              "tokenPath": "path.[-1]"
+            }
+          },
+          {
+            "path": "to",
+            "label": "To",
+            "format": "addressName",
+            "params": {
+              "types": [
+                "eoa",
+                "contract",
+                "wallet"
+              ],
+              "senderAddress": [
+                "0x0000000000000000000000000000000000000001"
+              ]
+            },
+            "visible": {
+              "ifNotIn": [
+                "0x0000000000000000000000000000000000000002"
+              ]
+            }
+          }
+        ]
+      },
+      "swapTokensForExactTokens(uint256 amountOut,uint256 amountInMax,address[] path,address to)": {
+        "intent": "Swap (v2)",
+        "fields": [
+          {
+            "path": "amountOut",
+            "label": "Get",
+            "format": "tokenAmount",
+            "params": {
+              "tokenPath": "path.[-1]"
+            }
+          },
+          {
+            "path": "amountInMax",
+            "label": "Pay at most",
+            "format": "tokenAmount",
+            "params": {
+              "tokenPath": "path.[0]",
+              "threshold": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
+              "message": "Unlimited"
+            }
+          },
+          {
+            "path": "to",
+            "label": "To",
+            "format": "addressName",
+            "params": {
+              "types": [
+                "eoa",
+                "contract",
+                "wallet"
+              ],
+              "senderAddress": [
+                "0x0000000000000000000000000000000000000001"
+              ]
+            },
+            "visible": {
+              "ifNotIn": [
+                "0x0000000000000000000000000000000000000002"
+              ]
+            }
+          }
+        ]
+      },
+      "unwrapWETH9(uint256 amountMinimum,address recipient)": {
+        "intent": "Unwrap to ETH",
+        "fields": [
+          {
+            "path": "amountMinimum",
+            "label": "At least",
+            "format": "amount"
+          },
+          {
+            "path": "recipient",
+            "label": "To",
+            "format": "addressName",
+            "params": {
+              "types": [
+                "eoa",
+                "contract",
+                "wallet"
+              ],
+              "senderAddress": [
+                "0x0000000000000000000000000000000000000001"
+              ]
+            },
+            "visible": {
+              "ifNotIn": [
+                "0x0000000000000000000000000000000000000002"
+              ]
+            }
+          }
+        ]
+      },
+      "unwrapWETH9(uint256 amountMinimum)": {
+        "intent": "Unwrap to ETH",
+        "fields": [
+          {
+            "path": "amountMinimum",
+            "label": "At least",
+            "format": "amount"
+          }
+        ]
+      },
+      "unwrapWETH9WithFee(uint256 amountMinimum,address recipient,uint256 feeBips,address feeRecipient)": {
+        "intent": "Unwrap to ETH",
+        "fields": [
+          {
+            "path": "amountMinimum",
+            "label": "At least",
+            "format": "amount"
+          },
+          {
+            "path": "recipient",
+            "label": "To",
+            "format": "addressName",
+            "params": {
+              "types": [
+                "eoa",
+                "contract",
+                "wallet"
+              ],
+              "senderAddress": [
+                "0x0000000000000000000000000000000000000001"
+              ]
+            },
+            "visible": {
+              "ifNotIn": [
+                "0x0000000000000000000000000000000000000002"
+              ]
+            }
+          },
+          {
+            "path": "feeBips",
+            "label": "Fee",
+            "format": "unit",
+            "params": {
+              "base": "%",
+              "decimals": 2
+            }
+          },
+          {
+            "path": "feeRecipient",
+            "label": "Fee to",
+            "format": "addressName",
+            "params": {
+              "types": [
+                "eoa",
+                "contract",
+                "wallet"
+              ],
+              "senderAddress": [
+                "0x0000000000000000000000000000000000000001"
+              ]
+            },
+            "visible": {
+              "ifNotIn": [
+                "0x0000000000000000000000000000000000000002"
+              ]
+            }
+          }
+        ]
+      },
+      "sweepToken(address token,uint256 amountMinimum,address recipient)": {
+        "intent": "Sweep",
+        "fields": [
+          {
+            "path": "amountMinimum",
+            "label": "At least",
+            "format": "tokenAmount",
+            "params": {
+              "tokenPath": "token"
+            }
+          },
+          {
+            "path": "recipient",
+            "label": "To",
+            "format": "addressName",
+            "params": {
+              "types": [
+                "eoa",
+                "contract",
+                "wallet"
+              ],
+              "senderAddress": [
+                "0x0000000000000000000000000000000000000001"
+              ]
+            },
+            "visible": {
+              "ifNotIn": [
+                "0x0000000000000000000000000000000000000002"
+              ]
+            }
+          }
+        ]
+      },
+      "sweepToken(address token,uint256 amountMinimum)": {
+        "intent": "Sweep",
+        "fields": [
+          {
+            "path": "amountMinimum",
+            "label": "At least",
+            "format": "tokenAmount",
+            "params": {
+              "tokenPath": "token"
+            }
+          }
+        ]
+      },
+      "sweepTokenWithFee(address token,uint256 amountMinimum,address recipient,uint256 feeBips,address feeRecipient)": {
+        "intent": "Sweep",
+        "fields": [
+          {
+            "path": "amountMinimum",
+            "label": "At least",
+            "format": "tokenAmount",
+            "params": {
+              "tokenPath": "token"
+            }
+          },
+          {
+            "path": "recipient",
+            "label": "To",
+            "format": "addressName",
+            "params": {
+              "types": [
+                "eoa",
+                "contract",
+                "wallet"
+              ],
+              "senderAddress": [
+                "0x0000000000000000000000000000000000000001"
+              ]
+            },
+            "visible": {
+              "ifNotIn": [
+                "0x0000000000000000000000000000000000000002"
+              ]
+            }
+          },
+          {
+            "path": "feeBips",
+            "label": "Fee",
+            "format": "unit",
+            "params": {
+              "base": "%",
+              "decimals": 2
+            }
+          },
+          {
+            "path": "feeRecipient",
+            "label": "Fee to",
+            "format": "addressName",
+            "params": {
+              "types": [
+                "eoa",
+                "contract",
+                "wallet"
+              ],
+              "senderAddress": [
+                "0x0000000000000000000000000000000000000001"
+              ]
+            },
+            "visible": {
+              "ifNotIn": [
+                "0x0000000000000000000000000000000000000002"
+              ]
+            }
+          }
+        ]
+      },
+      "refundETH()": {
+        "intent": "Refund leftover ETH",
+        "fields": []
+      },
+      "wrapETH(uint256 value)": {
+        "intent": "Wrap ETH",
+        "fields": [
+          {
+            "path": "value",
+            "label": "Amount",
+            "format": "amount",
+            "visible": "optional"
+          }
+        ]
+      },
+      "multicall(uint256 deadline,bytes[] data)": {
+        "intent": "Uniswap",
+        "fields": [
+          {
+            "path": "@.value",
+            "label": "Send",
+            "format": "amount",
+            "visible": {
+              "ifNotIn": [
+                "0"
+              ]
+            }
+          },
+          {
+            "path": "data.[]",
+            "label": "",
+            "format": "calldata",
+            "params": {
+              "calleePath": "@.to"
+            }
+          },
+          {
+            "path": "deadline",
+            "label": "Until",
+            "format": "date",
+            "params": {
+              "encoding": "timestamp"
+            },
+            "visible": "optional"
+          }
+        ]
+      },
+      "multicall(bytes32 previousBlockhash,bytes[] data)": {
+        "intent": "Uniswap",
+        "fields": [
+          {
+            "path": "@.value",
+            "label": "Send",
+            "format": "amount",
+            "visible": {
+              "ifNotIn": [
+                "0"
+              ]
+            }
+          },
+          {
+            "path": "data.[]",
+            "label": "",
+            "format": "calldata",
+            "params": {
+              "calleePath": "@.to"
+            }
+          }
+        ]
+      },
+      "multicall(bytes[] data)": {
+        "intent": "Uniswap",
+        "fields": [
+          {
+            "path": "@.value",
+            "label": "Send",
+            "format": "amount",
+            "visible": {
+              "ifNotIn": [
+                "0"
+              ]
+            }
+          },
+          {
+            "path": "data.[]",
+            "label": "",
+            "format": "calldata",
+            "params": {
+              "calleePath": "@.to"
+            }
+          }
+        ]
+      }
+    }
+  }
+}

@@ -2,7 +2,7 @@
  {
   "slug": "uniswap-universal-router",
   "title": "Uniswap Universal Router (ERC-8362)",
-  "note": "What the Uniswap app swaps through. Our own descriptor, written to the ERC-8362 custom-encoding draft as it is: each step of the swap, as the router runs it. Two real mainnet swaps. Safe Signer safe-31.",
+  "note": "What the Uniswap app swaps through. Our own descriptor, written to the ERC-8362 custom-encoding draft as it is: each step of the swap, as the router runs it. Two real mainnet swaps.",
   "cases": [
    {
     "name": "Swap 0.4805 ETH for USDC (V4)",
@@ -320,11 +320,11 @@
  },
  {
   "slug": "uniswap-v3",
-  "title": "Uniswap V3 SwapRouter02",
-  "note": "The router the Uniswap app used before the Universal Router. Its descriptor is merged and on wedgies now. The registry's 9 test transactions.",
+  "title": "Uniswap SwapRouter02",
+  "note": "The router the Uniswap app used before the Universal Router. Our own descriptor: multicall and each call in it, on Ethereum, Base, Arbitrum, Optimism and Polygon. Nine real multicall swaps (Ethereum and Base) and the registry's nine tests.",
   "cases": [
    {
-    "name": "Swap - chain 1 (1)",
+    "name": "multicall 0x4d440772 (ETH in)",
     "chainId": 1,
     "to": "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45",
     "pages": [
@@ -334,16 +334,19 @@
     ]
    },
    {
-    "name": "swap",
+    "name": "multicall 0xf9b8c69c (ETH in)",
     "chainId": 1,
     "to": "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45",
     "pages": [
      "screens/uniswap-v3/02-1.png",
-     "screens/uniswap-v3/02-2.png"
+     "screens/uniswap-v3/02-2.png",
+     "screens/uniswap-v3/02-3.png",
+     "screens/uniswap-v3/02-4.png",
+     "screens/uniswap-v3/02-5.png"
     ]
    },
    {
-    "name": "Swap - chain 1 (2)",
+    "name": "multicall 0x7565cf37 (ETH in)",
     "chainId": 1,
     "to": "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45",
     "pages": [
@@ -353,16 +356,17 @@
     ]
    },
    {
-    "name": "Swap - chain 1 (3)",
+    "name": "multicall 0x96032916 (tokens in)",
     "chainId": 1,
     "to": "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45",
     "pages": [
      "screens/uniswap-v3/04-1.png",
-     "screens/uniswap-v3/04-2.png"
+     "screens/uniswap-v3/04-2.png",
+     "screens/uniswap-v3/04-3.png"
     ]
    },
    {
-    "name": "Swap exact output, no input cap (path)",
+    "name": "multicall 0xca5b394a (tokens in)",
     "chainId": 1,
     "to": "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45",
     "pages": [
@@ -371,12 +375,95 @@
     ]
    },
    {
+    "name": "multicall 0xe1b6fb28 (ETH in)",
+    "chainId": 8453,
+    "to": "0x2626664c2603336e57b271c5c0b26f421741e481",
+    "pages": [
+     "screens/uniswap-v3/06-1.png",
+     "screens/uniswap-v3/06-2.png"
+    ]
+   },
+   {
+    "name": "multicall 0x01a5fba4 (ETH in)",
+    "chainId": 8453,
+    "to": "0x2626664c2603336e57b271c5c0b26f421741e481",
+    "pages": [
+     "screens/uniswap-v3/07-1.png",
+     "screens/uniswap-v3/07-2.png"
+    ]
+   },
+   {
+    "name": "multicall 0x9d9d49bd (tokens in)",
+    "chainId": 8453,
+    "to": "0x2626664c2603336e57b271c5c0b26f421741e481",
+    "pages": [
+     "screens/uniswap-v3/08-1.png",
+     "screens/uniswap-v3/08-2.png",
+     "screens/uniswap-v3/08-3.png"
+    ]
+   },
+   {
+    "name": "multicall 0x3c61ef61 (tokens in)",
+    "chainId": 8453,
+    "to": "0x2626664c2603336e57b271c5c0b26f421741e481",
+    "pages": [
+     "screens/uniswap-v3/09-1.png",
+     "screens/uniswap-v3/09-2.png",
+     "screens/uniswap-v3/09-3.png"
+    ]
+   },
+   {
+    "name": "Swap - chain 1 (1)",
+    "chainId": 1,
+    "to": "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45",
+    "pages": [
+     "screens/uniswap-v3/10-1.png",
+     "screens/uniswap-v3/10-2.png"
+    ]
+   },
+   {
+    "name": "swap",
+    "chainId": 1,
+    "to": "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45",
+    "pages": [
+     "screens/uniswap-v3/11-1.png",
+     "screens/uniswap-v3/11-2.png"
+    ]
+   },
+   {
+    "name": "Swap - chain 1 (2)",
+    "chainId": 1,
+    "to": "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45",
+    "pages": [
+     "screens/uniswap-v3/12-1.png",
+     "screens/uniswap-v3/12-2.png"
+    ]
+   },
+   {
+    "name": "Swap - chain 1 (3)",
+    "chainId": 1,
+    "to": "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45",
+    "pages": [
+     "screens/uniswap-v3/13-1.png",
+     "screens/uniswap-v3/13-2.png"
+    ]
+   },
+   {
+    "name": "Swap exact output, no input cap (path)",
+    "chainId": 1,
+    "to": "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45",
+    "pages": [
+     "screens/uniswap-v3/14-1.png",
+     "screens/uniswap-v3/14-2.png"
+    ]
+   },
+   {
     "name": "Swap exact output, no input cap (single)",
     "chainId": 1,
     "to": "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45",
     "pages": [
-     "screens/uniswap-v3/06-1.png",
-     "screens/uniswap-v3/06-2.png"
+     "screens/uniswap-v3/15-1.png",
+     "screens/uniswap-v3/15-2.png"
     ]
    },
    {
@@ -384,8 +471,8 @@
     "chainId": 1,
     "to": "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45",
     "pages": [
-     "screens/uniswap-v3/07-1.png",
-     "screens/uniswap-v3/07-2.png"
+     "screens/uniswap-v3/16-1.png",
+     "screens/uniswap-v3/16-2.png"
     ]
    },
    {
@@ -393,8 +480,8 @@
     "chainId": 1,
     "to": "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45",
     "pages": [
-     "screens/uniswap-v3/08-1.png",
-     "screens/uniswap-v3/08-2.png"
+     "screens/uniswap-v3/17-1.png",
+     "screens/uniswap-v3/17-2.png"
     ]
    },
    {
@@ -402,8 +489,8 @@
     "chainId": 1,
     "to": "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45",
     "pages": [
-     "screens/uniswap-v3/09-1.png",
-     "screens/uniswap-v3/09-2.png"
+     "screens/uniswap-v3/18-1.png",
+     "screens/uniswap-v3/18-2.png"
     ]
    }
   ]
