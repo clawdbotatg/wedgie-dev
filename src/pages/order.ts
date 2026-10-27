@@ -379,7 +379,7 @@ function claim(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
 const WHYNOT = [["price", "Price"], ["time", "Ran out of time"], ["pay", "Couldn't pay"], ["looking", "Just looking"]];
 type View = { id: string; cart: Cart; lines: { item: Item | "ship"; qty: number; cents: number }[] | null; cents: number; pay: string; status: string; chain: number | null; usdc: string | null; payTo?: string;
   tracking: string | null; url?: string; why?: string; left?: number; got?: string; checking?: boolean;
-  created: string; paid_at: string | null; shipped_at: string | null; moving_at?: string | null; delivered_at?: string | null };
+  created: string; paid_at: string | null; shipped_at: string | null; moving_at?: string | null; delivered_at?: string | null; note?: string };
 
 // Ordered → Paid → Shipped → On the way → Delivered: a sprite and a date each; the newest one bounces till it's delivered.
 function steps(v: View) {
@@ -442,6 +442,7 @@ function status(id: string, box: HTMLElement, say: (s: string, bad?: boolean) =>
     }
     if (v.status === "paid" || v.status === "shipped") h += steps(v);
     if (v.status === "paid") h += `<p class="good"><b>Paid, thank you.</b></p><p>${esc(SHIPS)} The tracking number shows up here when it does.</p>`;
+    if (v.note) h += `<p class="o-note"><b>A note from us:</b> ${esc(v.note)}</p>`;
     if (v.status === "shipped") h += `<p class="good"><b>${v.delivered_at ? "Delivered." : "Shipped."}</b> Your address is deleted.</p>
       <p>USPS tracking: <a href="https://tools.usps.com/go/TrackConfirmAction?tLabels=${encodeURIComponent(v.tracking || "")}" target="_blank" rel="noopener">${esc(v.tracking)}</a></p>`;
     if (v.status === "canceled") h += `<p>Canceled.</p>`;

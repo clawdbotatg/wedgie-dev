@@ -11,6 +11,7 @@
 //   GET ?moving=1                shipped orders not delivered yet, 60 days back: {id, tracking, shipped_at, moving_at} (orders.py track)
 //   POST {id, step, at}          step "moving" or "delivered" (the buyer's order page shows it), at = when USPS said so.
 //                                Only the step and its time: never a place
+//   POST {id, note}              a note on a shipped order's page till it's delivered, typed by hand (orders.py note); "" clears
 // Each GET also marks paid the USDC orders made in the last 3 days, or with something sent, whose deposit address now
 // holds their price (older empty ones settle when their buyer opens the order page), and deletes what's done with: shipped or canceled orders and
 // unpaid or expired ones with nothing sent, 30 days on. GET ?stock=1: just the stock counts, {left: {wedgie, kit}}.
@@ -79,6 +80,11 @@ export async function POST(req: Request) {
     const r = b.step === "delivered"
       ? await sql`update orders set delivered_at = coalesce(delivered_at, ${at.toISOString()}), moving_at = coalesce(moving_at, ${at.toISOString()}) where id = ${b.id} and status = 'shipped' returning id`
       : await sql`update orders set moving_at = coalesce(moving_at, ${at.toISOString()}) where id = ${b.id} and status = 'shipped' returning id`;
+    return r.length ? json({ ok: true }) : oops("No shipped order with that id.", 404);
+  }
+  if (b.note !== undefined) {
+    if (typeof b.note !== "string" || b.note.length > 500) return oops("note is text, 500 characters at most.");
+    const r = await sql`update orders set note = ${b.note.trim() || null} where id = ${b.id} and status = 'shipped' returning id`;
     return r.length ? json({ ok: true }) : oops("No shipped order with that id.", 404);
   }
   if (b.boxed !== undefined) {

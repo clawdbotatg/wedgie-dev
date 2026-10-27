@@ -67,6 +67,7 @@ export async function db() {
     await sql`create table if not exists safe_cmp (n bigserial primary key, what text not null, chain int not null, safe text not null, diffs text not null, at timestamptz not null default now())`;   // api/safe.ts PUT: where Safe's API and the chain disagreed
     await sql`alter table orders add column if not exists moving_at timestamptz`;      // shipped: USPS has it moving (omen, admin.ts step); never a place
     await sql`alter table orders add column if not exists delivered_at timestamptz`;   // shipped: USPS delivered it
+    await sql`alter table orders add column if not exists note text`;   // shipped: a word from us on the order page (admin.ts note), e.g. a late box
     await sql`alter table orders add column if not exists boxed_at timestamptz`;   // paid: label bought and packed (admin.ts boxed), address kept till it ships
     await sql`create table if not exists alerts (     -- "email me when it's $67 again" (api/alert.ts, _mail.ts sendAlerts); gone after its 2nd mail
       email_hash text primary key, email_enc text not null, ip text, created timestamptz not null default now())`;
@@ -98,7 +99,7 @@ export function same(a: string, b: string) {   // constant time
 export type Order = {
   id: string; token_hash: string; cart: Cart; lines: Line[] | null; cents: number; pay: "card" | "usdc" | "cv"; status: string; sealed: string | null;
   chain: number | null; usdc: string | null; from_block: string | null; stripe_session: string | null; tx: string | null; payer: string | null; deposit: string | null;
-  tracking: string | null; created: string; paid_at: string | null; shipped_at: string | null; moving_at?: string | null; delivered_at?: string | null; boxed_at?: string | null; held?: boolean | null; got?: string | null;
+  tracking: string | null; created: string; paid_at: string | null; shipped_at: string | null; moving_at?: string | null; delivered_at?: string | null; boxed_at?: string | null; note?: string | null; held?: boolean | null; got?: string | null;
 };
 
 /** What the buyer's own order page may see: never the sealed address, the payer or the session. */
@@ -109,6 +110,7 @@ export const publicView = (o: Order, got?: bigint, checking?: boolean) => ({
   checking: checking || undefined,   // a chain couldn't be read: got may be short
   left: o.status === "new" ? Math.max(0, Date.parse(o.created) + QUOTE - Date.now()) : undefined,
   tracking: o.tracking, created: o.created, paid_at: o.paid_at, shipped_at: o.shipped_at, moving_at: o.moving_at, delivered_at: o.delivered_at,
+  note: o.status === "shipped" && !o.delivered_at ? o.note || undefined : undefined,
 });
 
 /** What every box costs over its list price right now (catalog.ts extraAt): paid orders at their paying, open

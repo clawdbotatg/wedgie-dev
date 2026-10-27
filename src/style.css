@@ -181,6 +181,7 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 22px; }
 .status { padding: 14px 16px; font-size: 16px; min-height: 52px; }
 .bad { color: #c22621; }
 .good { color: var(--mint-d); }
+.o-note { padding: 10px 12px; border-left: 4px solid #f2a900; background: rgba(242, 169, 0, .12); }
 .editor { width: 100%; min-height: 260px; border: 0; padding: 16px; font: 14px/1.5 var(--mono); color: var(--ink); resize: vertical; outline: none; }
 .out { margin: 0; padding: 14px 16px; font: 13px/1.45 var(--mono); max-height: 240px; min-height: 60px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
 .out.log { max-height: 380px; }
