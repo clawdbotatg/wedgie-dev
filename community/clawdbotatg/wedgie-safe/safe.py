@@ -38,7 +38,7 @@ import save
 import ui
 from ui import WHITE, INK, MUTED, GREY, GREEN_D, RED
 
-FW = "safe-29"
+FW = "safe-30"
 RP_ID = b"wedgie.dev"
 FIELDS = '"origin":"https://wedgie.dev"'
 ASK_MS = 120000
@@ -192,7 +192,7 @@ def on_data(mid, m):
 # structure to a root built into this app), so a host can only leave things out, never make them up.
 clear = []              # the bundle, in pieces (bytes)
 clear_have = 0
-CLEAR_MAX = 6000        # bytes: a descriptor (the spec's minimum is 4 KB), its proof, a few tokens
+CLEAR_MAX = 10000       # bytes: a descriptor (the spec's minimum is 4 KB; our Universal Router's is 5.5), its proof, a few tokens
 
 
 def clear_tag():
@@ -536,27 +536,43 @@ def _fit(lines, room=None):
     return parts + [part] if part or not parts else parts
 
 
+def _unclear():
+    for m in ("safe_8362", "safe_7730", "safe_wire"):     # loaded only for a descriptor
+        sys.modules.pop(m, None)
+    gc.collect()
+
+
 def confirm(tx):
     """The transaction on the screen, a page per action in a batch. True only on A through every page."""
     k = L.Keys(physical=True)
     k.pressed()
     sf = tx["safe"]
     foot = CHAINS.get(tx["chainId"], "chain %d" % tx["chainId"])
-    import safe_read
-    acts = None
-    try:
-        acts = safe_read.batch(tx)
-        # A DELEGATECALL runs someone else's code as this Safe: only Safe's own MultiSend, whose every action the
-        # wedgie reads, and none inside it (audit 10-16: a red page could still be signed)
-        if tx["operation"] and acts is None or acts and any(a["operation"] for a in acts):
-            raise ValueError("a DELEGATECALL: Safe Signer won't sign that")
-        pages = [safe_read.describe(tx)] if acts is None else safe_read.fold(acts)
-    finally:
-        del acts
-        del sys.modules["safe_read"]
-        for m in ("safe_ur", "safe_7730", "safe_wire"):     # loaded only for a Uniswap swap, a descriptor
-            sys.modules.pop(m, None)
-        gc.collect()
+    pages = None
+    if not tx["operation"] and tx.get("clear"):     # a descriptor came with one call: it says what the call does,
+        try:                                        # read before safe_read takes the heap (a Universal Router
+            import safe_7730                        # swap's needs it all)
+            c = safe_7730.read(tx, tx["clear"])
+            if isinstance(c, tuple):
+                pages = [c]
+            else:                       # it can't: safe_read's own page, with the reason
+                tx["clear"], tx["why"] = None, c
+        finally:
+            _unclear()
+    if pages is None:
+        import safe_read
+        acts = None
+        try:
+            acts = safe_read.batch(tx)
+            # A DELEGATECALL runs someone else's code as this Safe: only Safe's own MultiSend, whose every action
+            # the wedgie reads, and none inside it (audit 10-16: a red page could still be signed)
+            if tx["operation"] and acts is None or acts and any(a["operation"] for a in acts):
+                raise ValueError("a DELEGATECALL: Safe Signer won't sign that")
+            pages = [safe_read.describe(tx)] if acts is None else safe_read.fold(acts)
+        finally:
+            del acts
+            del sys.modules["safe_read"]
+            _unclear()
     # A page that doesn't fit goes on over more pages: every line is seen before the press (wedgie-dev 10-15:
     # an unknown token's recipient fell off the bottom).
     pages = [(head, part) for head, lines in pages for part in _fit(lines)]

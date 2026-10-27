@@ -291,11 +291,7 @@ def describe(tx):
         return "Danger", [("can take all", RED, BIG)] + _addr_lines("", to, RED)[1:]
     if not data:
         return "Fee" if to == RELAY else "Send", out + [_bigv(tx, tx["value"])] + _who(to, safe)
-    ur = sel in ("3593564c", "24856bc3")   # execute(commands, inputs[, deadline]): maybe Uniswap's Universal Router
-    if ur:
-        import safe_ur
-        ur = to in safe_ur.UR.get(tx["chainId"], ())
-    if tx["value"] and to not in ROUTERS and not ur:
+    if tx["value"] and to not in ROUTERS:
         out.append(("+ %s %s" % (amount(tx["value"], 18), coin(tx)), RED))
     n1, n2 = lambda: int.from_bytes(_arg(data, 1), "big"), lambda: int.from_bytes(_arg(data, 2), "big")
     if to == safe and sel == "0d582f13" and len(data) == 68:
@@ -343,16 +339,8 @@ def describe(tx):
             u = None
         if u:
             return u[0], out + u[1]
-    if ur:
-        try:
-            u = safe_ur.read(tx)
-        except Exception:
-            u = None
-        return u or ("Swap", [("via Uniswap", INK)] +
-                     ([("pay", MUTED), _bigv(tx, tx["value"])] if tx["value"] else []) +
-                     [("can't read it", RED, BIG), ("can't check what you get", RED)])
-    why = None
-    if tx.get("clear") and not ur:      # an ERC-7730 descriptor came with it (safe_7730: proven, or ignored)
+    why = tx.get("why")                 # safe.confirm tried the descriptor first and it couldn't
+    if tx.get("clear"):                 # an ERC-7730 descriptor came with it (safe_7730: proven, or ignored)
         import safe_7730
         c = safe_7730.read(tx, tx["clear"])
         if isinstance(c, tuple):

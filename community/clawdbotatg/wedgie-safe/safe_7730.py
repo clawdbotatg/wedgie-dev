@@ -34,13 +34,24 @@ def _map(b, i):
     return out
 
 
-def trust(s):
-    """Which root a signed structure (its bytes) reaches: "a", "b", or None."""
-    msg, env = w.signed_message(s)
+def trust(b, j):
+    """Which root the signed structure at b[j] reaches: "a", "b", or None. Hashed where it lies: a 5 KB descriptor
+    copied whole needs 5 KB in one piece, which a busy heap may not have (w.signed_message, done in place)."""
+    n, i = w.array(b, j)
+    if n < 2:
+        return None
+    for _ in range(n - 1):
+        i = w.item_end(b, i)
+    env = w.load(b, i)
+    if not isinstance(env, list) or len(env) != 5:
+        return None
     proof = env[4]
     if env[0] != 4 or env[3] != b"" or not isinstance(proof, list) or len(proof) > 32:
         return None
-    h = hashlib.sha256(b"\x00" + msg).digest()
+    h = hashlib.sha256(b"\x00")
+    h.update(memoryview(b)[j:i])
+    h.update(w.dumps(env[:3]))
+    h = h.digest()
     for p in proof:                     # pairs sorted, as Trezor's definitions tree
         if not isinstance(p, bytes) or len(p) != 32:
             return None
@@ -76,7 +87,7 @@ class Ctx:
                     break
                 k = w.item_end(b, k)
             if ok:
-                t = trust(bytes(b[j:w.item_end(b, j)]))
+                t = trust(b, j)
                 if t:
                     return j, t
         return None, None
@@ -184,16 +195,29 @@ def _pick(vals, i):
 
 
 class Call:
-    """One call being read: its data (no selector) and container [from, to, value, chain id]."""
+    """One call being read: its data (no selector) and container [from, to, value, chain id]. env: the entries of
+    the ERC-8362 object being decoded (value source 3)."""
     def __init__(self, to, data, value, sender, chain, depth):
         self.to, self.cd, self.depth, self.chain = to, data[4:], depth, chain
         self.value = value
         self.txc = [sender, to, value.to_bytes(32, "big"), chain.to_bytes(32, "big")]
+        self.env = None
+
+
+def _sub(call, cd=None, env=None):
+    """The same call, reading other bytes (a switch case's payload) or an object's entries."""
+    c = Call(call.to, b"", call.value, call.txc[0], call.chain, call.depth)
+    c.cd, c.txc, c.env = call.cd if cd is None else cd, call.txc, env
+    return c
 
 
 def _values(ctx, call, v):
     if v[2][0] == 1 and v[2][1] == 2:
         ctx.value_shown = True
+    if v[2][0] == 3:                    # an entry of the object being decoded
+        if call.env is None or not 0 <= v[2][1] < len(call.env) or not isinstance(call.env[v[2][1]], bytes):
+            raise Bad("no such entry")
+        return [call.env[v[2][1]]]
     try:
         return w.value(v, call.cd, call.txc)
     except ValueError as e:
@@ -289,6 +313,17 @@ def _text(ctx, call, param, val, i):
     raise Bad("param %r" % (k,))
 
 
+def _fieldat(ctx, call, fi, out):
+    """The field at b[fi]. A switch (ERC-8362) is read where it lies, only the case it takes loaded: the whole
+    of a Universal Router one as Python lists is more than the heap has."""
+    b = ctx.b
+    if w.load(b, w.at(b, w.at(b, fi, 1), 0)) == 14:
+        import safe_8362
+        safe_8362.switch_at(ctx, call, fi, out)
+        return
+    _field(ctx, call, w.load(b, fi), out)
+
+
 def _field(ctx, call, f, out, pick=None):
     label, param = f[0], f[1]
     vis = f[2] if len(f) > 2 else None
@@ -333,6 +368,10 @@ def _field(ctx, call, f, out, pick=None):
         if k == 9:
             _calldata(ctx, call, label, param, v, ii, out)
             continue
+        if k in (13, 14):               # ERC-8362: its own file, loaded only for these
+            import safe_8362
+            safe_8362.field(ctx, call, label, param, v, ii, out)
+            continue
         t, kind = _text(ctx, call, param, v, ii)
         out.append((label, t, kind))
 
@@ -348,6 +387,14 @@ def _calldata(ctx, call, label, param, data, i, out):
     chain = call.chain
     if param[3]:
         chain = _int(_pick(_values(ctx, call, param[3]), i), 1, None)
+    if len(param) > 7 and param[7]:      # ERC-8362 operation: anything but CALL, red
+        ex, cs, op = param[7]
+        if ex is not None:
+            n = _int(_pick(_values(ctx, call, ex), i), 1, None)
+            op = ([o for k, o in cs if k == n] or [op])[0]
+        if op != 1:
+            out.append(("", {2: "DELEGATECALL: can do anything", 3: "creates a contract", 4: "creates a contract",
+                             5: "CALLCODE: can do anything"}.get(op, "an unknown operation"), "warn"))
     if call.depth >= MAX_DEPTH or len(data) < 4:
         out.append((label, ("call", None, None, None, callee), "call"))
         return
@@ -358,7 +405,7 @@ def _calldata(ctx, call, label, param, data, i, out):
         return
     sub = []
     for fi in w.elements(ctx.b, w.at(ctx.b, j, 10)):
-        _field(ctx, inner, w.load(ctx.b, fi), sub)
+        _fieldat(ctx, inner, fi, sub)
     out.append((label, ("call", w.load(ctx.b, w.at(ctx.b, j, 4)), w.load(ctx.b, w.at(ctx.b, j, 5)), sub, callee), "call"))
 
 
@@ -376,7 +423,7 @@ def items(tx, bundle):
     call = Call(_raw(tx["to"]), data, tx["value"], _raw(tx["safe"]), tx["chainId"], 0)
     out = []
     for fi in w.elements(ctx.b, w.at(ctx.b, j, 10)):
-        _field(ctx, call, w.load(ctx.b, fi), out)
+        _fieldat(ctx, call, fi, out)
     if w.extra_bytes(call.cd):
         out.append(("", "%d extra bytes at the end" % w.extra_bytes(call.cd), "warn"))
     if tx["value"] and not ctx.value_shown:
@@ -406,7 +453,8 @@ def read(tx, bundle):
                 lines.extend([("a call to", MUTED), (_hex(callee), RED, ADDR),
                               ("can't read it", RED)])
                 return
-            lines.append((ci + (" (" + co + ")" if co else ""), INK))
+            if ci:
+                lines.append((ci + (" (" + co + ")" if co else ""), INK))
             for x in cs:
                 add(*x)
         elif kind and kind[:6] == "amount":
