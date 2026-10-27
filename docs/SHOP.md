@@ -90,13 +90,13 @@ Orders from before 2026-10-15 were paid straight to wedgie.eth with an exact amo
 
 ## CV claims (/claim)
 
-A CLAWD staker burns 500,000,000 CV (clawdviction, larv.ai) for one free wedgie, one per wallet, 15 ever. Brief:
+A CLAWD staker burns 500,000,000 CV (clawdviction, larv.ai) for one free wedgie, one per wallet, while stock lasts. No other cap (Austin, 10-26). Brief:
 `clawdviction/docs/WEDGIE-CLAIM.md`. Code: `api/_cv.ts`, `claim()` in `api/order.ts`, `claim()` in `src/pages/order.ts`.
 The wallet signs larv.ai's fixed message; our server checks it, reserves the wallet (`cv_claims`, kept for good:
 an order's payer is wiped at ship and the order deleted after 30 days), makes the order, asks larv.ai to burn, then
 marks it paid (`pay 'cv'`, `cents 0`). A failed burn deletes both rows. A claim takes a box from stock but never
 raises the price. Env: `CV_SPEND_SECRET` (larv.ai's; never logged, never to a browser; none = closed), `CV_API`
-(default larv.ai), `CV_CLAIM_COST`, `CV_CLAIM_MAX`. vite never loads `CV_*` from `.env`: the probe can't burn real CV.
+(default larv.ai), `CV_CLAIM_COST`. vite never loads `CV_*` from `.env`: the probe can't burn real CV.
 Test: `node tools/claimprobe.mjs` (a fake larv.ai).
 
 ## Checkout counts

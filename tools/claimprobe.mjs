@@ -59,14 +59,14 @@ const ADMIN = crypto.randomBytes(24).toString("hex");
 
 const vite = spawn("npx", ["vite", "--port", String(VPORT), "--strictPort"], { stdio: ["ignore", "pipe", "inherit"],
   env: { ...process.env, VITE_SEAL_KEY: pub, SHOP_ADMIN_TOKEN: ADMIN, STRIPE_SECRET_KEY: "", SHOP_PAY_TO: "",
-    CV_SPEND_SECRET: SECRET, CV_API: `http://127.0.0.1:${CPORT}`, CV_CLAIM_MAX: "15",
+    CV_SPEND_SECRET: SECRET, CV_API: `http://127.0.0.1:${CPORT}`,
     SHOP_MAIL_FILE: dir + "/mails.jsonl", SHOP_DATABASE_URL_DEV: "pglite" } });
 kids.push(vite);
 for (let i = 0; ; i++) { try { if ((await fetch(SITE + "/api/order")).ok) break; } catch {} if (i > 100) throw new Error("vite didn't start"); await sleep(300); }
 const admin = async (b) => (await fetch(SITE + "/api/admin", { method: "POST", headers: { authorization: "Bearer " + ADMIN, "content-type": "application/json" }, body: JSON.stringify(b) })).json();
 const shop = async (w = "") => (await fetch(SITE + "/api/order" + (w ? "?wallet=" + w : ""))).json();
 await admin({ stock: 8, item: "wedgie" });
-ok((await shop()).left.wedgie === 8 && (await shop()).cv.left === 15, "8 wedgies in stock, 15 claims open");
+ok((await shop()).left.wedgie === 8 && (await shop()).cv.open, "8 wedgies in stock, claims open");
 
 const cache = homedir() + "/Library/Caches/ms-playwright";
 const shell = readdirSync(cache).filter((d) => d.startsWith("chromium_headless_shell-")).sort().reverse()[0];
@@ -120,7 +120,7 @@ ok(spends.length === 1 && spends[0].secret === SECRET && spends[0].amount === 50
 ok(page.sent.every((b) => !b.includes(NAME) && !b.includes(STREET)), "the address never left the browser in clear");
 ok(await page.getByText("claimed with CV").isVisible(), "the order page says claimed with CV");
 const after = await shop(rich.address);
-ok(after.extra === extra0 && after.left.wedgie === 7 && after.cv.left === 14 && after.cv.claimed === id, "the price didn't move; one box and one claim gone");
+ok(after.extra === extra0 && after.left.wedgie === 7 && after.cv.claimed === id, "the price didn't move; one box gone");
 
 // 3
 page = await as(rich);
@@ -141,7 +141,7 @@ await fill(page);
 await page.locator("#c-go").click();
 await page.getByText("This wallet has 42 CV").waitFor();
 const f = await shop(flaky.address);
-ok(spends.length === 2 && f.cv.claimed === null && f.left.wedgie === 7 && f.cv.left === 14, "larv.ai said 402: no order, no claim, no box taken");
+ok(spends.length === 2 && f.cv.claimed === null && f.left.wedgie === 7, "larv.ai said 402: no order, no claim, no box taken");
 
 // 5
 const forged = await fetch(SITE + "/api/order", { method: "POST", headers: { "content-type": "application/json" },

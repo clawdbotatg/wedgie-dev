@@ -308,7 +308,7 @@ function claim(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
     <div class="safe-box recess" id="c-who">
       <img class="claim-clawd" src="/img/clawd.jpg" alt="Clawd" width="160" height="160">
       <p class="claim-pitch">Staked CLAWD on <a href="https://larv.ai" target="_blank" rel="noopener">larv.ai</a>? Burn <b id="c-cost">500,000,000</b> CV for a free wedgie, shipped. One per wallet.</p>
-      <p class="fine" id="c-left">&nbsp;</p>
+      <p class="fine" id="c-left" hidden></p>
       <p><button class="btn btn-green" id="c-connect" disabled>Connect wallet</button></p>
       <p id="c-bal" hidden></p>
     </div>
@@ -328,8 +328,9 @@ function claim(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
     if (!cv.open) { leftEl.textContent = "Claims open soon."; return; }
     cost = cv.cost;
     box.querySelector("#c-cost")!.textContent = cvn(cost);
-    leftEl.textContent = !cv.left ? "All the claim wedgies are gone." : !r.left?.wedgie ? "Wedgies are sold out." : `${cv.left} left.`;
-    connectB.disabled = !cv.left || !r.left?.wedgie;
+    leftEl.textContent = r.left?.wedgie ? "" : "Wedgies are sold out.";
+    leftEl.hidden = !leftEl.textContent;
+    connectB.disabled = !r.left?.wedgie;
     if (!wallet) return;
     bal.hidden = false;
     const short = `<code class="safe-addr">${esc(wallet)}</code><br>`;
@@ -338,7 +339,7 @@ function claim(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
     else if (cv.balance < 0) bal.innerHTML = short + "larv.ai didn't answer. Try again soon.";
     else if (cv.balance < cost) bal.innerHTML = short + `<b>${cvn(cv.balance)}</b> CV. ${cvn(cost - cv.balance)} more to go. <a href="https://larv.ai/stake" target="_blank" rel="noopener">Stake more</a>`;
     else bal.innerHTML = short + `<b class="good">${cvn(cv.balance)} CV.</b> Enough for a wedgie.`;
-    ready = !cv.claimed && cv.balance >= cost && !!cv.left && !!r.left?.wedgie;
+    ready = !cv.claimed && cv.balance >= cost && !!r.left?.wedgie;
     connectB.hidden = true;
     go.disabled = !ready;
   };

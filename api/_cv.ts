@@ -1,9 +1,9 @@
 // Claim a wedgie with conviction: a CLAWD staker burns CV_CLAIM_COST CV (clawdviction, larv.ai) for one free
-// wedgie, one per wallet, CV_CLAIM_MAX ever. A third way to pay an order (pay 'cv', api/order.ts); the brief:
+// wedgie, one per wallet, while stock lasts (no other cap). A third way to pay an order (pay 'cv', api/order.ts); the brief:
 // github.com/clawdbotatg/clawdviction docs/WEDGIE-CLAIM.md. larv.ai keeps no ledger, so one-per-wallet is ours:
 // cv_claims (api/_shop.ts) keeps the wallet for good, past the order's ship-time wipe and 30-day delete.
 // Env: CV_SPEND_SECRET (larv.ai's; server only, never logged, never sent to a browser), CV_API (larv.ai),
-// CV_CLAIM_COST, CV_CLAIM_MAX. No secret: claims aren't open.
+// CV_CLAIM_COST. No secret: claims aren't open.
 import { createPublicClient, http, recoverMessageAddress } from "viem";
 import { base } from "viem/chains";
 import { env, type db } from "./_shop.js";
@@ -11,7 +11,6 @@ import { env, type db } from "./_shop.js";
 export const CV_MSG = "larv.ai CV Spend";   // larv.ai checks exactly this
 export const cvApi = () => (env("CV_API") || "https://larv.ai").replace(/\/+$/, "");
 export const cvCost = () => Number(env("CV_CLAIM_COST") || 500_000_000);
-export const cvMax = () => Number(env("CV_CLAIM_MAX") || 15);
 export const cvOpen = () => !!env("CV_SPEND_SECRET");
 
 /** larv.ai's balance (its 5-minute column, the one spend checks), or null: never staked. Throws if larv.ai is down. */
@@ -43,12 +42,11 @@ export async function cvSpend(wallet: string, signature: string): Promise<{ ok: 
   } catch { return { ok: false, down: true }; }
 }
 
-/** Claims so far (burned, or mid-burn: a failed one's row is deleted; a shipped order is deleted after 30 days, its
- * claim row never), and whether this wallet has one (its order id). */
-export async function cvClaims(sql: Awaited<ReturnType<typeof db>>, wallet?: string) {
-  const [n] = await sql`select count(*)::int as n from cv_claims`;
-  const [mine] = wallet ? await sql`select order_id from cv_claims where wallet = ${wallet}` : [];
-  return { used: n.n as number, mine: (mine?.order_id as string) || null };
+/** This wallet's claim (its order id), or null. A failed burn's row is deleted; a shipped order is deleted after
+ * 30 days, its claim row never. */
+export async function cvClaimed(sql: Awaited<ReturnType<typeof db>>, wallet: string) {
+  const [mine] = await sql`select order_id from cv_claims where wallet = ${wallet}`;
+  return (mine?.order_id as string) || null;
 }
 
 export const fmtCv = (n: number) => Math.floor(n).toLocaleString("en-US");

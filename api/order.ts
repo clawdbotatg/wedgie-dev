@@ -1,7 +1,7 @@
 // /api/order
 //   GET                                       what's open: card, usdc; extra = cents over list price right now;
 //                                             left = {wedgie, kit} in stock (_shop.ts stockLeft); sends the price alerts once it's back down
-//   GET ?wallet=0x…                           + cv: claims (api/_cv.ts): open, cost, left; this wallet's balance (null: never
+//   GET ?wallet=0x…                           + cv: claims (api/_cv.ts): open, cost; this wallet's balance (null: never
 //                                             staked) and claimed (its order id, or null)
 //   POST {cart, sealed, email, pay, chain?}   a new order -> {id, token, url?} (url: Stripe Checkout); email: _mail.ts
 //   POST {pay: 'cv', cart, sealed, email, wallet, signature}   a claim: CV burned on larv.ai, paid from the start
@@ -12,7 +12,7 @@
 import { PAY_CHAINS, cartOk, cartLines, type Cart } from "../src/shop/catalog.js";
 import { depositOf } from "../src/shop/deposits.js";
 import { EMAIL, emailHash, lock, tokenOf, mailPaid, sendAlerts } from "./_mail.js";
-import { cvOpen, cvCost, cvMax, cvBalance, cvSigned, cvSpend, cvClaims, cvAlarm, fmtCv } from "./_cv.js";
+import { cvOpen, cvCost, cvBalance, cvSigned, cvSpend, cvClaimed, cvAlarm, fmtCv } from "./_cv.js";
 import { db, env, json, oops, randomHex, sha256, same, publicView, checkout, session, markPaid, endCard, usdcPaid, usdcFind, settleDeposit, extraNow, expireOld, late, rpc, ipOf, tooMany, stockLeft, short, oversold, type Order, crossSite } from "./_shop.js";
 
 const open = () => ({ card: !!env("STRIPE_SECRET_KEY"), usdc: !!env("SHOP_PAY_TO"), chains: Object.keys(PAY_CHAINS).map(Number).filter((c) => env("SHOP_RPC_" + c)) });
@@ -28,10 +28,12 @@ export async function GET(req: Request) {
 
 async function cvView(sql: Awaited<ReturnType<typeof db>> | null, w: string | null) {
   const wallet = w && /^0x[0-9a-fA-F]{40}$/.test(w) ? w.toLowerCase() : "";
-  const c = sql && cvOpen() ? await cvClaims(sql, wallet || undefined).catch(() => null) : null;
-  if (!c) return { open: false };
-  const balance = wallet ? await cvBalance(wallet).catch(() => -1) : undefined;   // -1: larv.ai didn't answer
-  return { open: true, cost: cvCost(), left: Math.max(0, cvMax() - c.used), ...(wallet ? { balance, claimed: c.mine } : {}) };
+  if (!sql || !cvOpen()) return { open: false };
+  if (!wallet) return { open: true, cost: cvCost() };
+  const claimed = await cvClaimed(sql, wallet).catch(() => undefined);
+  if (claimed === undefined) return { open: false };
+  const balance = await cvBalance(wallet).catch(() => -1);   // -1: larv.ai didn't answer
+  return { open: true, cost: cvCost(), balance, claimed };
 }
 
 export async function POST(req: Request) {
@@ -100,9 +102,7 @@ async function claim(sql: Awaited<ReturnType<typeof db>>, b: any, origin: string
   if (many) return oops(many, 429);
   const no = short(cart, await stockLeft(sql));
   if (no) return oops(no, 409);
-  const c = await cvClaims(sql, wallet);
-  if (c.mine) return oops("This wallet already claimed its wedgie.", 409);
-  if (c.used >= cvMax()) return oops("All the claim wedgies are gone.", 409);
+  if (await cvClaimed(sql, wallet)) return oops("This wallet already claimed its wedgie.", 409);
   const id = randomHex(6), token = await tokenOf(id), th = await sha256(token);
   const keyed = !!env("SHOP_MAIL_KEY");
   const eh = keyed ? await emailHash(b.email) : null, ee = keyed ? await lock(b.email.trim()) : null;
