@@ -183,7 +183,7 @@ const cases = txsFile ? JSON.parse(readFileSync(txsFile, "utf8")).map((c) =>
 function ask(t, k, msg = { type: "safe_sign", tx: t }, cb = null, shot = null, keys = []) {
   keys = [...(keys || [])];          // pressed first, one a second (a case's "keys": the d-pad through its details)
   for (let o = 0; cb && o < cb.length; o += hi.safe_chunk) {     // a clear-signing bundle first, in pieces
-    const a = h.req({ id: ++id, type: "safe_clear", at: o / 2, hex: cb.slice(o, o + hi.safe_chunk) }, 20000);
+    const a = h.req({ id: ++id, type: "safe_clear", at: o / 2, hex: cb.slice(o, o + hi.safe_chunk), ...(o ? {} : { n: cb.length / 2 }) }, 20000);
     if (a?.type !== "safe_clear") console.log("     clear piece:", JSON.stringify(a));
   }
   const rid = ++id, t0 = h.chip.ms;
