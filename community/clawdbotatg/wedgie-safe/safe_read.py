@@ -1,26 +1,13 @@
 # Safe Signer: reading a transaction into pages (describe, batch, fold). Loaded only while a question is up
 # (safe.confirm imports it and lets it go): the app's idle heap needs room for a 6 KB USB line.
 import binascii
-import safe as A
 from ui import INK, MUTED, GREEN_D, RED
-from safe import word, aword, unhex, hx, short, amount, coin, CHAINS, BIG, ADDR
+from safe import word, hx, short, amount, coin, CHAINS, BIG, ADDR
 
 from safe_icons import TOKENS     # tokens the wedgie knows itself: (chain, address) -> (symbol, decimals)
+from safe_book import ROUTERS, MODULES, MODULE_FACTORY, ROLES_COPY, RELAY, NAMES, roles_of, init as _init
 
-# contracts with a name: the same address on every chain unless the chain is in the key.
-# A swap router gets an exact approval and the swap names this Safe as who gets paid (checked below).
-ROUTERS = {"0x1231deb6f5749ef6ce6943a275a1d3e7486f4eae": "LI.FI",
-           "0x2626664c2603336e57b271c5c0b26f421741e481": "Uniswap",     # SwapRouter02, Base
-           "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45": "Uniswap"}     # SwapRouter02, Ethereum
-# Candide social recovery: a wallet starts on the 7-day one; pairing a wedgie puts the owner's own recovery address
-# on the 14-day one and the DAO on the 60-day one (the same Candide code, Instant Wallet deployed it)
-RECOVERY = {"0x088f6cfd8bb1ddb1bb069ccb3fc1a98927d233f2": 7, "0x9bacd92f4687db306d7ded5d4513a51ea05df25b": 14,
-            "0x6aa9a8ad0582db61a97a6e30eba22ba143d1e960": 60}
-PASSKEY_FACTORY = "0x1d31f259ee307358a26dfb23eb365939e8641195"  # safe-modules passkey 0.2.1 (a public contract; gitleaks:allow)
-MODULE_FACTORY = "0x000000000000addb49795b0f9ba5bc298cdda236"   # Zodiac ModuleProxyFactory
-ROLES_COPY = "0xf2964ce6161ce0e75964fe7927ce114cb0b283d5"       # Zodiac Roles 2.1.1
 MULTICALL3 = "0xca11bde05977b3631167028862be2a173976ca11"       # the budget sends ETH through it
-MODULES = {m: "%d-day recovery" % d for m, d in RECOVERY.items()}
 # the Roles calls the limit pages read (assignRoles, enableModule, disableModule, scopeTarget, revokeTarget,
 # scopeFunction, setAllowance, setTransactionUnwrapper)
 ROLES_SELS = ("957ed2b3", "610b5925", "e009cfde", "0c6c76b8", "0172a43a", "7508dd98", "a8ec43ee", "2916a9af")
@@ -33,9 +20,6 @@ ROLE = "86c37482ef7146c27eb2859f3f7443e45fcbc4e32caa3c89515918953dd30949"     # 
 LIMITS = {K_USDC: ("Daily limit", "USDC", 6, "a day with just Face ID"),
           K_ETH: ("Daily limit", None, 18, "a day with just Face ID"),     # None: the chain's coin
           K_FEE: ("Fee limit", "USDC", 6, "a day for fees")}
-# Instant Wallet's relay: it sends the transactions and is paid a fee in the batch. Built in, never from the host.
-RELAY = "0x4cfab32186e65e2a39ec0e882e11380cbf2f8a2f"
-NAMES = {RELAY: "the Instant relay"}
 LIFI = "0x1231deb6f5749ef6ce6943a275a1d3e7486f4eae"
 # LI.FI's swaps whose argument 3 is who gets paid (swapTokensGeneric and the six GenericSwapFacetV3 ones). Any
 # other selector with this Safe in word 3 is not a swap to this Safe (audit 10-16: one was shown as one).
@@ -127,25 +111,6 @@ def _lifi_to(data, safe):
     return None
 
 
-_roles_of = {}          # safe -> its Roles address (the keccaks are slow in plain Python: once each)
-
-
-def _init(safe):
-    """Roles.setUp(abi.encode(safe, safe, safe)): how Instant Wallet makes a Safe's own daily limit."""
-    return binascii.unhexlify("a4f9edbf") + word(32) + word(96) + aword(safe) * 3
-
-
-def roles_of(safe):
-    """The address of this Safe's own daily limit (Zodiac Roles, CREATE2 by the ModuleProxyFactory, salt
-    keccak(keccak(init), 0)): the limit pages say "Daily limit" only for calls to it."""
-    if safe not in _roles_of:
-        from safe_keccak import keccak256 as k
-        code = binascii.unhexlify("602d8060093d393df3363d3d373d3d3d363d73") + unhex(ROLES_COPY) + \
-            binascii.unhexlify("5af43d82803e903d91602b57fd5bf3")
-        h = k(b"\xff" + unhex(MODULE_FACTORY) + k(k(_init(safe)) + word(0)) + k(code))
-        _roles_of[safe] = hx(h[12:])
-    return _roles_of[safe]
-
 
 def _roles(tx, sel):
     """Zodiac Roles (the daily budget): what each setting call does, as (title, lines), or None."""
@@ -235,17 +200,6 @@ def _rule(tx, data, target):
     return None
 
 
-def _owner(a, c):
-    """An owner being added or removed: THIS wedgie, big, when it's this one; else its address."""
-    if A.signer and a == A.signer.lower():
-        return [("THIS wedgie", c, BIG)]
-    return _addr_lines("", a, c)[1:]
-
-
-def _then(n):
-    return ("then %d must sign" % n, INK)
-
-
 def describe(tx):
     """What the transaction does: (title, lines of (text, color[, kind])), at most 6 lines. Few words, big
     (wedgie-dev docs/STYLE.md rule 0): the title is the action, the amount or the one fact that matters big."""
@@ -258,33 +212,6 @@ def describe(tx):
         return "Fee" if to == RELAY else "Send", out + [_bigv(tx, tx["value"])] + _who(to, safe)
     if tx["value"] and to not in ROUTERS:
         out.append(("+ %s %s" % (amount(tx["value"], 18), coin(tx)), RED))
-    n1, n2 = lambda: int.from_bytes(_arg(data, 1), "big"), lambda: int.from_bytes(_arg(data, 2), "big")
-    if to == safe and sel == "0d582f13" and len(data) == 68:
-        return "Add owner", out + _owner(_aarg(data, 0), INK) + [_then(n1())]
-    if to == safe and sel == "f8dc5dd9" and len(data) == 100:
-        return "Remove owner", out + _owner(_aarg(data, 1), RED) + [_then(n2())]
-    if to == safe and sel == "e318b52b" and len(data) == 100:
-        return "Swap owner", out + [("out: " + short(_aarg(data, 1)), RED), ("in:", MUTED)] + _addr_lines("", _aarg(data, 2))[1:]
-    if to == safe and sel == "694e80c3" and len(data) == 36:
-        return "Must sign", out + [("%d" % int.from_bytes(_arg(data, 0), "big"), INK, BIG)]
-    if to == safe and sel == "610b5925" and len(data) == 36:
-        m = _aarg(data, 0)
-        if m == roles_of(safe):
-            return "Turn on", out + [("Daily limit", INK, BIG)]
-        return "Turn on", out + ([(MODULES[m], INK)] if m in MODULES else
-                                 [("can move any money", RED)] + _addr_lines("", m, RED)[1:])
-    if to == safe and sel == "e009cfde" and len(data) == 68:
-        m = _aarg(data, 1)
-        return "Turn off", out + ([("Daily limit" if m == roles_of(safe) else MODULES[m], RED)] if m in MODULES or
-                                  m == roles_of(safe) else _addr_lines("", m, RED)[1:])
-    if to in RECOVERY and sel == "be0e54d7" and len(data) == 68:
-        return "Add helper", out + _addr_lines("", _aarg(data, 0))[1:] + [("can swap owners", MUTED), ("after %d days" % RECOVERY[to], MUTED)]
-    if to in RECOVERY and sel == "936f7d86" and len(data) == 100:
-        return "Drop helper", out + _addr_lines("", _aarg(data, 1), RED)[1:]
-    if to in RECOVERY and sel == "0ba234d6" and len(data) == 4:
-        return "Cancel recovery", out
-    if to == PASSKEY_FACTORY and sel == "0d2f0489":
-        return "Make a key", out + [("not an owner yet", MUTED)]
     if to == MODULE_FACTORY and sel == "f1ab873c" and _aarg(data, 0) == ROLES_COPY and len(data) >= 100 and \
             not int.from_bytes(_arg(data, 2), "big") and _bytes_at(data[4:], int.from_bytes(_arg(data, 1), "big")) == _init(safe):
         return "Daily limit", out + [("set it up", INK)]
@@ -298,7 +225,13 @@ def describe(tx):
         who = [("by " + ROUTERS[sp], c)] if sp in ROUTERS else [("by", c)] + _addr_lines("", sp, c)[1:]
         return "Allow taking", out + [("ALL " + (_tok(tx, to)[0] or "of it"), c, BIG, _ico(tx, to)) if n >> 128 else _big(tx, to, n, c)] + who
     why = tx.get("why")                 # safe.confirm tried the descriptor first and it couldn't
+    p = tx.get("pre")                   # a batch's call, read from its descriptor first (safe_7730.reads)
+    if isinstance(p, tuple):
+        return p
+    why = p or why
     if tx.get("clear"):                 # an ERC-7730 descriptor came with it (safe_7730: proven, or ignored)
+        import gc
+        gc.collect()                    # a batch: safe_read is loaded too, and compiling safe_7730 needs room
         import safe_7730
         c = safe_7730.read(tx, tx["clear"])
         if isinstance(c, tuple):
@@ -336,12 +269,12 @@ def batch(tx):
     if data[4:36] != word(32) or len(data) < 68 + n or not n:     # empty: nothing to show, nothing signed (audit 10-18)
         raise ValueError("bad batch")
     b = data[68:68 + n]
-    out, i = [], 0
+    out, i, pre = [], 0, tx.get("pre") or {}
     while i < len(b):
         dl = int.from_bytes(b[i + 53:i + 85], "big")
         if b[i] > 1 or i + 85 + dl > len(b):
             raise ValueError("bad batch")
-        out.append({"chainId": tx["chainId"], "safe": tx["safe"], "operation": b[i], "clear": tx.get("clear"),
+        out.append({"chainId": tx["chainId"], "safe": tx["safe"], "operation": b[i], "pre": pre.get(len(out)),
                     "to": hx(b[i + 1:i + 21]), "value": int.from_bytes(b[i + 21:i + 53], "big"),
                     "data": b[i + 85:i + 85 + dl]})
         i += 85 + dl

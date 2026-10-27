@@ -38,7 +38,7 @@ import save
 import ui
 from ui import WHITE, INK, MUTED, GREY, GREEN_D, RED
 
-FW = "safe-32"
+FW = "safe-33"
 RP_ID = b"wedgie.dev"
 FIELDS = '"origin":"https://wedgie.dev"'
 ASK_MS = 120000
@@ -547,7 +547,7 @@ def _fit(lines, room=None):
 
 
 def _unclear():
-    for m in ("safe_8362", "safe_7730", "safe_wire"):     # loaded only for a descriptor
+    for m in ("safe_8362", "safe_7730", "safe_wire", "safe_book"):     # loaded only while reading one
         sys.modules.pop(m, None)
     gc.collect()
 

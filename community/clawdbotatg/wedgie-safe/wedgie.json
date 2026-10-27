@@ -9,6 +9,7 @@
         "safe_read.py",
         "safe_7730.py",
         "safe_8362.py",
+        "safe_book.py",
         "safe_wire.py",
         "safe_roots.py",
         "safe_keccak.py",

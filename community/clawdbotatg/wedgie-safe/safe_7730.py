@@ -294,13 +294,17 @@ def _text(ctx, call, param, val, i):
             if e[0] == n:
                 return e[1], None
         raise Bad("enum value %d not in the descriptor" % n)
-    if k == 8:                          # trusted name: no names are sent, so the address itself
+    if k == 8:                          # trusted name: none are sent; the ones the wedgie knows itself (safe_book)
         if len(param) > 5 and param[5] == 1:
             raise Bad("interoperable address")
         a = _addr(val)
         if any(_same(val, x, 5) for x in (param[4] or [])):
             a = safe
-        return a, "safe" if a == safe else "addr"
+        if a == safe:
+            return a, "safe"
+        import safe_book
+        n = safe_book.name(a, safe, _hex(call.to) == safe)
+        return (n, "me" if n == "THIS wedgie" else "named") if n else (a, "addr")
     if k == 10:                         # token ticker
         if any(_same(val, x, 5) for x in (param[2] or [])):
             return ctx.coin, None
@@ -402,7 +406,7 @@ def _calldata(ctx, call, label, param, data, i, out):
         out.append((label, ("call", None, None, None, callee), "call"))
         return
     inner = Call(callee, bytes(data), amt, sender, chain, call.depth + 1)
-    j, t = ctx.find(ctx.descs, (chain, callee, bytes(data[:4])))
+    j, t = ctx.find(ctx.descs, (chain, _key(ctx, callee), bytes(data[:4])))
     if j is None:
         out.append((label, ("call", None, None, None, callee), "call"))
         return
@@ -410,6 +414,14 @@ def _calldata(ctx, call, label, param, data, i, out):
     for fi in w.elements(ctx.b, w.at(ctx.b, j, 10)):
         _fieldat(ctx, inner, fi, sub)
     out.append((label, ("call", w.load(ctx.b, w.at(ctx.b, j, 4)), w.load(ctx.b, w.at(ctx.b, j, 5)), sub, callee), "call"))
+
+
+def _key(ctx, to):
+    """The address a call's descriptor is under: this Safe calling itself is under safe_book.THIS_SAFE."""
+    if _hex(to) == ctx.tx["safe"].lower():
+        import safe_book
+        return _raw(safe_book.THIS_SAFE)
+    return to
 
 
 def items(tx, bundle, small=False):
@@ -421,7 +433,7 @@ def items(tx, bundle, small=False):
     data = tx["data"]
     if len(data) < 4:
         raise Bad("no function")
-    j, t = ctx.find(ctx.descs, (tx["chainId"], _raw(tx["to"]), bytes(data[:4])))
+    j, t = ctx.find(ctx.descs, (tx["chainId"], _key(ctx, _raw(tx["to"])), bytes(data[:4])))
     if j is None:
         raise Bad("no descriptor for this call")
     call = Call(_raw(tx["to"]), data, tx["value"], _raw(tx["safe"]), tx["chainId"], 0)
@@ -468,6 +480,10 @@ def read(tx, bundle):
             lines.append((text, INK, ADDR))
         elif kind == "safe":
             lines.append(("this Safe", GREEN_D))
+        elif kind == "me":
+            lines.append((text, INK, BIG))
+        elif kind == "named":
+            lines.append((text, INK))
         elif kind == "token?":              # a token no list knows: the number, and whose
             n, a = text.split(" of ")
             lines.extend([(n, RED), ("of a token it doesn't know", RED), (a, RED, ADDR)])
