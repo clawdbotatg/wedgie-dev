@@ -68,6 +68,7 @@ class Ctx:
         m = _map(b, 0)
         self.descs, self.tokens = m.get(13), m.get(8)
         self.value_shown = False
+        self.small = False              # on the screen: optional fields left out
 
     def find(self, arr, key):
         """The index in b of the first structure in the array at arr whose elements 1.. start with key, and the
@@ -365,6 +366,8 @@ def _field(ctx, call, f, out, pick=None):
                 continue
             if vis[0] == 2 and hit:     # if not in
                 continue
+            if vis[0] == 3 and ctx.small:   # optional: a small screen leaves it out (the spec lets it)
+                continue
         if k == 9:
             _calldata(ctx, call, label, param, v, ii, out)
             continue
@@ -409,10 +412,11 @@ def _calldata(ctx, call, label, param, data, i, out):
     out.append((label, ("call", w.load(ctx.b, w.at(ctx.b, j, 4)), w.load(ctx.b, w.at(ctx.b, j, 5)), sub, callee), "call"))
 
 
-def items(tx, bundle):
-    """(intent, owner, trust, [(label, text, kind)]) for tx's call, or raises Bad."""
+def items(tx, bundle, small=False):
+    """(intent, owner, trust, [(label, text, kind)]) for tx's call, or raises Bad. small: leave out optional fields."""
     import safe as A
     ctx = Ctx(tx, bundle)
+    ctx.small = small
     ctx.coin = A.coin(tx)
     data = tx["data"]
     if len(data) < 4:
@@ -425,7 +429,8 @@ def items(tx, bundle):
     for fi in w.elements(ctx.b, w.at(ctx.b, j, 10)):
         _fieldat(ctx, call, fi, out)
     if w.extra_bytes(call.cd):
-        out.append(("", "%d extra bytes at the end" % w.extra_bytes(call.cd), "warn"))
+        # said, in grey: Uniswap's app adds a 22-byte tag to every swap (a signer can't tell a tag from more)
+        out.append(("", "+%d bytes at the end" % w.extra_bytes(call.cd), "note"))
     if tx["value"] and not ctx.value_shown:
         out.append(("", "+ %s %s" % (A.amount(tx["value"], 18), ctx.coin), "warn"))
     return w.load(ctx.b, w.at(ctx.b, j, 4)), w.load(ctx.b, w.at(ctx.b, j, 5)), t, out
@@ -434,7 +439,7 @@ def items(tx, bundle):
 def read(tx, bundle):
     """(title, lines) for the Swap/Repay/... page, or a reason string it can't."""
     try:
-        intent, owner, t, its = items(tx, bundle)
+        intent, owner, t, its = items(tx, bundle, True)
     except (Bad, ValueError, KeyError, IndexError, TypeError) as e:
         return "descriptor: %s" % e
     from ui import INK, MUTED, GREEN_D, RED
@@ -470,6 +475,8 @@ def read(tx, bundle):
             lines.extend([("a token it doesn't know", RED), (text, RED, ADDR)])
         elif kind == "warn":
             lines.append((text, RED))
+        elif kind == "note":
+            lines.append((text, MUTED))
         else:
             lines.append((text, INK))
     for x in its:
