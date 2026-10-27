@@ -3,13 +3,20 @@
   "repos": [
     {
       "repo": "clawdbotatg/wedgie-safe",
-      "sha": "70952006637fff13dc787330dc80bf289c901c7a",
-      "at": "2026-10-27T21:18:34Z",
+      "sha": "5d0060941f501b16f3d96fef419e3d8a13cdb25c",
+      "at": "2026-10-27T22:23:33Z",
       "approved": "2026-10-27",
       "v": {
-        "safe": "ac591eccfacb"
+        "safe": "ebb0101f2041"
       },
       "past": [
+        {
+          "sha": "70952006637fff13dc787330dc80bf289c901c7a",
+          "at": "2026-10-27T21:18:34Z",
+          "v": {
+            "safe": "ac591eccfacb"
+          }
+        },
         {
           "sha": "f854a12ac87846f0c19373dea60e3527a6ed959c",
           "at": "2026-10-27T20:22:09Z",

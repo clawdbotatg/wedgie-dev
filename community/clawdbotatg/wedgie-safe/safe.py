@@ -38,7 +38,7 @@ import save
 import ui
 from ui import WHITE, INK, MUTED, GREY, GREEN_D, RED
 
-FW = "safe-31"
+FW = "safe-32"
 RP_ID = b"wedgie.dev"
 FIELDS = '"origin":"https://wedgie.dev"'
 ASK_MS = 120000
@@ -205,12 +205,19 @@ def clear_tag():
 
 
 def on_clear(mid, m):
-    """{"type":"safe_clear","at":<bytes so far>,"hex":"..."}: a piece of the next tx's clear-signing bundle."""
+    """{"type":"safe_clear","at":<bytes so far>,"hex":"...","n":<bundle bytes, on the first>}: a piece of the next tx's
+    clear-signing bundle. With n, the first piece takes one block for all of it while the heap is still in one piece,
+    and every piece goes straight in: joining pieces at sign time needed a free block that size on top of them (a real
+    wedgie on a phone, 10-27: MemoryError, 1784 bytes)."""
     global clear, clear_have
     at, h = m.get("at"), str(m.get("hex") or "")
     if at == 0:
         clear, clear_have = [], 0
-    if at != clear_have or len(h) % 2 or len(h) > CHUNK or clear_have + len(h) // 2 > CLEAR_MAX:
+        n = m.get("n")
+        if isinstance(n, int) and 0 < n <= CLEAR_MAX:
+            gc.collect()
+            clear = bytearray(n)
+    if at != clear_have or len(h) % 2 or len(h) > CHUNK or clear_have + len(h) // 2 > (len(clear) if isinstance(clear, bytearray) else CLEAR_MAX):
         clear, clear_have = [], 0
         W.send({"id": mid, "type": "error", "error": "bad clear piece (a bundle is up to %d bytes)" % CLEAR_MAX})
         return
@@ -221,7 +228,10 @@ def on_clear(mid, m):
         W.send({"id": mid, "type": "error", "error": "bad clear piece"})
         return
     h = m = None
-    clear.append(b)
+    if isinstance(clear, bytearray):
+        clear[clear_have:clear_have + len(b)] = b
+    else:
+        clear.append(b)
     clear_have += len(b)
     W.send({"id": mid, "type": "safe_clear", "have": clear_have})
 
@@ -231,7 +241,7 @@ def parse(t):
     A clear-signing bundle sent ahead comes along as tx["clear"] (and is used up)."""
     global pieces, have, room, clear, clear_have
     room = None
-    cb = b"".join(clear) if clear else None
+    cb = (clear if clear_have == len(clear) else None) if isinstance(clear, bytearray) else b"".join(clear) if clear else None
     clear, clear_have = [], 0
     data = t.get("data") or "0x"
     if data == "@":

@@ -22,12 +22,12 @@ f0224e865a8f55c77b0c13d353b4663e6d9642e99439d98c3045dea3f594ef91  grove.py
 @app  {"mod":"poidh","name":"Poidh Bounties","entry":"run","usb":true,"files":["poidh.py"]}
 9333052151fee99ff38ba0bd4d696f10707f3837abcf019d057fb7740c54e0a1  poidh.py
 @app  {"mod":"safe","name":"Safe Signer","entry":"run","usb":true,"files":["safe.py","safe_read.py","safe_7730.py","safe_8362.py","safe_wire.py","safe_roots.py","safe_keccak.py","safe_addr.py","safe_blockie.py","safe_key.py","safe_msg.py","safe_icons.py","safe_icons.bin"]}
-8e1962ca5802b31940e2cb3d7d11e3b5dfa43bb3577a0814d67f6055fcfebc92  safe.py
-bd16fef74c8eed080d0d941beb08709a6d97109b514a1813a4cf728d68874dd2  safe_read.py
+4fa5285cdf57dc7d6f0ecb25f5ca006e957201e30ac8e12ccc407e4d21b693c7  safe.py
+a6f1739450b441f1ec1c5ae9d05cbc48b5905cbe67d2af89317dcd6493af4d99  safe_read.py
 81e1bcef7be0da0bafc7caf54fa6106727bc2c9d8d44fd25a99b0dc3eea6edd9  safe_7730.py
 9f7a08afb731618076a383e33e68d0c48cd9b9190d284c5e8dad8f731c38cca3  safe_8362.py
 6110a0ede5b5da38473e3937797c524061d66a0fbf4e4fce31185189ecda7986  safe_wire.py
-7d7e1656507411b6334164f38187a149a7ab5d2e9ccf58fe56abc4173f78df48  safe_roots.py
+ded3746551766a9a952a5631fcefdc414328cac0248a5cf1f3eb577a61ae9c4d  safe_roots.py
 f5465cbfa72b6ea201d7993d09d0c4c163cf40fa1313f7938204bc32c12c94f5  safe_keccak.py
 ebb05bac073a564d54741c5ff029132e66ca2001260c080fb9c171481901304e  safe_addr.py
 44e2ec64f5e7c9acd8c50a293ffa16d19f45deaf2201d88bc7dc4c3a5996bb1e  safe_blockie.py

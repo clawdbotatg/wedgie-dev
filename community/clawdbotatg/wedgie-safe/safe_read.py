@@ -12,7 +12,6 @@ from safe_icons import TOKENS     # tokens the wedgie knows itself: (chain, addr
 ROUTERS = {"0x1231deb6f5749ef6ce6943a275a1d3e7486f4eae": "LI.FI",
            "0x2626664c2603336e57b271c5c0b26f421741e481": "Uniswap",     # SwapRouter02, Base
            "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45": "Uniswap"}     # SwapRouter02, Ethereum
-UNISWAP = ("0x2626664c2603336e57b271c5c0b26f421741e481", "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45")
 # Candide social recovery: a wallet starts on the 7-day one; pairing a wedgie puts the owner's own recovery address
 # on the 14-day one and the DAO on the 60-day one (the same Candide code, Instant Wallet deployed it)
 RECOVERY = {"0x088f6cfd8bb1ddb1bb069ccb3fc1a98927d233f2": 7, "0x9bacd92f4687db306d7ded5d4513a51ea05df25b": 14,
@@ -37,7 +36,6 @@ LIMITS = {K_USDC: ("Daily limit", "USDC", 6, "a day with just Face ID"),
 # Instant Wallet's relay: it sends the transactions and is paid a fee in the batch. Built in, never from the host.
 RELAY = "0x4cfab32186e65e2a39ec0e882e11380cbf2f8a2f"
 NAMES = {RELAY: "the Instant relay"}
-ROUTER_THIS = "0x0000000000000000000000000000000000000002"      # SwapRouter02: "the router", then unwrap
 LIFI = "0x1231deb6f5749ef6ce6943a275a1d3e7486f4eae"
 # LI.FI's swaps whose argument 3 is who gets paid (swapTokensGeneric and the six GenericSwapFacetV3 ones). Any
 # other selector with this Safe in word 3 is not a swap to this Safe (audit 10-16: one was shown as one).
@@ -127,39 +125,6 @@ def _lifi_to(data, safe):
     except Exception:
         pass
     return None
-
-
-def _uniswap(tx):
-    """SwapRouter02 multicall(deadline, [exactInput, unwrapWETH9?]) as (title, lines), or None."""
-    data, safe = tx["data"], tx["safe"]
-    b = data[4:]
-    arr = int.from_bytes(b[32:64], "big")
-    n = int.from_bytes(b[arr:arr + 32], "big")
-    calls = []
-    for i in range(n):
-        o = int.from_bytes(b[arr + 32 + 32 * i:arr + 64 + 32 * i], "big")
-        calls.append(_bytes_at(b, arr + 32 + o))
-    if not calls or calls[0][:4] != b"\xb8\x58\x18\x3f":
-        return None
-    p = calls[0][4:]
-    t = int.from_bytes(p[0:32], "big")
-    path = _bytes_at(p, t + int.from_bytes(p[t:t + 32], "big"))
-    to = hx(p[t + 44:t + 64])
-    amt_in = int.from_bytes(p[t + 64:t + 96], "big")
-    min_out = int.from_bytes(p[t + 96:t + 128], "big")
-    a, z = hx(path[:20]), hx(path[-20:])
-    eth_out = False
-    if to == ROUTER_THIS and len(calls) == 2 and calls[1][:4] == b"\x49\x40\x4b\x7c":
-        to, eth_out = hx(calls[1][4 + 44:4 + 64]), True
-    elif len(calls) != 1:
-        return None
-    get = _bigv(tx, min_out) if eth_out else _big(tx, z, min_out)
-    if tx["value"] and not (_tok(tx, a)[0] == "WETH" and amt_in == tx["value"]):   # ETH sent, but the swap pays
-        pay = [_big(tx, a, amt_in, RED), ("and sends %s %s" % (amount(tx["value"], 18), coin(tx)), RED)]   # something else
-    else:                                                                            # (audit 10-18)
-        pay = [_bigv(tx, tx["value"]) if tx["value"] else _big(tx, a, amt_in)]
-    return "Swap", [("pay", MUTED)] + pay + [("get at least", MUTED), get,
-                    ("to this Safe", GREEN_D) if to == safe else ("to " + short(to) + "!", RED)]
 
 
 _roles_of = {}          # safe -> its Roles address (the keccaks are slow in plain Python: once each)
@@ -332,13 +297,6 @@ def describe(tx):
             c = RED
         who = [("by " + ROUTERS[sp], c)] if sp in ROUTERS else [("by", c)] + _addr_lines("", sp, c)[1:]
         return "Allow taking", out + [("ALL " + (_tok(tx, to)[0] or "of it"), c, BIG, _ico(tx, to)) if n >> 128 else _big(tx, to, n, c)] + who
-    if to in UNISWAP and sel == "5ae401dc":
-        try:
-            u = _uniswap(tx)
-        except Exception:
-            u = None
-        if u:
-            return u[0], out + u[1]
     why = tx.get("why")                 # safe.confirm tried the descriptor first and it couldn't
     if tx.get("clear"):                 # an ERC-7730 descriptor came with it (safe_7730: proven, or ignored)
         import safe_7730
@@ -347,7 +305,7 @@ def describe(tx):
             return c
         why = c
     if to in ROUTERS:
-        far = _lifi_to(data, safe) if to == LIFI else None     # a Uniswap call _uniswap couldn't read: can't tell
+        far = _lifi_to(data, safe) if to == LIFI else None     # a Uniswap call with no descriptor: can't tell
         return ("Bridge" if far else "Swap"), out + [("via " + ROUTERS[to], INK)] + \
             ([("pay", MUTED), _bigv(tx, tx["value"])] if tx["value"] else []) + \
             ([("to this Safe", GREEN_D)] if far == 0 else
