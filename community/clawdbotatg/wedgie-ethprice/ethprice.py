@@ -1,5 +1,5 @@
-# ETH Price: the price of ETH and the newest block on Ethereum and Base, every 30 s, as a table of every step as
-# it happens. The wedgie has no internet: its page on wedgie.dev (open in a tab) or `wedgie.py net` carries it
+# ETH Price: the price of ETH, big, and a check under it as each source confirms it (Chainlink, Coinbase), every
+# 30 s. Down: every number and every step of the fetch under way, as a table. Up: back. The wedgie has no internet: its page on wedgie.dev (open in a tab) or `wedgie.py net` carries it
 # (firmware net.py, 0.3.61+). The sites it may reach are in wedgie.json "net": "chain" and api.coinbase.com.
 #   wedgie.dev    wedgie.dev's price, ~1 s. Grey: the computer or wedgie.dev could change it.
 #   Chainlink     the price from Chainlink's feed, read over the wedgie's own TLS (firmware 0.3.70+): nobody in
@@ -38,9 +38,37 @@ def block(chain, log=None):
     return "#" + commas(str(int(net.chain(chain, "eth_blockNumber", **kw), 16)))
 
 
+CHECKS = ("Chainlink", "Coinbase")     # the main screen's checks, under the price
+WANT = bytearray(1)     # 1: down was pressed, 2: up (set by the IRQ below, even mid-fetch; 0: nothing new)
+
+
+def arrows(tab):
+    """Up and down caught the moment they're pressed, and the screen switched at once (scheduled: it runs while a
+    fetch waits on the site): a fetch blocks for seconds between its own steps. The firmware's power.py has an IRQ
+    on every key (activity): it's still called."""
+    import sys
+    import micropython
+    from machine import Pin
+    pw = sys.modules.get("power")
+    touch = getattr(pw, "_touch", None)
+    dn = Pin(L.KEYS["down"], Pin.IN, Pin.PULL_UP)
+
+    flip = tab.flip
+
+    def irq(p):
+        WANT[0] = 1 if p is dn else 2
+        if touch:
+            touch()
+        micropython.schedule(flip, None)
+    for p in (dn, Pin(L.KEYS["up"], Pin.IN, Pin.PULL_UP)):
+        p.irq(irq, Pin.IRQ_FALLING, hard=True)
+
+
 class Table:
-    def __init__(self, d):
-        self.d = d
+    def __init__(self, d, keys):
+        self.d, self.keys = d, keys
+        self.more = False       # down: the whole table
+        self.drawing = False
         self.rows = []          # [name, value, seconds, color]
         self.steps = []         # (text, seconds) of the fetch under way, or the last one
         self.what = ""
@@ -54,7 +82,38 @@ class Table:
             self.rows.append([name, value, s, c])
         self.draw()
 
+    def look(self):
+        """Up and down switch the screens, even mid-fetch (each step calls it). True: the green button."""
+        k = self.keys.pressed()
+        self.arrow(k)
+        return "A" in k or "press" in k
+
+    def flip(self, _):
+        if not self.drawing:            # mid-draw: that draw picks it up at its end
+            self.arrow()
+
+    def arrow(self, k=()):
+        w, WANT[0] = WANT[0], 0
+        more = True if w == 1 or "down" in k else False if w == 2 or "up" in k else self.more
+        if more != self.more:
+            self.more = more
+            self.draw()
+
+    def get(self, name):
+        for r in self.rows:
+            if r[0] == name:
+                return r
+
     def draw(self):
+        self.drawing = True
+        try:
+            self.table() if self.more else self.main()
+        finally:
+            self.drawing = False
+        if WANT[0]:
+            self.arrow()
+
+    def table(self):
         d = self.d
         d.fill(ui.WHITE)
         ui.band(d)
@@ -71,6 +130,33 @@ class Table:
             x = "%4.1fs" % s
             d.text(x, 236 - 8 * len(x), y, ui.MUTED)
         ui.say(d, "{g} now", 226, ui.MUTED)
+        for i in range(5):                      # up: back
+            d.fill_rect(226 - i, 226 + i, 1 + 2 * i, 1, ui.MUTED)
+        d.show()
+
+    def main(self):
+        """The price, as big as it fits (grey till Chainlink's is in), and a check under it for each source."""
+        d = self.d
+        d.fill(ui.WHITE)
+        ui.band(d)
+        ui.say(d, "ETH", 46, ui.MUTED, 2)
+        cl, fast = self.get("Chainlink"), self.get("wedgie.dev")
+        ok = lambda r: r and r[3] != ui.RED and r[1][:1] == "$"      # in (the last one stays up while it's asked again)
+        p, c = (cl[1], ui.INK) if ok(cl) else (fast[1], ui.MUTED) if ok(fast) else ("...", ui.MUTED)
+        ui.say(d, p, 80, c, 3 if len(p) <= 9 else 2)
+        for i, name in enumerate(CHECKS):
+            r, y = self.get(name), 132 + i * 28
+            x = 120 - (16 + 8 + 16 * len(name)) // 2
+            if ok(r):
+                ui.check(d, x, y)
+            elif r and r[3] == ui.RED:
+                ui.warn(d, x, y + 1)
+            else:
+                d.ellipse(x + 8, y + 7, 5, 5, ui.GREY, True)
+            d.big_text(name, x + 24, y, ui.INK if ok(r) else ui.MUTED, 2)
+        ui.say(d, "{g} now", 222, ui.MUTED)
+        for i in range(5):                      # down: more
+            d.fill_rect(222 + i, 222 + i, 11 - 2 * i, 1, ui.MUTED)
         d.show()
 
     def fetch(self, name, f, fmt, c=ui.INK, steps=True):
@@ -82,6 +168,7 @@ class Table:
 
         def log(step):
             self.steps.append((NAMES.get(step) or step + " checked", sec()))
+            self.look()
             self.draw()
         old = [r for r in self.rows if r[0] == name]
         self.row(name, old[0][1] if old else "...", None, ui.MUTED)
@@ -118,7 +205,8 @@ def logs():
 def run():
     d = L.LCD()
     keys = L.Keys()
-    tab = Table(d)
+    tab = Table(d, keys)
+    arrows(tab)
     tab.draw()
     lg = logs()
     first = True
@@ -137,7 +225,6 @@ def run():
         tab.fetch("Base block", lambda: block(8453), str, steps=False)
         t = time.ticks_ms()
         while time.ticks_diff(time.ticks_ms(), t) < EVERY:
-            k = keys.pressed()
-            if "A" in k or "press" in k:
+            if tab.look():
                 break
             time.sleep_ms(50)

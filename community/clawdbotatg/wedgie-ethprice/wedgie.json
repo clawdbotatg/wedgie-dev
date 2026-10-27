@@ -3,7 +3,7 @@
     {
       "mod": "ethprice",
       "name": "ETH Price",
-      "about": "The ETH price, step by step: every check the wedgie makes shows as it passes. Gets the internet from its wedgie.dev page: keep it open.",
+      "about": "The ETH price, big, with a check as Chainlink and Coinbase confirm it. Down: every step. Keep its wedgie.dev page open.",
       "files": [
         "ethprice.py"
       ],
