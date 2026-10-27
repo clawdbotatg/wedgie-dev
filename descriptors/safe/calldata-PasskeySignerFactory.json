@@ -1,0 +1,96 @@
+{
+  "$schema": "../../specs/erc7730-v2.schema.json",
+  "context": {
+    "$id": "Safe passkey signer factory 0.2.1",
+    "contract": {
+      "deployments": [
+        {
+          "chainId": 1,
+          "address": "0x1d31f259eE307358a26dFb23EB365939E8641195"
+        },
+        {
+          "chainId": 10,
+          "address": "0x1d31f259eE307358a26dFb23EB365939E8641195"
+        },
+        {
+          "chainId": 56,
+          "address": "0x1d31f259eE307358a26dFb23EB365939E8641195"
+        },
+        {
+          "chainId": 100,
+          "address": "0x1d31f259eE307358a26dFb23EB365939E8641195"
+        },
+        {
+          "chainId": 137,
+          "address": "0x1d31f259eE307358a26dFb23EB365939E8641195"
+        },
+        {
+          "chainId": 146,
+          "address": "0x1d31f259eE307358a26dFb23EB365939E8641195"
+        },
+        {
+          "chainId": 999,
+          "address": "0x1d31f259eE307358a26dFb23EB365939E8641195"
+        },
+        {
+          "chainId": 4663,
+          "address": "0x1d31f259eE307358a26dFb23EB365939E8641195"
+        },
+        {
+          "chainId": 5042,
+          "address": "0x1d31f259eE307358a26dFb23EB365939E8641195"
+        },
+        {
+          "chainId": 8453,
+          "address": "0x1d31f259eE307358a26dFb23EB365939E8641195"
+        },
+        {
+          "chainId": 9745,
+          "address": "0x1d31f259eE307358a26dFb23EB365939E8641195"
+        },
+        {
+          "chainId": 42161,
+          "address": "0x1d31f259eE307358a26dFb23EB365939E8641195"
+        },
+        {
+          "chainId": 42220,
+          "address": "0x1d31f259eE307358a26dFb23EB365939E8641195"
+        },
+        {
+          "chainId": 43114,
+          "address": "0x1d31f259eE307358a26dFb23EB365939E8641195"
+        },
+        {
+          "chainId": 84532,
+          "address": "0x1d31f259eE307358a26dFb23EB365939E8641195"
+        },
+        {
+          "chainId": 11155111,
+          "address": "0x1d31f259eE307358a26dFb23EB365939E8641195"
+        }
+      ]
+    }
+  },
+  "metadata": {
+    "owner": "Safe",
+    "contractName": "SafeWebAuthnSignerFactory",
+    "info": {
+      "url": "https://github.com/safe-global/safe-modules/tree/main/modules/passkey"
+    }
+  },
+  "display": {
+    "formats": {
+      "createSigner(uint256 x,uint256 y,uint176 verifiers)": {
+        "intent": "Make a key",
+        "fields": [
+          {
+            "path": "x",
+            "label": "Not an owner yet",
+            "format": "raw",
+            "visible": "optional"
+          }
+        ]
+      }
+    }
+  }
+}

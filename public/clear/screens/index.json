@@ -662,5 +662,109 @@
     ]
    }
   ]
+ },
+ {
+  "slug": "safe-settings",
+  "title": "Safe settings",
+  "note": "Owners, how many must sign, modules, Candide recovery helpers and passkey signers. Our own descriptors (a Safe calling itself is read with one bound to 0x5afe..5afe). Names the wedgie knows itself, like THIS wedgie or 14-day recovery, replace the address.",
+  "cases": [
+   {
+    "name": "Add this wedgie as an owner",
+    "chainId": 8453,
+    "to": "0x5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+    "pages": [
+     "screens/safe-settings/01-1.png"
+    ]
+   },
+   {
+    "name": "Add an owner",
+    "chainId": 8453,
+    "to": "0x5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+    "pages": [
+     "screens/safe-settings/02-1.png"
+    ]
+   },
+   {
+    "name": "Remove an owner",
+    "chainId": 8453,
+    "to": "0x5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+    "pages": [
+     "screens/safe-settings/03-1.png"
+    ]
+   },
+   {
+    "name": "Swap an owner for this wedgie",
+    "chainId": 8453,
+    "to": "0x5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+    "pages": [
+     "screens/safe-settings/04-1.png",
+     "screens/safe-settings/04-2.png"
+    ]
+   },
+   {
+    "name": "Change how many must sign",
+    "chainId": 8453,
+    "to": "0x5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+    "pages": [
+     "screens/safe-settings/05-1.png"
+    ]
+   },
+   {
+    "name": "Turn on 14-day recovery",
+    "chainId": 8453,
+    "to": "0x5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+    "pages": [
+     "screens/safe-settings/06-1.png"
+    ]
+   },
+   {
+    "name": "Turn on an unknown module",
+    "chainId": 8453,
+    "to": "0x5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+    "pages": [
+     "screens/safe-settings/07-1.png"
+    ]
+   },
+   {
+    "name": "Turn off 7-day recovery",
+    "chainId": 8453,
+    "to": "0x5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+    "pages": [
+     "screens/safe-settings/08-1.png"
+    ]
+   },
+   {
+    "name": "Add a recovery helper (14 days)",
+    "chainId": 8453,
+    "to": "0x9bacd92f4687db306d7ded5d4513a51ea05df25b",
+    "pages": [
+     "screens/safe-settings/09-1.png"
+    ]
+   },
+   {
+    "name": "Drop a recovery helper",
+    "chainId": 8453,
+    "to": "0x9bacd92f4687db306d7ded5d4513a51ea05df25b",
+    "pages": [
+     "screens/safe-settings/10-1.png"
+    ]
+   },
+   {
+    "name": "Cancel a recovery",
+    "chainId": 8453,
+    "to": "0x088f6cfd8bb1ddb1bb069ccb3fc1a98927d233f2",
+    "pages": [
+     "screens/safe-settings/11-1.png"
+    ]
+   },
+   {
+    "name": "Make a passkey signer",
+    "chainId": 8453,
+    "to": "0x1d31f259ee307358a26dfb23eb365939e8641195",
+    "pages": [
+     "screens/safe-settings/12-1.png"
+    ]
+   }
+  ]
  }
 ]

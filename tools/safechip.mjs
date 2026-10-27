@@ -174,8 +174,8 @@ const cases = txsFile ? JSON.parse(readFileSync(txsFile, "utf8")).map((c) =>
   ["Uniswap: at most 0.0205 ETH for 50 USDC (V3 exact-out, ERC-8362 descriptor)", urOut, 1, true],
   ["send 0.5 ETH", tx("0x" + "77".repeat(20), "0x", "500000000000000000"), 1],
   ["send 0.5 POL on Polygon", { ...tx("0x" + "77".repeat(20), "0x", "500000000000000000"), chainId: 137 }, 1],
-  ["add owner: itself", tx(safe, E.addOwnerData(signer, 2)), 1],
-  ["remove owner: itself", tx(safe, E.removeOwnerData(E.SENTINEL, signer, 1)), 1],
+  ["add owner: itself", tx(safe, E.addOwnerData(signer, 2)), 1, true],
+  ["remove owner: itself", tx(safe, E.removeOwnerData(E.SENTINEL, signer, 1)), 1, true],
   [`MultiSend batch, ${n} USDC sends (${JSON.stringify(batch).length} B line)`, batch, n],
 ];
 /** Send one safe_sign, press k once a second (the app drops presses made before its question is up) until

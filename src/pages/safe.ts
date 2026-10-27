@@ -1767,7 +1767,7 @@ export function safe(main: HTMLElement) {
     asking = true; paintAll();
     say("Look at the wedgie: check what it shows, then press the green button to sign (red says no).");
     // what the registry says about it (ERC-7730), sent ahead: the wedgie checks it against its own roots
-    const cb = clearTag && chunk ? await Clear.bundle(clearTag, chain, t).catch(() => null) : null;
+    const cb = clearTag && chunk ? await Clear.bundle(clearTag, chain, { ...t, safe: safeAddr }).catch(() => null) : null;
     const close = pressModal("Check it", "then sign", "sign");     // its pages say next, then sign
     try {
       const g = await ask(wedgie, async (r) => {

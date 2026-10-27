@@ -1,0 +1,141 @@
+{
+  "$schema": "../../specs/erc7730-v2.schema.json",
+  "context": {
+    "$id": "Candide social recovery, 14 days",
+    "contract": {
+      "deployments": [
+        {
+          "chainId": 1,
+          "address": "0x9bacd92f4687db306d7ded5d4513a51ea05df25b"
+        },
+        {
+          "chainId": 10,
+          "address": "0x9bacd92f4687db306d7ded5d4513a51ea05df25b"
+        },
+        {
+          "chainId": 56,
+          "address": "0x9bacd92f4687db306d7ded5d4513a51ea05df25b"
+        },
+        {
+          "chainId": 100,
+          "address": "0x9bacd92f4687db306d7ded5d4513a51ea05df25b"
+        },
+        {
+          "chainId": 137,
+          "address": "0x9bacd92f4687db306d7ded5d4513a51ea05df25b"
+        },
+        {
+          "chainId": 146,
+          "address": "0x9bacd92f4687db306d7ded5d4513a51ea05df25b"
+        },
+        {
+          "chainId": 999,
+          "address": "0x9bacd92f4687db306d7ded5d4513a51ea05df25b"
+        },
+        {
+          "chainId": 4663,
+          "address": "0x9bacd92f4687db306d7ded5d4513a51ea05df25b"
+        },
+        {
+          "chainId": 5042,
+          "address": "0x9bacd92f4687db306d7ded5d4513a51ea05df25b"
+        },
+        {
+          "chainId": 8453,
+          "address": "0x9bacd92f4687db306d7ded5d4513a51ea05df25b"
+        },
+        {
+          "chainId": 9745,
+          "address": "0x9bacd92f4687db306d7ded5d4513a51ea05df25b"
+        },
+        {
+          "chainId": 42161,
+          "address": "0x9bacd92f4687db306d7ded5d4513a51ea05df25b"
+        },
+        {
+          "chainId": 42220,
+          "address": "0x9bacd92f4687db306d7ded5d4513a51ea05df25b"
+        },
+        {
+          "chainId": 43114,
+          "address": "0x9bacd92f4687db306d7ded5d4513a51ea05df25b"
+        },
+        {
+          "chainId": 84532,
+          "address": "0x9bacd92f4687db306d7ded5d4513a51ea05df25b"
+        },
+        {
+          "chainId": 11155111,
+          "address": "0x9bacd92f4687db306d7ded5d4513a51ea05df25b"
+        }
+      ]
+    }
+  },
+  "metadata": {
+    "owner": "Candide",
+    "contractName": "14-day recovery",
+    "info": {
+      "url": "https://docs.candide.dev/wallet/plugins/recovery-with-guardians/"
+    }
+  },
+  "display": {
+    "formats": {
+      "addGuardianWithThreshold(address guardian,uint256 threshold)": {
+        "intent": "Add helper",
+        "fields": [
+          {
+            "path": "guardian",
+            "label": "Can swap owners after 14 days",
+            "format": "addressName",
+            "params": {
+              "types": [
+                "eoa",
+                "contract",
+                "wallet"
+              ],
+              "sources": [
+                "local"
+              ]
+            }
+          },
+          {
+            "path": "threshold",
+            "label": "Helpers needed",
+            "format": "raw",
+            "visible": "optional"
+          }
+        ]
+      },
+      "revokeGuardianWithThreshold(address prevGuardian,address guardian,uint256 threshold)": {
+        "intent": "Drop helper",
+        "fields": [
+          {
+            "path": "guardian",
+            "label": "Helper",
+            "format": "addressName",
+            "params": {
+              "types": [
+                "eoa",
+                "contract",
+                "wallet"
+              ],
+              "sources": [
+                "local"
+              ]
+            }
+          },
+          {
+            "path": "threshold",
+            "label": "Helpers needed",
+            "format": "raw",
+            "visible": "optional"
+          }
+        ]
+      },
+      "cancelRecovery()": {
+        "intent": "Cancel recovery",
+        "fields": []
+      }
+    }
+  }
+}

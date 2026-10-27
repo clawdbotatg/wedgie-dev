@@ -6,6 +6,10 @@ replaces the registry's for the same function. They go in root a (no "not audite
 
 Goal: every Safe Signer screen comes from a descriptor (the registry's or ours); no hand-written readers.
 
+**Upstream:** this folder is a staging area. Once a descriptor is solid (real txs, reviewed, looks right on a
+wedgie), PR it to the registry so every wallet gets it. Always. Ones the spec can't take yet (ThisSafe's
+`0x5afe..5afe` binding, ERC-8362 files) go up when it can, or as a proposal.
+
 - `uniswap/calldata-UniversalRouter-v2.{0,1}.json`: the Universal Router, written to the ERC-8362 draft
   (Custom Encoding Layout, [ERCs PR #1925](https://github.com/ethereum/ERCs/pull/1925)) as it is: `commands` a
   `customEncoding` sequence, `inputs[]` a `switch` on `commands[$index]` masked `0x3f`, V4 actions a switch in a

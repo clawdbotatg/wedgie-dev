@@ -6,6 +6,7 @@
 
 export const CLEAR_MAX = 6000;          // bytes: what Safe Signer takes (its CLEAR_MAX), unless the release says more
 const MULTISEND = "8d80ff0a";
+const THIS_SAFE = "0x5afe5afe5afe5afe5afe5afe5afe5afe5afe5afe";
 const files = new Map<string, Promise<Record<string, string> | null>>();
 
 type Load = (path: string) => Promise<Record<string, string> | null>;
@@ -45,7 +46,7 @@ const head = (n: number) => n < 24 ? (0x80 + n).toString(16) : n < 256 ? "98" + 
  * The bundle for a Safe tx (hex, no 0x), or null when the registry has nothing for any call in it. tag: the data the
  * wedgie's app trusts (its hello's safe_clear).
  */
-export async function bundle(tag: string, chain: number, t: { to: string; data?: string | null; operation?: number | string }) {
+export async function bundle(tag: string, chain: number, t: { to: string; data?: string | null; operation?: number | string; safe?: string }) {
   const data = (t.data || "0x").slice(2).toLowerCase();
   const calls = +(t.operation || 0) === 1 && data.startsWith(MULTISEND)
     ? unbatch(data).filter((c) => c.operation === 0)
@@ -53,7 +54,9 @@ export async function bundle(tag: string, chain: number, t: { to: string; data?:
   const top: string[] = [], inner: string[] = [], seen = new Set<string>();
   for (const c of calls) {
     if (c.data.length < 8) continue;
-    const to = c.to.toLowerCase().slice(2), f = await file(tag, chain, "0x" + to);
+    // the Safe calling itself (owners, threshold, modules): its descriptor is under THIS_SAFE (wedgie-safe safe_book)
+    const to = c.to.toLowerCase().slice(2), self = !!t.safe && to === t.safe.toLowerCase().slice(2);
+    const f = await file(tag, chain, self ? THIS_SAFE : "0x" + to);
     const d = f?.["0x" + c.data.slice(0, 8)];
     if (d && !seen.has(d)) { seen.add(d); top.push(d); }
     // a call inside the call (multicall, permitAndCall, a Safe setup): any contract the calldata names, or this one
