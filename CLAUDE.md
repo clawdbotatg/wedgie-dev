@@ -54,7 +54,8 @@ Prices: `src/shop/catalog.ts`. Test: `ORDERS_PY=<wedgie-shipping>/orders.py node
 ```
 npm run dev                                   # localhost:5173
 npm run build && npx vite preview --port 4173
-node tools/sign.mjs                           # the release gate
+node tools/sign.mjs                           # sign (Touch ID at once); push; then in the background:
+node tools/sign.mjs --gate-only               # the gate, ~13 min. FAIL = the release is live: patch it now
 node tools/chipprobe.mjs                      # virtual RP2040, real heap
 python3 tools/boardprobe.py buttons           # real board
 node tools/safechip.mjs                       # Safe signer app on a virtual RP2040

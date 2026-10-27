@@ -48,7 +48,7 @@ node tools/community.mjs status                             # which apps GitHub 
 node tools/community.mjs update                             # take every one of them (or: update owner/repo)
 node tools/community.mjs add clawdbotatg/wedgie-<name>     # its current commit (or owner/repo@ref)
 git diff community/                                         # read it: this runs on people's wedgies
-node tools/sign.mjs                                         # runs tools/gate.mjs first; signs only if it passes
+node tools/sign.mjs                                         # signs at once; after the push: --gate-only, patch on a FAIL
 git add community.json community/ release/ && git commit && git push
 ```
 
