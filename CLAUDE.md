@@ -1,7 +1,9 @@
 # wedgie-dev
 
 The website (wedgie.dev) and the wedgie firmware. Overview: `README.md`. Read `EXPECTATIONS.md` first.
-Push to main = deploy (Vercel). **Before every push that touches `src/`: `node tools/loadprobe.mjs`** (~30 s: every page on a phone, and a firmware update from a background tab).
+Push to main = deploy (Vercel). **Ship first, test after** (Austin, 10-27), for the site, firmware and apps alike:
+push, then in the background `node tools/loadprobe.mjs` (site: every page on a phone, a firmware update from a
+background tab) or `node tools/sign.mjs --gate-only` (firmware/apps). A FAIL means it's live: patch it now.
 
 ## Docs that must stay true
 
