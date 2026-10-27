@@ -2,7 +2,7 @@
  {
   "slug": "uniswap-universal-router",
   "title": "Uniswap Universal Router (ERC-8362)",
-  "note": "What the Uniswap app swaps through. Our own descriptor, written to the ERC-8362 custom-encoding draft as it is: each step of the swap, as the router runs it. Two real mainnet swaps. Safe Signer safe-30.",
+  "note": "What the Uniswap app swaps through. Our own descriptor, written to the ERC-8362 custom-encoding draft as it is: each step of the swap, as the router runs it. Two real mainnet swaps. Safe Signer safe-31.",
   "cases": [
    {
     "name": "Swap 0.4805 ETH for USDC (V4)",
@@ -10,9 +10,7 @@
     "to": "0x23617e59a5925b2a4bf75d73ff6711cd0b29de85",
     "pages": [
      "screens/uniswap-universal-router/01-1.png",
-     "screens/uniswap-universal-router/01-2.png",
-     "screens/uniswap-universal-router/01-3.png",
-     "screens/uniswap-universal-router/01-4.png"
+     "screens/uniswap-universal-router/01-2.png"
     ]
    },
    {
@@ -22,8 +20,7 @@
     "pages": [
      "screens/uniswap-universal-router/02-1.png",
      "screens/uniswap-universal-router/02-2.png",
-     "screens/uniswap-universal-router/02-3.png",
-     "screens/uniswap-universal-router/02-4.png"
+     "screens/uniswap-universal-router/02-3.png"
     ]
    }
   ]

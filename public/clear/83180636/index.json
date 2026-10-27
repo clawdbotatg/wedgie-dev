@@ -1,0 +1,16 @@
+{
+ "tag": "83180636",
+ "registry": "171b6b5bf137e2433a4bde35cffd64d4d7fe25bd",
+ "issued": 1793135126,
+ "roots": {
+  "a": "a49df0415651bd7586cdb8fa0d263de27e3b9cfb854b9bf05acacdbc94fd76f4",
+  "b": "27473172d6dfb5baf44bb00643c2e5da3048792007ef52157ee271082ff56247"
+ },
+ "audited": 816,
+ "notAudited": 6541,
+ "tokens": 2472,
+ "auditors": [
+  "Cyfrin"
+ ],
+ "clearMax": 10000
+}

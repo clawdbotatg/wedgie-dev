@@ -198,7 +198,8 @@
                             "1": "this Safe",
                             "0": "the router"
                           }
-                        }
+                        },
+                        "visible": "optional"
                       }
                     ]
                   }
@@ -260,7 +261,8 @@
                             "1": "this Safe",
                             "0": "the router"
                           }
-                        }
+                        },
+                        "visible": "optional"
                       }
                     ]
                   }
@@ -484,7 +486,8 @@
                             "1": "this Safe",
                             "0": "the router"
                           }
-                        }
+                        },
+                        "visible": "optional"
                       }
                     ]
                   }
@@ -546,7 +549,8 @@
                             "1": "this Safe",
                             "0": "the router"
                           }
-                        }
+                        },
+                        "visible": "optional"
                       }
                     ]
                   }
@@ -597,7 +601,8 @@
                           ],
                           "threshold": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
                           "message": "all it holds"
-                        }
+                        },
+                        "visible": "optional"
                       },
                       {
                         "path": "recipient",
@@ -734,7 +739,8 @@
                                       "nativeCurrencyAddress": [
                                         "0x0000000000000000000000000000000000000000"
                                       ]
-                                    }
+                                    },
+                                    "visible": "optional"
                                   },
                                   {
                                     "path": "p.poolKey.currency1",
@@ -744,7 +750,8 @@
                                       "nativeCurrencyAddress": [
                                         "0x0000000000000000000000000000000000000000"
                                       ]
-                                    }
+                                    },
+                                    "visible": "optional"
                                   },
                                   {
                                     "path": "p.zeroForOne",
@@ -755,17 +762,20 @@
                                         "1": "first to second",
                                         "0": "second to first"
                                       }
-                                    }
+                                    },
+                                    "visible": "optional"
                                   },
                                   {
                                     "path": "p.amountIn",
                                     "label": "Amount in",
-                                    "format": "raw"
+                                    "format": "raw",
+                                    "visible": "optional"
                                   },
                                   {
                                     "path": "p.amountOutMinimum",
                                     "label": "At least out",
-                                    "format": "raw"
+                                    "format": "raw",
+                                    "visible": "optional"
                                   }
                                 ]
                               }
@@ -811,7 +821,8 @@
                                       "nativeCurrencyAddress": [
                                         "0x0000000000000000000000000000000000000000"
                                       ]
-                                    }
+                                    },
+                                    "visible": "optional"
                                   },
                                   {
                                     "path": "p.poolKey.currency1",
@@ -821,7 +832,8 @@
                                       "nativeCurrencyAddress": [
                                         "0x0000000000000000000000000000000000000000"
                                       ]
-                                    }
+                                    },
+                                    "visible": "optional"
                                   },
                                   {
                                     "path": "p.zeroForOne",
@@ -832,17 +844,20 @@
                                         "1": "first to second",
                                         "0": "second to first"
                                       }
-                                    }
+                                    },
+                                    "visible": "optional"
                                   },
                                   {
                                     "path": "p.amountOut",
                                     "label": "Amount out",
-                                    "format": "raw"
+                                    "format": "raw",
+                                    "visible": "optional"
                                   },
                                   {
                                     "path": "p.amountInMaximum",
                                     "label": "At most in",
-                                    "format": "raw"
+                                    "format": "raw",
+                                    "visible": "optional"
                                   }
                                 ]
                               }
@@ -902,7 +917,8 @@
                                         "1": "this Safe",
                                         "0": "the router"
                                       }
-                                    }
+                                    },
+                                    "visible": "optional"
                                   }
                                 ]
                               }
@@ -1174,7 +1190,8 @@
             "format": "date",
             "params": {
               "encoding": "timestamp"
-            }
+            },
+            "visible": "optional"
           }
         ]
       },
@@ -1264,7 +1281,8 @@
                             "1": "this Safe",
                             "0": "the router"
                           }
-                        }
+                        },
+                        "visible": "optional"
                       }
                     ]
                   }
@@ -1326,7 +1344,8 @@
                             "1": "this Safe",
                             "0": "the router"
                           }
-                        }
+                        },
+                        "visible": "optional"
                       }
                     ]
                   }
@@ -1550,7 +1569,8 @@
                             "1": "this Safe",
                             "0": "the router"
                           }
-                        }
+                        },
+                        "visible": "optional"
                       }
                     ]
                   }
@@ -1612,7 +1632,8 @@
                             "1": "this Safe",
                             "0": "the router"
                           }
-                        }
+                        },
+                        "visible": "optional"
                       }
                     ]
                   }
@@ -1663,7 +1684,8 @@
                           ],
                           "threshold": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
                           "message": "all it holds"
-                        }
+                        },
+                        "visible": "optional"
                       },
                       {
                         "path": "recipient",
@@ -1800,7 +1822,8 @@
                                       "nativeCurrencyAddress": [
                                         "0x0000000000000000000000000000000000000000"
                                       ]
-                                    }
+                                    },
+                                    "visible": "optional"
                                   },
                                   {
                                     "path": "p.poolKey.currency1",
@@ -1810,7 +1833,8 @@
                                       "nativeCurrencyAddress": [
                                         "0x0000000000000000000000000000000000000000"
                                       ]
-                                    }
+                                    },
+                                    "visible": "optional"
                                   },
                                   {
                                     "path": "p.zeroForOne",
@@ -1821,17 +1845,20 @@
                                         "1": "first to second",
                                         "0": "second to first"
                                       }
-                                    }
+                                    },
+                                    "visible": "optional"
                                   },
                                   {
                                     "path": "p.amountIn",
                                     "label": "Amount in",
-                                    "format": "raw"
+                                    "format": "raw",
+                                    "visible": "optional"
                                   },
                                   {
                                     "path": "p.amountOutMinimum",
                                     "label": "At least out",
-                                    "format": "raw"
+                                    "format": "raw",
+                                    "visible": "optional"
                                   }
                                 ]
                               }
@@ -1877,7 +1904,8 @@
                                       "nativeCurrencyAddress": [
                                         "0x0000000000000000000000000000000000000000"
                                       ]
-                                    }
+                                    },
+                                    "visible": "optional"
                                   },
                                   {
                                     "path": "p.poolKey.currency1",
@@ -1887,7 +1915,8 @@
                                       "nativeCurrencyAddress": [
                                         "0x0000000000000000000000000000000000000000"
                                       ]
-                                    }
+                                    },
+                                    "visible": "optional"
                                   },
                                   {
                                     "path": "p.zeroForOne",
@@ -1898,17 +1927,20 @@
                                         "1": "first to second",
                                         "0": "second to first"
                                       }
-                                    }
+                                    },
+                                    "visible": "optional"
                                   },
                                   {
                                     "path": "p.amountOut",
                                     "label": "Amount out",
-                                    "format": "raw"
+                                    "format": "raw",
+                                    "visible": "optional"
                                   },
                                   {
                                     "path": "p.amountInMaximum",
                                     "label": "At most in",
-                                    "format": "raw"
+                                    "format": "raw",
+                                    "visible": "optional"
                                   }
                                 ]
                               }
@@ -1968,7 +2000,8 @@
                                         "1": "this Safe",
                                         "0": "the router"
                                       }
-                                    }
+                                    },
+                                    "visible": "optional"
                                   }
                                 ]
                               }
