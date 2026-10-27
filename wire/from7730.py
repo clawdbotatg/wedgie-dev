@@ -253,6 +253,7 @@ class Ctx:
             return [5, 20, [1, CONTAINER[k]]] if k in ("from", "to") else [1, 32, [1, CONTAINER[k]]]
         if path.startswith("$."):
             raise Unsupported("path %s" % path)
+        path = re.sub(r"(?<=\w)\[", ".[", path)        # "inputs[]" (ERC-8362's examples) = "inputs.[]"
         steps = _steps(path[2:]) if path.startswith("#.") else list(base) + _steps(path)
         prog, t, size = program(self.params, steps)
         f, n = family(t)
@@ -328,21 +329,168 @@ def _param(f, ctx, base):
         callee = pv("calleePath", "callee", 5)
         if callee is None:
             raise Unsupported("calldata without a callee")
-        return [9, val, callee, pv("chainIdPath", "chainId", 1), pv("selectorPath", "selector", 7),
-                pv("amountPath", "amount", 1), pv("spenderPath", "spender", 5)]
+        out = [9, val, callee, pv("chainIdPath", "chainId", 1), pv("selectorPath", "selector", 7),
+               pv("amountPath", "amount", 1), pv("spenderPath", "spender", 5)]
+        op = p.get("operation")             # ERC-8362: [value, [[key, op]], default op]; op 1 CALL, 2 DELEGATECALL..
+        if op is not None:
+            ops = {"CALL": 1, "DELEGATECALL": 2, "CREATE": 3, "CREATE2": 4, "CALLCODE": 5}
+            if isinstance(op, str):
+                out.append([None, [], ops[op]])
+            else:
+                ex = op["expression"]
+                cs = op.get("cases") or {}
+                out.append([ctx.value(ex if isinstance(ex, str) else ex["path"], None, base),
+                            [[int(k, 0), ops[v]] for k, v in cs.items() if k != "$default"], ops.get(cs.get("$default"))])
+        return out
     if fmt == "tokenTicker":
         return [10, val, natives(), pv("chainIdPath", "chainId", 1)]
     if fmt == "chainId":
         return [11, val]
+    if fmt == "customEncoding":
+        return [13, val, _node(f.get("params") or {}, ctx), f.get("label")]
     raise Unsupported("format %s" % fmt)
+
+
+# ---- ERC-8362 draft (Custom Encoding Layout, ERCs PR #1925, as of 10-19) ----------------------------
+# customEncoding, sequence, object, switch, mask, $index. Not yet: interaction, $fallback, @.data, a display field
+# addressing an entry by path (an entry shows itself inline), operation. The wire format has no binding for them
+# yet, so this is ours (safe_7730 reads it):
+#   param 13 customEncoding: [13, value, node, label]
+#     node: [0, n] uint of n bytes | [1, how, n] bytes: how 0 n bytes, 1 as long as entry n says, 2 to the end
+#           | [2, n] address in 20 or 32 bytes | [3] bool | [4, [[skip, node, field or null]]] object
+#           | [5, node, count or null] sequence (null: until the bytes run out)
+#   param 14 switch: [14, value, [expression value, element size or null, mask or null], [[key, case]], default]
+#     case: [0, intent, fields] (the value is the ABI encoding of the case's tuple) | [1, node] | null (reject)
+#     element size: "x[$index]", the i-th element of the uint sequence x, i = which value of the switch's own path
+#   value source 3: [3, k], entry k of the object being decoded
+IMPLIED = {"addressName": {"type": "address", "bytes": 32}}
+for _f in ("amount", "tokenAmount", "date", "duration", "unit", "enum", "chainId", "nftName"):
+    IMPLIED[_f] = {"type": "uint", "bytes": 32}
+
+
+class Entries(Ctx):
+    """An object's entries, for its own display: "~.name" (or a bare name) is entry k."""
+    def __init__(self, ctx, names, types):
+        Ctx.__init__(self, ctx.doc, ctx.params)
+        self.names, self.types = names, types
+
+    def value(self, path=None, const=None, base=(), fam=None):
+        if isinstance(path, str):
+            n = path[2:] if path.startswith("~.") else path
+            if n in self.names:
+                t = self.types[self.names.index(n)]
+                if t is None:
+                    raise Unsupported("entry %s isn't a value" % n)
+                return [t[0], t[1], [3, self.names.index(n)]]
+            if path.startswith("~."):
+                raise Unsupported("no entry %s" % path)
+        return Ctx.value(self, path, const, base, fam)
+
+
+def _kind(n):
+    """(family, size) a node decodes to, or None (a sequence or object)."""
+    t = n.get("type")
+    return {"uint": (1, n.get("bytes")), "address": (5, 20), "bool": (6, 1), "bytes": (7, None)}.get(t)
+
+
+def _node(n, ctx, names=()):
+    t = n.get("type")
+    if t == "uint":
+        if not 0 < int(n.get("bytes", 0)) <= 32:
+            raise Unsupported("uint of %r bytes" % n.get("bytes"))
+        return [0, int(n["bytes"])]
+    if t == "address":
+        if n.get("bytes") not in (20, 32):
+            raise Unsupported("address of %r bytes" % n.get("bytes"))
+        return [2, n["bytes"]]
+    if t == "bool":
+        return [3]
+    if t == "bytes":
+        ways = [k for k in ("length", "lengthFrom", "toEnd") if k in n]
+        if len(ways) != 1:
+            raise Unsupported("bytes: one of length, lengthFrom, toEnd")
+        if ways[0] == "length":
+            return [1, 0, int(n["length"])]
+        if ways[0] == "toEnd":
+            return [1, 2, None]
+        if n["lengthFrom"] not in names:
+            raise Unsupported("lengthFrom %s: not an earlier entry" % n["lengthFrom"])
+        return [1, 1, list(names).index(n["lengthFrom"])]
+    if t == "sequence":
+        return [5, _node(n["element"], ctx), n.get("count")]
+    if t == "object":
+        es = n.get("entries") or []
+        nm = [e["name"] for e in es]
+        if len(set(nm)) != len(nm):
+            raise Unsupported("entry names not unique")
+        sch = [e.get("schema") or IMPLIED.get(e.get("format")) for e in es]
+        if None in sch:
+            raise Unsupported("entry without a schema")
+        ec = Entries(ctx, nm, [_kind(x) for x in sch])
+        out = []
+        for i, (e, x) in enumerate(zip(es, sch)):
+            shown = ("label" in e or "format" in e) and e.get("visible") not in ("never", False)
+            fd = None
+            if shown:
+                if e.get("format") == "customEncoding":
+                    raise Unsupported("an entry can't be customEncoding")
+                g = dict(e, path="~." + e["name"])
+                fd = [e.get("label") or "", _param(g, ec, ()), _vis(e.get("visible"), g, ec), e.get("separator"), None]
+            out.append([int(e.get("offset", 0)), _node(x, ctx, nm[:i]), fd])
+        return [4, out]
+    raise Unsupported("node type %r" % t)
+
+
+def _switch(f, ctx, doc, base, seqs):
+    sw = f["switch"]
+    val = ctx.value(f.get("path"), None, base)
+    ex = sw["expression"]
+    ep, mask = (ex.get("path"), ex.get("mask")) if isinstance(ex, dict) else (ex, None)
+    size = None
+    if ep.endswith("[$index]"):
+        ep = ep[:-8]
+        if ep not in seqs:
+            raise Unsupported("%s[$index]: not a uint sequence here" % ep)
+        size = seqs[ep]
+    ev = ctx.value(ep, None, base)
+    cases, default = [], None
+    for k, c in sw["cases"].items():
+        if c == "reject":
+            cc = None
+        elif c.get("format") == "customEncoding":
+            cc = [1, _node(c.get("params") or {}, ctx)]
+        else:
+            if len(c) != 1:
+                raise Unsupported("a case is one tuple")
+            sig, spec = next(iter(c.items()))
+            sig = sig.strip()
+            if not (sig.startswith("(") and sig.endswith(")")):
+                raise Unsupported("case %r" % sig)
+            cctx = Ctx(doc, _params(sig[1:-1]))
+            cc = [0, spec.get("intent"), fields(spec.get("fields") or [], cctx, doc)]
+        if k == "$default":
+            default = cc
+        else:
+            cases.append([int(k, 0), cc])
+    return [14, val, [ev, size, int(mask, 0) if isinstance(mask, str) else mask], cases, default]
 
 
 def fields(fs, ctx, doc, base=()):
     out = []
+    seqs = {}                               # path -> element size, of a customEncoding sequence of uints (for $index)
+    for f in fs:
+        p = f.get("params") or {}
+        if f.get("format") == "customEncoding" and p.get("type") == "sequence" and p["element"].get("type") == "uint":
+            seqs[f["path"]] = int(p["element"]["bytes"])
     for f in fs:
         f = _field_def(f, doc)
         if "encryption" in f:
             raise Unsupported("encryption")
+        if "switch" in f:
+            out.append([f.get("label") or "", _switch(f, ctx, doc, base, seqs), _vis(f.get("visible"), f, ctx), None, None])
+            continue
+        if "interaction" in f:
+            raise Unsupported("interaction")
         if "fields" in f:                   # a group: its fields' paths are relative to its own
             gb = list(base) + _steps(f.get("path", "")) if not f.get("path", "").startswith("#.") else _steps(f["path"][2:])
             sub = fields(f["fields"], ctx, doc, gb)

@@ -11,10 +11,14 @@ https://github.com/ZKNoxHQ/eth-universal-signer/blob/7730-wire-format-implementa
 
 - **Used by Safe Signer safe-24** (clawdbotatg/wedgie-safe): `safe_wire.py` is a copy of `wire.py` (keep them the
   same), `safe_7730.py` turns a descriptor into the screen. On the shelf since 10-22 (firmware 0.3.58).
-  Uniswap's Universal Router stays hand-read (`safe_ur.py`) until ERC-8362 lands: 7730 can't describe it yet.
-- **The data** wedgie.dev serves: `release.py` builds `public/clear/<tag>/` from the registry and token lists
-  (Uniswap's, then CoinGecko's top 1,000 coins, minus any ticker another address has on that chain; safe-28: tag
-  38476364, registry 171b6b5), every structure with a Merkle proof (algorithm 4) to two roots built into the app (`safe_roots.py`). See below.
+  Uniswap's Universal Router is read from our ERC-8362 descriptor since safe-30 (`safe_ur.py` is gone).
+- **ERC-8362 draft** (customEncoding, sequence, object, switch, mask, `$index`, calldata `operation`): compiled by
+  `from7730.py` into our own wire binding (params 13 and 14, value source 3, written down there), read by
+  `safe_8362.py` (safe-30+). Not yet: `interaction`, `$fallback`, `@.data`, display fields that address an entry.
+- **Our descriptors** (`descriptors/`): on top of the registry, root a. First: Uniswap's Universal Router.
+- **The data** wedgie.dev serves: `release.py` builds `public/clear/<tag>/` from the registry, ours and token lists
+  (Uniswap's, then CoinGecko's top 1,000 coins, minus any ticker another address has on that chain; safe-30: tag
+  f4f3fe64, registry 171b6b5), every structure with a Merkle proof (algorithm 4) to two roots built into the app (`safe_roots.py`). See below.
 - **Tests:** `tools/test_clear.py` runs the app's reader on the registry's own test transactions (1,510 on chains
   the app does: 1,367 show exactly what the registry expects, 125 differ on purpose, 18 explained in the test);
   `tools/safechip.mjs` signs four of them on a virtual RP2040.

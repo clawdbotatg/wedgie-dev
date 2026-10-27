@@ -47,10 +47,10 @@ few big words per page, and signs only on **green (A)**. **Red (Y)**, or no answ
   from the fields and signs that.
 - Read in plain words: ETH and token sends (each chain's own coin: 0.5 POL on Polygon), owner and threshold
   changes, modules on/off, Candide recovery (guardians, cancel), Instant Wallet's daily budget (Zodiac Roles),
-  exact approvals, Uniswap swaps (Universal Router V3/V4: pay, get at least, to this Safe, fee), MultiSend
-  batches, removing a queued tx.
-- **Clear signing (ERC-7730):** any other contract call is read from the public ERC-7730 registry's descriptors
-  (https://github.com/ethereum/clear-signing-erc7730-registry), sent by wedgie.dev/safe ahead of the tx
+  exact approvals, MultiSend batches, removing a queued tx.
+- **Clear signing (ERC-7730):** any contract call with a descriptor is read from it: the public ERC-7730
+  registry's (https://github.com/ethereum/clear-signing-erc7730-registry) or wedgie.dev's own (safe-30+: Uniswap's
+  Universal Router, step by step, written to the ERC-8362 custom-encoding draft), sent by wedgie.dev/safe ahead of the tx
   (`safe_clear`) with a Merkle proof to a root built into the app. The host can leave something out (the page
   then says it can't read it), never change it. Audited descriptors (ERC-8176, Cyfrin) and the rest; the rest end
   in red "not audited". Works inside MultiSend (Morpho's approve + deposit).

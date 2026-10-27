@@ -1,0 +1,15 @@
+# Our descriptors
+
+ERC-7730 descriptors we write ourselves, added on top of the
+[EF registry](https://github.com/ethereum/clear-signing-erc7730-registry) by `wire/release.py`. One of ours
+replaces the registry's for the same function. They go in root a (no "not audited").
+
+Goal: every Safe Signer screen comes from a descriptor (the registry's or ours); no hand-written readers.
+
+- `uniswap/calldata-UniversalRouter-v2.{0,1}.json`: the Universal Router, written to the ERC-8362 draft
+  (Custom Encoding Layout, [ERCs PR #1925](https://github.com/ethereum/ERCs/pull/1925)) as it is: `commands` a
+  `customEncoding` sequence, `inputs[]` a `switch` on `commands[$index]` masked `0x3f`, V4 actions a switch in a
+  switch. v2.0 and v2.1 differ only in V4 multi-hop swaps (`minHopPriceX36`). Made from Safe Signer's old
+  `safe_ur.py` address list.
+
+A new or changed descriptor ships with a new data release (new roots), so a new Safe Signer version.

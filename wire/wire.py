@@ -11,7 +11,7 @@
 # Limits are the spec's minimums or more; past one it raises ValueError, never shows half an answer.
 # Tests: tools/test_wire.py (CPython), tools/wirechip.mjs (a virtual RP2040).
 
-MAX_DEPTH = 16          # CBOR nesting
+MAX_DEPTH = 24          # CBOR nesting (ERC-8362: a switch in a switch case)
 MAX_PATH = 16           # path elements
 MAX_ARRAYS = 8          # nested arrays in a path
 MAX_VALUES = 16         # values one value yields
@@ -114,22 +114,27 @@ def load(b, i):
 
 
 def item_end(b, i=0, depth=0):
-    """The index right after the item at i, found without decoding it (nothing allocated)."""
-    if depth > MAX_DEPTH:
-        raise ValueError("cbor: too deep")
-    mt, v, i, ai = _head(b, i)
-    if mt == 2 or mt == 3:
-        if i + v > len(b):
-            raise ValueError("cbor: cut short")
-        return i + v
-    if mt == 4 or mt == 5:
-        for _ in range(v * (mt - 3)):
-            i = item_end(b, i, depth + 1)
-        return i
-    if mt == 6:
-        return item_end(b, i, depth + 1)
-    if mt == 7 and ai not in (20, 21, 22):
-        raise ValueError("cbor: simple/float %d" % ai)
+    """The index right after the item at i, found without decoding it. A loop, not recursion: a deep descriptor
+    (ERC-8362's switch in a switch) walked by recursion left a timer callback no stack (wedgie-safe safe-30)."""
+    left = [1]                              # items still to skip, per open array/map/tag
+    while left:
+        if len(left) - 1 + depth > MAX_DEPTH:
+            raise ValueError("cbor: too deep")
+        left[-1] -= 1
+        mt, v, i, ai = _head(b, i)
+        if mt == 2 or mt == 3:
+            if i + v > len(b):
+                raise ValueError("cbor: cut short")
+            i += v
+        elif mt == 4 or mt == 5:
+            if v:
+                left.append(v * (mt - 3))
+        elif mt == 6:
+            left.append(1)
+        elif mt == 7 and ai not in (20, 21, 22):
+            raise ValueError("cbor: simple/float %d" % ai)
+        while left and not left[-1]:
+            left.pop()
     return i
 
 

@@ -170,8 +170,8 @@ const cases = txsFile ? JSON.parse(readFileSync(txsFile, "utf8")).map((c) =>
   [c.name, { ...tx(c.to, c.data, c.value), chainId: c.chainId, safe: c.safe || safe, operation: c.operation || 0, ...(c.sim ? { sim: c.sim } : {}) }, 1, true, c.keys]) : [
   ...clearTxs.map((c) => [`clear signing: ${c.name}${c.trust === "a" ? "" : " (not audited)"}`, { ...tx(c.to, c.data, c.value), chainId: c.chainId, operation: c.operation || 0 }, 1, true]),
   ["change the daily limit (3 actions, 1 page)", limit, 1],
-  ["Uniswap: swap 0.4805 ETH for USDC (V4)", urIn, 1],
-  ["Uniswap: at most 0.0205 ETH for 50 USDC (V3 exact-out)", urOut, 1],
+  ["Uniswap: swap 0.4805 ETH for USDC (V4, ERC-8362 descriptor)", urIn, 1, true],
+  ["Uniswap: at most 0.0205 ETH for 50 USDC (V3 exact-out, ERC-8362 descriptor)", urOut, 1, true],
   ["send 0.5 ETH", tx("0x" + "77".repeat(20), "0x", "500000000000000000"), 1],
   ["send 0.5 POL on Polygon", { ...tx("0x" + "77".repeat(20), "0x", "500000000000000000"), chainId: 137 }, 1],
   ["add owner: itself", tx(safe, E.addOwnerData(signer, 2)), 1],
@@ -210,7 +210,7 @@ for (const [what, t, pages, clear, keys] of cases) {
   const r = ram(what);
   // a yes reaches the chip step: no chip here, so the app answers its error (anything but a crash)
   const chipStep = got?.type === "safe_sig" || /trustm|ATECC608/.test(got?.error || "");
-  check(chipStep && !crash(out), `${what}: ${pages} page(s), A through them, ${secs} s: answered ${got ? got.type + (got.error ? " (" + got.error.slice(0, 40) + ")" : "") : "nothing"} · ${r?.ram} B free`);
+  check(chipStep && !crash(out), `${what}: ${pages} page(s), A through them, ${secs} s: answered ${got ? got.type + (got.error ? " (" + got.error.slice(0, 200) + ")" : "") : "nothing"} · ${r?.ram} B free`);
 }
 if (txsFile) { console.log(failed ? `${failed} FAILED` : "all checks passed"); process.exit(failed ? 1 : 0); }
 if (hi?.safe_chunk) {     // a transaction over the 6 KB line: its data in safe_data pieces first, then "@"
@@ -227,7 +227,7 @@ if (hi?.safe_chunk) {     // a transaction over the 6 KB line: its data in safe_
     const r = ram(`a ${size} B tx in pieces`);
     const chipStep = got?.type === "safe_sig" || /trustm|ATECC608/.test(got?.error || "");
     if (size > (hi.safe_max || 8000)) { check(!okp && !crash(all.slice(before)), `a ${size} B transaction: refused as too big, no crash`); continue; }
-    check(okp && chipStep && !crash(all.slice(before)), `a ${size} B transaction in ${Math.ceil(size * 2 / hi.safe_chunk)} safe_data pieces, then signed, ${secs} s: answered ${got ? got.type + (got.error ? " (" + got.error.slice(0, 40) + ")" : "") : "nothing"} · ${r?.ram} B free`);
+    check(okp && chipStep && !crash(all.slice(before)), `a ${size} B transaction in ${Math.ceil(size * 2 / hi.safe_chunk)} safe_data pieces, then signed, ${secs} s: answered ${got ? got.type + (got.error ? " (" + got.error.slice(0, 200) + ")" : "") : "nothing"} · ${r?.ram} B free`);
   }
 }
 if (hi?.app && hi.app >= "safe-23") {     // safe_remove: the delete request for a queued tx (its data as a hash)
@@ -236,7 +236,7 @@ if (hi?.app && hi.app >= "safe-23") {     // safe_remove: the delete request for
   const { got, secs } = ask(null, "A", { type: "safe_remove", tx: rm, totp: 497960 });
   const r = ram("safe_remove");
   const chipStep = got?.type === "safe_sig" || /trustm|ATECC608/.test(got?.error || "");
-  check(chipStep && !crash(all.slice(before)), `safe_remove: "Remove it?" #${rm.nonce}, A, ${secs} s: answered ${got ? got.type + (got.error ? " (" + got.error.slice(0, 40) + ")" : "") : "nothing"} · ${r?.ram} B free`);
+  check(chipStep && !crash(all.slice(before)), `safe_remove: "Remove it?" #${rm.nonce}, A, ${secs} s: answered ${got ? got.type + (got.error ? " (" + got.error.slice(0, 200) + ")" : "") : "nothing"} · ${r?.ram} B free`);
   const no = ask(null, "Y", { type: "safe_remove", tx: rm, totp: 497960 });
   check(no.got?.type === "refused" && no.got.safeTxHash === E.safeTxHash(rm.chainId, rm.safe, { ...rm, data: data || "0x" }),
     `safe_remove Y: refused, with the Safe tx hash it worked out (${no.got?.safeTxHash?.slice(0, 10)}…)`);
@@ -249,7 +249,7 @@ if (hi?.app && hi.app >= "safe-29") {     // safe_message: a site's text (sign-i
   const { got, secs } = ask(null, "A", m, null, shots && join(shots, "safe-message"));
   const r = ram("safe_message");
   const chipStep = got?.type === "safe_sig" || /trustm|ATECC608/.test(got?.error || "");
-  check(chipStep && !crash(all.slice(before)), `safe_message: a sign-in text, A through its pages, ${secs} s: answered ${got ? got.type + (got.error ? " (" + got.error.slice(0, 40) + ")" : "") : "nothing"} · ${r?.ram} B free`);
+  check(chipStep && !crash(all.slice(before)), `safe_message: a sign-in text, A through its pages, ${secs} s: answered ${got ? got.type + (got.error ? " (" + got.error.slice(0, 200) + ")" : "") : "nothing"} · ${r?.ram} B free`);
   const no = ask(null, "Y", m);
   check(no.got?.type === "refused" && no.got.safeMessageHash === want, `safe_message Y: refused, with the SafeMessage hash viem gets (${no.got?.safeMessageHash?.slice(0, 10)}…)`);
   const bad = h.req({ id: ++id, type: "safe_message", chainId: 1, safe, hex: toHex("h\u00e9llo") }, 8000);

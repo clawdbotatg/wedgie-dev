@@ -4,7 +4,7 @@
 // proof to a root built into the app, so leaving one out is all a page could do wrong (the wedgie then says it
 // can't read the call). The bundle is the wire format's eth-sign-request keys 8 (tokens) and 13 (descriptors).
 
-export const CLEAR_MAX = 6000;          // bytes: what Safe Signer takes (its CLEAR_MAX)
+export const CLEAR_MAX = 6000;          // bytes: what Safe Signer takes (its CLEAR_MAX), unless the release says more
 const MULTISEND = "8d80ff0a";
 const files = new Map<string, Promise<Record<string, string> | null>>();
 
@@ -14,8 +14,8 @@ let load = fromSite;
 /** Where the files come from (tests: the disk). */
 export const loadFrom = (l: Load) => { load = l; files.clear(); };
 
-function file(tag: string, chain: number, name: string) {
-  const k = `${tag}/${chain}/${name}`;
+function file(tag: string, chain: number, name: string, path?: string) {
+  const k = path ?? `${tag}/${chain}/${name}`;
   if (!files.has(k)) files.set(k, load(k));
   return files.get(k)!;
 }
@@ -69,9 +69,11 @@ export async function bundle(tag: string, chain: number, t: { to: string; data?:
   const toks = await file(tag, chain, "tokens");
   const named = (calls.map((c) => c.data).join("") + top.join("") + inner.join("")).toLowerCase();
   const tk = Object.entries(toks || {}).filter(([a]) => named.includes(a.slice(2))).map(([, s]) => s);
-  // as much as fits, most needed first: the calls' own descriptors, the tokens, then the calls inside
+  // as much as fits, most needed first: the calls' own descriptors, the tokens, then the calls inside. A release
+  // made for a newer app says how much that app takes (index.json clearMax)
+  const max = +((await file(tag, 0, "index", `${tag}/index`))?.clearMax ?? CLEAR_MAX) || CLEAR_MAX;
   let size = 8;
-  const take = (l: string[]) => l.filter((s) => (size + s.length / 2 <= CLEAR_MAX) && (size += s.length / 2, true));
+  const take = (l: string[]) => l.filter((s) => (size + s.length / 2 <= max) && (size += s.length / 2, true));
   const d = take(top), k = take(tk), i = take(inner);
   if (!d.length && !i.length) return null;
   return "a2" + "08" + head(k.length) + k.join("") + "0d" + head(d.length + i.length) + d.join("") + i.join("");

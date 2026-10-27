@@ -5,7 +5,7 @@
 # Every descriptor (transaction-info) and token (token-information) is a wire-format structure signed with
 # algorithm 4: no signature, a Merkle proof to a root built into the app (spec v 29.09.26-1, as PQ1). The app
 # itself is signed when wedgie.dev publishes it, so nothing here needs a key. Two roots:
-#   a: descriptors an auditor we trust attested (ERC-8176, EAS offchain, checked here), and the tokens
+#   a: descriptors an auditor we trust attested (ERC-8176, EAS offchain, checked here), ours (descriptors/), tokens
 #   b: every other descriptor: the wedgie shows "not audited"
 # Leaf = SHA-256(0x00 || message), node = SHA-256(0x01 || the smaller hash || the bigger), an odd one out goes up
 # as is; message = the structure with its envelope cut to [4, leaf index, issued-at] (wire.signed_message).
@@ -24,6 +24,8 @@ import wire, from7730
 AUDITORS = {"0x3846c3a30e62075fa916216b35ef04b8f53931f6": "Cyfrin"}     # registry auditors/ we accept
 EAS_SCHEMA = "0xe023eef113c1670774801c34b377fdf612dd8a4d2fa92fe382e15bd91fafb5c2"   # ERC-8176's EAS schema id, public (gitleaks:allow)
 CHAINS = {1, 10, 56, 100, 137, 146, 999, 4663, 5042, 8453, 9745, 42161, 42220, 43114, 84532, 11155111}   # wedgie-safe's
+CLEAR_MAX = 10000   # bytes of bundle the app made with this release takes (safe-30+; older apps: 6000, src/safe/clear.ts)
+OURS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "descriptors")   # ours, on top of the registry
 TOKEN_LIST = "https://tokens.uniswap.org"
 # then CoinGecko's top 1,000 coins by market cap, on the chains it lists (decimals from its per-chain token lists).
 # A ticker already taken on that chain by another address is left out: no second "USDC".
@@ -132,6 +134,17 @@ def descriptors(reg):
     return out, skipped
 
 
+def ours(root=OURS):
+    """Our own descriptors (wedgie-dev descriptors/): root a, and over the registry's for the same function.
+    Compiled in full here: a file that won't compile stops the release."""
+    out = []
+    for fn in from7730.files(root):
+        doc = from7730.load(fn)
+        out += [(c, a, s, b, ["wedgie"], os.path.relpath(fn, os.path.dirname(root)))
+                for c, a, s, b in from7730.convert(fn, doc=doc, seal=lambda body: body) if c in CHAINS]
+    return out
+
+
 def get(url, tries=4):
     for i in range(tries):
         try:
@@ -181,6 +194,9 @@ def tokens(extra=()):
 def build(reg, issued, extra_tokens=()):
     """{ "a"/"b": root }, [(kind, chain, address, key, structure bytes, root name)], skipped files."""
     descs, skipped = descriptors(reg)
+    mine = ours()
+    taken = {(c, a, s) for c, a, s, *_ in mine}
+    descs = [d for d in descs if d[:3] not in taken] + mine
     toks = tokens(extra_tokens)
     sets = {"a": [], "b": []}
     for c, a, s, body, by, fn in descs:
@@ -218,7 +234,8 @@ def main():
     nt = sum(1 for x in out if x[0] == "t")
     with open(os.path.join(base, "index.json"), "w") as f:
         json.dump({"tag": tag, "registry": sha, "issued": issued, "roots": {k: v.hex() for k, v in roots.items()},
-                   "audited": n["a"], "notAudited": n["b"], "tokens": nt, "auditors": sorted(set(AUDITORS.values()))}, f, indent=1)
+                   "audited": n["a"], "notAudited": n["b"], "tokens": nt, "auditors": sorted(set(AUDITORS.values())),
+                   "clearMax": CLEAR_MAX}, f, indent=1)
     with open(roots_py, "w") as f:
         f.write("# Safe Signer: the roots of the clear-signing data it trusts. Made by wedgie-dev wire/release.py, don't edit.\n"
                 "# Registry %s, issued %d. a: audited (%s) descriptors and tokens; b: the rest, \"not audited\".\n"
