@@ -32,6 +32,15 @@ if (process.argv.includes("--gate-only")) {
   console.log(g.status === 0 ? "gate passed" : "GATE FAILED: this release is live; fix it and ship a patch now");
   process.exit(g.status === 0 ? 0 : 1);
 }
+// Several sessions sign. One that signs on an old main wastes Austin's Touch ID (10-27, three times: another
+// session's signed shelf landed first, and one signature covers the whole shelf). Touch ID only on a tree that
+// has everything on origin/main: rebase first. Then commit release/ and push at once.
+const fetched = spawnSync("git", ["fetch", "-q", "origin", "main"], { cwd: root });
+if (fetched.status !== 0) console.log("sign: couldn't fetch origin (offline?): not checked against main");
+else if (spawnSync("git", ["merge-base", "--is-ancestor", "origin/main", "HEAD"], { cwd: root }).status !== 0) {
+  console.error("not signed: origin/main has commits this tree doesn't (another session pushed or signed). `git rebase origin/main`, then sign");
+  process.exit(1);
+}
 const text = releaseText(signedSerial() + 1);     // one more every signing: wedgies refuse a lower one (job.py)
 const k = yk ? 1 : 0;
 const run = yk ? spawnSync("uv", ["run", "-q", "--with", "yubikey-manager", "python3", join(root, "tools/yksign.py")], { input: text, encoding: "utf8", stdio: ["pipe", "pipe", "inherit"] })

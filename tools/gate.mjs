@@ -12,14 +12,18 @@
 //     the live sites on a virtual RP2040 are tools/netchip.mjs, not here: a site's outage isn't a bad release)
 //   - Safe Signer's key is made once and locked for good, never replaced (tools/test_safekey.py, a fake Trust M and ATECC608)
 //     and its signing runs in the shelf copy's memory (tools/safechip.mjs)
+// Only apps changed since the last signed list (release/firmware.txt, apps.txt): the static checks and each changed app's
+// fresh plug-in; safechip only for Safe Signer, the chip installs only for Buttons or Hello (Austin, 10-27: an
+// ETH Price update waited 10 min on Safe Signer's test). The core changed, or --all: everything.
 // Not covered: the virtual chip has no computer reading the WEDGIE drive at boot (macOS does: that's
 // when 0.3.13 broke), and no real board. Run tools/boardprobe.py on one before telling anyone it works.
-//   node tools/gate.mjs            (needs uv; run from the tree being signed)
-import { spawn } from "node:child_process";
+//   node tools/gate.mjs [--all]    (needs uv; run from the tree being signed)
+import { spawn, spawnSync } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { firmware } from "./rp2040/image.mjs";
+import { releaseText, appsText } from "./release.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const fw = join(root, "firmware");
@@ -34,7 +38,24 @@ function bootSource() {
 }
 
 const carts = firmware().carts.map((c) => c.mod);       // firmware/carts.json and the shelf (community.json)
-const jobs = [
+// What changed since the signed list: the core (any file's hash, or the version), and which apps
+const core = (t) => t.split("\n").filter((l) => /^[0-9a-f]{64}  |^version /.test(l)).join("\n");
+const byApp = (t) => Object.fromEntries(t.split(/^(?=@app  )/m).filter((b) => b.startsWith("@app")).map((b) => [JSON.parse(b.split("\n")[0].slice(6)).mod, b]));
+// The signed list before this release: release/ on disk, or (this tree already signed: the gate runs after the
+// push) the one before, from git
+const git = (...a) => spawnSync("git", a, { cwd: root, encoding: "utf8" }).stdout || "";
+const disk = (n) => { try { return readFileSync(join(root, "release", n), "utf8"); } catch { return ""; } };
+const signedNow = core(disk("firmware.txt")) === core(releaseText(0)) && disk("apps.txt") === appsText();
+const before = signedNow && git("log", "-2", "--format=%H", "--", "release/firmware.sig").split("\n")[1];
+const read = (n) => before ? git("show", `${before}:release/${n}`) : disk(n);
+const was = byApp(read("apps.txt")), now = byApp(appsText());
+const coreSame = !process.argv.includes("--all") && read("firmware.txt") && core(read("firmware.txt")) === core(releaseText(0));
+const changed = Object.keys(now).filter((m) => now[m] !== was[m]);
+const want = (name) => !coreSame || ["test_job", "test_memory", "test_style", "test_docs", "mpy --check"].includes(name)
+  || (/^(safechip|test_safekey)$/.test(name) && changed.includes("safe"))
+  || (/^chip: /.test(name) && changed.some((m) => m === "buttons" || m === "hello"))
+  || changed.some((m) => name === `fresh plug-in: ${m}`);
+const all = [
   ["test_job", ["python3", "tools/test_job.py"]],
   ["test_memory", ["python3", "tools/test_memory.py"]],
   ["test_style", ["python3", "tools/test_style.py"]],
@@ -47,11 +68,12 @@ const jobs = [
   ["chip: install over Buttons + update", ["node", "tools/chipprobe.mjs", "--from", "buttons", "--to", "hello"]],
   ...["none", ...carts].map((a) => [`fresh plug-in: ${a}`, ["node", "tools/bootprobe.mjs", a]]),
 ];
+const jobs = all.filter(([name]) => want(name));
 
 const t0 = Date.now();
 const src = bootSource();
 let failed = src.length ? [`compiled core: ${src.join(" ")} would compile on the wedgie at boot (run tools/mpy.py)`] : [];
-console.log(`gate: ${jobs.length + 1} checks, side by side`);
+console.log(`gate: ${jobs.length + 1} checks, side by side` + (coreSame ? ` (only apps changed: ${changed.join(" ") || "none"}; the rest ran when the core was signed; --all for every one)` : ""));
 const results = await Promise.all(jobs.map(([name, cmd]) => new Promise((res) => {
   const p = spawn(cmd[0], cmd.slice(1), { cwd: root });
   let out = "";
