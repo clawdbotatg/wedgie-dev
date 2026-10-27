@@ -2,7 +2,8 @@
 // navigator.serial, like a phone or incognito) and fails on any page error or "Something did not load".
 // Run before every push that touches src/ (~10 s). The 2026-10-22 outage: a top-bar function called before
 // it was defined crashed wedgie.dev on phones for 40 minutes; this would have caught it.
-// Locally it then runs tools/hiddenprobe.mjs (~16 s): a firmware update from a background tab, and
+// Locally it then runs tools/hiddenprobe.mjs (~16 s): a firmware update from a background tab,
+// tools/blinkprobe.mjs: one whose USB blinks as the install opens it, and
 // tools/oldappprobe.mjs (~10 s): a firmware update on a wedgie running an older Safe Signer.
 //   node tools/loadprobe.mjs            build + check localhost
 //   node tools/loadprobe.mjs <url>      check a live site (no build)
@@ -44,6 +45,9 @@ if (server) {
   const o = spawnSync("node", [new URL("./oldappprobe.mjs", import.meta.url).pathname, base], { encoding: "utf8" });
   hidden ||= o.status;
   console.log(o.status ? "FAIL: an update with an older Safe Signer on it (tools/oldappprobe.mjs)\n" + (o.stdout + o.stderr).trim() : "OK: an update with an older Safe Signer on it goes through");
+  const k = spawnSync("node", [new URL("./blinkprobe.mjs", import.meta.url).pathname, base], { encoding: "utf8" });
+  hidden ||= k.status;
+  console.log(k.status ? "FAIL: an update whose USB blinks as it's opened (tools/blinkprobe.mjs)\n" + (k.stdout + k.stderr).trim() : "OK: an update whose USB blinks as it's opened goes through");
 }
 server?.kill();
 process.exit(bad.length || hidden ? 1 : 0);

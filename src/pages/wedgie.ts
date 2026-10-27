@@ -386,6 +386,9 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     if (hw.dataset.html !== rows) { hw.dataset.html = rows; hw.innerHTML = rows; }   // a repaint must not snap "How we know" shut
   }
 
+  // The last update's failure, drawn in the firmware box itself: the status line got wiped when the wedgie came back
+  // and the page showed a plain Update button, as if nothing had happened (10-27).
+  let fwErr = "";
   function paintFw(x: W.Wedgie) {
     const box = $("#d-fw");
     if (!m) { box.innerHTML = ""; return; }
@@ -397,13 +400,14 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     // takes the app list on its own; older firmware sees no apps in today's signed list: install.ts APP_LIST).
     const need = !fresh && (x.kind === "wedgie" || x.kind === "micropython");
     main.querySelector(".wd")!.classList.toggle("need-fw", need);
-    const sig = `${cur}|${m.version}|${x.kind}|${!!link}|${!!busy}`;
+    const sig = `${cur}|${m.version}|${x.kind}|${!!link}|${!!busy}|${fwErr}`;
     if (box.dataset.sig === sig) return;
     box.dataset.sig = sig;
     box.innerHTML = `<div class="fwrow"><div><h4>${cur ? `wedgie ${esc(cur)}` : x.kind === "wallet" ? "wedgie" : "No wedgie firmware"}</h4><p>${what}</p></div>` +
       `<div class="fwbtns"><button class="btn ${need ? "btn-lg btn-pulse" : "btn-sm"} ${fresh ? "" : "btn-green"}" data-fw ${!link || busy ? "disabled" : ""}>${fresh ? "Reinstall" : cur || x.kind === "wallet" ? "Update" : "Install"}</button>` +
       (fresh ? "" : `<button class="btn btn-xs fwask" data-fwask>Let your agent check it first</button>`) + `</div></div>` +
-      (fresh ? "" : `<p class="fine">Takes a minute. Its app and its saves stay on it.</p>`);
+      (fresh ? "" : `<p class="fine">Takes a minute. Its app and its saves stay on it.</p>`) +
+      (fwErr && !fresh ? `<p class="fwerr"><b class="bad">The update failed:</b> ${esc(fwErr)}. Its app is back. It's safe to try again.</p>` : "");
     box.querySelector<HTMLButtonElement>("[data-fw]")?.addEventListener("click", updateFw);
     const ask = box.querySelector<HTMLButtonElement>("[data-fwask]");
     if (ask) ask.onclick = () => navigator.clipboard.writeText(agentCheck(m!, cur)).then(
@@ -715,7 +719,7 @@ Not covered: apps and MicroPython itself.
   async function updateFw() {
     if (!link || busy || !w) return;
     const r = link, x = w;
-    busy = "fw"; paint(); meter(0, "starting");
+    busy = "fw"; fwErr = ""; paint(); meter(0, "starting");
     traceStart(`update ${x.short} ${x.version} -> ${m?.version} running ${x.running}`);
     try {
       if (x.kind === "micropython") { await r.enter({ reset: true }); }   // bare MicroPython: no drive, a reset is safe
@@ -738,9 +742,12 @@ Not covered: apps and MicroPython itself.
       traceEnd("ok");
     } catch (e: any) {
       traceEnd("FAILED: " + (e?.message || e));
+      fwErr = String(e?.message || e);
       meter(null);
+      setScreen(home());                // never left on "Updating firmware" (10-27: it looked stuck, nothing said why)
       status(`<b class="bad">Update failed:</b> ${esc(e?.message || e)}. It's safe to try again.`);
-      await backToApp(r).catch(() => {});
+      busy = ""; paint();               // said now: backToApp on a port that's gone can take a long time
+      await Promise.race([backToApp(r).catch(() => {}), new Promise((res) => setTimeout(res, 15000))]);
     }
     busy = ""; paint(); W.touch();      // attach() again (it waited while the update had it)
   }

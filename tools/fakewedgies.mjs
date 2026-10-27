@@ -297,7 +297,13 @@ export function fakeWedgies(specs) {
       return { readable, writable };
     }
     let cur2 = streams();
-    const port = { getInfo: () => ({ usbVendorId: 0x2e8a, usbProductId: 5 }), async open() { if (st.dropped) throw new DOMException("Failed to open serial port.", "NetworkError"); cur2 = streams(); }, async close() {},
+    const port = { getInfo: () => ({ usbVendorId: 0x2e8a, usbProductId: 5 }), async open() {
+        if (st.dropped) throw new DOMException("Failed to open serial port.", "NetworkError");
+        // blink: after a job's restart the drive re-enumerates ~1 s later, once the page has found it again: the
+        // install's own open lands in that drop (a real board, 10-27). The second open since the restart fails.
+        if (st.blink && st.jobRestarts && !st.blinked && (st.opensSince = (st.opensSince || 0) + 1) >= 2) { st.blinked = st.blink !== "always"; st.blinkHook(); throw new DOMException("Failed to open serial port.", "NetworkError"); }
+        cur2 = streams();
+      }, async close() {},
       get readable() { return cur2.readable; }, get writable() { return cur2.writable; }, _st: st };
     return port;
   }
@@ -308,14 +314,21 @@ export function fakeWedgies(specs) {
     p._st.person = b.person;
     p._st.hello = b.hello;
     p._st.app = b.app;
+    p._st.blink = b.blink;
     return p;
   });
   window.__ports = ports;
   const t = new EventTarget();
   const plugged = new Set(ports);
   window.__plug = (i, on) => { const p = ports[i]; p._st.dropped = !on; if (on && (p._st.files.has("wedgiedrive.py") || p._st.files.has("wedgiedrive.mpy"))) p._st.mark = p._st.driveOn = true; if (on) { if (p._st.slowStart) p._st.slowUntil = Date.now() + p._st.slowStart; plugged.add(p); t.dispatchEvent(Object.assign(new Event("connect"), { port: p })); } else { plugged.delete(p); t.dispatchEvent(Object.assign(new Event("disconnect"), { port: p })); } };
+  for (const p of ports) p._st.blinkHook = () => {
+    p._st.dropped = true;
+    t.dispatchEvent(Object.assign(new Event("disconnect"), { port: p }));
+    setTimeout(() => { p._st.dropped = false; t.dispatchEvent(Object.assign(new Event("connect"), { port: p })); }, 1500);
+  };
   for (const p of ports) p._st.resetHook = () => {
     p._st.dropped = true;
+    p._st.opensSince = 0;
     p._st.fail?.(new DOMException("The device has been lost.", "NetworkError"));   // Chrome errors the open port's reads
     setTimeout(() => t.dispatchEvent(Object.assign(new Event("disconnect"), { port: p })), 1500);   // macOS tells the page late
     setTimeout(() => { p._st.dropped = false; t.dispatchEvent(Object.assign(new Event("connect"), { port: p })); }, 5000);

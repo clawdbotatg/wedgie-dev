@@ -357,13 +357,30 @@ async function job(r: Repl, m: Manifest, title: string, write: string[], del: st
   }
   finally { askHint(""); close(); askStart = 0; }
   lastAsk = { site: Math.round(site), wedgie: v.asked_ms ?? null, what: title };
-  if (v.port) return withRepl(v.port as Wedgie, async (r2) => {
-    const h = await r2.hello(1500).catch(() => null);
-    if (!h?.job) throw new Error("the wedgie restarted without the install (did someone press the red button?)");
-    if (lastAsk) lastAsk.wedgie = h.asked_ms ?? null;      // the go that carried it went out on the old port
-    if (h.bin) binOf.set(r2, h.bin);
-    return rest(r2);
-  });
+  if (v.port) {
+    // Its USB drops once more ~1 s after the restart (the drive re-enumerates): the port found may be gone by the
+    // time it's opened. Look again and retry, never give up on the first (10-27: "Failed to open serial port",
+    // the page stopped, the wedgie waited 30 s for it and went back to its app).
+    const uid = uidOf.get(r)!;
+    let port = v.port as Wedgie;
+    for (let i = 0; ; i++) {
+      try {
+        return await withRepl(port, async (r2) => {
+          const h = await r2.hello(1500).catch(() => null);
+          if (!h?.job) throw new Error("the wedgie restarted without the install (did someone press the red button?)");
+          if (lastAsk) lastAsk.wedgie = h.asked_ms ?? null;      // the go that carried it went out on the old port
+          if (h.bin) binOf.set(r2, h.bin);
+          return rest(r2);
+        });
+      } catch (e: any) {
+        if (!/'open' on 'SerialPort'|open serial port/i.test(String(e?.message || e)) || i >= 5) throw e;
+        traceNote(`couldn't open it (${e?.message || e}): looking again`);
+        const again = await waitBack(uid, Date.now() - 100, 10000);
+        if (!again) throw new Error("the wedgie restarted and didn't come back. Unplug it and plug it in again");
+        port = again;
+      }
+    }
+  }
   if (v.type === "refused") throw new Error(Date.now() - sent > 55000 ? "nobody pressed the green button on the wedgie in time" : "the wedgie said no (the red button)");
   if (v.type === "busy") throw new Error("the wedgie is busy signing; try again after");
   if (v.type !== "go") throw new Error(`the wedgie said ${v.error || v.type}`);
