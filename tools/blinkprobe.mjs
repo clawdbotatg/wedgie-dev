@@ -57,6 +57,21 @@ const said = await p2.waitForFunction((re) => new RegExp(re).exec(document.query
 check(SAID.test(said), `a USB that never lets it open: the page says so: ${said}`);
 await p2.waitForTimeout(8000);
 check(SAID.test(await p2.evaluate(() => document.querySelector("main").innerText)), "still says so 8 s later");
+await ctx2.close();
+// an app holding the chip busy while it waits on a fetch: the page must carry its net at once, not after the
+// chip check (10-27: ETH Price said No internet for a minute while the page waited for the chip), then check it
+const ctx3 = await browser.newContext({ viewport: { width: 1200, height: 900 } });
+await ctx3.addInitScript(fakeWedgies, [
+  { uid: "aa11bb22cc3d9f01", machine: "Raspberry Pi Pico with RP2040", files: { "main.py": 1, "slot.py": 1, "wedgiedrive.py": 1, "wedgie.py": 'VERSION = "0.3.73"', "apps.json": "[]" }, chipBusy: true },
+]);
+const p3 = await ctx3.newPage();
+p3.on("pageerror", (e) => errs.push(e.message));
+const t3 = Date.now();
+await p3.goto(base + "/connect/3D9F01");
+const netIn = await p3.waitForFunction(() => window.__ports[0]._st.netAt, null, { timeout: 30000 }).then((h) => h.jsonValue(), () => 0);
+check(netIn && netIn - t3 < 6000, `a busy chip: the page carries its net in ${netIn ? ((netIn - t3) / 1000).toFixed(1) + " s" : "never"}`);
+const chipped = await p3.waitForFunction(() => window.__ports[0]._st.chips > 0, null, { timeout: 15000 }).then(() => true, () => false);
+check(chipped, "and checks the chip after");
 check(!errs.length, "no page errors" + (errs.length ? ": " + errs.join(" | ") : ""));
 console.log(bad ? `${bad} FAILED` : "all ok");
 await browser.close();

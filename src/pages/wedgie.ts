@@ -318,6 +318,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
       setScreen(home());
       paint();
       if (liveFs()) loadSaves();
+      if (x.proofLater) W.reprove(x, r).then(paint);   // its app had the chip busy when found: now, while we carry its net
       await held;
     }).catch((e) => { status(`<b class="bad">Can't open it:</b> ${esc(e?.message || e)}`); })
       .finally(() => { if (x === w) { link = null; } });

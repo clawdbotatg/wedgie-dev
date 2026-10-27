@@ -33,6 +33,7 @@ export type Wedgie = {
   ram?: number;          // bytes of heap free when it said hello (0.3.11+)
   chip?: any;            // what answered on I2C: { type, serial? }
   proof?: ChipCheck & { state: "checking" | "done" | "unknown" };   // the chip proven working (once per plug-in)
+  proofLater?: boolean;  // its app had the chip busy when it was found: its page checks again (reprove) once it's carrying its net
   error?: string;
   readyAt?: number;      // when identify last finished (the update bench: "it came back after its restart")
   log: string;
@@ -211,7 +212,7 @@ function talk(w: Wedgie) {
     if (h.backend) w.chip = { type: h.backend === "atecc608" ? "ATECC608" : h.backend, serial: h.serial };
     w.board = h.board || "wedgie";
     if (h.job) w.proof = { state: "unknown", pass: false, facts: [], detail: "It's installing" };   // in install mode: the job owns it
-    else if (w.kind === "wedgie" && h.carts) await prove(w, r);
+    else if (w.kind === "wedgie" && h.carts) await prove(w, r, false);
     else w.proof = { state: "unknown", pass: false, facts: [],
       detail: w.kind === "wallet" ? "The Wallet is running; it checks the chip itself" : "Update the firmware to check the chip" };
   });
@@ -219,16 +220,19 @@ function talk(w: Wedgie) {
 
 /** The chip proven working, once per plug-in, without stopping anything: firmware 0.1.4+
  *  does the chip work on request and the page checks the answer (chipcheck.ts). */
-async function prove(w: Wedgie, r: Repl) {
+async function prove(w: Wedgie, r: Repl, wait = true) {
   w.proof = { state: "checking", pass: false, detail: "checking the chip", facts: [] };
   emit();
   try {
     // 0.3.53+: busy while its app is using the chip (this check would reset it under the app; 0.3.71+: a whole
     // net fetch, 5-8 s, and an app may fetch several in a row). Wait it out: never call a busy chip broken.
     // An error: ask again a few times before saying "no chip" (10-26: one check caught mid-fetch said wires swapped).
+    // Not while it's being found (wait false): until it's ready nobody carries its app's net, so a fetch it's
+    // waiting on keeps the chip busy (10-27: ETH Price said No internet for a minute). Busy then: proofLater.
+    w.proofLater = false;
     const ask = async () => {
       let d = await r.request({ type: "chip" }, 15000);
-      for (let i = 0; d.busy && i < 240; i++) {
+      for (let i = 0; d.busy && wait && i < 240; i++) {
         await new Promise((res) => setTimeout(res, 500));
         d = await r.request({ type: "chip" }, 15000);
       }
@@ -240,7 +244,8 @@ async function prove(w: Wedgie, r: Repl) {
       d = await ask();
     }
     if (d.busy) {
-      w.proof = { state: "unknown", pass: false, facts: [], detail: "Its app is using the chip: check again in a minute" };
+      w.proofLater = !wait;
+      w.proof = { state: "unknown", pass: false, facts: [], detail: wait ? "Its app is using the chip: check again in a minute" : "Its app is using the chip: checking it soon" };
       return;
     }
     w.chip = d.chip ? { type: d.chip, serial: d.serial, configLocked: d.configLocked } : { type: "none" };

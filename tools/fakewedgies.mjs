@@ -203,6 +203,9 @@ export function fakeWedgies(specs) {
         const p = st.person || {};
         return setTimeout(() => { st.open = p.say !== "no"; push(JSON.stringify({ id, type: st.open ? "open" : "refused" }) + "\r\n"); }, p.ms ?? 300);
       }
+      if (msg.type === "net" && msg.rid == null) { st.netAt = st.netAt || Date.now(); return; }    // the page carries its net now
+      // chipBusy: its app has the chip until someone carries its net (an app waiting on a fetch, 10-27)
+      if (msg.type === "chip" && st.chipBusy && !st.netAt) return push(JSON.stringify({ id, type: "chip", busy: 1, kind: null }) + "\r\n");
       if (msg.type === "chip" && v >= "0.1.4") {
         st.chips++;
         if (st.chip === "none") return push(JSON.stringify({ id, type: "chip", kind: null, chip: null, lines: { sda: 0, scl: 0 }, msg: "00" }) + "\r\n");
@@ -315,6 +318,7 @@ export function fakeWedgies(specs) {
     p._st.hello = b.hello;
     p._st.app = b.app;
     p._st.blink = b.blink;
+    p._st.chipBusy = b.chipBusy;
     return p;
   });
   window.__ports = ports;
