@@ -8,6 +8,9 @@
 #   net.post("https://poidh.xyz/api", {"q": 1}, pick="data")                 -> the same, for a POST of JSON
 #   net.chain(8453, "eth_getBalance", ["0x...", "latest"])                    -> the call's result
 #   net.price()                                                               -> ETH in dollars (a float)
+#   net.get(url, log=f)      (0.3.72+, also post/chain(1)/price): f(step) as each happens, to show them: "connect",
+#                            "keys", "open", "asked", "cert 0" .. (each certificate checked), "signed" (the
+#                            site's own signature checked), "answer". Each step has passed when it's said.
 #
 # net.get and net.post (0.3.67+, post 0.3.70+) are the wedgie's own TLS 1.3 to the site (tls.py, the Trust M
 # does the math): the computer and wedgie.dev's relay carry encrypted bytes, so they can block an answer but
@@ -78,9 +81,9 @@ def _own(req):
     return req.get("chain") == 1 and not str(req.get("method", "")).startswith("wedgie_")
 
 
-def _rpc(method, params, ms=MS):
+def _rpc(method, params, ms=MS, log=None):
     import json
-    v = post(RPC1, json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": list(params)}), ms=ms)
+    v = post(RPC1, json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": list(params)}), ms=ms, log=log)
     if not isinstance(v, dict):
         raise Error("not JSON-RPC")
     if "error" in v:
@@ -141,17 +144,17 @@ def wait(rid, ms=MS):
     return answer(rid)
 
 
-def post(url, data, pick=None, ms=MS):
+def post(url, data, pick=None, ms=MS, log=None):
     """POST JSON (a dict or list, or a str already JSON) to an https site over the wedgie's own TLS."""
     if not isinstance(data, str):
         import json
         data = json.dumps(data)
     if len(data) > 1500:
         raise Error("too much to send")
-    return get(url, pick, ms, data.encode())
+    return get(url, pick, ms, data.encode(), log)
 
 
-def get(url, pick=None, ms=MS, body=None):
+def get(url, pick=None, ms=MS, body=None, log=None):
     """GET an https site over the wedgie's own TLS; its JSON (or text), with pick applied."""
     if not url.startswith("https://"):
         raise Error("https only")
@@ -164,6 +167,8 @@ def get(url, pick=None, ms=MS, body=None):
     q, said = _tcp.setdefault(rid, []), []
     _out[rid] = []
     _send(rid, {"type": "tcp", "rid": rid, "host": host})
+    if log:
+        log("connect")
 
     def send(b):
         import binascii
@@ -194,7 +199,7 @@ def get(url, pick=None, ms=MS, body=None):
     try:                                # wipes this connection's key and fails both (10-26: "No chip" on the page)
         import tls
         try:
-            body = tls.Conn(host, send, recv).get("/" + path, most=MOST, body=body)
+            body = tls.Conn(host, send, recv, log=log).get("/" + path, most=MOST, body=body)
         except tls.Error as e:
             raise Error(said[0] if said else str(e))
         except OSError as e:            # no Trust M to do the math
@@ -267,12 +272,12 @@ def _walk(v, steps):
     return None
 
 
-def chain(chain_id, method, params=(), ms=MS):
+def chain(chain_id, method, params=(), ms=MS, log=None):
     if _own({"chain": chain_id, "method": method}):
-        return _rpc(method, params, ms)
+        return _rpc(method, params, ms, log)
     return wait(ask({"chain": chain_id, "method": method, "params": list(params)}), ms)
 
 
-def price(ms=MS):
+def price(ms=MS, log=None):
     """ETH in dollars: Chainlink's feed on Ethereum (latestAnswer), read over the wedgie's own TLS."""
-    return int(_rpc("eth_call", ({"to": FEED, "data": "0x50d25bcd"}, "latest"), ms), 16) / 1e8
+    return int(_rpc("eth_call", ({"to": FEED, "data": "0x50d25bcd"}, "latest"), ms, log), 16) / 1e8

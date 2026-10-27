@@ -675,6 +675,7 @@ class Conn:
         self._write(23, (b"POST " if body is not None else b"GET ") + path.encode() + b" HTTP/1.1\r\nHost: " + self.host.encode()
                     + b"\r\nConnection: close\r\nAccept-Encoding: identity\r\nUser-Agent: wedgie\r\n" + headers + b"\r\n"
                     + (body or b""))
+        self.log("asked")
         self._checks()
         out, hl, cl, chunked, closed = bytearray(), -1, None, False, False
         while True:
@@ -706,6 +707,7 @@ class Conn:
                 break
         if hl < 0:
             raise Error("no answer")
+        self.log("answer")
         self.status = int(bytes(out[:hl]).split(b" ", 2)[1])
         body = memoryview(out)[hl + 4:]
         if chunked:
