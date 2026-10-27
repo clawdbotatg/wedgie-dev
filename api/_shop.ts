@@ -6,7 +6,7 @@
 // And checkout counts (api/count.ts): a number per day per step, about no one.
 // Never log a request body here: even sealed, it doesn't belong in Vercel's logs.
 // Env: SHOP_DATABASE_URL, STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET (card), SHOP_PAY_TO (USDC),
-// SHOP_ADMIN_TOKEN (omen's orders.py), SHOP_STATS_TOKEN (api/stats.ts, counts only), SHOP_RPC_<chainId> (an Alchemy URL: never a public RPC).
+// CV_* (claims, api/_cv.ts), SHOP_ADMIN_TOKEN (omen's orders.py), SHOP_STATS_TOKEN (api/stats.ts, counts only), SHOP_RPC_<chainId> (an Alchemy URL: never a public RPC).
 import { neon } from "@neondatabase/serverless";
 import { ITEMS, nameOf, PAY_CHAINS, QUOTE, cartLines, extraAt, type Cart, type Item, type Line } from "../src/shop/catalog.js";
 
@@ -27,7 +27,7 @@ export async function db() {
       token_hash text not null,
       cart jsonb not null,
       cents int not null,
-      pay text not null,              -- card | usdc
+      pay text not null,              -- card | usdc | cv (api/_cv.ts)
       status text not null default 'new',   -- new | paid | shipped | canceled | expired (never paid in time)
       sealed text,                    -- the address, sealed to omen's key; null once shipped
       chain int, usdc bigint,         -- usdc: the amount asked for, in 6-decimal units
@@ -72,6 +72,8 @@ export async function db() {
       email_hash text primary key, email_enc text not null, ip text, created timestamptz not null default now())`;
     await sql`alter table alerts add column if not exists sent int not null default 0`;   // mails sent so far (2 at most)
     await sql`alter table alerts add column if not exists sent_at timestamptz`;
+    await sql`create table if not exists cv_claims (   -- api/_cv.ts: a wallet that claimed its wedgie with CV; kept for good (one per wallet)
+      wallet text primary key, order_id text not null, created timestamptz not null default now(), burned_at timestamptz)`;
   })().catch((e) => { ready = null; throw e; });
   await ready;
   return sql;
@@ -94,7 +96,7 @@ export function same(a: string, b: string) {   // constant time
 }
 
 export type Order = {
-  id: string; token_hash: string; cart: Cart; lines: Line[] | null; cents: number; pay: "card" | "usdc"; status: string; sealed: string | null;
+  id: string; token_hash: string; cart: Cart; lines: Line[] | null; cents: number; pay: "card" | "usdc" | "cv"; status: string; sealed: string | null;
   chain: number | null; usdc: string | null; from_block: string | null; stripe_session: string | null; tx: string | null; payer: string | null; deposit: string | null;
   tracking: string | null; created: string; paid_at: string | null; shipped_at: string | null; moving_at?: string | null; delivered_at?: string | null; boxed_at?: string | null; held?: boolean | null; got?: string | null;
 };
@@ -110,11 +112,11 @@ export const publicView = (o: Order, got?: bigint, checking?: boolean) => ({
 });
 
 /** What every box costs over its list price right now (catalog.ts extraAt): paid orders at their paying, open
- * quotes at their making, so splitting a cart into orders saves nothing. */
+ * quotes at their making, so splitting a cart into orders saves nothing. A CV claim (api/_cv.ts) never raises it. */
 export async function extraNow(sql: Awaited<ReturnType<typeof db>>) {
   const rows = await sql`select coalesce(paid_at, created) as at, cart from orders
-    where (status in ('paid', 'shipped') and paid_at > now() - interval '60 days')
-    or (status = 'new' and created > now() - ${`${QUOTE / 1000} seconds`}::interval)`;
+    where pay <> 'cv' and ((status in ('paid', 'shipped') and paid_at > now() - interval '60 days')
+    or (status = 'new' and created > now() - ${`${QUOTE / 1000} seconds`}::interval))`;
   return extraAt(rows.map((r: any) => ({ at: Date.parse(r.at), n: (r.cart.wedgie || 0) + (r.cart.kit || 0) })), Date.now());
 }
 

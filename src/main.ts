@@ -41,7 +41,7 @@ const onCode = path === "/code";
 const onDebug = path === "/debug";
 const onSafe = path === "/safe" || path.startsWith("/safe/");   // the list, or one Safe (/safe/<chain>:<address>)
 const onSecret = path === "/secret";
-const onOrder = path === "/order" || path.startsWith("/order/") || path === "/orders" || path === "/signin";   // buy, one order (/order/<id>), yours, sign in
+const onOrder = path === "/order" || path.startsWith("/order/") || path === "/orders" || path === "/signin" || path === "/claim";   // buy, one order (/order/<id>), yours, sign in
 const onLegal = path === "/terms" || path === "/privacy";
 const onTelegram = path === "/telegram";
 const onEmu = path === "/virtual" || path === "/emu";   // /emu: its old name

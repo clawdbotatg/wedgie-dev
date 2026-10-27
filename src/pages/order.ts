@@ -1,5 +1,6 @@
 // wedgie.dev/order: buy wedgies. /order/<id>: one order's status (paid, shipped, tracking). /orders: every order
-// this browser made (the header's Orders button, main.ts, shows once there is one).
+// this browser made (the header's Orders button, main.ts, shows once there is one). /claim: a free wedgie for CV
+// burned on larv.ai (api/_cv.ts), one per wallet.
 // The address is sealed in this browser before it's sent (shop/seal.ts): our server, Stripe and the chain
 // never see it. Card = Stripe Checkout (payment only). USDC = a transfer on Base (a QR code for any phone
 // wallet, or this browser's wallet) for an amount whose last digits (under a cent) name the order; the server
@@ -41,17 +42,17 @@ async function api(body?: unknown, url = "/api/order") {
 
 export function order(main: HTMLElement) {
   const path = location.pathname.replace(/\/+$/, "");
-  const id = /^\/order\/([0-9a-f]{12})$/.exec(path)?.[1], all = path === "/orders", signin = path === "/signin";
+  const id = /^\/order\/([0-9a-f]{12})$/.exec(path)?.[1], all = path === "/orders", signin = path === "/signin", cv = path === "/claim";
   main.innerHTML = `
   <section class="test-page safe-page order-page${signin ? " signin-page" : ""}">
-    <h1>${signin ? "Sign in" : all ? "Your orders" : id ? "Your order" : "Order"}</h1>
+    <h1>${signin ? "Sign in" : all ? "Your orders" : id ? "Your order" : cv ? "Claim a wedgie" : "Order"}</h1>
     <div id="o-body" class="order-stack"></div>
     <p class="safe-msg" id="o-msg" hidden></p>
   </section>`;
   const body = main.querySelector<HTMLElement>("#o-body")!;
   const msgEl = main.querySelector<HTMLElement>("#o-msg")!;
   const say = (s: string, bad = false) => { msgEl.hidden = !s; msgEl.innerHTML = bad ? `<b class="bad">${esc(s)}</b>` : esc(s); if (bad && !signin && !all) count(errKey(s)); };
-  if (signin) signIn(body, say); else if (all) list(body, say); else if (id) status(id, body, say); else form(body, say);
+  if (signin) signIn(body, say); else if (all) list(body, say); else if (id) status(id, body, say); else if (cv) claim(body, say); else form(body, say);
 }
 
 // ---- signed in (api/login.ts): a session good till `until`, and the last email used here (fills the box in) ----
@@ -149,6 +150,56 @@ async function list(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
   }, (e) => { box.querySelector(`[data-id="${i}"] .o-st`)!.textContent = msgOf(e); }));
 }
 
+// ---- the address: sealed in this browser (shop/seal.ts). /order and /claim ----
+const shipHtml = (pay = "the card processor and the blockchain") => `
+    <div class="safe-box recess" id="o-ship">
+      <h2>Ship to</h2>
+      <p class="fine">Your address is locked right here in your browser with a key only our shipping computer has.
+        Our server, ${pay} never see it, and we delete it once the box is in the mail.</p>
+      <form class="order-fields" id="o-addr" autocomplete="on">
+        <label class="wide">Country <select name="country" autocomplete="shipping country"><option value="US">United States</option>${COUNTRIES.map((c) => [c, place(c)]).sort((a, b) => a[1].localeCompare(b[1])).map(([c, n]) => `<option value="${c}">${esc(n)}</option>`).join("")}</select></label>
+        <label class="wide">Name <input name="name" autocomplete="shipping name" maxlength="80"></label>
+        <label class="wide">Address <input name="line1" autocomplete="shipping address-line1" maxlength="100"></label>
+        <label class="wide">Apt, suite <span class="fine">(optional)</span> <input name="line2" autocomplete="shipping address-line2" maxlength="100"></label>
+        <label>City <input name="city" autocomplete="shipping address-level2" maxlength="60"></label>
+        <label class="us">State <select name="state" autocomplete="shipping address-level1"><option value=""></option>${STATES.map((s) => `<option>${s}</option>`).join("")}</select></label>
+        <label class="us">ZIP <input name="zip" autocomplete="shipping postal-code" inputmode="numeric" maxlength="10"></label>
+        <label class="abroad" hidden>State, province <span class="fine">(if any)</span> <input name="region" autocomplete="shipping address-level1" maxlength="60"></label>
+        <label class="abroad" hidden>Postal code <input name="postal" autocomplete="shipping postal-code" maxlength="12"></label>
+        <label class="wide abroad" hidden>Phone <span class="fine">(for customs and the courier)</span> <input name="phone" type="tel" autocomplete="tel" maxlength="30"></label>
+        <label class="wide">Email <span class="fine">${session() ? "(signed in)" : "(for the tracking number; never shared)"}</span> <input name="email" type="email" autocomplete="email" maxlength="100" value="${esc(lastEmail())}"${session() && lastEmail() ? " readonly" : ""}></label>
+      </form>
+    </div>`;
+
+function shipForm(box: HTMLElement, say: (s: string, bad?: boolean) => void, onWhere: (abroad: boolean) => void) {
+  // A real <form> (never submitted) is what makes browsers offer to fill in the saved address.
+  const addr = box.querySelector<HTMLFormElement>("#o-addr")!;
+  addr.onsubmit = (e) => e.preventDefault();
+  addr.addEventListener("input", () => count("form"));
+  // Outside the US: province and postal code instead of state and ZIP, and a phone.
+  const country = addr.querySelector<HTMLSelectElement>("[name=country]")!;
+  const where = () => {
+    const abroad = country.value !== "US";
+    addr.querySelectorAll<HTMLElement>(".us").forEach((e) => (e.hidden = abroad));
+    addr.querySelectorAll<HTMLElement>(".abroad").forEach((e) => (e.hidden = !abroad));
+    onWhere(abroad);
+  };
+  country.addEventListener("change", where);
+  where();
+  const shipTo = (): ShipTo | null => {
+    const v = (n: string) => (addr.querySelector<HTMLInputElement>(`[name=${n}]`)!.value || "").trim();   // addr: the price alert has an email box too
+    const c = country.value, us = c === "US";
+    const s: ShipTo = { name: v("name"), line1: v("line1"), line2: v("line2"), city: v("city"), state: v(us ? "state" : "region"), zip: v(us ? "zip" : "postal"),
+      country: c, phone: us ? "" : v("phone"), email: v("email") };
+    const bad = !s.name ? "your name" : !s.line1 ? "your street address" : !s.city ? "your city"
+      : us && !STATES.includes(s.state) ? "your state" : us && !/^\d{5}(-\d{4})?$/.test(s.zip) ? "a 5-digit ZIP"
+      : !us && !/\d{6,}/.test(s.phone.replace(/\D/g, "")) ? "your phone" : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.email) ? "your email" : "";
+    if (bad) { say(`Fill in ${bad}.`, true); return null; }
+    return s;
+  };
+  return { shipTo };
+}
+
 // ---- a new order ----
 function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
   const q = new URLSearchParams(location.search);
@@ -167,24 +218,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
       <p class="fine" id="o-lines" hidden></p>
       ${WHY}
     </div>
-    <div class="safe-box recess" id="o-ship">
-      <h2>Ship to</h2>
-      <p class="fine">Your address is locked right here in your browser with a key only our shipping computer has.
-        Our server, the card processor and the blockchain never see it, and we delete it once the box is in the mail.</p>
-      <form class="order-fields" id="o-addr" autocomplete="on">
-        <label class="wide">Country <select name="country" autocomplete="shipping country"><option value="US">United States</option>${COUNTRIES.map((c) => [c, place(c)]).sort((a, b) => a[1].localeCompare(b[1])).map(([c, n]) => `<option value="${c}">${esc(n)}</option>`).join("")}</select></label>
-        <label class="wide">Name <input name="name" autocomplete="shipping name" maxlength="80"></label>
-        <label class="wide">Address <input name="line1" autocomplete="shipping address-line1" maxlength="100"></label>
-        <label class="wide">Apt, suite <span class="fine">(optional)</span> <input name="line2" autocomplete="shipping address-line2" maxlength="100"></label>
-        <label>City <input name="city" autocomplete="shipping address-level2" maxlength="60"></label>
-        <label class="us">State <select name="state" autocomplete="shipping address-level1"><option value=""></option>${STATES.map((s) => `<option>${s}</option>`).join("")}</select></label>
-        <label class="us">ZIP <input name="zip" autocomplete="shipping postal-code" inputmode="numeric" maxlength="10"></label>
-        <label class="abroad" hidden>State, province <span class="fine">(if any)</span> <input name="region" autocomplete="shipping address-level1" maxlength="60"></label>
-        <label class="abroad" hidden>Postal code <input name="postal" autocomplete="shipping postal-code" maxlength="12"></label>
-        <label class="wide abroad" hidden>Phone <span class="fine">(for customs and the courier)</span> <input name="phone" type="tel" autocomplete="tel" maxlength="30"></label>
-        <label class="wide">Email <span class="fine">${session() ? "(signed in)" : "(for the tracking number; never shared)"}</span> <input name="email" type="email" autocomplete="email" maxlength="100" value="${esc(lastEmail())}"${session() && lastEmail() ? " readonly" : ""}></label>
-      </form>
-    </div>
+    ${shipHtml()}
     <div class="safe-box recess" id="o-pay">
       <h2>Pay</h2>
       <p class="row"><button class="btn" id="o-card" disabled>Pay by card</button></p>
@@ -221,21 +255,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
   })));
   paint();
 
-  // A real <form> (never submitted) is what makes browsers offer to fill in the saved address.
-  const addr = box.querySelector<HTMLFormElement>("#o-addr")!;
-  addr.onsubmit = (e) => e.preventDefault();
-  addr.addEventListener("input", () => count("form"));
-  // Outside the US: province and postal code instead of state and ZIP, a phone, and the shipping line in the price.
-  const country = addr.querySelector<HTMLSelectElement>("[name=country]")!;
-  const where = () => {
-    const abroad = country.value !== "US";
-    addr.querySelectorAll<HTMLElement>(".us").forEach((e) => (e.hidden = abroad));
-    addr.querySelectorAll<HTMLElement>(".abroad").forEach((e) => (e.hidden = !abroad));
-    if (abroad) cart.abroad = true; else delete cart.abroad;
-    paint();
-  };
-  country.addEventListener("change", where);
-  where();
+  const { shipTo: addrOf } = shipForm(box, say, (abroad) => { if (abroad) cart.abroad = true; else delete cart.abroad; paint(); });
   const card = box.querySelector<HTMLButtonElement>("#o-card")!, crypto = box.querySelector<HTMLButtonElement>("#o-usdc")!;
   const openEl = box.querySelector<HTMLElement>("#o-open")!;
   let shop: { card: boolean; usdc: boolean } = { card: false, usdc: false };
@@ -253,15 +273,8 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
   });
 
   const shipTo = (): ShipTo | null => {
-    const v = (n: string) => (addr.querySelector<HTMLInputElement>(`[name=${n}]`)!.value || "").trim();   // addr: the price alert has an email box too
-    const c = country.value, us = c === "US";
-    const s: ShipTo = { name: v("name"), line1: v("line1"), line2: v("line2"), city: v("city"), state: v(us ? "state" : "region"), zip: v(us ? "zip" : "postal"),
-      country: c, phone: us ? "" : v("phone"), email: v("email") };
-    const bad = !s.name ? "your name" : !s.line1 ? "your street address" : !s.city ? "your city"
-      : us && !STATES.includes(s.state) ? "your state" : us && !/^\d{5}(-\d{4})?$/.test(s.zip) ? "a 5-digit ZIP"
-      : !us && !/\d{6,}/.test(s.phone.replace(/\D/g, "")) ? "your phone" : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.email) ? "your email" : "";
-    if (bad) { say(`Fill in ${bad}.`, true); return null; }
-    if (!cartCents(cart, extra)) { say("Pick at least one.", true); return null; }
+    const s = addrOf();
+    if (s && !cartCents(cart, extra)) { say("Pick at least one.", true); return null; }
     return s;
   };
   const go = async (pay: "card" | "usdc", b: HTMLButtonElement) => {
@@ -282,6 +295,82 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
   };
   card.onclick = () => go("card", card);
   crypto.onclick = () => go("usdc", crypto);
+}
+
+// ---- /claim: burn CV (clawdviction, larv.ai) for one wedgie, one per wallet (api/_cv.ts). The wallet signs larv.ai's
+// fixed message; the signature goes only to our /api/order, which burns it there. Any wallet: this browser's, or
+// RainbowKit (safe/rainbow.ts: a phone over WalletConnect).
+const CV_MSG = "larv.ai CV Spend";
+const cvn = (n: number) => Math.floor(n).toLocaleString("en-US");
+function claim(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
+  const cart: Cart = { wedgie: 1, kit: 0 };
+  box.innerHTML = `
+    <div class="safe-box recess" id="c-who">
+      <p>Staked CLAWD on <a href="https://larv.ai" target="_blank" rel="noopener">larv.ai</a>? Burn <b id="c-cost">500,000,000</b> CV for a free wedgie, shipped. One per wallet.</p>
+      <p class="fine" id="c-left">&nbsp;</p>
+      <p><button class="btn btn-green" id="c-connect" disabled>Connect wallet</button></p>
+      <p id="c-bal" hidden></p>
+    </div>
+    ${shipHtml("larv.ai and the blockchain")}
+    <div class="safe-box recess">
+      <p><button class="btn btn-green" id="c-go" disabled>Burn CV for a wedgie</button></p>
+      <p class="fine">Can't be undone. By claiming you agree to the <a href="/terms" target="_blank">Terms of Sale</a>.</p>
+    </div>`;
+  const { shipTo } = shipForm(box, say, (abroad) => { if (abroad) cart.abroad = true; else delete cart.abroad; });
+  const connectB = box.querySelector<HTMLButtonElement>("#c-connect")!, go = box.querySelector<HTMLButtonElement>("#c-go")!;
+  const bal = box.querySelector<HTMLElement>("#c-bal")!, leftEl = box.querySelector<HTMLElement>("#c-left")!;
+  let p: any = null, wallet = "", cost = 0, ready = false;
+
+  const look = async () => {
+    const r = await api(undefined, "/api/order" + (wallet ? "?wallet=" + wallet : ""));
+    const cv = r.cv || {};
+    if (!cv.open) { leftEl.textContent = "Claims open soon."; return; }
+    cost = cv.cost;
+    box.querySelector("#c-cost")!.textContent = cvn(cost);
+    leftEl.textContent = !cv.left ? "All the claim wedgies are gone." : !r.left?.wedgie ? "Wedgies are sold out." : `${cv.left} left.`;
+    connectB.disabled = !cv.left || !r.left?.wedgie;
+    if (!wallet) return;
+    bal.hidden = false;
+    const short = `<code class="safe-addr">${esc(wallet)}</code><br>`;
+    if (cv.claimed) bal.innerHTML = short + (mem()[cv.claimed] ? `Claimed. <a href="/order/${esc(cv.claimed)}">See your order</a>` : "This wallet already claimed its wedgie.");
+    else if (cv.balance == null) bal.innerHTML = short + `This wallet has never staked CLAWD. <a href="https://larv.ai/stake" target="_blank" rel="noopener">Stake on larv.ai</a>`;
+    else if (cv.balance < 0) bal.innerHTML = short + "larv.ai didn't answer. Try again soon.";
+    else if (cv.balance < cost) bal.innerHTML = short + `<b>${cvn(cv.balance)}</b> CV. ${cvn(cost - cv.balance)} more to go. <a href="https://larv.ai/stake" target="_blank" rel="noopener">Stake more</a>`;
+    else bal.innerHTML = short + `<b class="good">${cvn(cv.balance)} CV.</b> Enough for a wedgie.`;
+    ready = !cv.claimed && cv.balance >= cost && !!cv.left && !!r.left?.wedgie;
+    connectB.hidden = true;
+    go.disabled = !ready;
+  };
+  look().catch((e) => say(msgOf(e), true));
+
+  connectB.onclick = async () => {
+    connectB.disabled = true;
+    try {
+      p = eth() || await (await import("../safe/rainbow")).connect();
+      const [a] = await p.request({ method: "eth_requestAccounts" });
+      wallet = String(a).toLowerCase();
+      say("");
+      await look();
+    } catch (e) { say(msgOf(e), true); connectB.disabled = false; }
+  };
+  go.onclick = async () => {
+    if (!ready) return;
+    const s = shipTo();
+    if (!s) return;
+    go.disabled = true;
+    try {
+      say("Sign in your wallet.");
+      const hex = "0x" + Array.from(new TextEncoder().encode(CV_MSG), (b) => b.toString(16).padStart(2, "0")).join("");
+      const signature = await p.request({ method: "personal_sign", params: [hex, wallet] });
+      say("Locking your address.");
+      const sealed = await seal({ ...s, cart });
+      say("Burning CV.");
+      const r = await api({ pay: "cv", cart, sealed, email: s.email, wallet, signature });
+      remember(r.id, { token: r.token, at: Date.now() });
+      localStorage.setItem(LAST, s.email);
+      location.href = `/order/${r.id}`;
+    } catch (e) { say(msgOf(e), true); go.disabled = false; look().catch(() => {}); }
+  };
 }
 
 // ---- one order ----
@@ -319,7 +408,7 @@ function status(id: string, box: HTMLElement, say: (s: string, bad?: boolean) =>
     const c = v.chain ? PAY_CHAINS[v.chain] : null;
     const items = v.lines ? v.lines.map((l) => `${l.qty} × ${esc(nameOf(l.item))} at ${usd(l.cents)}`).join(", ")
       : (Object.keys(ITEMS) as Item[]).filter((k) => v!.cart[k]).map((k) => `${v!.cart[k]} × ${esc(ITEMS[k].name)}`).join(", ");
-    let h = `<div class="safe-box recess"><h2>Order ${esc(v.id)}</h2><p>${items} · <b>${usd(v.cents)}</b> shipped</p>`;
+    let h = `<div class="safe-box recess"><h2>Order ${esc(v.id)}</h2><p>${items} · <b>${v.pay === "cv" ? "claimed with CV" : usd(v.cents)}</b> shipped</p>`;
     if (v.status === "new" && v.pay === "card") h += `<p>Not paid yet. This price holds for <b class="o-left"></b>.</p>${v.url ? `<p><a class="btn" href="${esc(v.url)}">Pay by card</a></p>` : ""}`;
     // A deposit order (got is set): its own address, any amount counts, short = send the rest. Something sent
     // already holds the price, so it stays payable after the clock runs out. Old orders: the exact amount to the Safe.

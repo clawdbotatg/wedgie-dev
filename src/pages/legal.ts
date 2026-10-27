@@ -60,6 +60,7 @@ const PRIVACY = `
 
 <h2>Payment</h2>
 <p>Card payments are handled by Stripe, under <a href="https://stripe.com/privacy" target="_blank" rel="noopener">Stripe's privacy policy</a>. We never see your card number. Stripe may ask for a billing address; that stays with Stripe. USDC payments are public on the blockchain, like any transaction.</p>
+<p>A wedgie claimed with CV (larv.ai): we keep the wallet that claimed it, for good, so a wallet claims only once. Its signature goes to larv.ai to burn the CV; we don't keep it.</p>
 
 <h2>Orders</h2>
 <p>We keep what you ordered and its status. Once it ships, the dates USPS has it moving and delivers it (never where). We delete an order 30 days after it ships or is canceled, or 30 days after it was made if it was never paid. An unpaid order that got some USDC is kept until it's sorted out with you.</p>

@@ -1,7 +1,10 @@
 // /api/order
 //   GET                                       what's open: card, usdc; extra = cents over list price right now;
 //                                             left = {wedgie, kit} in stock (_shop.ts stockLeft); sends the price alerts once it's back down
+//   GET ?wallet=0x…                           + cv: claims (api/_cv.ts): open, cost, left; this wallet's balance (null: never
+//                                             staked) and claimed (its order id, or null)
 //   POST {cart, sealed, email, pay, chain?}   a new order -> {id, token, url?} (url: Stripe Checkout); email: _mail.ts
+//   POST {pay: 'cv', cart, sealed, email, wallet, signature}   a claim: CV burned on larv.ai, paid from the start
 //   POST {id, token, tx?, renew?}             its status (a USDC one: what its deposit address holds); tx: old orders only;
 //                                             renew: an expired order quoted again at today's price
 // A quote holds 10 minutes (catalog.ts QUOTE); then the order is 'expired'.
@@ -9,6 +12,7 @@
 import { PAY_CHAINS, cartOk, cartLines, type Cart } from "../src/shop/catalog.js";
 import { depositOf } from "../src/shop/deposits.js";
 import { EMAIL, emailHash, lock, tokenOf, mailPaid, sendAlerts } from "./_mail.js";
+import { cvOpen, cvCost, cvMax, cvBalance, cvSigned, cvSpend, cvClaims, cvAlarm, fmtCv } from "./_cv.js";
 import { db, env, json, oops, randomHex, sha256, same, publicView, checkout, session, markPaid, endCard, usdcPaid, usdcFind, settleDeposit, extraNow, expireOld, late, rpc, ipOf, tooMany, stockLeft, short, oversold, type Order, crossSite } from "./_shop.js";
 
 const open = () => ({ card: !!env("STRIPE_SECRET_KEY"), usdc: !!env("SHOP_PAY_TO"), chains: Object.keys(PAY_CHAINS).map(Number).filter((c) => env("SHOP_RPC_" + c)) });
@@ -19,7 +23,15 @@ export async function GET(req: Request) {
   if (sql && extra === 0 && env("SHOP_MAIL_KEY")) await sendAlerts(sql, new URL(req.url).origin, 0).catch(() => {});
   const l = sql ? await stockLeft(sql).catch(() => null) : null;
   const left = { wedgie: Math.max(0, l?.wedgie || 0), kit: Math.max(0, l?.kit || 0) };
-  return json({ ...open(), extra: Math.max(0, extra), left });
+  return json({ ...open(), extra: Math.max(0, extra), left, cv: await cvView(sql, new URL(req.url).searchParams.get("wallet")) });
+}
+
+async function cvView(sql: Awaited<ReturnType<typeof db>> | null, w: string | null) {
+  const wallet = w && /^0x[0-9a-fA-F]{40}$/.test(w) ? w.toLowerCase() : "";
+  const c = sql && cvOpen() ? await cvClaims(sql, wallet || undefined).catch(() => null) : null;
+  if (!c) return { open: false };
+  const balance = wallet ? await cvBalance(wallet).catch(() => -1) : undefined;   // -1: larv.ai didn't answer
+  return { open: true, cost: cvCost(), left: Math.max(0, cvMax() - c.used), ...(wallet ? { balance, claimed: c.mine } : {}) };
 }
 
 export async function POST(req: Request) {
@@ -35,6 +47,7 @@ export async function POST(req: Request) {
 
 async function create(sql: Awaited<ReturnType<typeof db>>, b: any, origin: string, ip: string) {
   const o = open();
+  if (b?.pay === "cv") return claim(sql, b, origin, ip);
   if (!cartOk(b?.cart)) return oops("Pick what you'd like.");
   if (typeof b.sealed !== "string" || !/^v1\.[A-Za-z0-9_.-]{40,4000}$/.test(b.sealed)) return oops("The address didn't come through sealed.");
   if (typeof b.email !== "string" || b.email.length > 100 || !EMAIL.test(b.email.trim())) return oops("Fill in your email.");
@@ -68,6 +81,51 @@ async function create(sql: Awaited<ReturnType<typeof db>>, b: any, origin: strin
     return json({ id, token });
   }
   return oops("Pay by card or USDC.");
+}
+
+/** A claim (api/_cv.ts): reserve the wallet, then burn, then paid. A burn never happens without an order to ship;
+ * a failed burn leaves nothing behind. */
+async function claim(sql: Awaited<ReturnType<typeof db>>, b: any, origin: string, ip: string) {
+  if (!cvOpen()) return oops("Claims aren't open yet.", 503);
+  if (!cartOk(b.cart) || b.cart.wedgie !== 1 || b.cart.kit) return oops("A claim is one wedgie.");
+  if (typeof b.sealed !== "string" || !/^v1\.[A-Za-z0-9_.-]{40,4000}$/.test(b.sealed)) return oops("The address didn't come through sealed.");
+  if (typeof b.email !== "string" || b.email.length > 100 || !EMAIL.test(b.email.trim())) return oops("Fill in your email.");
+  if (typeof b.wallet !== "string" || !/^0x[0-9a-fA-F]{40}$/.test(b.wallet)) return oops("Connect a wallet.");
+  if (typeof b.signature !== "string" || !/^0x[0-9a-fA-F]{130,4000}$/.test(b.signature)) return oops("Sign with your wallet.");
+  const wallet = b.wallet.toLowerCase();
+  if (!(await cvSigned(wallet, b.signature))) return oops("That signature isn't from this wallet.", 403);
+  const cart: Cart = { wedgie: 1, kit: 0, ...(b.cart.abroad ? { abroad: true } : {}) };
+  await expireOld(sql);
+  const many = await tooMany(sql, ip);
+  if (many) return oops(many, 429);
+  const no = short(cart, await stockLeft(sql));
+  if (no) return oops(no, 409);
+  const c = await cvClaims(sql, wallet);
+  if (c.mine) return oops("This wallet already claimed its wedgie.", 409);
+  if (c.used >= cvMax()) return oops("All the claim wedgies are gone.", 409);
+  const id = randomHex(6), token = await tokenOf(id), th = await sha256(token);
+  const keyed = !!env("SHOP_MAIL_KEY");
+  const eh = keyed ? await emailHash(b.email) : null, ee = keyed ? await lock(b.email.trim()) : null;
+  const lines = [{ item: "wedgie", qty: 1, cents: 0 }];
+  const taken = await sql`insert into cv_claims (wallet, order_id) values (${wallet}, ${id}) on conflict do nothing returning wallet`;
+  if (!taken.length) return oops("This wallet already claimed its wedgie.", 409);
+  const undo = async () => { await sql`delete from orders where id = ${id} and status = 'new'`; await sql`delete from cv_claims where wallet = ${wallet} and order_id = ${id}`; };
+  try {
+    await sql`insert into orders (id, token_hash, cart, lines, cents, pay, sealed, payer, ip, email_hash, email_enc) values (${id}, ${th}, ${JSON.stringify(cart)}, ${JSON.stringify(lines)}, 0, 'cv', ${b.sealed}, ${wallet}, ${ip}, ${eh}, ${ee})`;
+  } catch (e) { await undo(); throw e; }
+  if (oversold(await stockLeft(sql), cart)) { await undo(); return oops(SOLD, 409); }
+  const r = await cvSpend(wallet, b.signature);
+  if (!r.ok) {
+    await undo();
+    if (r.short != null) return oops(`This wallet has ${fmtCv(r.short)} CV. A wedgie takes ${fmtCv(cvCost())}.`, 402);
+    return oops("larv.ai didn't answer. Nothing was burned.", 502);
+  }
+  try {
+    await sql`update orders set status = 'paid', paid_at = now() where id = ${id}`;
+    await sql`update cv_claims set burned_at = now() where wallet = ${wallet}`;
+  } catch { await cvAlarm(id, wallet); }
+  await mailPaid(sql, id, origin);
+  return json({ id, token });
 }
 
 const SOLD = "Someone just took the last one.";
