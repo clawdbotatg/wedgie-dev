@@ -33,8 +33,10 @@ def dollars(v):
     return "$" + commas(i) + "." + f
 
 
-def block(chain, log=None):
+def block(chain, log=None, keep=False):
     kw = {"log": log} if log else {}            # log: firmware 0.3.72+
+    if keep:
+        kw["keep"] = True
     return "#" + commas(str(int(net.chain(chain, "eth_blockNumber", **kw), 16)))
 
 
@@ -193,13 +195,14 @@ def fast():
                 raise
 
 
-def logs():
-    """Firmware 0.3.72+ reports each step of its own TLS (net.get log=)."""
+def fw():
+    """The firmware's version: 0.3.72+ reports each step of its own TLS (net.get log=), 0.3.74+ keeps a connection
+    open (keep=True: the block, asked of the same node right after the price, skips the handshake)."""
     try:
         import wedgie
-        return tuple(int(x) for x in wedgie.VERSION.split(".")) >= (0, 3, 72)
+        return tuple(int(x) for x in wedgie.VERSION.split("."))
     except Exception:
-        return False
+        return (0,)
 
 
 def run():
@@ -208,15 +211,16 @@ def run():
     tab = Table(d, keys)
     arrows(tab)
     tab.draw()
-    lg = logs()
+    v = fw()
+    lg, kp = v >= (0, 3, 72), v >= (0, 3, 74)
     first = True
     while True:
         if first:
             tab.fetch("wedgie.dev", fast, dollars, ui.MUTED, steps=False)
             first = False
         if lg:
-            tab.fetch("Chainlink", lambda log: net.price(log=log), dollars, ui.GREEN_D)
-            tab.fetch("Eth block", lambda log: block(1, log), str)
+            tab.fetch("Chainlink", lambda log: net.price(log=log, keep=True) if kp else net.price(log=log), dollars, ui.GREEN_D)
+            tab.fetch("Eth block", lambda log: block(1, log, kp), str)
             tab.fetch("Coinbase", lambda log: float(net.get("https://api.coinbase.com/v2/prices/ETH-USD/spot", pick="data.amount", log=log)), dollars, ui.GREEN_D)
         else:
             tab.fetch("Chainlink", net.price, dollars, ui.GREEN_D, steps=False)
