@@ -22,6 +22,10 @@ wedgie), PR it to the registry so every wallet gets it. Always. Ones the spec ca
 - `uniswap/calldata-SwapRouter02.json`: the router before it. The registry's swaps (our words), plus `multicall`
   with each call in it, unwrap/sweep (and their fee versions), refund, wrap, on 5 chains.
 
+- `lifi/calldata-LIFIDiamond-swaps.json`: the registry's LI.FI same-chain swaps (6) plus `swapTokensGeneric`, with
+  `senderAddress: "@.from"` on the receiver (ours, `wire/README.md`): red when it isn't this Safe. Bridges stay the
+  registry's. Made by `tools/make_lifi.py` from the registry file.
+
 The 0x..01 and 0x..02 recipients are Uniswap's "the caller" (this Safe) and "the router" (a step in the middle,
 hidden). Fields a small screen can skip are `"visible": "optional"`.
 

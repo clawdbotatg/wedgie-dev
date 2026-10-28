@@ -1,0 +1,16 @@
+{
+ "tag": "b404bedb",
+ "registry": "171b6b5bf137e2433a4bde35cffd64d4d7fe25bd",
+ "issued": 1793158151,
+ "roots": {
+  "a": "fca6136516b17f92a6c57adec1756611f80edbda0fa9a39027fdf23dffcb317e",
+  "b": "a6fdccfca321acb360d327226531fa5f089c515addddb14fe0f9ff55ab3694fa"
+ },
+ "audited": 1383,
+ "notAudited": 6483,
+ "tokens": 2472,
+ "auditors": [
+  "Cyfrin"
+ ],
+ "clearMax": 10000
+}

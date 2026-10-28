@@ -54,8 +54,8 @@ few big words per page, and signs only on **green (A)**. **Red (Y)**, or no answ
   (`safe_clear`) with a Merkle proof to a root built into the app. The host can leave something out (the page
   then says it can't read it), never change it. Audited descriptors (ERC-8176, Cyfrin) and the rest; the rest end
   in red "not audited". Works inside MultiSend (Morpho's approve + deposit).
-- **Warn, don't block.** What it can't read is a big red line or a red page, and A still signs. LI.FI swaps and
-  bridges show who gets paid, then a big red "trust LI.FI". An unlimited approval says "ALL", red.
+- **Warn, don't block.** What it can't read is a big red line or a red page, and A still signs. A LI.FI swap's
+  receiver is red when it isn't this Safe. An unlimited approval says "ALL", red.
 - **Refused outright** (the screen can't show them honestly): a DELEGATECALL to anything but Safe's MultiSend
   ("can take all"), a gas refund (gasPrice > 0: send with gasPrice 0), an empty batch.
 - A press made before a page is up never answers it (no answer in a page's first 0.6 s).

@@ -326,7 +326,9 @@ def _param(f, ctx, base):
         return [7, val, sorted([key(k), v] for k, v in e.items())]
     if fmt == "addressName":
         return [8, val, [NAME_TYPES[x] for x in p.get("types") or []], [],
-                [_const(ctx.ref(a)) for a in ([p["senderAddress"]] if isinstance(p.get("senderAddress"), str) else p.get("senderAddress") or [])],
+                # "@.from" (ours): the sender itself, no stand-in address; b"" matches no address, so only this Safe is
+                [b"" if a == "@.from" else _const(ctx.ref(a))
+                 for a in ([p["senderAddress"]] if isinstance(p.get("senderAddress"), str) else p.get("senderAddress") or [])],
                 None]
     if fmt == "calldata":
         callee = pv("calleePath", "callee", 5)

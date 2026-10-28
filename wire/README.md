@@ -55,7 +55,7 @@ updated: an app only reads its own tag's data. Descriptors are compiled from cle
 `includes`, the same JSON an auditor hashes; an attestation counts only if its EAS signature recovers to an auditor
 in `AUDITORS` and its data is that hash.
 
-## Two additions of ours (proposed for ERC-7730 / ERC-8362)
+## Additions of ours (proposed for ERC-7730 / ERC-8362)
 
 Found on a real Uniswap v4 swap (10-27): the wedgie said "Take out: 0 USDC", and the minimum back was hidden.
 
@@ -80,7 +80,13 @@ Found on a real Uniswap v4 swap (10-27): the wedgie said "Take out: 0 USDC", and
    Wire: case `[2, param]`, param's value null (the switch's). The draft already has `format` in a case, but only
    `customEncoding`, which decodes the bytes again.
 
-Standard: `tokenAmount`, `tokenPath`, `threshold`/`message`, ERC-8362's `switch`. Ours: the two above, in
+3. **The sender itself as `senderAddress`** (`addressName` `params.senderAddress: "@.from"`). ERC-7730 lists
+   stand-in addresses only (Uniswap's 0x..01). LI.FI has none: its `_receiver` is just who gets paid, and should
+   be the Safe. With `"@.from"` the wallet shows "this Safe" when it is, and red "not this Safe!" when it isn't.
+   Wire: an empty byte string in the senderAddress list (it matches no address). In
+   `descriptors/lifi/calldata-LIFIDiamond-swaps.json` (the registry's 6 swaps + `swapTokensGeneric`).
+
+Standard: `tokenAmount`, `tokenPath`, `threshold`/`message`, ERC-8362's `switch`. Ours: 1 and 2 above, in
 `descriptors/uniswap/calldata-UniversalRouter-v2.{0,1}.json` (v4 actions) only. `MAX_DEPTH` is 28 (was 24): the
 switch on a flag inside a v4 action inside a command is two levels deeper.
 
