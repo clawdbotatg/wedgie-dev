@@ -73,6 +73,9 @@ const IWQ = "https://instantwallet.io/api/safe/queue";
 const SLOW_MS = 8000;
 const appLink = (chain: number, safe: string, path = "home") => `https://app.safe.global/${path}?safe=${CHAINS[chain].app || CHAINS[chain].key}:${safe}`;
 const LINE_MAX = 6000;      // the wedgie drops a USB line over 6 KB
+// clear-sim (github.com/clawdbotatg/clear-sim): runs the tx and signs what goes in and out. The wedgie picks the
+// nonce, checks the signature against its own list of simulator keys, and shows a short page first (safe-28+).
+const SIM_URL = "https://sim.wedgie.dev";
 const DATA_MAX = 8000;      // wedgie-safe safe_data pieces: up to this many bytes (what an RP2040 heap joins safely)
 
 // Safe's service goes through /api/safe (our key: without one Safe allows 5,000 reads a month per IP, and one person's
@@ -399,6 +402,7 @@ export function safe(main: HTMLElement) {
   }
   let chunk = 0;          // hex chars per safe_data piece (its hello's safe_chunk), 0: this app can't take pieces
   let clearTag = "";      // the clear-signing data its app trusts (its hello's safe_clear), "": none (an older app)
+  let simOk = false;      // its app checks a clear-sim answer (its hello's safe_sim: "p256")
   let onWedgie: string[] | null = null;   // the wedgie's own list ("8453:0x.."), null: its app keeps none
   let account = "", busy = false;
   // the view: null = the list; else one Safe
@@ -740,6 +744,7 @@ export function safe(main: HTMLElement) {
       const before = signer;
       key = h.safe; signer = E.signerAddress(key!.x, key!.y); signers = E.signerAddresses(key!.x, key!.y); chunk = +h.safe_chunk || 0;
       clearTag = typeof h.safe_clear === "string" ? h.safe_clear : "";
+      simOk = h.safe_sim === "p256";
       // newer apps work out the address themselves and show it: the two must agree
       if (h.signer && !eqA(h.signer, signer)) { key = null; signer = ""; signers = []; throw new Error(`The wedgie says its address is ${h.signer}, this page works out ${E.signerAddress(h.safe.x, h.safe.y)}. Not using it: tell us.`); }
       const om = oldSaved.match(/^(\w+):(0x[0-9a-fA-F]{40})$/);
@@ -1775,7 +1780,12 @@ export function safe(main: HTMLElement) {
           const a = await r.request({ type: "safe_clear", at: o / 2, hex: cb.slice(o, o + chunk) }, 20000);
           if (a.type !== "safe_clear") break;           // it can still sign; it just can't read the call
         }
-        if (!big) return r.request({ type: "safe_sign", tx }, 200000);
+        // a simulation, asked with the wedgie's own nonce. None (no internet, a revert, too big): the usual pages
+        const sim = simOk && !tx.operation ? await simulate(r, tx).catch(() => null) : null;
+        if (!big) {
+          const withSim = sim ? { ...tx, sim } : tx;
+          return r.request({ type: "safe_sign", tx: JSON.stringify({ id: 1000, type: "safe_sign", tx: withSim }).length > LINE_MAX ? tx : withSim }, 200000);
+        }
         say("Sending the transaction to the wedgie in pieces.");
         const hex = tx.data.slice(2);
         for (let o = 0; o < hex.length; o += chunk) {        // its data first, then the tx with data "@"
@@ -1783,13 +1793,21 @@ export function safe(main: HTMLElement) {
           if (a.type !== "safe_data") throw new Error(a.error || "The wedgie didn't take a piece.");
         }
         say("Look at the wedgie: check what it shows, then press the green button to sign (red says no).");
-        return r.request({ type: "safe_sign", tx: { ...tx, data: "@" } }, 200000);
+        return r.request({ type: "safe_sign", tx: { ...tx, data: "@", ...(sim ? { sim } : {}) } }, 200000);
       });
       if (g.type === "refused") throw new Error("The wedgie said no.");
       if (g.type !== "safe_sig") throw new Error(g.error || "The wedgie didn't sign.");
       if (g.safeTxHash !== E.safeTxHash(chain, safeAddr, t)) throw new Error("The wedgie signed a different hash: not sent.");
       return slots.map((a) => ({ owner: a, signature: E.safeSignature(a, g as E.WedgieSig) }));
     } finally { asking = false; close(); }
+  }
+  /** clear-sim's signed answer for tx, from the Safe, with a nonce the wedgie just picked. */
+  async function simulate(r: Drive.Asker, tx: { chainId: number; safe: string; to: string; value: string; data: string }) {
+    const n = await r.request({ type: "safe_nonce" }, 5000);
+    if (n.type !== "safe_nonce") return null;
+    const a = await fetch(SIM_URL, { method: "POST", headers: { "Content-Type": "application/json" }, signal: AbortSignal.timeout(15000),
+      body: JSON.stringify({ chain: tx.chainId, from: tx.safe, to: tx.to, value: tx.value, data: tx.data, nonce: n.nonce }) }).then((x) => x.json());
+    return a?.r ? a : null;
   }
   async function walletSig(t: E.SafeTx) {
     const from = account = await wallet(chain);
