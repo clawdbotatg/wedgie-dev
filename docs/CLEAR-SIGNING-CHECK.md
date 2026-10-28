@@ -45,4 +45,5 @@ the end unless you mean it. Tick each when it looks right.
   crash (`clear_buf`, `safe_7730.reads`) sits in the wedgie-safe worktree; no live session owns it.
 - **Daily limit** (Zodiac Roles, Instant Wallet) and LI.FI: still hand-written.
 - **Upstream:** PR the solid descriptors to the EF registry (descriptors/README.md). Open: SwapRouter02 multicall + 4 chains, ethereum/clear-signing-erc7730-registry#3161. Next: Candide recovery, passkey factory.
-- One-pool V4 swaps can't name their tokens (ERC-8362 can't pick by direction): hidden, the pay/get lines carry it.
+- One-pool V4 swaps name their tokens (a switch on `zeroForOne`) and v4's 0 reads "all USDC the swap gives"
+  (safe-38, not yet on a real wedgie).

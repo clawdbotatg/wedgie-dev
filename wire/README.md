@@ -55,6 +55,35 @@ updated: an app only reads its own tag's data. Descriptors are compiled from cle
 `includes`, the same JSON an auditor hashes; an attestation counts only if its EAS signature recovers to an auditor
 in `AUDITORS` and its data is that hash.
 
+## Two additions of ours (proposed for ERC-7730 / ERC-8362)
+
+Found on a real Uniswap v4 swap (10-27): the wedgie said "Take out: 0 USDC", and the minimum back was hidden.
+
+1. **A message for an exact value** (`tokenAmount` `params.specialValues`). ERC-7730 has only `threshold` +
+   `message` (at or above X). Some contracts read one exact value as words: Uniswap v4's `OPEN_DELTA` = 0 is
+   "all the pool owes" in TAKE, "all you owe" in SETTLE. A wallet that prints 0 is wrong; a global "0 = all" rule
+   is wrong too (approve 0 is a revoke). So the descriptor says it, per field:
+   ```json
+   "params": {"tokenPath": "currency", "specialValues": {"0": "all {token} the swap gives"}}
+   ```
+   The value (decimal or 0x hex) shows as its text, `{token}` the ticker (no `{token}`: the ticker after it, as
+   `message` does). Wire: one more entry at the end of `tokenAmount`'s param, `[[n, text], ...]`, sent only when
+   given. Proposal for ERC-7730: the same key for `amount` and `tokenAmount`, checked before `threshold`.
+2. **A switch case that is a display format** (ERC-8362 `switch`, case `{"format": ..., "params": ...}` other
+   than `customEncoding`): the switch's own value shown with that format. It picks a token by a flag: a v4
+   one-pool swap's output is `currency1` if `zeroForOne` else `currency0`.
+   ```json
+   {"path": "p.amountOutMinimum", "label": "Get at least", "switch": {"expression": {"path": "p.zeroForOne"},
+    "cases": {"0x01": {"format": "tokenAmount", "params": {"tokenPath": "p.poolKey.currency1"}},
+              "0x00": {"format": "tokenAmount", "params": {"tokenPath": "p.poolKey.currency0"}}}}}
+   ```
+   Wire: case `[2, param]`, param's value null (the switch's). The draft already has `format` in a case, but only
+   `customEncoding`, which decodes the bytes again.
+
+Standard: `tokenAmount`, `tokenPath`, `threshold`/`message`, ERC-8362's `switch`. Ours: the two above, in
+`descriptors/uniswap/calldata-UniversalRouter-v2.{0,1}.json` (v4 actions) only. `MAX_DEPTH` is 28 (was 24): the
+switch on a flag inside a v4 action inside a command is two levels deeper.
+
 ## What building it taught us (for Bacca and the WG)
 
 1. **P-256 isn't an allowed algorithm**, and secp256k1 in pure Python is ~2 s a check. Algorithm 4 (a Merkle root

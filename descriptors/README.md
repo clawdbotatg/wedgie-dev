@@ -13,8 +13,11 @@ wedgie), PR it to the registry so every wallet gets it. Always. Ones the spec ca
 - `uniswap/calldata-UniversalRouter-v2.{0,1}.json`: the Universal Router, written to the ERC-8362 draft
   (Custom Encoding Layout, [ERCs PR #1925](https://github.com/ethereum/ERCs/pull/1925)) as it is: `commands` a
   `customEncoding` sequence, `inputs[]` a `switch` on `commands[$index]` masked `0x3f`, V4 actions a switch in a
-  switch. v2.0 and v2.1 differ only in V4 multi-hop swaps (`minHopPriceX36`). Made from Safe Signer's old
-  `safe_ur.py` address list.
+  switch. v2.0 and v2.1 differ only in V4 swaps (`minHopPriceX36`, `maxHopPriceX36`). Made from Safe Signer's old
+  `safe_ur.py` address list. V4 amounts use our two additions (`wire/README.md`): one-pool swaps name their tokens
+  by `zeroForOne`, and v4's 0 (`OPEN_DELTA`) reads "all {token} the swap gives" (TAKE), "... the swap costs"
+  (SETTLE), "... from before" (swap in), "... owed" (swap out). No optional pool/direction or "From" fields: the
+  bundle Instant Wallet sends is at most 6600 B, and a two-token swap must fit with both tokens.
 
 - `uniswap/calldata-SwapRouter02.json`: the router before it. The registry's swaps (our words), plus `multicall`
   with each call in it, unwrap/sweep (and their fee versions), refund, wrap, on 5 chains.

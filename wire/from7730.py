@@ -301,9 +301,12 @@ def _param(f, ctx, base):
         return [1, val]
     if fmt == "tokenAmount":
         th = p.get("threshold")
-        return [2, val, pv("tokenPath", "token", 5), natives(),
-                int.from_bytes(_const(th), "big") if th is not None else None, p.get("message"),
-                pv("chainIdPath", "chainId", 1)]
+        out = [2, val, pv("tokenPath", "token", 5), natives(),
+               int.from_bytes(_const(th), "big") if th is not None else None, p.get("message"),
+               pv("chainIdPath", "chainId", 1)]
+        if p.get("specialValues"):          # ours: a value the contract reads as words (Uniswap v4's 0 = "all of it")
+            out.append(sorted([int(k, 0), v] for k, v in p["specialValues"].items()))
+        return out
     if fmt == "nftName":
         c = pv("collectionPath", "collection", 5)
         if c is None:
@@ -361,6 +364,10 @@ def _param(f, ctx, base):
 #           | [5, node, count or null] sequence (null: until the bytes run out)
 #   param 14 switch: [14, value, [expression value, element size or null, mask or null], [[key, case]], default]
 #     case: [0, intent, fields] (the value is the ABI encoding of the case's tuple) | [1, node] | null (reject)
+#           | [2, param] (ours: a case that is a display format, e.g. tokenAmount, for the switch's own value;
+#             param's value is null: the switch's)
+#   tokenAmount, ours: [2, value, token, natives, threshold, message, chain, [[n, text]]] (params.specialValues
+#     {"0": "all the {token} the swap gives"}: n shows as its text, "{token}" the ticker; only when given)
 #     element size: "x[$index]", the i-th element of the uint sequence x, i = which value of the switch's own path
 #   value source 3: [3, k], entry k of the object being decoded
 IMPLIED = {"addressName": {"type": "address", "bytes": 32}}
@@ -459,6 +466,9 @@ def _switch(f, ctx, doc, base, seqs):
             cc = None
         elif c.get("format") == "customEncoding":
             cc = [1, _node(c.get("params") or {}, ctx)]
+        elif "format" in c:                 # ours: a display format for the switch's own value (its token by a flag)
+            cc = [2, _param(dict(c, path=f.get("path")), ctx, base)]
+            cc[1][1] = None                 # the switch's own value: not sent twice
         else:
             if len(c) != 1:
                 raise Unsupported("a case is one tuple")

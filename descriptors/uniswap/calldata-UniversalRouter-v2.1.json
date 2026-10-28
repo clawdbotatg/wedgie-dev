@@ -193,18 +193,6 @@
                             "0x0000000000000000000000000000000000000002"
                           ]
                         }
-                      },
-                      {
-                        "path": "payerIsUser",
-                        "label": "From",
-                        "format": "enum",
-                        "params": {
-                          "enum": {
-                            "1": "this Safe",
-                            "0": "the router"
-                          }
-                        },
-                        "visible": "optional"
                       }
                     ]
                   }
@@ -256,18 +244,6 @@
                             "0x0000000000000000000000000000000000000002"
                           ]
                         }
-                      },
-                      {
-                        "path": "payerIsUser",
-                        "label": "From",
-                        "format": "enum",
-                        "params": {
-                          "enum": {
-                            "1": "this Safe",
-                            "0": "the router"
-                          }
-                        },
-                        "visible": "optional"
                       }
                     ]
                   }
@@ -481,18 +457,6 @@
                             "0x0000000000000000000000000000000000000002"
                           ]
                         }
-                      },
-                      {
-                        "path": "payerIsUser",
-                        "label": "From",
-                        "format": "enum",
-                        "params": {
-                          "enum": {
-                            "1": "this Safe",
-                            "0": "the router"
-                          }
-                        },
-                        "visible": "optional"
                       }
                     ]
                   }
@@ -544,18 +508,6 @@
                             "0x0000000000000000000000000000000000000002"
                           ]
                         }
-                      },
-                      {
-                        "path": "payerIsUser",
-                        "label": "From",
-                        "format": "enum",
-                        "params": {
-                          "enum": {
-                            "1": "this Safe",
-                            "0": "the router"
-                          }
-                        },
-                        "visible": "optional"
                       }
                     ]
                   }
@@ -733,54 +685,72 @@
                           },
                           "cases": {
                             "0x06": {
-                              "(((address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks) poolKey,bool zeroForOne,uint128 amountIn,uint128 amountOutMinimum,bytes hookData) p)": {
+                              "(((address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks) poolKey,bool zeroForOne,uint128 amountIn,uint128 amountOutMinimum,uint256 minHopPriceX36,bytes hookData) p)": {
                                 "intent": "Swap (one pool)",
                                 "fields": [
                                   {
-                                    "path": "p.poolKey.currency0",
-                                    "label": "Pool",
-                                    "format": "tokenTicker",
-                                    "params": {
-                                      "nativeCurrencyAddress": [
-                                        "0x0000000000000000000000000000000000000000"
-                                      ]
-                                    },
-                                    "visible": "optional"
-                                  },
-                                  {
-                                    "path": "p.poolKey.currency1",
-                                    "label": "and",
-                                    "format": "tokenTicker",
-                                    "params": {
-                                      "nativeCurrencyAddress": [
-                                        "0x0000000000000000000000000000000000000000"
-                                      ]
-                                    },
-                                    "visible": "optional"
-                                  },
-                                  {
-                                    "path": "p.zeroForOne",
-                                    "label": "Direction",
-                                    "format": "enum",
-                                    "params": {
-                                      "enum": {
-                                        "1": "first to second",
-                                        "0": "second to first"
-                                      }
-                                    },
-                                    "visible": "optional"
-                                  },
-                                  {
                                     "path": "p.amountIn",
-                                    "label": "Amount in",
-                                    "format": "raw",
-                                    "visible": "optional"
+                                    "label": "Pay",
+                                    "switch": {
+                                      "expression": {
+                                        "path": "p.zeroForOne"
+                                      },
+                                      "cases": {
+                                        "0x01": {
+                                          "format": "tokenAmount",
+                                          "params": {
+                                            "tokenPath": "p.poolKey.currency0",
+                                            "nativeCurrencyAddress": [
+                                              "0x0000000000000000000000000000000000000000"
+                                            ],
+                                            "specialValues": {
+                                              "0": "all {token} from before"
+                                            }
+                                          }
+                                        },
+                                        "0x00": {
+                                          "format": "tokenAmount",
+                                          "params": {
+                                            "tokenPath": "p.poolKey.currency1",
+                                            "nativeCurrencyAddress": [
+                                              "0x0000000000000000000000000000000000000000"
+                                            ],
+                                            "specialValues": {
+                                              "0": "all {token} from before"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
                                   },
                                   {
                                     "path": "p.amountOutMinimum",
-                                    "label": "At least out",
-                                    "format": "raw",
-                                    "visible": "optional"
+                                    "label": "Get at least",
+                                    "switch": {
+                                      "expression": {
+                                        "path": "p.zeroForOne"
+                                      },
+                                      "cases": {
+                                        "0x01": {
+                                          "format": "tokenAmount",
+                                          "params": {
+                                            "tokenPath": "p.poolKey.currency1",
+                                            "nativeCurrencyAddress": [
+                                              "0x0000000000000000000000000000000000000000"
+                                            ]
+                                          }
+                                        },
+                                        "0x00": {
+                                          "format": "tokenAmount",
+                                          "params": {
+                                            "tokenPath": "p.poolKey.currency0",
+                                            "nativeCurrencyAddress": [
+                                              "0x0000000000000000000000000000000000000000"
+                                            ]
+                                          }
+                                        }
+                                      }
+                                    }
                                   }
                                 ]
                               }
@@ -797,7 +767,10 @@
                                       "tokenPath": "p.currencyIn",
                                       "nativeCurrencyAddress": [
                                         "0x0000000000000000000000000000000000000000"
-                                      ]
+                                      ],
+                                      "specialValues": {
+                                        "0": "all {token} from before"
+                                      }
                                     }
                                   },
                                   {
@@ -815,54 +788,72 @@
                               }
                             },
                             "0x08": {
-                              "(((address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks) poolKey,bool zeroForOne,uint128 amountOut,uint128 amountInMaximum,bytes hookData) p)": {
+                              "(((address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks) poolKey,bool zeroForOne,uint128 amountOut,uint128 amountInMaximum,uint256 maxHopPriceX36,bytes hookData) p)": {
                                 "intent": "Swap exact out (one pool)",
                                 "fields": [
                                   {
-                                    "path": "p.poolKey.currency0",
-                                    "label": "Pool",
-                                    "format": "tokenTicker",
-                                    "params": {
-                                      "nativeCurrencyAddress": [
-                                        "0x0000000000000000000000000000000000000000"
-                                      ]
-                                    },
-                                    "visible": "optional"
-                                  },
-                                  {
-                                    "path": "p.poolKey.currency1",
-                                    "label": "and",
-                                    "format": "tokenTicker",
-                                    "params": {
-                                      "nativeCurrencyAddress": [
-                                        "0x0000000000000000000000000000000000000000"
-                                      ]
-                                    },
-                                    "visible": "optional"
-                                  },
-                                  {
-                                    "path": "p.zeroForOne",
-                                    "label": "Direction",
-                                    "format": "enum",
-                                    "params": {
-                                      "enum": {
-                                        "1": "first to second",
-                                        "0": "second to first"
-                                      }
-                                    },
-                                    "visible": "optional"
-                                  },
-                                  {
                                     "path": "p.amountOut",
-                                    "label": "Amount out",
-                                    "format": "raw",
-                                    "visible": "optional"
+                                    "label": "Get",
+                                    "switch": {
+                                      "expression": {
+                                        "path": "p.zeroForOne"
+                                      },
+                                      "cases": {
+                                        "0x01": {
+                                          "format": "tokenAmount",
+                                          "params": {
+                                            "tokenPath": "p.poolKey.currency1",
+                                            "nativeCurrencyAddress": [
+                                              "0x0000000000000000000000000000000000000000"
+                                            ],
+                                            "specialValues": {
+                                              "0": "all {token} owed"
+                                            }
+                                          }
+                                        },
+                                        "0x00": {
+                                          "format": "tokenAmount",
+                                          "params": {
+                                            "tokenPath": "p.poolKey.currency0",
+                                            "nativeCurrencyAddress": [
+                                              "0x0000000000000000000000000000000000000000"
+                                            ],
+                                            "specialValues": {
+                                              "0": "all {token} owed"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
                                   },
                                   {
                                     "path": "p.amountInMaximum",
-                                    "label": "At most in",
-                                    "format": "raw",
-                                    "visible": "optional"
+                                    "label": "Pay at most",
+                                    "switch": {
+                                      "expression": {
+                                        "path": "p.zeroForOne"
+                                      },
+                                      "cases": {
+                                        "0x01": {
+                                          "format": "tokenAmount",
+                                          "params": {
+                                            "tokenPath": "p.poolKey.currency0",
+                                            "nativeCurrencyAddress": [
+                                              "0x0000000000000000000000000000000000000000"
+                                            ]
+                                          }
+                                        },
+                                        "0x00": {
+                                          "format": "tokenAmount",
+                                          "params": {
+                                            "tokenPath": "p.poolKey.currency1",
+                                            "nativeCurrencyAddress": [
+                                              "0x0000000000000000000000000000000000000000"
+                                            ]
+                                          }
+                                        }
+                                      }
+                                    }
                                   }
                                 ]
                               }
@@ -879,7 +870,10 @@
                                       "tokenPath": "p.currencyOut",
                                       "nativeCurrencyAddress": [
                                         "0x0000000000000000000000000000000000000000"
-                                      ]
+                                      ],
+                                      "specialValues": {
+                                        "0": "all {token} owed"
+                                      }
                                     }
                                   },
                                   {
@@ -910,20 +904,11 @@
                                         "0x0000000000000000000000000000000000000000"
                                       ],
                                       "threshold": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
-                                      "message": "all it holds"
-                                    }
-                                  },
-                                  {
-                                    "path": "payerIsUser",
-                                    "label": "From",
-                                    "format": "enum",
-                                    "params": {
-                                      "enum": {
-                                        "1": "this Safe",
-                                        "0": "the router"
+                                      "message": "all it holds",
+                                      "specialValues": {
+                                        "0": "all {token} the swap costs"
                                       }
-                                    },
-                                    "visible": "optional"
+                                    }
                                   }
                                 ]
                               }
@@ -986,8 +971,9 @@
                                       "nativeCurrencyAddress": [
                                         "0x0000000000000000000000000000000000000000"
                                       ],
-                                      "threshold": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
-                                      "message": "all it holds"
+                                      "specialValues": {
+                                        "0": "all {token} the swap gives"
+                                      }
                                     }
                                   },
                                   {
@@ -1281,18 +1267,6 @@
                             "0x0000000000000000000000000000000000000002"
                           ]
                         }
-                      },
-                      {
-                        "path": "payerIsUser",
-                        "label": "From",
-                        "format": "enum",
-                        "params": {
-                          "enum": {
-                            "1": "this Safe",
-                            "0": "the router"
-                          }
-                        },
-                        "visible": "optional"
                       }
                     ]
                   }
@@ -1344,18 +1318,6 @@
                             "0x0000000000000000000000000000000000000002"
                           ]
                         }
-                      },
-                      {
-                        "path": "payerIsUser",
-                        "label": "From",
-                        "format": "enum",
-                        "params": {
-                          "enum": {
-                            "1": "this Safe",
-                            "0": "the router"
-                          }
-                        },
-                        "visible": "optional"
                       }
                     ]
                   }
@@ -1569,18 +1531,6 @@
                             "0x0000000000000000000000000000000000000002"
                           ]
                         }
-                      },
-                      {
-                        "path": "payerIsUser",
-                        "label": "From",
-                        "format": "enum",
-                        "params": {
-                          "enum": {
-                            "1": "this Safe",
-                            "0": "the router"
-                          }
-                        },
-                        "visible": "optional"
                       }
                     ]
                   }
@@ -1632,18 +1582,6 @@
                             "0x0000000000000000000000000000000000000002"
                           ]
                         }
-                      },
-                      {
-                        "path": "payerIsUser",
-                        "label": "From",
-                        "format": "enum",
-                        "params": {
-                          "enum": {
-                            "1": "this Safe",
-                            "0": "the router"
-                          }
-                        },
-                        "visible": "optional"
                       }
                     ]
                   }
@@ -1821,54 +1759,72 @@
                           },
                           "cases": {
                             "0x06": {
-                              "(((address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks) poolKey,bool zeroForOne,uint128 amountIn,uint128 amountOutMinimum,bytes hookData) p)": {
+                              "(((address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks) poolKey,bool zeroForOne,uint128 amountIn,uint128 amountOutMinimum,uint256 minHopPriceX36,bytes hookData) p)": {
                                 "intent": "Swap (one pool)",
                                 "fields": [
                                   {
-                                    "path": "p.poolKey.currency0",
-                                    "label": "Pool",
-                                    "format": "tokenTicker",
-                                    "params": {
-                                      "nativeCurrencyAddress": [
-                                        "0x0000000000000000000000000000000000000000"
-                                      ]
-                                    },
-                                    "visible": "optional"
-                                  },
-                                  {
-                                    "path": "p.poolKey.currency1",
-                                    "label": "and",
-                                    "format": "tokenTicker",
-                                    "params": {
-                                      "nativeCurrencyAddress": [
-                                        "0x0000000000000000000000000000000000000000"
-                                      ]
-                                    },
-                                    "visible": "optional"
-                                  },
-                                  {
-                                    "path": "p.zeroForOne",
-                                    "label": "Direction",
-                                    "format": "enum",
-                                    "params": {
-                                      "enum": {
-                                        "1": "first to second",
-                                        "0": "second to first"
-                                      }
-                                    },
-                                    "visible": "optional"
-                                  },
-                                  {
                                     "path": "p.amountIn",
-                                    "label": "Amount in",
-                                    "format": "raw",
-                                    "visible": "optional"
+                                    "label": "Pay",
+                                    "switch": {
+                                      "expression": {
+                                        "path": "p.zeroForOne"
+                                      },
+                                      "cases": {
+                                        "0x01": {
+                                          "format": "tokenAmount",
+                                          "params": {
+                                            "tokenPath": "p.poolKey.currency0",
+                                            "nativeCurrencyAddress": [
+                                              "0x0000000000000000000000000000000000000000"
+                                            ],
+                                            "specialValues": {
+                                              "0": "all {token} from before"
+                                            }
+                                          }
+                                        },
+                                        "0x00": {
+                                          "format": "tokenAmount",
+                                          "params": {
+                                            "tokenPath": "p.poolKey.currency1",
+                                            "nativeCurrencyAddress": [
+                                              "0x0000000000000000000000000000000000000000"
+                                            ],
+                                            "specialValues": {
+                                              "0": "all {token} from before"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
                                   },
                                   {
                                     "path": "p.amountOutMinimum",
-                                    "label": "At least out",
-                                    "format": "raw",
-                                    "visible": "optional"
+                                    "label": "Get at least",
+                                    "switch": {
+                                      "expression": {
+                                        "path": "p.zeroForOne"
+                                      },
+                                      "cases": {
+                                        "0x01": {
+                                          "format": "tokenAmount",
+                                          "params": {
+                                            "tokenPath": "p.poolKey.currency1",
+                                            "nativeCurrencyAddress": [
+                                              "0x0000000000000000000000000000000000000000"
+                                            ]
+                                          }
+                                        },
+                                        "0x00": {
+                                          "format": "tokenAmount",
+                                          "params": {
+                                            "tokenPath": "p.poolKey.currency0",
+                                            "nativeCurrencyAddress": [
+                                              "0x0000000000000000000000000000000000000000"
+                                            ]
+                                          }
+                                        }
+                                      }
+                                    }
                                   }
                                 ]
                               }
@@ -1885,7 +1841,10 @@
                                       "tokenPath": "p.currencyIn",
                                       "nativeCurrencyAddress": [
                                         "0x0000000000000000000000000000000000000000"
-                                      ]
+                                      ],
+                                      "specialValues": {
+                                        "0": "all {token} from before"
+                                      }
                                     }
                                   },
                                   {
@@ -1903,54 +1862,72 @@
                               }
                             },
                             "0x08": {
-                              "(((address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks) poolKey,bool zeroForOne,uint128 amountOut,uint128 amountInMaximum,bytes hookData) p)": {
+                              "(((address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks) poolKey,bool zeroForOne,uint128 amountOut,uint128 amountInMaximum,uint256 maxHopPriceX36,bytes hookData) p)": {
                                 "intent": "Swap exact out (one pool)",
                                 "fields": [
                                   {
-                                    "path": "p.poolKey.currency0",
-                                    "label": "Pool",
-                                    "format": "tokenTicker",
-                                    "params": {
-                                      "nativeCurrencyAddress": [
-                                        "0x0000000000000000000000000000000000000000"
-                                      ]
-                                    },
-                                    "visible": "optional"
-                                  },
-                                  {
-                                    "path": "p.poolKey.currency1",
-                                    "label": "and",
-                                    "format": "tokenTicker",
-                                    "params": {
-                                      "nativeCurrencyAddress": [
-                                        "0x0000000000000000000000000000000000000000"
-                                      ]
-                                    },
-                                    "visible": "optional"
-                                  },
-                                  {
-                                    "path": "p.zeroForOne",
-                                    "label": "Direction",
-                                    "format": "enum",
-                                    "params": {
-                                      "enum": {
-                                        "1": "first to second",
-                                        "0": "second to first"
-                                      }
-                                    },
-                                    "visible": "optional"
-                                  },
-                                  {
                                     "path": "p.amountOut",
-                                    "label": "Amount out",
-                                    "format": "raw",
-                                    "visible": "optional"
+                                    "label": "Get",
+                                    "switch": {
+                                      "expression": {
+                                        "path": "p.zeroForOne"
+                                      },
+                                      "cases": {
+                                        "0x01": {
+                                          "format": "tokenAmount",
+                                          "params": {
+                                            "tokenPath": "p.poolKey.currency1",
+                                            "nativeCurrencyAddress": [
+                                              "0x0000000000000000000000000000000000000000"
+                                            ],
+                                            "specialValues": {
+                                              "0": "all {token} owed"
+                                            }
+                                          }
+                                        },
+                                        "0x00": {
+                                          "format": "tokenAmount",
+                                          "params": {
+                                            "tokenPath": "p.poolKey.currency0",
+                                            "nativeCurrencyAddress": [
+                                              "0x0000000000000000000000000000000000000000"
+                                            ],
+                                            "specialValues": {
+                                              "0": "all {token} owed"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
                                   },
                                   {
                                     "path": "p.amountInMaximum",
-                                    "label": "At most in",
-                                    "format": "raw",
-                                    "visible": "optional"
+                                    "label": "Pay at most",
+                                    "switch": {
+                                      "expression": {
+                                        "path": "p.zeroForOne"
+                                      },
+                                      "cases": {
+                                        "0x01": {
+                                          "format": "tokenAmount",
+                                          "params": {
+                                            "tokenPath": "p.poolKey.currency0",
+                                            "nativeCurrencyAddress": [
+                                              "0x0000000000000000000000000000000000000000"
+                                            ]
+                                          }
+                                        },
+                                        "0x00": {
+                                          "format": "tokenAmount",
+                                          "params": {
+                                            "tokenPath": "p.poolKey.currency1",
+                                            "nativeCurrencyAddress": [
+                                              "0x0000000000000000000000000000000000000000"
+                                            ]
+                                          }
+                                        }
+                                      }
+                                    }
                                   }
                                 ]
                               }
@@ -1967,7 +1944,10 @@
                                       "tokenPath": "p.currencyOut",
                                       "nativeCurrencyAddress": [
                                         "0x0000000000000000000000000000000000000000"
-                                      ]
+                                      ],
+                                      "specialValues": {
+                                        "0": "all {token} owed"
+                                      }
                                     }
                                   },
                                   {
@@ -1998,20 +1978,11 @@
                                         "0x0000000000000000000000000000000000000000"
                                       ],
                                       "threshold": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
-                                      "message": "all it holds"
-                                    }
-                                  },
-                                  {
-                                    "path": "payerIsUser",
-                                    "label": "From",
-                                    "format": "enum",
-                                    "params": {
-                                      "enum": {
-                                        "1": "this Safe",
-                                        "0": "the router"
+                                      "message": "all it holds",
+                                      "specialValues": {
+                                        "0": "all {token} the swap costs"
                                       }
-                                    },
-                                    "visible": "optional"
+                                    }
                                   }
                                 ]
                               }
@@ -2074,8 +2045,9 @@
                                       "nativeCurrencyAddress": [
                                         "0x0000000000000000000000000000000000000000"
                                       ],
-                                      "threshold": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
-                                      "message": "all it holds"
+                                      "specialValues": {
+                                        "0": "all {token} the swap gives"
+                                      }
                                     }
                                   },
                                   {
