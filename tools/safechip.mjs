@@ -186,6 +186,17 @@ function ask(t, k, msg = { type: "safe_sign", tx: t }, cb = null, shot = null, k
     const a = h.req({ id: ++id, type: "safe_clear", at: o / 2, hex: cb.slice(o, o + hi.safe_chunk), ...(o ? {} : { n: cb.length / 2 }) }, 20000);
     if (a?.type !== "safe_clear") console.log("     clear piece:", JSON.stringify(a));
   }
+  // as /safe does (LINE_MAX): a safe_sign line over 3 KB sends its data in safe_data pieces first, then "@"
+  if (msg.type === "safe_sign" && hi?.safe_chunk && JSON.stringify({ id: 1000, ...msg }).length > 3000 && msg.tx.data !== "@") {
+    let at = 0;
+    for (let o = 2; o < msg.tx.data.length; o += hi.safe_chunk) {
+      const hex = msg.tx.data.slice(o, o + hi.safe_chunk);
+      const a = h.req({ id: ++id, type: "safe_data", at, hex }, 20000);
+      at += hex.length / 2;
+      if (a?.type !== "safe_data" || a.have !== at) { console.log("     piece:", JSON.stringify(a)); break; }
+    }
+    msg = { ...msg, tx: { ...msg.tx, data: "@" } };
+  }
   const rid = ++id, t0 = h.chip.ms;
   h.chip.write(JSON.stringify({ id: rid, ...msg }) + "\n");
   let got = null;

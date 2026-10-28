@@ -72,7 +72,9 @@ const api = (chain: number) => `https://api.safe.global/tx-service/${CHAINS[chai
 const IWQ = "https://instantwallet.io/api/safe/queue";
 const SLOW_MS = 8000;
 const appLink = (chain: number, safe: string, path = "home") => `https://app.safe.global/${path}?safe=${CHAINS[chain].app || CHAINS[chain].key}:${safe}`;
-const LINE_MAX = 6000;      // the wedgie drops a USB line over 6 KB
+// The wedgie drops a USB line over 6 KB, but one near it needs that much RAM in one piece: a 5.7 KB MultiSend ran out
+// of memory after the drive grew by a sector (0.3.74, safechip). Over 3 KB, the data goes in safe_data pieces.
+const LINE_MAX = 3000;
 // clear-sim (github.com/clawdbotatg/clear-sim): runs the tx and signs what goes in and out. The wedgie picks the
 // nonce, checks the signature against its own list of simulator keys, and shows a short page first (safe-28+).
 const SIM_URL = "https://sim.wedgie.dev";
