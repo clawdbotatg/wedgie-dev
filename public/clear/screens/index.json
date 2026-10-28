@@ -766,5 +766,83 @@
     ]
    }
   ]
+ },
+ {
+  "slug": "approvals",
+  "title": "Approvals and sends",
+  "note": "ERC-20 approve and transfer from the registry's generic descriptor (any token), and the red warnings every dapp gets: an unnamed spender, an unlimited amount, an unknown module, a swap that pays someone else. Safe Signer safe-35.",
+  "cases": [
+   {
+    "name": "Send 25 USDC",
+    "chainId": 8453,
+    "to": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+    "pages": [
+     "screens/approvals/01-1.png",
+     "screens/approvals/01-2.png"
+    ]
+   },
+   {
+    "name": "Pay the Instant relay a 0.02 USDC fee",
+    "chainId": 8453,
+    "to": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+    "pages": [
+     "screens/approvals/02-1.png"
+    ]
+   },
+   {
+    "name": "Approve unlimited USDC to an unknown spender",
+    "chainId": 8453,
+    "to": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+    "pages": [
+     "screens/approvals/03-1.png",
+     "screens/approvals/03-2.png"
+    ]
+   },
+   {
+    "name": "Approve 100 USDC to Uniswap",
+    "chainId": 8453,
+    "to": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+    "pages": [
+     "screens/approvals/04-1.png"
+    ]
+   },
+   {
+    "name": "Stop an approval",
+    "chainId": 8453,
+    "to": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+    "pages": [
+     "screens/approvals/05-1.png",
+     "screens/approvals/05-2.png"
+    ]
+   },
+   {
+    "name": "Send a token it doesn't know",
+    "chainId": 8453,
+    "to": "0xabababababababababababababababababababab",
+    "pages": [
+     "screens/approvals/06-1.png",
+     "screens/approvals/06-2.png"
+    ]
+   },
+   {
+    "name": "Turn on an unknown module",
+    "chainId": 8453,
+    "to": "0x5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+    "pages": [
+     "screens/approvals/07-1.png"
+    ]
+   },
+   {
+    "name": "Uniswap swap that pays someone else",
+    "chainId": 1,
+    "to": "0x23617e59a5925b2a4bf75d73ff6711cd0b29de85",
+    "pages": [
+     "screens/approvals/08-1.png",
+     "screens/approvals/08-2.png",
+     "screens/approvals/08-3.png",
+     "screens/approvals/08-4.png"
+    ]
+   }
+  ]
  }
 ]

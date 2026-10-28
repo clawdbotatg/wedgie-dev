@@ -9,6 +9,9 @@ https://github.com/ZKNoxHQ/eth-universal-signer/blob/7730-wire-format-implementa
 
 ## Status
 
+What shipped and what a human must still see on a real wedgie: `docs/CLEAR-SIGNING-CHECK.md`.
+
+
 - **Used by Safe Signer safe-24** (clawdbotatg/wedgie-safe): `safe_wire.py` is a copy of `wire.py` (keep them the
   same), `safe_7730.py` turns a descriptor into the screen. On the shelf since 10-22 (firmware 0.3.58).
   Uniswap's Universal Router is read from our ERC-8362 descriptor since safe-30 (`safe_ur.py` is gone).
