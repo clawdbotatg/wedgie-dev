@@ -1,0 +1,16 @@
+{
+ "tag": "36a62b9d",
+ "registry": "171b6b5bf137e2433a4bde35cffd64d4d7fe25bd",
+ "issued": 1793144920,
+ "roots": {
+  "a": "0c6e150b82c6b6d4b853835017ede4ad0c64029e8d354ae6eb6ac550400df7f1",
+  "b": "a2a7ca1e32fd7405909972ad2c1e260bae1e679d851f7e004ca65ee27ff53234"
+ },
+ "audited": 1189,
+ "notAudited": 6567,
+ "tokens": 2471,
+ "auditors": [
+  "Cyfrin"
+ ],
+ "clearMax": 10000
+}

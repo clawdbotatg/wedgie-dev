@@ -25,6 +25,10 @@ AUDITORS = {"0x3846c3a30e62075fa916216b35ef04b8f53931f6": "Cyfrin"}     # regist
 EAS_SCHEMA = "0xe023eef113c1670774801c34b377fdf612dd8a4d2fa92fe382e15bd91fafb5c2"   # ERC-8176's EAS schema id, public (gitleaks:allow)
 CHAINS = {1, 10, 56, 100, 137, 146, 999, 4663, 5042, 8453, 9745, 42161, 42220, 43114, 84532, 11155111}   # wedgie-safe's
 CLEAR_MAX = 10000   # bytes of bundle the app made with this release takes (safe-30+; older apps: 6000, src/safe/clear.ts)
+# The registry's descriptors for any contract of a kind (no addresses): bound to ANY, which the app reads a call
+# with when no descriptor is under its own address. Only ERC-20 for now: ERC-721's approve has the same selector.
+GENERIC = {"ercs/calldata-erc20-tokens.json"}
+ANY = "0x7730773077307730773077307730773077307730"
 OURS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "descriptors")   # ours, on top of the registry
 TOKEN_LIST = "https://tokens.uniswap.org"
 # then CoinGecko's top 1,000 coins by market cap, on the chains it lists (decimals from its per-chain token lists).
@@ -124,6 +128,10 @@ def descriptors(reg):
             if "contract" not in (raw.get("context") or {}) and "includes" not in raw:
                 continue
             doc = resolve_includes(raw, p.parent)
+            rel = os.path.relpath(fn, reg)
+            if rel in GENERIC:  # any token: bound to ANY, which the app falls back to (wedgie-safe safe_book)
+                doc = dict(doc, context=dict(doc["context"], contract={"deployments": [
+                    {"chainId": c, "address": ANY} for c in sorted(CHAINS)]}))
             if "contract" not in (doc.get("context") or {}) or "deployments" not in doc["context"]["contract"]:
                 continue        # an interface others include, or a factory binding: no addresses of its own
             by = attested(fn, descriptor_hash(p), reg)

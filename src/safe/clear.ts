@@ -7,6 +7,7 @@
 export const CLEAR_MAX = 6000;          // bytes: what Safe Signer takes (its CLEAR_MAX), unless the release says more
 const MULTISEND = "8d80ff0a";
 const THIS_SAFE = "0x5afe5afe5afe5afe5afe5afe5afe5afe5afe5afe";
+const ANY = "0x7730773077307730773077307730773077307730";      // wire/release.py: descriptors for any token
 const files = new Map<string, Promise<Record<string, string> | null>>();
 
 type Load = (path: string) => Promise<Record<string, string> | null>;
@@ -57,7 +58,8 @@ export async function bundle(tag: string, chain: number, t: { to: string; data?:
     // the Safe calling itself (owners, threshold, modules): its descriptor is under THIS_SAFE (wedgie-safe safe_book)
     const to = c.to.toLowerCase().slice(2), self = !!t.safe && to === t.safe.toLowerCase().slice(2);
     const f = await file(tag, chain, self ? THIS_SAFE : "0x" + to);
-    const d = f?.["0x" + c.data.slice(0, 8)];
+    // none under its own address: the registry's one for any contract of its kind (ERC-20 transfer, approve)
+    const d = f?.["0x" + c.data.slice(0, 8)] ?? (await file(tag, chain, ANY))?.["0x" + c.data.slice(0, 8)];
     if (d && !seen.has(d)) { seen.add(d); top.push(d); }
     // a call inside the call (multicall, permitAndCall, a Safe setup): any contract the calldata names, or this one
     // (a multicall into itself), whose selector the calldata carries
@@ -70,7 +72,8 @@ export async function bundle(tag: string, chain: number, t: { to: string; data?:
   if (!top.length && !inner.length) return null;
   // the tokens the calldata or a descriptor names (a constant token is only in the descriptor)
   const toks = await file(tag, chain, "tokens");
-  const named = (calls.map((c) => c.data).join("") + top.join("") + inner.join("")).toLowerCase();
+  // and the called contract itself (ERC-20 transfer/approve: the token is @.to)
+  const named = (calls.map((c) => c.to.slice(2) + c.data).join("") + top.join("") + inner.join("")).toLowerCase();
   const tk = Object.entries(toks || {}).filter(([a]) => named.includes(a.slice(2))).map(([, s]) => s);
   // as much as fits, most needed first: the calls' own descriptors, the tokens, then the calls inside. A release
   // made for a newer app says how much that app takes (index.json clearMax)
