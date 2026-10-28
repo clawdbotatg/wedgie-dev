@@ -10,7 +10,7 @@ e8f645382cc4d21e5d58168101e7f3891cd0f3921c26205e153393ff78f5c309  bunker_art.mpy
 @app  {"mod":"buttons","name":"Buttons","entry":"run","files":["buttons.py"]}
 8e228f1f9d15dcc6210319e1034ad59afa21b92c1661cd4b88a3653ea59ff132  buttons.py
 @app  {"mod":"ethprice","name":"ETH Price","entry":"run","files":["ethprice.py"]}
-02ba5b688f972e59c4ec97e2cb230d3f912b7ad8e9b6522ef6bd216596b2953b  ethprice.py
+b5bd3b37106c56ecb87f3f1416afcdbcd74b73d5a465b6b6afb1e8ec204628c7  ethprice.py
 @app  {"mod":"frog","name":"Frog","entry":"run","files":["frog.py"]}
 cf5456e981f7230c0e2b3e1e6a1658c7482159708047d44f89e490aad1891d66  frog.py
 @app  {"mod":"g2048","name":"2048","entry":"run","files":["g2048.py"]}
