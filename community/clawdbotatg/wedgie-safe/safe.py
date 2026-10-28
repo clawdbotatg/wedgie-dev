@@ -40,7 +40,7 @@ import save
 import ui
 from ui import WHITE, INK, MUTED, GREY, GREEN_D, RED
 
-FW = "safe-37"         # and "version" in wedgie.json: the site shows it (v37)
+FW = "safe-39"         # and "version" in wedgie.json: the site shows it (v39)
 RP_ID = b"wedgie.dev"
 FIELDS = '"origin":"https://wedgie.dev"'
 ASK_MS = 120000
@@ -156,7 +156,7 @@ room = None
 def hold():
     global room
     if room is None:
-        gc.collect()
+        _lend()
         try:
             room = bytearray(MAX_DATA + 64)
         except MemoryError:
@@ -201,6 +201,26 @@ CLEAR_BUF = 6600
 clear_buf = None
 clear_have = 0
 CLEAR_MAX = 10000       # bytes: a descriptor (the spec's minimum is 4 KB; our Universal Router's is 5.5), its proof, a few tokens
+
+
+def _lend():
+    """clear_buf's room back to the heap while no bundle is coming in: a big tx (a 5.7 KB USB line, 8 KB of data)
+    needs it (safechip 10-27: the 17-send MultiSend's line was "bad json" with it held). _keep takes it again."""
+    global clear_buf
+    if clear_buf and not clear_have and not isinstance(clear, memoryview):
+        clear_buf = None
+    gc.collect()
+
+
+def _keep():
+    """clear_buf again once nothing big is in flight (after a request is done)."""
+    global clear_buf
+    if clear_buf is None and not have and room is None and not clear_have:
+        gc.collect()
+        try:
+            clear_buf = bytearray(CLEAR_BUF)
+        except MemoryError:             # no clear signing then (a bundle's pieces join at sign time, as before)
+            pass
 
 
 def clear_tag():
@@ -844,7 +864,11 @@ def pump():
         W.send({"type": "error", "error": "line too long"})
     elif line and line.strip():
         try:
-            m = json.loads(line)
+            try:
+                m = json.loads(line)
+            except MemoryError:         # clear_buf's room, then once more
+                _lend()
+                m = json.loads(line)
         except Exception:
             line = None
             gc.collect()
@@ -860,6 +884,8 @@ def pump():
         except Exception as e:
             dirty = True
             W.failed(m.get("id"), e)
+        m = None
+        _keep()
 
 
 def run():
@@ -877,12 +903,7 @@ def run():
         find_signer()
     except Exception as e:              # the address is for the screen; signing works without it
         sys.print_exception(e)
-    global clear_buf
-    gc.collect()
-    try:
-        clear_buf = bytearray(CLEAR_BUF)
-    except MemoryError:                 # no clear signing then (a bundle's pieces join at sign time, as before)
-        pass
+    _keep()
     W.send(W.hello(None, type="ready", running="safe", app=FW, safe=key if state == "ok" else None,
                    signer=signer if state == "ok" else None, safe_state=state, safe_chunk=CHUNK,
                    safe_clear=clear_tag()))
