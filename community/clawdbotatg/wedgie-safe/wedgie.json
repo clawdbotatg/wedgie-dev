@@ -21,6 +21,7 @@
         "safe_icons.py",
         "safe_icons.bin"
       ],
+      "version": "36",
       "entry": "run",
       "fw": "0.3.17",
       "usb": true,

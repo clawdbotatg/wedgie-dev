@@ -40,7 +40,7 @@ import save
 import ui
 from ui import WHITE, INK, MUTED, GREY, GREEN_D, RED
 
-FW = "safe-35"
+FW = "safe-36"         # and "version" in wedgie.json: the site shows it (v36)
 RP_ID = b"wedgie.dev"
 FIELDS = '"origin":"https://wedgie.dev"'
 ASK_MS = 120000
@@ -193,7 +193,12 @@ def on_data(mid, m):
 # Clear signing (safe_7730.py): the host sends a bundle of ERC-7730 wire-format structures ahead of a tx, in
 # safe_clear pieces; the next safe_sign uses it and drops it. The bundle proves itself (a Merkle proof per
 # structure to a root built into this app), so a host can only leave things out, never make them up.
-clear = []              # the bundle, in pieces (bytes)
+clear = []              # the bundle, in pieces (bytes), or a view of clear_buf
+# made once at start, while the heap is in one piece, and reused: made at a bundle's first piece, after a few
+# transactions had broken the heap up, it found no block that big (virtual RP2040, 10-27: 6504 bytes). CLEAR_BUF,
+# not CLEAR_MAX: kept for good, 10 KB left a swap batch's reading short. Instant Wallet sends up to 6000.
+CLEAR_BUF = 6600
+clear_buf = None
 clear_have = 0
 CLEAR_MAX = 10000       # bytes: a descriptor (the spec's minimum is 4 KB; our Universal Router's is 5.5), its proof, a few tokens
 
@@ -218,9 +223,15 @@ def on_clear(mid, m):
         clear, clear_have = [], 0
         n = m.get("n")
         if isinstance(n, int) and 0 < n <= CLEAR_MAX:
-            gc.collect()
-            clear = bytearray(n)
-    if at != clear_have or len(h) % 2 or len(h) > CHUNK or clear_have + len(h) // 2 > (len(clear) if isinstance(clear, bytearray) else CLEAR_MAX):
+            if clear_buf and n <= len(clear_buf):
+                clear = memoryview(clear_buf)[:n]
+            else:                       # bigger than the one made at start (wedgie.dev's up to CLEAR_MAX): try now
+                gc.collect()
+                try:
+                    clear = memoryview(bytearray(n))
+                except MemoryError:     # no block that big: pieces, joined at sign time if there's room then
+                    pass
+    if at != clear_have or len(h) % 2 or len(h) > CHUNK or clear_have + len(h) // 2 > (len(clear) if isinstance(clear, memoryview) else CLEAR_MAX):
         clear, clear_have = [], 0
         W.send({"id": mid, "type": "error", "error": "bad clear piece (a bundle is up to %d bytes)" % CLEAR_MAX})
         return
@@ -231,7 +242,7 @@ def on_clear(mid, m):
         W.send({"id": mid, "type": "error", "error": "bad clear piece"})
         return
     h = m = None
-    if isinstance(clear, bytearray):
+    if isinstance(clear, memoryview):
         clear[clear_have:clear_have + len(b)] = b
     else:
         clear.append(b)
@@ -244,7 +255,7 @@ def parse(t):
     A clear-signing bundle sent ahead comes along as tx["clear"] (and is used up)."""
     global pieces, have, room, clear, clear_have
     room = None
-    cb = (clear if clear_have == len(clear) else None) if isinstance(clear, bytearray) else b"".join(clear) if clear else None
+    cb = (clear if clear_have == len(clear) else None) if isinstance(clear, memoryview) else b"".join(clear) if clear else None
     clear, clear_have = [], 0
     data = t.get("data") or "0x"
     if data == "@":
@@ -581,16 +592,20 @@ def confirm(tx):
     foot = CHAINS.get(tx["chainId"], "chain %d" % tx["chainId"])
     nonce, sim_nonce, info = sim_nonce, None, None
     pages = None
-    if not tx["operation"] and tx.get("clear"):     # a descriptor came with one call: it says what the call does,
-        try:                                        # read before safe_read takes the heap (a Universal Router
-            import safe_7730                        # swap's needs it all)
-            c = safe_7730.read(tx, tx["clear"])
-            if isinstance(c, tuple):
-                pages = [c]
-                if tx["sim"]:           # what a simulation is checked against, while the descriptor is loaded
-                    info = _sim_info(safe_7730, tx)
-            else:                       # it can't: safe_read's own page, with the reason
-                tx["clear"], tx["why"] = None, c
+    if tx.get("clear"):                 # descriptors came along: they say what the calls do, read before safe_read
+        try:                            # takes the heap (a Universal Router swap's needs it all), a batch's too
+            import safe_7730
+            if tx["operation"]:
+                tx["pre"] = safe_7730.reads(tx)
+            else:
+                c = safe_7730.read(tx, tx["clear"])
+                if isinstance(c, tuple):
+                    pages = [c]
+                    if tx["sim"]:       # what a simulation is checked against, while the descriptor is loaded
+                        info = _sim_info(safe_7730, tx)
+                else:                   # it can't: safe_read's own page, with the reason
+                    tx["why"] = c
+            tx["clear"] = None
         finally:
             _unclear()
     if pages is None:
@@ -862,6 +877,12 @@ def run():
         find_signer()
     except Exception as e:              # the address is for the screen; signing works without it
         sys.print_exception(e)
+    global clear_buf
+    gc.collect()
+    try:
+        clear_buf = bytearray(CLEAR_BUF)
+    except MemoryError:                 # no clear signing then (a bundle's pieces join at sign time, as before)
+        pass
     W.send(W.hello(None, type="ready", running="safe", app=FW, safe=key if state == "ok" else None,
                    signer=signer if state == "ok" else None, safe_state=state, safe_chunk=CHUNK,
                    safe_clear=clear_tag()))

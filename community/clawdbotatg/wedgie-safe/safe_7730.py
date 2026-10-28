@@ -460,6 +460,25 @@ def items(tx, bundle, small=False):
     return w.load(ctx.b, w.at(ctx.b, j, 4)), w.load(ctx.b, w.at(ctx.b, j, 5)), t, out
 
 
+def reads(tx):
+    """A batch's calls read from their descriptors ahead of safe_read (safe.confirm: in a batch, safe_read loaded
+    first left no room to compile this module; a real wedgie, 10-27, a swap + the relay fee: MemoryError, 1784
+    bytes). {i: page or reason} by the call's place in the MultiSend batch. safe_read.batch checks the batch."""
+    d, out = tx["data"], {}
+    b = d[68:68 + int.from_bytes(d[36:68], "big")]
+    i = 0
+    while i + 85 <= len(b):
+        n = int.from_bytes(b[i + 53:i + 85], "big")
+        if not b[i] and n >= 4:
+            a = {"chainId": tx["chainId"], "safe": tx["safe"], "operation": 0, "data": b[i + 85:i + 85 + n],
+                 "to": "0x" + "".join("%02x" % c for c in b[i + 1:i + 21]), "value": int.from_bytes(b[i + 21:i + 53], "big")}
+            out[len(out)] = read(a, tx["clear"])
+        else:
+            out[len(out)] = None
+        i += 85 + n
+    return out
+
+
 # approve, increaseAllowance; enableModule, setGuard, setFallbackHandler, setModuleGuard
 RISKY = (b"\x09\x5e\xa7\xb3", b"\x39\x50\x93\x51", b"\x61\x0b\x59\x25", b"\xe1\x9a\x9d\xd9",
          b"\xf0\x8a\x03\x23", b"\xe0\x68\xdf\x37")
