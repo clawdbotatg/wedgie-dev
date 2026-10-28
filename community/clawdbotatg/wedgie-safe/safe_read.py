@@ -5,7 +5,7 @@ from ui import INK, MUTED, GREEN_D, RED
 from safe import word, hx, short, amount, coin, CHAINS, BIG, ADDR
 
 from safe_icons import TOKENS     # tokens the wedgie knows itself: (chain, address) -> (symbol, decimals)
-from safe_book import ROUTERS, MODULES, MODULE_FACTORY, ROLES_COPY, RELAY, NAMES, roles_of, init as _init
+from safe_book import ROUTERS, MODULE_FACTORY, ROLES_COPY, RELAY, NAMES, roles_of, init as _init
 
 MULTICALL3 = "0xca11bde05977b3631167028862be2a173976ca11"       # the budget sends ETH through it
 # the Roles calls the limit pages read (assignRoles, enableModule, disableModule, scopeTarget, revokeTarget,
@@ -62,30 +62,10 @@ def _who(a, safe):
     return _addr_lines("to", a)
 
 
-def _amt(tx, a, n):
-    sym, dec = _tok(tx, a)
-    return "%s %s" % (amount(n, dec), sym) if sym else "%d of %s" % (n, short(a))
-
-
-def _ico(tx, a):
-    """The picture of a token the wedgie knows itself (safe_icons), found by its address; None for any other."""
-    import safe_icons
-    return safe_icons.at(tx["chainId"], a)
-
-
-def _big(tx, a, n, c=INK):
-    """An amount of the token at a, big, with its picture if the wedgie knows it."""
-    return (_amt(tx, a, n), c, BIG, _ico(tx, a))
-
-
 def _bigv(tx, v, c=INK):
     """An amount of the chain's coin, big, with its picture (ETH's on an ETH chain)."""
     import safe_icons
     return ("%s %s" % (amount(v, 18), coin(tx)), c, BIG, safe_icons.of(coin(tx)))
-
-
-def _name(a, safe):
-    return "this Safe" if a == safe else ROUTERS.get(a) or MODULES.get(a) or short(a)
 
 
 def _bytes_at(data, off):
@@ -215,15 +195,6 @@ def describe(tx):
     if to == MODULE_FACTORY and sel == "f1ab873c" and _aarg(data, 0) == ROLES_COPY and len(data) >= 100 and \
             not int.from_bytes(_arg(data, 2), "big") and _bytes_at(data[4:], int.from_bytes(_arg(data, 1), "big")) == _init(safe):
         return "Daily limit", out + [("set it up", INK)]
-    if sel == "095ea7b3" and len(data) == 68:
-        sp, n = _aarg(data, 0), int.from_bytes(_arg(data, 1), "big")
-        c = INK if not n or sp in ROUTERS else RED
-        if not n:
-            return "Stop spending", out + [(_name(sp, safe), INK), ("can't take any", INK)]
-        if n >> 128:                    # "unlimited": every one of them, now and later
-            c = RED
-        who = [("by " + ROUTERS[sp], c)] if sp in ROUTERS else [("by", c)] + _addr_lines("", sp, c)[1:]
-        return "Allow taking", out + [("ALL " + (_tok(tx, to)[0] or "of it"), c, BIG, _ico(tx, to)) if n >> 128 else _big(tx, to, n, c)] + who
     why = tx.get("why")                 # safe.confirm tried the descriptor first and it couldn't
     p = tx.get("pre")                   # a batch's call, read from its descriptor first (safe_7730.reads)
     if isinstance(p, tuple):
@@ -248,13 +219,6 @@ def describe(tx):
     r = _roles(tx, sel) if sel in ROLES_SELS and to == roles_of(safe) else None
     if r:
         return r[0], out + r[1]
-    if sel == "a9059cbb" and len(data) == 68:
-        tok = TOKENS.get((tx["chainId"], to))
-        n = int.from_bytes(_arg(data, 1), "big")
-        if not tok:
-            return "Send", out + [("%d of token" % n, INK)] + _addr_lines("", to, RED)[1:] + _who(_aarg(data, 0), safe)
-        r = _aarg(data, 0)
-        return "Fee" if r == RELAY else "Send", out + [_big(tx, to, n)] + _who(r, safe)
     return "Unknown", out + [("can't read this", RED, BIG)] + _addr_lines("on", to, RED) + ([(why[:28], RED)] if why else [])
 
 

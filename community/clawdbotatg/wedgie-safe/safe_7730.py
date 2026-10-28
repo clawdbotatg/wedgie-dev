@@ -273,8 +273,8 @@ def _text(ctx, call, param, val, i):
                 return "%d of %s" % (n, _addr(tok)), "token?"
             ticker, d = t
             pic = I.at(chain, _addr(tok))
-        if param[4] is not None and n >= param[4]:
-            return "%s %s" % (param[5] or "Unlimited", ticker), _amount(pic)
+        if param[4] is not None and n >= param[4]:      # "!": red on an approval (read's RISKY)
+            return "%s %s" % (param[5] or "Unlimited", ticker), _amount(pic) + "!"
         return "%s %s" % (A.amount(n, d), ticker), _amount(pic)
     if k == 3:                          # nft
         c = _addr(_pick(_values(ctx, call, param[2]), i))
@@ -304,6 +304,8 @@ def _text(ctx, call, param, val, i):
             return a, "safe"
         import safe_book
         n = safe_book.name(a, safe, _hex(call.to) == safe)
+        if param[4]:                    # the descriptor expects the sender here (a swap's recipient): anyone else, red
+            return (n or a), "else"
         return (n, "me" if n == "THIS wedgie" else "named") if n else (a, "addr")
     if k == 10:                         # token ticker
         if any(_same(val, x, 5) for x in (param[2] or [])):
@@ -406,7 +408,7 @@ def _calldata(ctx, call, label, param, data, i, out):
         out.append((label, ("call", None, None, None, callee), "call"))
         return
     inner = Call(callee, bytes(data), amt, sender, chain, call.depth + 1)
-    j, t = ctx.find(ctx.descs, (chain, _key(ctx, callee), bytes(data[:4])))
+    j, t = _find(ctx, chain, callee, bytes(data[:4]))
     if j is None:
         out.append((label, ("call", None, None, None, callee), "call"))
         return
@@ -424,6 +426,16 @@ def _key(ctx, to):
     return to
 
 
+def _find(ctx, chain, to, sel):
+    """The descriptor for a call: under its own address (this Safe's under THIS_SAFE), else the one for any
+    contract of its kind (safe_book.ANY: the registry's ERC-20 transfer and approve)."""
+    j, t = ctx.find(ctx.descs, (chain, _key(ctx, to), sel))
+    if j is None:
+        import safe_book
+        j, t = ctx.find(ctx.descs, (chain, _raw(safe_book.ANY), sel))
+    return j, t
+
+
 def items(tx, bundle, small=False):
     """(intent, owner, trust, [(label, text, kind)]) for tx's call, or raises Bad. small: leave out optional fields."""
     import safe as A
@@ -433,7 +445,7 @@ def items(tx, bundle, small=False):
     data = tx["data"]
     if len(data) < 4:
         raise Bad("no function")
-    j, t = ctx.find(ctx.descs, (tx["chainId"], _key(ctx, _raw(tx["to"])), bytes(data[:4])))
+    j, t = _find(ctx, tx["chainId"], _raw(tx["to"]), bytes(data[:4]))
     if j is None:
         raise Bad("no descriptor for this call")
     call = Call(_raw(tx["to"]), data, tx["value"], _raw(tx["safe"]), tx["chainId"], 0)
@@ -448,6 +460,11 @@ def items(tx, bundle, small=False):
     return w.load(ctx.b, w.at(ctx.b, j, 4)), w.load(ctx.b, w.at(ctx.b, j, 5)), t, out
 
 
+# approve, increaseAllowance; enableModule, setGuard, setFallbackHandler, setModuleGuard
+RISKY = (b"\x09\x5e\xa7\xb3", b"\x39\x50\x93\x51", b"\x61\x0b\x59\x25", b"\xe1\x9a\x9d\xd9",
+         b"\xf0\x8a\x03\x23", b"\xe0\x68\xdf\x37")
+
+
 def read(tx, bundle):
     """(title, lines) for the Swap/Repay/... page, or a reason string it can't."""
     try:
@@ -457,6 +474,10 @@ def read(tx, bundle):
     from ui import INK, MUTED, GREEN_D, RED
     from safe import BIG, ADDR
     lines = []
+    # calls that hand over money or the Safe itself (an approval; a module, guard or fallback): an address the
+    # wedgie has no name for, and an unlimited amount, are red. Whose call it is doesn't matter: the same rule
+    # for every dapp
+    risky = bytes(tx["data"][:4]) in RISKY
 
     def add(label, text, kind):
         if kind == "label":
@@ -475,9 +496,12 @@ def read(tx, bundle):
             for x in cs:
                 add(*x)
         elif kind and kind[:6] == "amount":
-            lines.append((text, INK, BIG, int(kind[6:]) if kind[6:] else None))
+            p = kind[6:].rstrip("!")
+            lines.append((text, RED if risky and kind[-1] == "!" else INK, BIG, int(p) if p else None))
         elif kind == "addr":
-            lines.append((text, INK, ADDR))
+            lines.append((text, RED if risky else INK, ADDR))
+        elif kind == "else":                # someone other than this Safe where the Safe is expected
+            lines.extend([(text, RED, ADDR) if text[:2] == "0x" else (text, RED), ("not this Safe!", RED)])
         elif kind == "safe":
             lines.append(("this Safe", GREEN_D))
         elif kind == "me":

@@ -19,6 +19,9 @@ ROUTERS = {"0x1231deb6f5749ef6ce6943a275a1d3e7486f4eae": "LI.FI",
 # "this Safe" calling itself (owners, threshold, modules) is read with the descriptor at this address
 # (wedgie-dev descriptors/safe/calldata-ThisSafe.json): a Safe is a proxy at its own address on every chain
 THIS_SAFE = "0x5afe5afe5afe5afe5afe5afe5afe5afe5afe5afe"
+# a call with no descriptor under its own address is read with the registry's one for any contract of its kind
+# (ERC-20 transfer, approve), bound here by wedgie-dev wire/release.py
+ANY = "0x7730773077307730773077307730773077307730"
 
 _roles_of = {}          # safe -> its Roles address (the keccaks are slow in plain Python: once each)
 

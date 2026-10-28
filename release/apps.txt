@@ -21,19 +21,20 @@ f0224e865a8f55c77b0c13d353b4663e6d9642e99439d98c3045dea3f594ef91  grove.py
 0cf9561df639b610056d896dbf503f37d4df3c1ef59eab58dfd3118913be23aa  keypad.py
 @app  {"mod":"poidh","name":"Poidh Bounties","entry":"run","usb":true,"files":["poidh.py"]}
 9333052151fee99ff38ba0bd4d696f10707f3837abcf019d057fb7740c54e0a1  poidh.py
-@app  {"mod":"safe","name":"Safe Signer","entry":"run","usb":true,"files":["safe.py","safe_read.py","safe_7730.py","safe_8362.py","safe_book.py","safe_wire.py","safe_roots.py","safe_keccak.py","safe_addr.py","safe_blockie.py","safe_key.py","safe_msg.py","safe_icons.py","safe_icons.bin"]}
-9885212e716a3b9ab5a76f1140037d271e7ad7c885db93db652cb0e57e74892f  safe.py
-59aa4fc8d47a5738a94bdf49008a149e6d66cd9e8031bc36038f69b750778910  safe_read.py
-cc6e9865f2e1af9da41a41f708ca45c4ab9b92256df647feb779a90c49b1f2ba  safe_7730.py
+@app  {"mod":"safe","name":"Safe Signer","entry":"run","usb":true,"files":["safe.py","safe_read.py","safe_7730.py","safe_8362.py","safe_book.py","safe_wire.py","safe_roots.py","safe_keccak.py","safe_addr.py","safe_blockie.py","safe_key.py","safe_msg.py","safe_sim.py","safe_icons.py","safe_icons.bin"]}
+3958fbbf12ffd60a4e1b41f90d11cbf0258d25a124f9b935a38a6bdadb23afc7  safe.py
+b0825f2fda15f477df193fd55018e3f1aa688aab406010527d76973865d02104  safe_read.py
+a0de97c8011c8952e77cb0bab3a5520edea5b7c7655c2024e6a8d1ff2d728b4e  safe_7730.py
 9f7a08afb731618076a383e33e68d0c48cd9b9190d284c5e8dad8f731c38cca3  safe_8362.py
-a35ed9bc4a45fca744d83923a227a6a2b1592542fcd10ea5c9602dcb5ae9c0e2  safe_book.py
+184b51fc4f68133bb8c3ba5ecd3cda27c43bef84e695c65964379d3fc81f826e  safe_book.py
 6110a0ede5b5da38473e3937797c524061d66a0fbf4e4fce31185189ecda7986  safe_wire.py
-70af0be9b64e3cc31a2cc148ab644fdd5a9104e5143298ed4f9568c803e26d18  safe_roots.py
+481e668b983f19a5b9a1ce2a50c9da7e58ef8e46b99575c8af1be87754bda30d  safe_roots.py
 f5465cbfa72b6ea201d7993d09d0c4c163cf40fa1313f7938204bc32c12c94f5  safe_keccak.py
 ebb05bac073a564d54741c5ff029132e66ca2001260c080fb9c171481901304e  safe_addr.py
 44e2ec64f5e7c9acd8c50a293ffa16d19f45deaf2201d88bc7dc4c3a5996bb1e  safe_blockie.py
 c94e3e1188f0e7a6fbf8df03066a9b6f63be336d9f81b7279a1cdcfc784e288f  safe_key.py
 dccf2509eed6af1bc18b5d2e4a8b4a40c130c40e2977e80cf69ffcd39b0aaf4e  safe_msg.py
+3c556283894bdeb915a6918a2a89984340aa3ec169a73d498aff6e3cd5bdde3b  safe_sim.py
 8039de5fb6b0250004ae979a417a65527180c6fbf7e332543309d4aa1f1e33d9  safe_icons.py
 5103284e98ba1298532b0b5a1f9bb74d1882544795678726c88dda69f63cc012  safe_icons.bin
 @app  {"mod":"secret","name":"Secrets","entry":"run","usb":true,"files":["secret.py","secret_box.py"]}

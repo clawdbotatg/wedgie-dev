@@ -31,6 +31,8 @@
 #   can still run (only a tx at its nonce stops it), and the screen says so.
 #   {"type":"safe_prove","text":"Join Telegram","code":".."} -> "Prove it" on screen; on A, safe_proof: the key signs
 #   the code and the chip's factory key vouches for the key (safe_msg.prove; wedgie.dev/telegram).
+#   {"type":"safe_nonce"} -> {"type":"safe_nonce","nonce":"<32 hex>"}: a fresh nonce for the next safe_sign's "sim",
+#   a clear-sim answer the host asked for with it (hello says "safe_sim": "p256"). One use; safe_sim.py.
 import sys, select, json, time, gc, binascii, hashlib
 import lcd as L
 import wedgie as W
@@ -38,7 +40,7 @@ import save
 import ui
 from ui import WHITE, INK, MUTED, GREY, GREEN_D, RED
 
-FW = "safe-33"
+FW = "safe-35"
 RP_ID = b"wedgie.dev"
 FIELDS = '"origin":"https://wedgie.dev"'
 ASK_MS = 120000
@@ -76,6 +78,7 @@ key = None          # {"x": "0x..", "y": "0x..", "chip": "ATECC608" | "OPTIGA Tr
 state = "none"      # "ok" signs; "none" no key yet; "lock" a key from before locking; "swap" not ours (safe_key)
 signer = None       # its Safe owner address, "0x.." checksummed (safe_addr.py), or None
 note = ""           # one line under the home screen (the last thing that happened)
+sim_nonce = None    # the nonce the next tx's simulation must carry (safe_nonce), used up by the next safe_sign
 dirty = True
 
 
@@ -260,6 +263,7 @@ def parse(t):
     if tx["operation"] > 1:
         raise ValueError("bad operation")
     tx["clear"] = cb
+    tx["sim"] = t.get("sim") if isinstance(t.get("sim"), dict) else None     # a signed clear-sim answer (safe_sim)
     return tx
 
 
@@ -509,9 +513,9 @@ def _card(safe):
             d.text(ch, x + 8 * j, y, WHITE if n < 6 or n >= 38 else GREY)
 
 
-def _screen(head, lines, yes, k, foot="", safe=None):
+def _screen(head, lines, yes, k, foot="", safe=None, nav=False):
     """One page of the question: which Safe in a card at the top, the action big, its lines, the chain small
-    at the bottom. True on a real A, False on Y or no answer."""
+    at the bottom. True on a real A, False on Y or no answer; nav: "up" or "down" on the d-pad."""
     d.fill(WHITE)
     if safe:
         _card(safe)
@@ -529,6 +533,8 @@ def _screen(head, lines, yes, k, foot="", safe=None):
         for kk in k.pressed():          # nor one in its first SETTLE ms: a press meant for what was there (audit 10-18)
             if kk in ("A", "Y") and time.ticks_diff(time.ticks_ms(), t0) >= SETTLE:
                 return kk == "A"
+            if nav and kk in ("up", "down"):
+                return kk
         time.sleep_ms(20)
     return False
 
@@ -546,6 +552,20 @@ def _fit(lines, room=None):
     return parts + [part] if part or not parts else parts
 
 
+def _sim_info(C, tx):
+    """(owner, trust, minimum) from the descriptor, for a simulation's check, or None. minimum: what the call
+    says comes back at least, when the token isn't known (its raw "(unknown token)" amount)."""
+    try:
+        _, owner, trust, its = C.items(tx, tx["clear"])
+    except Exception:
+        return None
+    minimum = None
+    for label, text, kind in its:
+        if kind == "warn" and text.endswith("(unknown token)"):
+            minimum = int(text.split(" ")[0])
+    return owner, trust, minimum
+
+
 def _unclear():
     for m in ("safe_8362", "safe_7730", "safe_wire", "safe_book"):     # loaded only while reading one
         sys.modules.pop(m, None)
@@ -554,10 +574,12 @@ def _unclear():
 
 def confirm(tx):
     """The transaction on the screen, a page per action in a batch. True only on A through every page."""
+    global sim_nonce
     k = L.Keys(physical=True)
     k.pressed()
     sf = tx["safe"]
     foot = CHAINS.get(tx["chainId"], "chain %d" % tx["chainId"])
+    nonce, sim_nonce, info = sim_nonce, None, None
     pages = None
     if not tx["operation"] and tx.get("clear"):     # a descriptor came with one call: it says what the call does,
         try:                                        # read before safe_read takes the heap (a Universal Router
@@ -565,6 +587,8 @@ def confirm(tx):
             c = safe_7730.read(tx, tx["clear"])
             if isinstance(c, tuple):
                 pages = [c]
+                if tx["sim"]:           # what a simulation is checked against, while the descriptor is loaded
+                    info = _sim_info(safe_7730, tx)
             else:                       # it can't: safe_read's own page, with the reason
                 tx["clear"], tx["why"] = None, c
         finally:
@@ -583,11 +607,40 @@ def confirm(tx):
             del acts
             del sys.modules["safe_read"]
             _unclear()
+    sim = bool(tx["sim"]) and not tx["operation"]      # a signed simulation: a short page first, the usual under it
     # A page that doesn't fit goes on over more pages: every line is seen before the press (wedgie-dev 10-15:
     # an unknown token's recipient fell off the bottom).
     pages = [(head, part) for head, lines in pages for part in _fit(lines)]
     if not pages:                       # nothing on the screen: never a signature (audit 10-18)
         raise ValueError("nothing to show")
+    if sim:
+        try:
+            import safe_sim
+            sim = safe_sim.check(tx, tx["sim"], nonce)
+            if not sim[1]:              # nothing moves (an approval, a vote): the usual pages say it better
+                raise ValueError("nothing moves")
+            out, warns = safe_sim.pages(tx, tx["sim"], sim[0], sim[1], info)
+        except (ValueError, KeyError, TypeError) as e:
+            print("simulation:", e)     # can't use it: the usual pages
+            sim = None
+        finally:
+            sys.modules.pop("safe_sim", None)
+            gc.collect()
+    if sim:
+        who = sim[0]
+        n = len(warns) + sum(1 for _, ls in pages if any(l[1] == RED for l in ls))
+        main = out[0][1]
+        main.append(("! %s  (down)" % warns[0] if n == 1 and warns else "! %d warnings (down)" % n if n else
+                     "says %s (down)" % who[:ui.COLS_SMALL - 12], RED if n else GREEN_D))
+        if sum(_h(l) for l in main) > ROOM:    # the contract is on its own page too
+            main.pop(0)
+        if sum(_h(l) for l in main) > ROOM and not n:      # and who simulated it (the Checked page)
+            main.pop()
+        usd = [l for l in main if l[1] == MUTED]
+        while sum(_h(l) for l in main) > ROOM and usd:    # still too tall: dollars go (on each page)
+            main.remove(usd.pop())
+        out[0] = (pages[0][0], main)
+        return _browse([(h, part) for h, ls in out for part in _fit(ls)] + pages, k, foot, sf)
     n = len(pages)
     for i, (head, lines) in enumerate(pages):
         last = i == n - 1
@@ -595,6 +648,27 @@ def confirm(tx):
                        "%d/%d %s" % (i + 1, n, foot) if n > 1 else foot, sf):
             return False
     return True
+
+
+def _browse(pages, k, foot, sf):
+    """The short page first, the d-pad's up and down through the rest. Red says no on any page. Green goes to the
+    next page not seen yet, and signs once every page has been: the short page doesn't say who gets paid, or what
+    else the call does, so every line is still seen before the press (as without a simulation)."""
+    i, n, seen = 0, len(pages), 1
+    while True:
+        head, lines = pages[i]
+        ok = seen >= n
+        r = _screen(head, lines, "sign" if ok else "next", k,
+                    "%d/%d %s" % (i + 1, n, "down: more" if i < n - 1 else foot), sf, True)
+        if r is True and not ok:
+            i = seen
+        elif r == "down":
+            i = min(i + 1, n - 1)
+        elif r == "up":
+            i = max(i - 1, 0)
+        else:
+            return r
+        seen = max(seen, i + 1)
 
 
 # ---- requests ---------------------------------------------------------------------------------
@@ -691,7 +765,7 @@ def keep_safe(chain, safe):
 
 
 def handle(m):
-    global dirty
+    global dirty, sim_nonce
     mid, t = m.get("id"), m.get("type")
     if t == "safe_sign":
         on_sign(mid, m.get("tx"))
@@ -711,6 +785,10 @@ def handle(m):
             sys.modules.pop("safe_msg", None)
             _unload()
         dirty = True
+    elif t == "safe_nonce":
+        import os
+        sim_nonce = binascii.hexlify(os.urandom(16)).decode()
+        W.send({"id": mid, "type": "safe_nonce", "nonce": sim_nonce})
     elif t == "safe_list":
         W.send({"id": mid, "type": "safe_list", "safes": save.load("safes", [])})
     elif t == "safe_note":
@@ -723,7 +801,7 @@ def handle(m):
     elif t == "hello":
         W.send(W.hello(mid, running="safe", app=FW, safe=key if state == "ok" else None, signer=signer if state == "ok" else None,
                        safe_state=state, safe_chunk=CHUNK,
-                       safe_clear=clear_tag()))
+                       safe_clear=clear_tag(), safe_sim="p256"))
     else:                               # hello's cousins, shots, jobs, open: the slot's
         import slot
         slot.handle(m)
