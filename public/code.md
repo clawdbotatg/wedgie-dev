@@ -412,6 +412,10 @@ n = int(net.chain(8453, "eth_blockNumber"), 16)      # a chain read: eth_call, e
   Edge; it sends the bytes through wedgie.dev's relay), or `python3 wedgie.py net` in a terminal (straight to
   the site). Nothing open: `net.Error("no internet: ...")` after 15 s. Say so on your screen and in your README.
 - An install or update that comes mid-fetch stops it (0.3.73+): `net.Error("stopped: an install came")`.
+- **Asking the same site again? `keep=True` (0.3.74+):** `net.get(url, keep=True)` (also `post`, `chain(1, ...)`,
+  `price`) leaves the connection open. The next request to that site within 20 s skips the handshake: ~1 s, not
+  5-8, and just as safe. It holds ~16 KB of RAM till `net.close()` or a request to another site. Some sites hang up
+  sooner (BuidlGuidl's node: ~5 s); then it opens a new one by itself.
 - Sites: https only, GET (POST JSON 0.3.70+, 1500 bytes at most), only what `"net"` lists (a name covers its subdomains). Its certificate must come
   from a CA Mozilla trusts: ECDSA (P-256, P-384) or, 0.3.69+, RSA (2048 bits or more). Coinbase, CoinGecko,
   GitHub, Kraken, Binance, mempool.space, Firebase, DefiLlama and wedgie.dev all work. Try yours on

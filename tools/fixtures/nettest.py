@@ -17,7 +17,9 @@ SITES = (
     ("price", None),                                     # net.price: Chainlink over its own TLS (0.3.70+)
     ("block", None),                                     # net.chain(1, ...): BuidlGuidl's node, the same
     ("price", None),                                     # an rm comes mid-fetch: it stops the fetch (0.3.73+)
-)
+    ("keep", None),                                      # keep (0.3.74+): Coinbase, left open
+    ("keep", None),                                      # the same site again: no handshake (BuidlGuidl's node hangs
+)                                                        # up in ~5 s: a virtual wedgie is slower than that)
 
 
 def run():
@@ -26,7 +28,10 @@ def run():
         gc.collect()
         f0, t = gc.mem_free(), time.ticks_ms()
         try:
-            v = net.price() if url == "price" else net.chain(1, "eth_blockNumber") if url == "block" else net.get(url, pick)
+            v = (net.price() if url == "price" else net.chain(1, "eth_blockNumber") if url == "block"
+                 else net.get(SITES[0][0], SITES[0][1], keep=True) if url == "keep" else net.get(url, pick))
+            if isinstance(v, str) and len(v) > 200:
+                v = "%d chars" % len(v)
             W.send({"type": "nettest", "url": url, "v": v, "ms": time.ticks_diff(time.ticks_ms(), t)})
         except net.Error as e:
             W.send({"type": "nettest", "url": url, "error": str(e)})

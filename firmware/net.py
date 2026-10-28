@@ -8,6 +8,9 @@
 #   net.post("https://poidh.xyz/api", {"q": 1}, pick="data")                 -> the same, for a POST of JSON
 #   net.chain(8453, "eth_getBalance", ["0x...", "latest"])                    -> the call's result
 #   net.price()                                                               -> ETH in dollars (a float)
+#   net.get(url, keep=True)  (0.3.74+, also post/chain(1)/price): leaves the connection open; the next request to the
+#                            same site within KEEP ms skips the handshake (~1 s, not 5-8). net.close() ends it
+#                            (~16 KB of RAM back; a later request to another site ends it too).
 #   net.get(url, log=f)      (0.3.72+, also post/chain(1)/price): f(step) as each happens, to show them: "connect",
 #                            "keys", "open", "asked", "cert 0" .. (each certificate checked), "signed" (the
 #                            site's own signature checked), "answer". Each step has passed when it's said.
@@ -31,6 +34,7 @@ import wedgie as W
 
 MS = 15000
 MOST = 6000         # the biggest answer a site may send (bytes, the body): it's all in RAM before pick
+KEEP = 20000        # ms a keep=True connection waits for the next get (then the next get opens a new one)
 RPC1 = "https://mainnet.rpc.buidlguidl.com/"    # Ethereum reads, over the wedgie's own TLS
 FEED = "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"     # Chainlink ETH/USD on Ethereum (8 decimals)
 
@@ -81,9 +85,9 @@ def _own(req):
     return req.get("chain") == 1 and not str(req.get("method", "")).startswith("wedgie_")
 
 
-def _rpc(method, params, ms=MS, log=None):
+def _rpc(method, params, ms=MS, log=None, keep=False):
     import json
-    v = post(RPC1, json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": list(params)}), ms=ms, log=log)
+    v = post(RPC1, json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": list(params)}), ms=ms, log=log, keep=keep)
     if not isinstance(v, dict):
         raise Error("not JSON-RPC")
     if "error" in v:
@@ -144,52 +148,94 @@ def wait(rid, ms=MS):
     return answer(rid)
 
 
-def post(url, data, pick=None, ms=MS, log=None):
+def post(url, data, pick=None, ms=MS, log=None, keep=False):
     """POST JSON (a dict or list, or a str already JSON) to an https site over the wedgie's own TLS."""
     if not isinstance(data, str):
         import json
         data = json.dumps(data)
     if len(data) > 1500:
         raise Error("too much to send")
-    return get(url, pick, ms, data.encode(), log)
+    return get(url, pick, ms, data.encode(), log, keep)
 
 
-def get(url, pick=None, ms=MS, body=None, log=None):
-    """GET an https site over the wedgie's own TLS; its JSON (or text), with pick applied."""
+class _Link:
+    """One TCP connection the computer carries for this app (rid), and the TLS on it (conn, once it's up)."""
+    def __init__(self, host, log):
+        global _rid
+        _rid += 1
+        self.rid, self.serve, self.host, self.conn = _rid, _serve(), host, None
+        self.q = _tcp.setdefault(self.rid, [])
+        self.said, self.later, self.ms = [], (), MS
+        self.t0 = self.used = time.ticks_ms()
+        _out[self.rid] = []
+        _send(self.rid, {"type": "tcp", "rid": self.rid, "host": host})
+        if log:
+            log("connect")
+
+    def send(self, b):
+        import binascii
+        _send(self.rid, {"type": "tcp", "rid": self.rid, "d": binascii.b2a_base64(b, newline=False).decode()})
+
+    def recv(self):
+        q, t = self.q, time.ticks_ms()
+        while not q or self.later:
+            if self.later:              # an install is waiting: stop this fetch now (10-27: an install waited 41 s
+                self.said.append("stopped: an install came")   # on 4 fetches in a row)
+                return b""
+            if time.ticks_diff(time.ticks_ms(), t) > self.ms:
+                raise Error("no internet: open its page on wedgie.dev")
+            if self.serve:
+                self.serve()
+            time.sleep_ms(10)
+        x = q.pop(0)
+        if isinstance(x, str):          # the computer's reason it closed ("not in its net", "can't reach")
+            self.said.append(x)
+            return b""
+        return x or b""
+
+    def end(self):
+        _tcp.pop(self.rid, None)
+        _out.pop(self.rid, None)
+        W.send({"type": "tcp", "rid": self.rid, "end": True})
+
+    def fresh(self, host):
+        """Good for another request to host (keep): the site kept it open, used in the last KEEP ms, and the relay
+        (it ends every connection after 60 s) won't end it under the next one."""
+        n = time.ticks_ms()
+        return (host == self.host and self.conn and not self.conn.dead and time.ticks_diff(n, self.used) < KEEP
+                and time.ticks_diff(n, self.t0) < 45000)
+
+
+_kept = None        # the connection a keep=True get left open (one at a time)
+
+
+def close():
+    """Ends the connection a keep=True get left open, and gives its RAM back (~16 KB)."""
+    global _kept
+    k, _kept = _kept, None
+    if k:
+        k.end()
+        import sys
+        import gc
+        sys.modules.pop("tls", None)
+        gc.collect()
+
+
+def get(url, pick=None, ms=MS, body=None, log=None, keep=False):
+    """GET an https site over the wedgie's own TLS; its JSON (or text), with pick applied. keep (0.3.74+): leave the
+    connection open, so the next get to the same site within KEEP ms skips the handshake (~1 s, not 5-8)."""
+    global _kept
     if not url.startswith("https://"):
         raise Error("https only")
     host, _, path = url[8:].partition("/")
     if not host or ":" in host or "@" in host:
         raise Error("a site name, no port")
-    global _rid
-    _rid += 1
-    rid, serve = _rid, _serve()
-    q, said = _tcp.setdefault(rid, []), []
-    _out[rid] = []
-    _send(rid, {"type": "tcp", "rid": rid, "host": host})
-    if log:
-        log("connect")
-
-    def send(b):
-        import binascii
-        _send(rid, {"type": "tcp", "rid": rid, "d": binascii.b2a_base64(b, newline=False).decode()})
-
-    def recv():
-        t = time.ticks_ms()
-        while not q or later:
-            if later:                   # an install is waiting: stop this fetch now (10-27: an install waited 41 s
-                said.append("stopped: an install came")   # on 4 fetches in a row)
-                return b""
-            if time.ticks_diff(time.ticks_ms(), t) > ms:
-                raise Error("no internet: open its page on wedgie.dev")
-            if serve:
-                serve()
-            time.sleep_ms(10)
-        x = q.pop(0)
-        if isinstance(x, str):          # the computer's reason it closed ("not in its net", "can't reach")
-            said.append(x)
-            return b""
-        return x or b""
+    import gc
+    k, _kept = _kept, None
+    if k and not k.fresh(host):
+        k.end()
+        k = None
+        gc.collect()                    # its ~16 KB back before this one's handshake
     import sys
     import gc
     import trustm
@@ -199,21 +245,36 @@ def get(url, pick=None, ms=MS, body=None, log=None):
     h, later = slot.handle, []
     slot.handle = lambda m: later.append(m) if m.get("type") in ("job", "open", "rm") and len(later) < 4 else h(m)
     trustm.busy[0] += 1                 # the whole fetch: the host's chip check (wedgie.chip) resets the chip, which
-    try:                                # wipes this connection's key and fails both (10-26: "No chip" on the page)
+    link, ok = k, False                 # wipes this connection's key and fails both (10-26: "No chip" on the page)
+    try:
         import tls
-        try:
-            body = tls.Conn(host, send, recv, log=log).get("/" + path, most=MOST, body=body)
-        except tls.Error as e:
-            raise Error(said[0] if said else str(e))
-        except OSError as e:            # no Trust M to do the math
-            raise Error("needs the Trust M chip (%s)" % e)
+        while True:
+            if link is None:
+                link = _Link(host, log)
+            link.said, link.later, link.ms = [], later, ms
+            try:
+                if link.conn is None:
+                    link.conn = tls.Conn(host, link.send, link.recv, log=log)
+                body = link.conn.get("/" + path, most=MOST, body=body, keep=keep)
+                break
+            except tls.Error as e:
+                if link is k and not later:     # a kept one the site or relay closed meanwhile: once more, new
+                    link.end()
+                    link = k = None
+                    continue
+                raise Error(link.said[0] if link.said else str(e))
+            except OSError as e:        # no Trust M to do the math
+                raise Error("needs the Trust M chip (%s)" % e)
+        ok = keep and not link.conn.dead
     finally:
         trustm.busy[0] -= 1
         slot.handle = h
-        del _tcp[rid]
-        _out.pop(rid, None)
-        W.send({"type": "tcp", "rid": rid, "end": True})
-        sys.modules.pop("tls", None)    # ~11 KB of code: back as soon as it's done
+        if ok:
+            link.used, _kept = time.ticks_ms(), link
+        else:
+            if link:
+                link.end()
+            sys.modules.pop("tls", None)    # ~11 KB of code: back as soon as it's done
         gc.collect()
         import micropython
         for m in later:                 # as the USB Timer runs it: nothing else reads USB under its question
@@ -275,12 +336,12 @@ def _walk(v, steps):
     return None
 
 
-def chain(chain_id, method, params=(), ms=MS, log=None):
+def chain(chain_id, method, params=(), ms=MS, log=None, keep=False):
     if _own({"chain": chain_id, "method": method}):
-        return _rpc(method, params, ms, log)
+        return _rpc(method, params, ms, log, keep)
     return wait(ask({"chain": chain_id, "method": method, "params": list(params)}), ms)
 
 
-def price(ms=MS, log=None):
+def price(ms=MS, log=None, keep=False):
     """ETH in dollars: Chainlink's feed on Ethereum (latestAnswer), read over the wedgie's own TLS."""
-    return int(_rpc("eth_call", ({"to": FEED, "data": "0x50d25bcd"}, "latest"), ms, log), 16) / 1e8
+    return int(_rpc("eth_call", ({"to": FEED, "data": "0x50d25bcd"}, "latest"), ms, log, keep), 16) / 1e8

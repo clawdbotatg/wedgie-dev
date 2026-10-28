@@ -432,6 +432,7 @@ class Conn:
         self.pend, self.pi = b"", 0
         self.rd = self.wr = None
         self.checks = []                    # signatures to check (_checks) before reading the answer
+        self.dead = False                   # the site closed it: no more requests on it (keep)
         _sure(self._handshake)
 
     def _read(self, mv):
@@ -660,72 +661,93 @@ class Conn:
         a = _kids(sig, *_tlv(sig, 0))
         return self.chip.verify(kind, d, int.from_bytes(sig[a[0][2]:a[0][3]], "big"), int.from_bytes(sig[a[1][2]:a[1][3]], "big"), pub)
 
-    def get(self, path, headers=b"", most=8192, body=None):
-        return _sure(self._get, path, headers, most, body)
+    def get(self, path, headers=b"", most=8192, body=None, keep=False):
+        return _sure(self._get, path, headers, most, body, keep)
 
-    def _get(self, path, headers, most, body):
+    def _get(self, path, headers, most, body, keep):
         """GET path over this connection (POST `body`, JSON bytes, if given); the answer's body (bytes, up to
-        `most`). Closes it. Only a whole answer: its Content-Length, its last chunk, or the site's close_notify;
-        cut short by the computer, it's an Error."""
+        `most`). keep: asks the site to keep it open for another get (dead: it didn't); else it closes. Only a whole
+        answer: its Content-Length, its last chunk, or the site's close_notify; cut short by the computer, it's an Error."""
         # The request goes before the signatures are checked: sites hang up ~10 s after connecting without one, and a
         # virtual wedgie at half speed took longer than that. The cost: a fake site would see the path asked for.
         # It can't change the answer: nothing is read until every check passes.
         if body is not None:
             headers += b"Content-Type: application/json\r\nContent-Length: %d\r\n" % len(body)    # small: once, ~50 bytes
         self._write(23, (b"POST " if body is not None else b"GET ") + path.encode() + b" HTTP/1.1\r\nHost: " + self.host.encode()
-                    + b"\r\nConnection: close\r\nAccept-Encoding: identity\r\nUser-Agent: wedgie\r\n" + headers + b"\r\n"
+                    + (b"\r\nConnection: keep-alive" if keep else b"\r\nConnection: close") + b"\r\nAccept-Encoding: identity\r\nUser-Agent: wedgie\r\n" + headers + b"\r\n"
                     + (body or b""))
         self.log("asked")
         self._checks()
-        out, hl, cl, chunked, closed = bytearray(), -1, None, False, False
+        # out: the answer so far, n bytes of it. Once its length is known (Content-Length) it's made that size at
+        # once: growing it by doubling needed twice the answer in one piece (16 KB answers, 0.3.74).
+        out, n, hl, cl, chunked, closed = bytearray(1024), 0, -1, None, False, False
         while True:
             try:
                 typ, data = self._record()
             except Error as e:
-                if str(e) == "closed":
+                if str(e) == "closed":            # the computer's end, not the site's: not a whole answer
+                    self.dead = True
                     break
                 raise
             if typ == 21:                     # close_notify
-                closed = True
+                self.dead = closed = True
                 break
             if typ != 23:
                 continue                      # 22: NewSessionTicket and the like
-            if len(out) + len(data) > most + 2048:
+            k = len(data)
+            if n + k > most + 2048:
                 raise Error("answer too big")
-            out += data
+            if n + k > len(out):
+                o, out = out, None
+                out = bytearray(max(n + k, 2 * len(o)) if cl is None or chunked else hl + 4 + cl)
+                out[:n] = memoryview(o)[:n]
+                del o
+            out[n:n + k] = data
+            n += k
             if hl < 0:
-                hl = out.find(b"\r\n\r\n")
+                hl = bytes(out[:n]).find(b"\r\n\r\n")
                 if hl >= 0:
                     for line in bytes(out[:hl]).lower().split(b"\r\n")[1:]:
                         if line.startswith(b"content-length:"):
                             cl = int(line[15:])
                         elif line.startswith(b"transfer-encoding:"):
                             chunked = b"chunked" in line
-            if hl >= 0 and cl is not None and not chunked and len(out) - hl - 4 >= cl:
+                        elif line.startswith(b"connection:") and b"close" in line:
+                            self.dead = True
+                    if cl is not None and not chunked and cl > most:
+                        raise Error("answer too big")
+            if hl >= 0 and cl is not None and not chunked and n - hl - 4 >= cl:
                 break
-            if hl >= 0 and chunked and out.endswith(b"\r\n0\r\n\r\n"):
+            if hl >= 0 and chunked and bytes(out[max(0, n - 7):n]) == b"\r\n0\r\n\r\n":
                 break
         if hl < 0:
             raise Error("no answer")
         self.log("answer")
+        if not keep:
+            self.dead = True
         self.status = int(bytes(out[:hl]).split(b" ", 2)[1])
-        body = memoryview(out)[hl + 4:]
-        if chunked:
-            got, j = bytearray(), 0
+        body = memoryview(out)[hl + 4:n]
+        if chunked:                           # the pieces moved down in place
+            j = w = 0
             while True:
                 e = bytes(body[j:j + 12]).find(b"\r\n")
                 if e < 0:
                     raise Error("cut short")
-                n = int(bytes(body[j:j + e]).split(b";")[0], 16)
-                if not n:
-                    return bytes(got)
-                if j + e + 4 + n > len(body):
+                k = int(bytes(body[j:j + e]).split(b";")[0], 16)
+                if not k:
+                    return bytes(body[:w])
+                if j + e + 4 + k > len(body):
                     raise Error("cut short")
-                got += body[j + e + 2:j + e + 2 + n]
-                j += e + 4 + n
+                for i in range(0, k, 256):    # forward, in steps: the source is always ahead of where it goes
+                    m = min(256, k - i)
+                    body[w + i:w + i + m] = bytes(body[j + e + 2 + i:j + e + 2 + i + m])
+                w += k
+                j += e + 4 + k
         if cl is not None:
             if len(body) != cl:
                 raise Error("cut short")
         elif not closed:
             raise Error("cut short")
+        else:
+            self.dead = True
         return bytes(body)

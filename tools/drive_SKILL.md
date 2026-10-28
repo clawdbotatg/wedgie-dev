@@ -15,14 +15,14 @@ or an ATECC608) **wedged** between the boards on I2C. It runs MicroPython plus t
 into one app, and asks on its own screen before anything that matters. Games, tools, and a hardware signer for a
 Safe multisig. Everything is MIT. Home: https://wedgie.dev
 
-**The current firmware is 0.3.73.** If a wedgie's `hello` says older, update it first: everything here assumes
+**The current firmware is 0.3.74.** If a wedgie's `hello` says older, update it first: everything here assumes
 current firmware.
 
 ```yaml
 name: wedgie
 site: https://wedgie.dev
 skill_index: https://wedgie.dev/skill.md          # this file
-firmware: 0.3.73
+firmware: 0.3.74
 license: MIT (hardware design, case, firmware, site, art)
 source: https://github.com/clawdbotatg/wedgie-dev
 made_by: Austin Griffith and Gus Griffith, with @ClawdBotATG; sold by BuidlGuidl DAO LLC
@@ -223,7 +223,7 @@ https://instantwallet.io. Details: safe.md.
 
 # Talk to a wedgie over USB
 
-Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.73**; if `hello`
+Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.74**; if `hello`
 says older, run `wedgie.py update` first.
 
 ## Talk to it directly
@@ -348,7 +348,7 @@ from answering. Hold **Y**: no WEDGIE drive this time (debugging only).
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.73","fw":"wedgie-0.3.73","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.74","fw":"wedgie-0.3.74","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":3,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -754,10 +754,10 @@ few big words per page, and signs only on **green (A)**. **Red (Y)**, or no answ
   from the fields and signs that.
 - Read in plain words: ETH and token sends (each chain's own coin: 0.5 POL on Polygon), owner and threshold
   changes, modules on/off, Candide recovery (guardians, cancel), Instant Wallet's daily budget (Zodiac Roles),
-  exact approvals, Uniswap swaps (Universal Router V3/V4: pay, get at least, to this Safe, fee), MultiSend
-  batches, removing a queued tx.
-- **Clear signing (ERC-7730):** any other contract call is read from the public ERC-7730 registry's descriptors
-  (https://github.com/ethereum/clear-signing-erc7730-registry), sent by wedgie.dev/safe ahead of the tx
+  exact approvals, MultiSend batches, removing a queued tx.
+- **Clear signing (ERC-7730):** any contract call with a descriptor is read from it: the public ERC-7730
+  registry's (https://github.com/ethereum/clear-signing-erc7730-registry) or wedgie.dev's own (safe-30+: Uniswap's
+  Universal Router, step by step, written to the ERC-8362 custom-encoding draft), sent by wedgie.dev/safe ahead of the tx
   (`safe_clear`) with a Merkle proof to a root built into the app. The host can leave something out (the page
   then says it can't read it), never change it. Audited descriptors (ERC-8176, Cyfrin) and the rest; the rest end
   in red "not audited". Works inside MultiSend (Morpho's approve + deposit).
@@ -1186,6 +1186,8 @@ https://wedgie.dev/virtual.md
 - `name` up to 14 characters (it's printed on the cartridge), Title Case. `about` one line, up to 140
   characters. `label` the cartridge color (`#rrggbb`). `icon` 12 rows of 12 characters: `.` clear,
   `k` black, `w` white, `g` green, `r` red, `y` yellow, `b` blue, `s` grey.
+- `version` (optional): your app's number, like `"35"` or `"1.2"`; the site shows `v35 · <commit>`. Leave it
+  out and the site counts: v1 the first time it's on wedgie.dev, v2 the next.
 - `chip`: `"ATECC608"` or `"OPTIGA Trust M"` if it needs that secure chip. `usb`: true only if the app
   speaks its own protocol on USB (a wallet); almost never. Then the firmware stops answering USB for you.
 - `net`: the sites it gets from the internet (below), like `["api.coinbase.com", "chain"]`. A site name
@@ -1489,6 +1491,10 @@ n = int(net.chain(8453, "eth_blockNumber"), 16)      # a chain read: eth_call, e
   Edge; it sends the bytes through wedgie.dev's relay), or `python3 wedgie.py net` in a terminal (straight to
   the site). Nothing open: `net.Error("no internet: ...")` after 15 s. Say so on your screen and in your README.
 - An install or update that comes mid-fetch stops it (0.3.73+): `net.Error("stopped: an install came")`.
+- **Asking the same site again? `keep=True` (0.3.74+):** `net.get(url, keep=True)` (also `post`, `chain(1, ...)`,
+  `price`) leaves the connection open. The next request to that site within 20 s skips the handshake: ~1 s, not
+  5-8, and just as safe. It holds ~16 KB of RAM till `net.close()` or a request to another site. Some sites hang up
+  sooner (BuidlGuidl's node: ~5 s); then it opens a new one by itself.
 - Sites: https only, GET (POST JSON 0.3.70+, 1500 bytes at most), only what `"net"` lists (a name covers its subdomains). Its certificate must come
   from a CA Mozilla trusts: ECDSA (P-256, P-384) or, 0.3.69+, RSA (2048 bits or more). Coinbase, CoinGecko,
   GitHub, Kraken, Binance, mempool.space, Firebase, DefiLlama and wedgie.dev all work. Try yours on

@@ -98,8 +98,8 @@ def leaf(san=(HOST,), key=None, issuer="Test CA", ikey=None, **kw):
 class Site:
     """A TLS 1.3 server on 127.0.0.1 with this key and chain. answer: what it sends for a GET."""
 
-    def __init__(self, key, chain, answer=b"HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello", tls12=False, close=True):
-        self.answer, self.close = answer, close
+    def __init__(self, key, chain, answer=b"HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello", tls12=False, close=True, keep=1):
+        self.answer, self.close, self.keep = answer, close, keep     # keep: requests served on one connection
         cf, kf = os.path.join(TMP, "c%d.pem" % id(self)), os.path.join(TMP, "k%d.pem" % id(self))
         open(cf, "wb").write(b"".join(c.public_bytes(serialization.Encoding.PEM) for c in chain))
         open(kf, "wb").write(key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
@@ -124,13 +124,14 @@ class Site:
         try:
             c.settimeout(5)
             s = self.ctx.wrap_socket(c, server_side=True)
-            req = b""
-            while b"\r\n\r\n" not in req:
-                d = s.recv(4096)
-                if not d:
-                    return
-                req += d
-            s.sendall(self.answer)
+            for _ in range(self.keep):
+                req = b""
+                while b"\r\n\r\n" not in req:
+                    d = s.recv(4096)
+                    if not d:
+                        return
+                    req += d
+                s.sendall(self.answer)
             if self.close:
                 s.unwrap()                      # close_notify
             c.close()
@@ -201,6 +202,33 @@ def fetch(site, host=HOST, **pipe):
         return "crash", traceback.format_exc(limit=3)
     finally:
         p.s.close()
+
+
+def fetch2(site, second=None, **pipe):
+    """Two gets on one kept connection (keep, 0.3.74+): (first, second), each ('ok', body) or ('error', why) or
+    ('crash', ...). second: f(record) -> record, for each whole record the site sends after the first answer."""
+    armed = []
+    if second:
+        pipe["records"] = lambda rs: [second(r) for r in rs] if armed else rs
+    p = Pipe(site.port, **pipe)
+    out, at = [], None
+    try:
+        c = tls.Conn(HOST, p.send, p.recv, chip=Soft())
+        for i in range(2):
+            try:
+                out.append(("ok", c.get("/", most=16000, keep=True)))
+            except tls.Error as e:
+                out.append(("error", str(e)))
+            except Exception:
+                out.append(("crash", traceback.format_exc(limit=3)))
+            armed.append(1)
+            if at is None:
+                at = p.din
+    except tls.Error as e:
+        out.append(("error", str(e)))
+    finally:
+        p.s.close()
+    return out + [None] * (2 - len(out)), at
 
 
 def must_fail(site, what, **kw):
@@ -358,6 +386,31 @@ def main():
     must_fail(Site(k, [c, inter], answer=b"HTTP/1.1 200 OK\r\nContent-Length: 50\r\n\r\nshort"), "shorter than its Content-Length")
     must_fail(Site(k, [c, inter], answer=chunked[:-5]), "a chunked answer without its last chunk")
     must_fail(Site(k, [c, inter], answer=b"HTTP/1.1 200 OK\r\nContent-Length: 20000\r\n\r\n" + bytes(20000)), "too big")
+
+    # keep (0.3.74+): a second request on the same connection. Its answer gets the same protection as the first.
+    kept = Site(k, [c, inter], close=False, keep=2)
+    (a, b), at = fetch2(kept)
+    check(a == ("ok", b"hello") and b == ("ok", b"hello"), "keep: two answers on one connection (%s, %s)" % (a, b))
+    bad = []
+    for off in range(65):               # every bit of the second answer's record flipped in turn
+        for bit in range(8):
+            def f(r, off=off, bit=bit):
+                if off >= len(r):
+                    return r
+                r = bytearray(r)
+                r[off] ^= 1 << bit
+                return bytes(r)
+            (a, b), _ = fetch2(kept, second=f)
+            if a != ("ok", b"hello") or b is None or b[0] != "error":
+                bad.append((off, bit, a, b))
+    check(not bad, "keep: every bit of the second answer flipped -> an error each time %s" % (bad[:2] or ""))
+    (a, b), _ = fetch2(kept, second=lambda r: r[:20])
+    check(a == ("ok", b"hello") and b and b[0] == "error", "keep: the second answer cut short -> %s" % (b,))
+    (a, b), _ = fetch2(Site(k, [c, inter], close=False, keep=1))
+    check(a[0] == "ok" and b and b[0] == "error", "keep: the site hung up after the first -> the second says so (%s)" % (b,))
+    b15 = b"HTTP/1.1 200 OK\r\nContent-Length: 15000\r\n\r\n" + bytes(range(256)) * 58 + bytes(152)
+    (a, b), _ = fetch2(Site(k, [c, inter], answer=b15, close=False, keep=2))
+    check(a == ("ok", b15[-15000:]) and b == ("ok", b15[-15000:]), "keep: two 15 KB answers")
 
     # the computer attacks: every answer must be the true one or an Error
     site = Site(k, [c, inter], answer=b"HTTP/1.1 200 OK\r\nContent-Length: 6000\r\n\r\n" + big)

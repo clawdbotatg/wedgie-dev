@@ -85,7 +85,10 @@ export function answerTcp(r: Repl, v: any, net: string[] | undefined, seen?: (wh
     };
     return;
   }
-  if (!s) return;
+  if (!s) {           // not ours (a page opened since: the wedgie kept a connection, net keep): say so at once
+    if (typeof v.d === "string") send({ error: "that connection is gone" });
+    return;
+  }
   if (v.end) {
     socks.delete(rid);
     s.ws.close();
