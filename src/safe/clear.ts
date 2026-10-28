@@ -3,6 +3,8 @@
 // (clawdbotatg/wedgie-safe safe_7730.py). The page only chooses what to send: every structure carries its own Merkle
 // proof to a root built into the app, so leaving one out is all a page could do wrong (the wedgie then says it
 // can't read the call). The bundle is the wire format's eth-sign-request keys 8 (tokens) and 13 (descriptors).
+// review: the clear-review round the wedgie saved (hello's safe_review): its robot-checked structures
+// (/clear/review/<n>/, wire/review.py) stand in for the registry's "not audited" ones; the app checks them against it.
 
 export const CLEAR_MAX = 6000;          // bytes: what Safe Signer takes (its CLEAR_MAX), unless the release says more
 const MULTISEND = "8d80ff0a";
@@ -20,6 +22,13 @@ function file(tag: string, chain: number, name: string, path?: string) {
   const k = path ?? `${tag}/${chain}/${name}`;
   if (!files.has(k)) files.set(k, load(k));
   return files.get(k)!;
+}
+
+/** A contract's descriptors (selector -> structure): the release's, with the review round's in place of the same. */
+async function descs(tag: string, chain: number, addr: string, review: number) {
+  const f = await file(tag, chain, addr);
+  const g = review > 0 ? await file(tag, chain, addr, `review/${review}/${chain}/${addr}`) : null;
+  return g ? { ...(f || {}), ...g } : f;
 }
 
 /** The calls in a MultiSend batch (its calldata, hex without 0x): operation, to, data each (describe.ts's unbatch, kept here so
@@ -47,7 +56,7 @@ const head = (n: number) => n < 24 ? (0x80 + n).toString(16) : n < 256 ? "98" + 
  * The bundle for a Safe tx (hex, no 0x), or null when the registry has nothing for any call in it. tag: the data the
  * wedgie's app trusts (its hello's safe_clear).
  */
-export async function bundle(tag: string, chain: number, t: { to: string; data?: string | null; operation?: number | string; safe?: string }) {
+export async function bundle(tag: string, chain: number, t: { to: string; data?: string | null; operation?: number | string; safe?: string }, review = 0) {
   const data = (t.data || "0x").slice(2).toLowerCase();
   const calls = +(t.operation || 0) === 1 && data.startsWith(MULTISEND)
     ? unbatch(data).filter((c) => c.operation === 0)
@@ -57,14 +66,14 @@ export async function bundle(tag: string, chain: number, t: { to: string; data?:
     if (c.data.length < 8) continue;
     // the Safe calling itself (owners, threshold, modules): its descriptor is under THIS_SAFE (wedgie-safe safe_book)
     const to = c.to.toLowerCase().slice(2), self = !!t.safe && to === t.safe.toLowerCase().slice(2);
-    const f = await file(tag, chain, self ? THIS_SAFE : "0x" + to);
+    const f = await descs(tag, chain, self ? THIS_SAFE : "0x" + to, review);
     // none under its own address: the registry's one for any contract of its kind (ERC-20 transfer, approve)
-    const d = f?.["0x" + c.data.slice(0, 8)] ?? (await file(tag, chain, ANY))?.["0x" + c.data.slice(0, 8)];
+    const d = f?.["0x" + c.data.slice(0, 8)] ?? (await descs(tag, chain, ANY, review))?.["0x" + c.data.slice(0, 8)];
     if (d && !seen.has(d)) { seen.add(d); top.push(d); }
     // a call inside the call (multicall, permitAndCall, a Safe setup): any contract the calldata names, or this one
     // (a multicall into itself), whose selector the calldata carries
     for (const a of new Set([to, ...addresses(c.data)])) {
-      const g = await file(tag, chain, "0x" + a);
+      const g = await descs(tag, chain, "0x" + a, review);
       if (!g) continue;
       for (const [sel, s] of Object.entries(g)) if (!seen.has(s) && c.data.slice(8).includes(sel.slice(2))) { seen.add(s); inner.push(s); }
     }

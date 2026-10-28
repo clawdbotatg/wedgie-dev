@@ -403,6 +403,7 @@ export function safe(main: HTMLElement) {
   let chunk = 0;          // hex chars per safe_data piece (its hello's safe_chunk), 0: this app can't take pieces
   let clearTag = "";      // the clear-signing data its app trusts (its hello's safe_clear), "": none (an older app)
   let simOk = false;      // its app checks a clear-sim answer (its hello's safe_sim: "p256")
+  let reviewRound = 0;    // the clear-review round its app saved (hello's safe_review; sent newer below), 0: none
   let onWedgie: string[] | null = null;   // the wedgie's own list ("8453:0x.."), null: its app keeps none
   let account = "", busy = false;
   // the view: null = the list; else one Safe
@@ -729,6 +730,15 @@ export function safe(main: HTMLElement) {
     if (app.length && !key && wedgie !== app[0]) readKey(app[0]);
   }
 
+  /** A newer clear-review round than its app saved: the app checks its signature with the key built into it. */
+  async function sendReview(w: W.Wedgie) {
+    const l = await fetch("/clear/review/latest.json", { cache: "no-cache" }).then((x) => x.json());
+    if (!(l?.round > reviewRound)) return;
+    const rd = await fetch(`/clear/review/${l.round}/round.json`).then((x) => x.json());
+    const a = await ask(w, (r) => r.request({ type: "safe_review", ...rd }, 30000));
+    if (a.type === "safe_review" && typeof a.round === "number") reviewRound = a.round;
+  }
+
   let keyTries = 0;
   async function readKey(w: W.Wedgie) {
     wedgie = w;
@@ -745,6 +755,8 @@ export function safe(main: HTMLElement) {
       key = h.safe; signer = E.signerAddress(key!.x, key!.y); signers = E.signerAddresses(key!.x, key!.y); chunk = +h.safe_chunk || 0;
       clearTag = typeof h.safe_clear === "string" ? h.safe_clear : "";
       simOk = h.safe_sim === "p256";
+      reviewRound = typeof h.safe_review === "number" ? h.safe_review : 0;
+      if (typeof h.safe_review === "number") await sendReview(w).catch(() => {});   // robot-checked descriptors
       // newer apps work out the address themselves and show it: the two must agree
       if (h.signer && !eqA(h.signer, signer)) { key = null; signer = ""; signers = []; throw new Error(`The wedgie says its address is ${h.signer}, this page works out ${E.signerAddress(h.safe.x, h.safe.y)}. Not using it: tell us.`); }
       const om = oldSaved.match(/^(\w+):(0x[0-9a-fA-F]{40})$/);
@@ -1772,7 +1784,7 @@ export function safe(main: HTMLElement) {
     asking = true; paintAll();
     say("Look at the wedgie: check what it shows, then press the green button to sign (red says no).");
     // what the registry says about it (ERC-7730), sent ahead: the wedgie checks it against its own roots
-    const cb = clearTag && chunk ? await Clear.bundle(clearTag, chain, { ...t, safe: safeAddr }).catch(() => null) : null;
+    const cb = clearTag && chunk ? await Clear.bundle(clearTag, chain, { ...t, safe: safeAddr }, reviewRound).catch(() => null) : null;
     const close = pressModal("Check it", "then sign", "sign");     // its pages say next, then sign
     try {
       const g = await ask(wedgie, async (r) => {

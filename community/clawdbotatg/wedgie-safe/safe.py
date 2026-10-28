@@ -33,6 +33,9 @@
 #   the code and the chip's factory key vouches for the key (safe_msg.prove; wedgie.dev/telegram).
 #   {"type":"safe_nonce"} -> {"type":"safe_nonce","nonce":"<32 hex>"}: a fresh nonce for the next safe_sign's "sim",
 #   a clear-sim answer the host asked for with it (hello says "safe_sim": "p256"). One use; safe_sim.py.
+#   {"type":"safe_review","round":n,"registry":"<40 hex>","root":"<64 hex>","signature":"<128 hex>"} -> {"type":
+#   "safe_review","round":n}: clear-review's signed round (wedgie.dev/clear/review/<n>/round.json), checked with its
+#   key and saved; then descriptors with its proofs show as robot-checked. hello says "safe_review": <saved round>.
 import sys, select, json, time, gc, binascii, hashlib
 import lcd as L
 import wedgie as W
@@ -40,7 +43,7 @@ import save
 import ui
 from ui import WHITE, INK, MUTED, GREY, GREEN_D, RED
 
-FW = "safe-41"         # and "version" in wedgie.json: the site shows it (v41)
+FW = "safe-42"         # and "version" in wedgie.json: the site shows it (v42)
 RP_ID = b"wedgie.dev"
 FIELDS = '"origin":"https://wedgie.dev"'
 ASK_MS = 120000
@@ -221,6 +224,12 @@ def _keep():
             clear_buf = bytearray(CLEAR_BUF)
         except MemoryError:             # no clear signing then (a bundle's pieces join at sign time, as before)
             pass
+
+
+def review_round():
+    """The clear-review round saved (safe_review), 0 for none: hello says it, so a host sends a newer one."""
+    v = save.load("review", None)
+    return v["round"] if v else 0
 
 
 def clear_tag():
@@ -824,6 +833,12 @@ def handle(m):
         import os
         sim_nonce = binascii.hexlify(os.urandom(16)).decode()
         W.send({"id": mid, "type": "safe_nonce", "nonce": sim_nonce})
+    elif t == "safe_review":           # a signed clear-review round: robot-checked descriptors (safe_7730 root "c")
+        import safe_7730
+        try:
+            W.send({"id": mid, "type": "safe_review", "round": safe_7730.take_review(m)})
+        finally:
+            _unclear()
     elif t == "safe_list":
         W.send({"id": mid, "type": "safe_list", "safes": save.load("safes", [])})
     elif t == "safe_note":
@@ -836,7 +851,7 @@ def handle(m):
     elif t == "hello":
         W.send(W.hello(mid, running="safe", app=FW, safe=key if state == "ok" else None, signer=signer if state == "ok" else None,
                        safe_state=state, safe_chunk=CHUNK,
-                       safe_clear=clear_tag(), safe_sim="p256"))
+                       safe_clear=clear_tag(), safe_sim="p256", safe_review=review_round()))
     else:                               # hello's cousins, shots, jobs, open: the slot's
         import slot
         slot.handle(m)
