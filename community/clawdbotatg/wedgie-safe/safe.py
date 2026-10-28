@@ -43,7 +43,7 @@ import save
 import ui
 from ui import WHITE, INK, MUTED, GREY, GREEN_D, RED
 
-FW = "safe-42"         # and "version" in wedgie.json: the site shows it (v42)
+FW = "safe-45"         # and "version" in wedgie.json: the site shows it (v45)
 RP_ID = b"wedgie.dev"
 FIELDS = '"origin":"https://wedgie.dev"'
 ASK_MS = 120000
@@ -226,6 +226,17 @@ def _keep():
             pass
 
 
+def _join(parts):
+    """The pieces in one block; clear_buf's room, then once more, when there's no block that big (safechip 10-28:
+    a bundle in pieces, 6682 bytes, after _keep found no room for clear_buf)."""
+    gc.collect()
+    try:
+        return b"".join(parts)
+    except MemoryError:
+        _lend()
+        return b"".join(parts)
+
+
 def review_round():
     """The clear-review round saved (safe_review), 0 for none: hello says it, so a host sends a newer one."""
     v = save.load("review", None)
@@ -284,13 +295,15 @@ def parse(t):
     A clear-signing bundle sent ahead comes along as tx["clear"] (and is used up)."""
     global pieces, have, room, clear, clear_have
     room = None
-    cb = (clear if clear_have == len(clear) else None) if isinstance(clear, memoryview) else b"".join(clear) if clear else None
-    clear, clear_have = [], 0
+    # used up first, whatever happens: a join that ran out of memory left them for the next tx, which failed too
+    parts, n, clear, clear_have = clear, clear_have, [], 0
+    cb = (parts if n == len(parts) else None) if isinstance(parts, memoryview) else _join(parts) if parts else None
+    parts = None
     data = t.get("data") or "0x"
     if data == "@":
-        gc.collect()
-        data = b"".join(pieces)
-        pieces, have = [], 0
+        parts, pieces, have = pieces, [], 0
+        data = _join(parts)
+        parts = None
         gc.collect()
     else:
         data = unhex(data)
@@ -638,7 +651,12 @@ def confirm(tx):
         finally:
             _unclear()
     if pages is None:
-        import safe_read
+        try:
+            import safe_read
+        except MemoryError:             # clear_buf's room, then once more (a real wedgie, safe-42, a Uniswap swap + fee
+            sys.modules.pop("safe_read", None)     # from Instant Wallet: MemoryError, 1280 bytes, here)
+            _lend()
+            import safe_read
         acts = None
         try:
             acts = safe_read.batch(tx)
@@ -862,7 +880,17 @@ def pump():
     """One request per call, read through the one line reader (wedgie.lines)."""
     global dirty
     R = W.lines()
-    line = R.pump(_poll)
+    try:
+        line = R.pump(_poll)
+    except MemoryError:                 # the line's one copy found no block: it's gone, clear_buf's room back
+        _lend()
+        W.send({"type": "error", "error": "no room for that line: send it again"})
+        return
+    # a line bigger than any piece (a 17-send batch in one line, 5.7 KB): its copy at the end needs one block
+    # that size, so clear_buf's room goes back first (safechip 10-28, firmware 0.3.74: MemoryError in that
+    # copy). Not for a safe_clear / safe_data piece (CHUNK hex, ~4.1 KB): the bundle's first one needs clear_buf.
+    if line is None and R.n > CHUNK + 500 and clear_buf is not None and not clear_have:
+        _lend()
     if R.intr:                          # a Ctrl-C while sealed: the red question (hatch.py)
         R.intr = False
         if W.SEALED and not W.is_open():
