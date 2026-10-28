@@ -107,6 +107,8 @@ https://wedgie.dev/virtual.md
 - `name` up to 14 characters (it's printed on the cartridge), Title Case. `about` one line, up to 140
   characters. `label` the cartridge color (`#rrggbb`). `icon` 12 rows of 12 characters: `.` clear,
   `k` black, `w` white, `g` green, `r` red, `y` yellow, `b` blue, `s` grey.
+- `version` (optional): your app's number, like `"35"` or `"1.2"`; the site shows `v35 · <commit>`. Leave it
+  out and the site counts: v1 the first time it's on wedgie.dev, v2 the next.
 - `chip`: `"ATECC608"` or `"OPTIGA Trust M"` if it needs that secure chip. `usb`: true only if the app
   speaks its own protocol on USB (a wallet); almost never. Then the firmware stops answering USB for you.
 - `net`: the sites it gets from the internet (below), like `["api.coinbase.com", "chain"]`. A site name

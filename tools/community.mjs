@@ -105,8 +105,10 @@ async function add(list, repo, c) {
   const e = { repo, sha: c.sha, at: c.at, approved: new Date().toISOString().slice(0, 10) };
   if (old?.apps) e.apps = old.apps;
   console.log(`${repo} @ ${c.sha.slice(0, 7)} (${c.at.slice(0, 10)})`);
-  e.v = Object.fromEntries((await vendor(e)).map((a) => [a.mod, a.v]));
-  const past = old ? [...(old.sha !== c.sha && old.v ? [{ sha: old.sha, at: old.at, v: old.v }] : []), ...(old.past || [])] : [];
+  const apps = await vendor(e);
+  e.v = Object.fromEntries(apps.map((a) => [a.mod, a.v]));
+  if (apps.some((a) => a.version)) e.version = Object.fromEntries(apps.filter((a) => a.version).map((a) => [a.mod, a.version]));
+  const past = old ? [...(old.sha !== c.sha && old.v ? [{ sha: old.sha, at: old.at, v: old.v, ...(old.version ? { version: old.version } : {}) }] : []), ...(old.past || [])] : [];
   if (past.length) e.past = past.filter((x) => x.sha !== c.sha);
   if (old) list.repos[list.repos.indexOf(old)] = e; else list.repos.push(e);
 }

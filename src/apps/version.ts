@@ -1,13 +1,12 @@
-// An app's version is its repo's commit: "4f7748d · Oct 4". A wedgie records only v (a hash of the app's
+// An app's version is its repo's commit, after its own number if its wedgie.json gives one: "v35 · 4f7748d". A wedgie records only v (a hash of the app's
 // files) in apps.json; the manifest's `known` (tools/fw.mjs) turns every v the shelf ever published back
 // into its commit, so the page can say which version a wedgie has, and an update apart from a version
 // wedgie.dev never had (one put on from GitHub, /code or wedgie.py). docs/APPS.md "Versions".
 import type { Cart, Manifest } from "../serial/install";
 
-export type Ver = { sha: string; at?: string };
-const day = (at?: string) => (at ? new Date(at).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "");
-/** "4f7748d · Oct 4" */
-export const verText = (x: Ver) => [x.sha.slice(0, 7), day(x.at)].filter(Boolean).join(" · ");
+export type Ver = { sha: string; at?: string; version?: string };
+/** "v35 · 4f7748d", or "4f7748d" (Austin 10-27: the number says it, the hash is for GitHub; no date) */
+export const verText = (x: Ver) => [x.version ? "v" + x.version : "", x.sha.slice(0, 7)].filter(Boolean).join(" · ");
 export const verLink = (repo: string, x: Ver, esc: (s: string) => string) =>
   `<a href="https://github.com/${esc(repo)}/commit/${esc(x.sha)}" target="_blank" rel="noopener">${esc(verText(x))}</a>`;
 
@@ -15,7 +14,7 @@ export const verLink = (repo: string, x: Ver, esc: (s: string) => string) =>
  *  version wedgie.dev published), other (one wedgie.dev never had), or none (no v recorded). */
 export function compare(m: Manifest, c: Cart, v: string | undefined): { is: "same" | "older" | "newer" | "other" | "none"; has?: Ver } {
   if (!v) return { is: "none" };
-  if (v === c.v) return { is: "same", has: c.sha ? { sha: c.sha, at: c.at } : undefined };
+  if (v === c.v) return { is: "same", has: c.sha ? { sha: c.sha, at: c.at, version: c.version } : undefined };
   const k = m.known?.[v];
   if (!k || k.mod !== c.mod || !c.at) return { is: "other" };
   return { is: k.at > c.at ? "newer" : "older", has: k };

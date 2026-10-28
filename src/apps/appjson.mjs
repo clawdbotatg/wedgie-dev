@@ -4,6 +4,7 @@
 //
 //   { "apps": [ { "mod": "snake", "name": "Snake", "about": "...", "files": ["snake/snake.py", ...],
 //                 "entry"?: "run", "chip"?: "ATECC608", "usb"?: true, "fw"?: "0.2.3", "label"?: "#22c452", "icon"?: [12 x 12],
+//                 "version"?: "35",
 //                 "net"?: ["poidh.xyz", "chain"] } ] }
 //
 // A wedgie's flash has no folders for apps: every file goes to its root under its own name. So every file
@@ -75,6 +76,7 @@ export function checkAppJson(j, core = [], taken = []) {
     if (a.usb !== undefined && typeof a.usb !== "boolean") bad("usb: true or leave it out");
     if (a.chip !== undefined && !CHIPS.includes(a.chip)) bad(`chip: ${CHIPS.map((c) => `"${c}"`).join(" or ")}, or leave it out`);
     if (a.fw !== undefined && (typeof a.fw !== "string" || !/^\d+\.\d+\.\d+$/.test(a.fw))) bad("fw: the oldest wedgie firmware it runs on, like \"0.2.3\"");
+    if (a.version !== undefined && (typeof a.version !== "string" || !/^\d+(\.\d+){0,2}$/.test(a.version))) bad("version: a number like \"35\" or \"1.2\" (shown as v35)");
     if (a.label !== undefined && (typeof a.label !== "string" || !/^#[0-9a-f]{6}$/i.test(a.label))) bad("label: a color like \"#22c452\"");
     if (a.net !== undefined && (!Array.isArray(a.net) || a.net.length > 10 || !a.net.every((s) => s === "chain" || (typeof s === "string" && HOST.test(s)))))
       bad("net: up to 10 site names like \"poidh.xyz\" (no https://, no path), or \"chain\"");
@@ -84,7 +86,7 @@ export function checkAppJson(j, core = [], taken = []) {
     apps.push({
       mod: a.mod, name: a.name.trim(), about: a.about || "", files: names, paths: a.files.slice(),
       ...(a.entry ? { entry: a.entry } : {}), ...(a.usb ? { usb: true } : {}), ...(a.chip ? { chip: a.chip } : {}), ...(a.fw ? { fw: a.fw } : {}),
-      ...(a.net?.length ? { net: a.net } : {}),
+      ...(a.net?.length ? { net: a.net } : {}), ...(a.version ? { version: a.version } : {}),
       label: a.label || "#8a8c8e", icon: a.icon || DEFAULT_ICON,
     });
   });

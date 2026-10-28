@@ -26,7 +26,9 @@ history before commit 020765c.
 
 ## Versions
 
-**An app's version is its repo's commit** (`4f7748d · Oct 4`). There is no version number to bump.
+**An app's version is its repo's commit**, shown after a number: `v35 · 30c97dd` (Austin 10-27: the number to
+read, the hash to look it up on GitHub, no date). The number is the app's own `"version"` in its wedgie.json, or
+else which time this repo is on the shelf (v1, v2, ...). `community.json` keeps a given `"version"` per commit.
 
 - **Pushing to the app's repo puts nothing on wedgie.dev.** The site serves only the commit it signed.
   Until you add it again, Update on the site gives the old one. The site says so under the cart:

@@ -24,13 +24,14 @@ import type { Repl } from "./repl";
 import { waitBack, withRepl, type Wedgie } from "./wedgies";
 import { traceNote } from "./repl";
 import { cmpVersion } from "../apps/appjson.mjs";
+import { verText } from "../apps/version";
 import { busy, progress, writeFile } from "./files";
 
 /** url: where to fetch it, when it isn't /fw/<name> (an app from a repo someone added). */
 export type FileInfo = { name: string; size: number; sha256: string; url?: string };
 /** chip: the secure chip it needs ("ATECC608" / "OPTIGA Trust M", as the chip check names them), if any.
  *  fw: the oldest wedgie firmware it runs on. repo/sha/at: an app from a GitHub repo, at that commit (its date); unreviewed: added on this browser, not on the shelf. */
-export type Cart = { mod: string; name: string; entry?: string; usb?: boolean; chip?: string; fw?: string; about?: string; files: string[]; v: string; size: number; label: string; icon: string[]; repo?: string; sha?: string; at?: string; unreviewed?: boolean; net?: string[] };
+export type Cart = { mod: string; name: string; entry?: string; usb?: boolean; chip?: string; fw?: string; about?: string; files: string[]; v: string; size: number; label: string; icon: string[]; repo?: string; sha?: string; at?: string; unreviewed?: boolean; net?: string[]; version?: string };
 /** Core files a newer core dropped: an update deletes them (0.2.0: the menu went). */
 const RETIRED = ["menu.py", "menu.mpy"];
 /** What the firmware keeps free for saves and itself (save.py FLOOR). */
@@ -38,7 +39,7 @@ const FLOOR = 32 * 1024;
 /** Bytes per write while copying: small, so each needs little RAM in one piece (RP2040). */
 const CHUNK = 1024;
 /** known: every v the shelf ever published -> its commit (tools/fw.mjs; src/apps/version.ts). */
-export type Manifest = { version: string; files: FileInfo[]; core: string[]; carts: Cart[]; known?: Record<string, { mod: string; repo: string; sha: string; at: string }>; signed?: boolean };
+export type Manifest = { version: string; files: FileInfo[]; core: string[]; carts: Cart[]; known?: Record<string, { mod: string; repo: string; sha: string; at: string; version?: string }>; signed?: boolean };
 
 let manifest: Promise<Manifest> | null = null;
 export function firmwareManifest(): Promise<Manifest> {
@@ -47,7 +48,7 @@ export function firmwareManifest(): Promise<Manifest> {
 }
 
 /** An app's version as its wedgie shows it under "Installing X" (0.3.59+): "ea626bc Oct 22", its commit. */
-export const appVer = (c: Cart) => c.sha ? [c.sha.slice(0, 7), c.at ? new Date(c.at).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""].filter(Boolean).join(" ") : "";
+export const appVer = (c: Cart) => c.sha ? verText({ sha: c.sha, version: c.version }) : "";
 
 /** A cart's version from its files' sha256s, in carts.json order. Same as cartV in tools/fw.mjs. */
 export async function cartV(hashes: (string | null)[]) {

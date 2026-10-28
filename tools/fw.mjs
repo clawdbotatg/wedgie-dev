@@ -60,9 +60,19 @@ export function buildFirmware() {
     shelfCarts.push({ ...a, v: cartV(hashes), size: a.files.reduce((s, n) => s + byName.get(n).size, 0) });
   }
   carts.unshift(...shelfCarts);        // the shelf's apps first on the site
-  const known = {};
-  for (const e of JSON.parse(readFileSync(join(root, "community.json"), "utf8")).repos)
-    for (const x of [e, ...(e.past || [])]) for (const [mod, v] of Object.entries(x.v || {})) known[v] = { mod, repo: e.repo, sha: x.sha, at: x.at };
+  // An app's number: its wedgie.json's "version", or else which time this is on the shelf (v1, v2, ...)
+  const known = {}, num = {};
+  for (const e of JSON.parse(readFileSync(join(root, "community.json"), "utf8")).repos) {
+    const all = [e, ...(e.past || [])];
+    all.forEach((x, i) => {
+      for (const [mod, v] of Object.entries(x.v || {})) {
+        const version = x.version?.[mod] || String(all.slice(i).filter((y) => y.v?.[mod]).length);
+        known[v] = { mod, repo: e.repo, sha: x.sha, at: x.at, version };
+        if (!i) num[mod] = version;
+      }
+    });
+  }
+  for (const c of shelfCarts) if (num[c.mod]) c.version = num[c.mod];
   // The signed file list (tools/sign.mjs). signed: it covers exactly these files; a wedgie refuses a
   // checked install from an unsigned manifest.
   let signed = false;
