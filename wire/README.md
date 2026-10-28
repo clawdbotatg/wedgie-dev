@@ -55,40 +55,27 @@ updated: an app only reads its own tag's data. Descriptors are compiled from cle
 `includes`, the same JSON an auditor hashes; an attestation counts only if its EAS signature recovers to an auditor
 in `AUDITORS` and its data is that hash.
 
-## Additions of ours (proposed for ERC-7730 / ERC-8362)
+## Standard only (Austin, 10-27: "we should not be inventing anything")
 
-Found on a real Uniswap v4 swap (10-27): the wedgie said "Take out: 0 USDC", and the minimum back was hidden.
+Our descriptors use ERC-7730 v2 and the ERC-8362 draft (ethereum/ERCs#1925, Alex Forshtat's, not ours) as written.
+Where they can't say something, the screen says less, and the gap goes to the registry as an issue.
 
-1. **A message for an exact value** (`tokenAmount` `params.specialValues`). ERC-7730 has only `threshold` +
-   `message` (at or above X). Some contracts read one exact value as words: Uniswap v4's `OPEN_DELTA` = 0 is
-   "all the pool owes" in TAKE, "all you owe" in SETTLE. A wallet that prints 0 is wrong; a global "0 = all" rule
-   is wrong too (approve 0 is a revoke). So the descriptor says it, per field:
-   ```json
-   "params": {"tokenPath": "currency", "specialValues": {"0": "all {token} the swap gives"}}
-   ```
-   The value (decimal or 0x hex) shows as its text, `{token}` the ticker (no `{token}`: the ticker after it, as
-   `message` does). Wire: one more entry at the end of `tokenAmount`'s param, `[[n, text], ...]`, sent only when
-   given. Proposal for ERC-7730: the same key for `amount` and `tokenAmount`, checked before `threshold`.
-2. **A switch case that is a display format** (ERC-8362 `switch`, case `{"format": ..., "params": ...}` other
-   than `customEncoding`): the switch's own value shown with that format. It picks a token by a flag: a v4
-   one-pool swap's output is `currency1` if `zeroForOne` else `currency0`.
-   ```json
-   {"path": "p.amountOutMinimum", "label": "Get at least", "switch": {"expression": {"path": "p.zeroForOne"},
-    "cases": {"0x01": {"format": "tokenAmount", "params": {"tokenPath": "p.poolKey.currency1"}},
-              "0x00": {"format": "tokenAmount", "params": {"tokenPath": "p.poolKey.currency0"}}}}}
-   ```
-   Wire: case `[2, param]`, param's value null (the switch's). The draft already has `format` in a case, but only
-   `customEncoding`, which decodes the bytes again.
+- **Uniswap v4's 0** (`OPEN_DELTA`: "all of it"). A real wedgie said "Take out: 0 USDC" (10-27). ERC-7730 has no
+  words for one exact value, so the amount is hidden at 0 (`visible: {"ifNotIn": ["0"]}`) and the intent says it:
+  TAKE is "Take out what the swap gives", SETTLE "Pay in what the swap costs"; a swap's 0 in or out is just left
+  out. Approve 0 still reads "0 USDC". (safe-38 had our own `params.specialValues`; gone.)
+- **A one-pool swap's tokens** (`currency1` if `zeroForOne`, else `currency0`): an ERC-8362 `switch` on
+  `p.zeroForOne` whose cases are `{"format": "tokenAmount", "params": {...}}`. That case shape is in ERC-8362's
+  schema (`switchCaseValue`, since 08-07), though its text only shows `customEncoding` cases. Wire: case
+  `[2, param]`, param's value null (the switch's). `visible` on such a field is read on the switch's own value.
+  `MAX_DEPTH` is 28 (was 24): a switch on a flag inside a v4 action inside a command.
+- **Still ours, to ask about:** `tokenTicker` with `nativeCurrencyAddress` (the spec gives that param to
+  `tokenAmount` only; v4 names ETH as 0x0), and `senderAddress: "@.from"` (LI.FI, below).
 
-3. **The sender itself as `senderAddress`** (`addressName` `params.senderAddress: "@.from"`). ERC-7730 lists
-   stand-in addresses only (Uniswap's 0x..01). LI.FI has none: its `_receiver` is just who gets paid, and should
-   be the Safe. With `"@.from"` the wallet shows "this Safe" when it is, and red "not this Safe!" when it isn't.
-   Wire: an empty byte string in the senderAddress list (it matches no address). In
-   `descriptors/lifi/calldata-LIFIDiamond-swaps.json` (the registry's 6 swaps + `swapTokensGeneric`).
-
-Standard: `tokenAmount`, `tokenPath`, `threshold`/`message`, ERC-8362's `switch`. Ours: 1 and 2 above, in
-`descriptors/uniswap/calldata-UniversalRouter-v2.{0,1}.json` (v4 actions) only. `MAX_DEPTH` is 28 (was 24): the
-switch on a flag inside a v4 action inside a command is two levels deeper.
+**`senderAddress: "@.from"`** (`addressName`, LI.FI). ERC-7730 lists stand-in addresses only (Uniswap's 0x..01).
+LI.FI has none: its `_receiver` is just who gets paid, and should be the Safe. With `"@.from"` the wallet shows
+"this Safe" when it is, and red "not this Safe!" when it isn't. Wire: an empty byte string in the senderAddress list
+(it matches no address). In `descriptors/lifi/calldata-LIFIDiamond-swaps.json`.
 
 ## What building it taught us (for Bacca and the WG)
 

@@ -638,10 +638,7 @@
                                             "tokenPath": "p.poolKey.currency0",
                                             "nativeCurrencyAddress": [
                                               "0x0000000000000000000000000000000000000000"
-                                            ],
-                                            "specialValues": {
-                                              "0": "all {token} from before"
-                                            }
+                                            ]
                                           }
                                         },
                                         "0x00": {
@@ -650,13 +647,15 @@
                                             "tokenPath": "p.poolKey.currency1",
                                             "nativeCurrencyAddress": [
                                               "0x0000000000000000000000000000000000000000"
-                                            ],
-                                            "specialValues": {
-                                              "0": "all {token} from before"
-                                            }
+                                            ]
                                           }
                                         }
                                       }
+                                    },
+                                    "visible": {
+                                      "ifNotIn": [
+                                        "0"
+                                      ]
                                     }
                                   },
                                   {
@@ -703,10 +702,12 @@
                                       "tokenPath": "p.currencyIn",
                                       "nativeCurrencyAddress": [
                                         "0x0000000000000000000000000000000000000000"
-                                      ],
-                                      "specialValues": {
-                                        "0": "all {token} from before"
-                                      }
+                                      ]
+                                    },
+                                    "visible": {
+                                      "ifNotIn": [
+                                        "0"
+                                      ]
                                     }
                                   },
                                   {
@@ -741,10 +742,7 @@
                                             "tokenPath": "p.poolKey.currency1",
                                             "nativeCurrencyAddress": [
                                               "0x0000000000000000000000000000000000000000"
-                                            ],
-                                            "specialValues": {
-                                              "0": "all {token} owed"
-                                            }
+                                            ]
                                           }
                                         },
                                         "0x00": {
@@ -753,13 +751,15 @@
                                             "tokenPath": "p.poolKey.currency0",
                                             "nativeCurrencyAddress": [
                                               "0x0000000000000000000000000000000000000000"
-                                            ],
-                                            "specialValues": {
-                                              "0": "all {token} owed"
-                                            }
+                                            ]
                                           }
                                         }
                                       }
+                                    },
+                                    "visible": {
+                                      "ifNotIn": [
+                                        "0"
+                                      ]
                                     }
                                   },
                                   {
@@ -806,10 +806,12 @@
                                       "tokenPath": "p.currencyOut",
                                       "nativeCurrencyAddress": [
                                         "0x0000000000000000000000000000000000000000"
-                                      ],
-                                      "specialValues": {
-                                        "0": "all {token} owed"
-                                      }
+                                      ]
+                                    },
+                                    "visible": {
+                                      "ifNotIn": [
+                                        "0"
+                                      ]
                                     }
                                   },
                                   {
@@ -828,7 +830,7 @@
                             },
                             "0x0b": {
                               "(address currency,uint256 amount,bool payerIsUser)": {
-                                "intent": "Pay in",
+                                "intent": "Pay in what the swap costs",
                                 "fields": [
                                   {
                                     "path": "amount",
@@ -840,10 +842,12 @@
                                         "0x0000000000000000000000000000000000000000"
                                       ],
                                       "threshold": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
-                                      "message": "all it holds",
-                                      "specialValues": {
-                                        "0": "all {token} the swap costs"
-                                      }
+                                      "message": "all it holds"
+                                    },
+                                    "visible": {
+                                      "ifNotIn": [
+                                        "0"
+                                      ]
                                     }
                                   }
                                 ]
@@ -896,7 +900,7 @@
                             },
                             "0x0e": {
                               "(address currency,address recipient,uint256 amount)": {
-                                "intent": "Take out",
+                                "intent": "Take out what the swap gives",
                                 "fields": [
                                   {
                                     "path": "amount",
@@ -906,10 +910,12 @@
                                       "tokenPath": "currency",
                                       "nativeCurrencyAddress": [
                                         "0x0000000000000000000000000000000000000000"
-                                      ],
-                                      "specialValues": {
-                                        "0": "all {token} the swap gives"
-                                      }
+                                      ]
+                                    },
+                                    "visible": {
+                                      "ifNotIn": [
+                                        "0"
+                                      ]
                                     }
                                   },
                                   {
@@ -1712,10 +1718,7 @@
                                             "tokenPath": "p.poolKey.currency0",
                                             "nativeCurrencyAddress": [
                                               "0x0000000000000000000000000000000000000000"
-                                            ],
-                                            "specialValues": {
-                                              "0": "all {token} from before"
-                                            }
+                                            ]
                                           }
                                         },
                                         "0x00": {
@@ -1724,13 +1727,15 @@
                                             "tokenPath": "p.poolKey.currency1",
                                             "nativeCurrencyAddress": [
                                               "0x0000000000000000000000000000000000000000"
-                                            ],
-                                            "specialValues": {
-                                              "0": "all {token} from before"
-                                            }
+                                            ]
                                           }
                                         }
                                       }
+                                    },
+                                    "visible": {
+                                      "ifNotIn": [
+                                        "0"
+                                      ]
                                     }
                                   },
                                   {
@@ -1777,10 +1782,12 @@
                                       "tokenPath": "p.currencyIn",
                                       "nativeCurrencyAddress": [
                                         "0x0000000000000000000000000000000000000000"
-                                      ],
-                                      "specialValues": {
-                                        "0": "all {token} from before"
-                                      }
+                                      ]
+                                    },
+                                    "visible": {
+                                      "ifNotIn": [
+                                        "0"
+                                      ]
                                     }
                                   },
                                   {
@@ -1815,10 +1822,7 @@
                                             "tokenPath": "p.poolKey.currency1",
                                             "nativeCurrencyAddress": [
                                               "0x0000000000000000000000000000000000000000"
-                                            ],
-                                            "specialValues": {
-                                              "0": "all {token} owed"
-                                            }
+                                            ]
                                           }
                                         },
                                         "0x00": {
@@ -1827,13 +1831,15 @@
                                             "tokenPath": "p.poolKey.currency0",
                                             "nativeCurrencyAddress": [
                                               "0x0000000000000000000000000000000000000000"
-                                            ],
-                                            "specialValues": {
-                                              "0": "all {token} owed"
-                                            }
+                                            ]
                                           }
                                         }
                                       }
+                                    },
+                                    "visible": {
+                                      "ifNotIn": [
+                                        "0"
+                                      ]
                                     }
                                   },
                                   {
@@ -1880,10 +1886,12 @@
                                       "tokenPath": "p.currencyOut",
                                       "nativeCurrencyAddress": [
                                         "0x0000000000000000000000000000000000000000"
-                                      ],
-                                      "specialValues": {
-                                        "0": "all {token} owed"
-                                      }
+                                      ]
+                                    },
+                                    "visible": {
+                                      "ifNotIn": [
+                                        "0"
+                                      ]
                                     }
                                   },
                                   {
@@ -1902,7 +1910,7 @@
                             },
                             "0x0b": {
                               "(address currency,uint256 amount,bool payerIsUser)": {
-                                "intent": "Pay in",
+                                "intent": "Pay in what the swap costs",
                                 "fields": [
                                   {
                                     "path": "amount",
@@ -1914,10 +1922,12 @@
                                         "0x0000000000000000000000000000000000000000"
                                       ],
                                       "threshold": "57896044618658097711785492504343953926634992332820282019728792003956564819968",
-                                      "message": "all it holds",
-                                      "specialValues": {
-                                        "0": "all {token} the swap costs"
-                                      }
+                                      "message": "all it holds"
+                                    },
+                                    "visible": {
+                                      "ifNotIn": [
+                                        "0"
+                                      ]
                                     }
                                   }
                                 ]
@@ -1970,7 +1980,7 @@
                             },
                             "0x0e": {
                               "(address currency,address recipient,uint256 amount)": {
-                                "intent": "Take out",
+                                "intent": "Take out what the swap gives",
                                 "fields": [
                                   {
                                     "path": "amount",
@@ -1980,10 +1990,12 @@
                                       "tokenPath": "currency",
                                       "nativeCurrencyAddress": [
                                         "0x0000000000000000000000000000000000000000"
-                                      ],
-                                      "specialValues": {
-                                        "0": "all {token} the swap gives"
-                                      }
+                                      ]
+                                    },
+                                    "visible": {
+                                      "ifNotIn": [
+                                        "0"
+                                      ]
                                     }
                                   },
                                   {

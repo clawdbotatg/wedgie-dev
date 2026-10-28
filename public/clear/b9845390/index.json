@@ -1,0 +1,16 @@
+{
+ "tag": "b9845390",
+ "registry": "171b6b5bf137e2433a4bde35cffd64d4d7fe25bd",
+ "issued": 1793160076,
+ "roots": {
+  "a": "43fabd962a7ac2f7c31473c803594c022be05a3c2af46d86f6590a51b89753e0",
+  "b": "02911b35af0188e6e99bcc19f0046e581c41ac5d81594e891875e5f80eb7f29b"
+ },
+ "audited": 1383,
+ "notAudited": 6483,
+ "tokens": 2473,
+ "auditors": [
+  "Cyfrin"
+ ],
+ "clearMax": 10000
+}
