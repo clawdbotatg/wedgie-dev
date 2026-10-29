@@ -155,7 +155,7 @@ const shipHtml = (pay = "the card processor and the blockchain") => `
     <div class="safe-box recess" id="o-ship">
       <h2>Ship to</h2>
       <p class="fine">Your address is locked right here in your browser with a key only our shipping computer has.
-        Our server, ${pay} never see it, and we delete it once the box is in the mail.</p>
+        Our server, ${pay} never see it, and we delete it once the box is delivered.</p>
       <form class="order-fields" id="o-addr" autocomplete="on">
         <label class="wide">Country <select name="country" autocomplete="shipping country"><option value="US">United States</option>${COUNTRIES.map((c) => [c, place(c)]).sort((a, b) => a[1].localeCompare(b[1])).map(([c, n]) => `<option value="${c}">${esc(n)}</option>`).join("")}</select></label>
         <label class="wide">Name <input name="name" autocomplete="shipping name" maxlength="80"></label>
@@ -443,7 +443,7 @@ function status(id: string, box: HTMLElement, say: (s: string, bad?: boolean) =>
     if (v.status === "paid" || v.status === "shipped") h += steps(v);
     if (v.status === "paid") h += `<p class="good"><b>Paid, thank you.</b></p><p>${esc(SHIPS)} The tracking number shows up here when it does.</p>`;
     if (v.note) h += `<p class="o-note"><b>A note from us:</b> ${esc(v.note)}</p>`;
-    if (v.status === "shipped") h += `<p class="good"><b>${v.delivered_at ? "Delivered." : "Shipped."}</b> Your address is deleted.</p>
+    if (v.status === "shipped") h += `<p class="good"><b>${v.delivered_at ? "Delivered.</b> Your address is deleted." : "Shipped.</b> We delete your address once it's delivered."}</p>
       <p>USPS tracking: <a href="https://tools.usps.com/go/TrackConfirmAction?tLabels=${encodeURIComponent(v.tracking || "")}" target="_blank" rel="noopener">${esc(v.tracking)}</a></p>`;
     if (v.status === "canceled") h += `<p>Canceled.</p>`;
     h += `</div><div class="safe-box recess"><h2>Keep this link</h2><p class="fine">It's how you check on this order from anywhere. Anyone with it can see the order's status (never your address).</p>

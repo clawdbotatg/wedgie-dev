@@ -2,7 +2,10 @@
 //   GET                          every paid, unshipped order with its sealed address (only omen can open it)
 //   POST {id, boxed: tracking}   boxed: label bought and packed, not mailed yet. Keeps the sealed address (a spoiled
 //                                label can be bought again); the tracking number is saved for the ship POST
-//   POST {id, tracking}          shipped: the sealed address, payer, transaction and Stripe session are wiped, the buyer
+//   GET ?id=X                    one order's sealed address while it's still kept, paid or shipped (orders.py show: a reprint
+//                                or a USPS missing-mail search): {order: {id, cart, status, tracking, shipped_at, delivered_at, sealed}}
+//   POST {id, tracking}          shipped: the payer, transaction and Stripe session are wiped (the sealed address stays till
+//                                it's delivered, so a lost box can still be searched for), the buyer
 //                                gets an email with the tracking number, and only once it's sent is their locked email
 //                                wiped (mailed: false = it failed; the same POST again retries it)
 //   POST {id, cancel: true}      canceled (refund by hand), wiped the same way; new, paid or expired
@@ -10,11 +13,12 @@
 //   POST {stock: n, item?}       n left to sell from now on (_shop.ts stockLeft); item wedgie or kit, none = both; 0 = sold out
 //   GET ?moving=1                shipped orders not delivered yet, 60 days back: {id, tracking, shipped_at, moving_at} (orders.py track)
 //   POST {id, step, at}          step "moving" or "delivered" (the buyer's order page shows it), at = when USPS said so.
-//                                Only the step and its time: never a place
+//                                Only the step and its time: never a place. Delivered wipes the sealed address
 //   POST {id, note}              a note on a shipped order's page till it's delivered, typed by hand (orders.py note); "" clears
 // Each GET also marks paid the USDC orders made in the last 3 days, or with something sent, whose deposit address now
 // holds their price (older empty ones settle when their buyer opens the order page), and deletes what's done with: shipped or canceled orders and
-// unpaid or expired ones with nothing sent, 30 days on. GET ?stock=1: just the stock counts, {left: {wedgie, kit}}.
+// unpaid or expired ones with nothing sent, 30 days on (a shipped box that never shows as delivered: 60 days, its
+// sealed address with it). GET ?stock=1: just the stock counts, {left: {wedgie, kit}}.
 import { db, env, json, oops, same, settleDeposit, stockLeft, STOCK_ROW, endCard, type Order, crossSite } from "./_shop.js";
 import type { Item } from "../src/shop/catalog.js";
 import { unlock, shippedMail, mailPaid, sendAlerts } from "./_mail.js";
@@ -37,11 +41,17 @@ export async function GET(req: Request) {
     return json({ days, counts, orders, canceled });
   }
   if (q.get("stock")) return json({ left: await stockLeft(sql) });
+  if (q.get("id")) {
+    const [o] = await sql`select id, cart, status, tracking, shipped_at, delivered_at, sealed from orders
+      where id = ${q.get("id")} and status in ('paid', 'shipped') and sealed is not null`;
+    return o ? json({ order: o }) : oops("No order with its address still kept.", 404);
+  }
   if (q.get("moving")) return json({ orders: await sql`select id, tracking, shipped_at, moving_at from orders
     where status = 'shipped' and tracking is not null and delivered_at is null and shipped_at > now() - interval '60 days' order by shipped_at` });
   // The shipped boxes deleted here come off the stock count too, so stockLeft doesn't forget them and hand them out again.
   // And they're tallied (counts "shipped_gone"), so api/stats.ts keeps an all-time shipped count.
-  await sql`with gone as (delete from orders where (status in ('shipped', 'canceled') and coalesce(shipped_at, paid_at, created) < now() - interval '30 days')
+  await sql`with gone as (delete from orders where (status = 'canceled' and coalesce(shipped_at, paid_at, created) < now() - interval '30 days')
+    or (status = 'shipped' and shipped_at < now() - (case when delivered_at is null then interval '60 days' else interval '30 days' end))
     or (status in ('new', 'expired') and coalesce(got, 0) = 0 and created < now() - interval '30 days') returning cart, status, paid_at),
     tally as (insert into counts (day, k, n) select current_date, 'shipped_gone', count(*)::int from gone where status = 'shipped'
       having count(*) > 0 on conflict (day, k) do update set n = counts.n + excluded.n)
@@ -78,7 +88,7 @@ export async function POST(req: Request) {
     if (isNaN(+at) || +at > Date.now() + 864e5) return oops("at is a time, not in the future.");
     // Delivered means it moved too; a step seen twice keeps its first time.
     const r = b.step === "delivered"
-      ? await sql`update orders set delivered_at = coalesce(delivered_at, ${at.toISOString()}), moving_at = coalesce(moving_at, ${at.toISOString()}) where id = ${b.id} and status = 'shipped' returning id`
+      ? await sql`update orders set sealed = null, delivered_at = coalesce(delivered_at, ${at.toISOString()}), moving_at = coalesce(moving_at, ${at.toISOString()}) where id = ${b.id} and status = 'shipped' returning id`
       : await sql`update orders set moving_at = coalesce(moving_at, ${at.toISOString()}) where id = ${b.id} and status = 'shipped' returning id`;
     return r.length ? json({ ok: true }) : oops("No shipped order with that id.", 404);
   }
@@ -103,7 +113,7 @@ export async function POST(req: Request) {
   if (typeof b.tracking !== "string" || !/^[A-Z0-9]{10,40}$/i.test(b.tracking.replace(/\s/g, ""))) return oops("That isn't a tracking number.");
   const tracking = b.tracking.replace(/\s/g, "");
   const r = await sql`update orders set status = 'shipped', shipped_at = now(), tracking = ${tracking},
-    sealed = null, payer = null, tx = null, stripe_session = null where id = ${b.id} and status = 'paid' returning email_enc`;
+    payer = null, tx = null, stripe_session = null where id = ${b.id} and status = 'paid' returning email_enc`;
   // Already shipped with its email still locked here: the mail failed last time, so this is the retry.
   const [o] = r.length ? r : await sql`select email_enc from orders where id = ${b.id} and status = 'shipped' and tracking = ${tracking} and email_enc is not null`;
   if (!o) return oops("No paid, unshipped order with that id.", 404);

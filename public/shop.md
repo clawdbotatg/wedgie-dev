@@ -66,7 +66,8 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md. Or build one your
 ## Privacy
 
 - **Your address is sealed in your browser** to the shipping computer's key before it leaves. Our server, Stripe
-  and the blockchain never see it; it's deleted once the box is in the mail.
+  and the blockchain never see it; it's deleted once USPS says the box is delivered (60 days at most), so a lost
+  box can still be searched for.
 - **Your email** is kept only as a keyed hash plus a locked copy, used for sign-in links and the paid and shipped
   emails, and wiped after it ships.
 - Details: https://wedgie.dev/privacy

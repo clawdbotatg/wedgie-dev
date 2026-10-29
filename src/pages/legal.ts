@@ -53,7 +53,7 @@ const PRIVACY = `
 <p>${SELLER} runs this site and the shop. We keep as little as we can.</p>
 
 <h2>Your address</h2>
-<p>Locked in your browser with a key only our shipping computer has. Our server, Stripe, and the blockchain never see your shipping address. We delete it once the box ships.</p>
+<p>Locked in your browser with a key only our shipping computer has. Our server, Stripe, and the blockchain never see your shipping address. We delete it once USPS says the box is delivered, or 60 days after it ships if it never shows up, so a lost box can still be searched for.</p>
 
 <h2>Your email</h2>
 <p>Used to send your sign-in link, your receipt, and your tracking number. The server keeps it locked (encrypted) with your order until the tracking email is sent, then deletes it; an order that's never paid keeps it until the order is deleted. While you're signed in, your sign-in keeps it locked too, until you sign out or 30 days pass. To find your orders it keeps a one-way hash of it. Our mailbox keeps copies of the emails we send you. We never sell or share your email.</p>
@@ -63,7 +63,7 @@ const PRIVACY = `
 <p>A wedgie claimed with CV (larv.ai): we keep the wallet that claimed it, for good, so a wallet claims only once. Its signature goes to larv.ai to burn the CV; we don't keep it.</p>
 
 <h2>Orders</h2>
-<p>We keep what you ordered and its status. Once it ships, the dates USPS has it moving and delivers it (never where). We delete an order 30 days after it ships or is canceled, or 30 days after it was made if it was never paid. An unpaid order that got some USDC is kept until it's sorted out with you.</p>
+<p>We keep what you ordered and its status. Once it ships, the dates USPS has it moving and delivers it (never where). We delete an order 30 days after it ships (60 if it never shows as delivered) or is canceled, or 30 days after it was made if it was never paid. An unpaid order that got some USDC is kept until it's sorted out with you.</p>
 
 <h2>Your wedgie</h2>
 <p>The site talks to a wedgie only after you tap Connect, and only in your browser. Its keys never leave it.</p>

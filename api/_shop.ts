@@ -1,7 +1,8 @@
 // The shop's server side (Vercel functions; files starting with _ aren't routes). What it holds:
 // an order's cart, how it was paid, and its address SEALED in the buyer's browser (src/shop/seal.ts) to
 // a key only the shipping computer has. This code can't read an address and never tries. Once a box
-// ships, the sealed address, the payer and the payment links are wiped; the rest goes 30 days later.
+// ships, the payer and the payment links are wiped; the sealed address once it's delivered (60 days at most); the rest
+// 30 days after it ships (60 if it never shows as delivered).
 // Also a keyed hash of the buyer's IP (ipOf), for OPEN_MAX; wiped after a day. Their email: _mail.ts.
 // And checkout counts (api/count.ts): a number per day per step, about no one.
 // Never log a request body here: even sealed, it doesn't belong in Vercel's logs.
@@ -29,7 +30,7 @@ export async function db() {
       cents int not null,
       pay text not null,              -- card | usdc | cv (api/_cv.ts)
       status text not null default 'new',   -- new | paid | shipped | canceled | expired (never paid in time)
-      sealed text,                    -- the address, sealed to omen's key; null once shipped
+      sealed text,                    -- the address, sealed to omen's key; null once delivered
       chain int, usdc bigint,         -- usdc: the amount asked for, in 6-decimal units
       stripe_session text,
       tx text, payer text,

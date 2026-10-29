@@ -44,7 +44,7 @@ The inbox: `python3 tools/mail.py list|read|send` (Gmail app password). Google 2
 
 Never holds an address it can read. The browser seals it (`src/shop/seal.ts`) to omen's key (`OMEN_KEY`,
 committed; private half only on omen, `wedgie-shipping/orders.py`). `api/` (Vercel + Neon) keeps only the
-sealed text and wipes it when omen ships. Stripe gets no address. Never log a request body in `api/`.
+sealed text and wipes it when USPS says delivered (60 days at most after it ships). Stripe gets no address. Never log a request body in `api/`.
 Email (`api/_mail.ts`, from wedgie@buidlguidl.com): stored only as a keyed hash (sign in by emailed link, `api/login.ts`) and
 locked till it ships (paid + shipped mails). Test: `node tools/mailprobe.mjs`.
 USDC: each order has its own deposit address; any amount counts. Never change the contract codes.
