@@ -18,7 +18,7 @@ What shipped and what a human must still see on a real wedgie: `docs/CLEAR-SIGNI
 - **ERC-8362 draft** (customEncoding, sequence, object, switch, mask, `$index`, calldata `operation`): compiled by
   `from7730.py` into our own wire binding (params 13 and 14, value source 3, written down there), read by
   `safe_8362.py` (safe-30+). Not yet: `interaction`, `$fallback`, `@.data`, display fields that address an entry.
-- **Our descriptors** (`descriptors/`): on top of the registry, root a. First: Uniswap's Universal Router.
+- **Our descriptors** ([clawdbotatg/clear-descriptors](https://github.com/clawdbotatg/clear-descriptors), a checkout beside this repo or `$CLEAR_DESCRIPTORS`; the files its `show.json` adds): on top of the registry, root a. First: Uniswap's Universal Router.
 - **The data** wedgie.dev serves: `release.py` builds `public/clear/<tag>/` from the registry, ours and token lists
   (Uniswap's, then CoinGecko's top 1,000 coins, minus any ticker another address has on that chain; safe-30: tag
   f4f3fe64, registry 171b6b5), every structure with a Merkle proof (algorithm 4) to two roots built into the app (`safe_roots.py`). See below.
@@ -75,7 +75,7 @@ Where they can't say something, the screen says less, and the gap goes to the re
 **`senderAddress: "@.from"`** (`addressName`, LI.FI). ERC-7730 lists stand-in addresses only (Uniswap's 0x..01).
 LI.FI has none: its `_receiver` is just who gets paid, and should be the Safe. With `"@.from"` the wallet shows
 "this Safe" when it is, and red "not this Safe!" when it isn't. Wire: an empty byte string in the senderAddress list
-(it matches no address). In `descriptors/lifi/calldata-LIFIDiamond-swaps.json`.
+(it matches no address). In clear-descriptors `registry/lifi/calldata-LIFIDiamond-swaps.json`.
 
 ## What building it taught us (for Bacca and the WG)
 

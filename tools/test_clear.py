@@ -155,7 +155,7 @@ def ok_diff(label, got, want):
     return want.isdigit() and got.split(" ")[0].replace(".", "").lstrip("0") == want.rstrip("0").lstrip("0")
 
 
-OURS = {(c, a, s) for c, a, s, *_ in release.ours()}     # our descriptors (descriptors/): our words, not the test's
+OURS = {(c, a, s) for c, a, s, *_ in release.ours()}     # our descriptors (clear-descriptors): our words, not the test's
 stats, why = collections.Counter(), collections.defaultdict(list)
 for fn, t, dp in tests:
     chain, to, value, data = decode(t["rawTx"])

@@ -5,7 +5,7 @@
 # Every descriptor (transaction-info) and token (token-information) is a wire-format structure signed with
 # algorithm 4: no signature, a Merkle proof to a root built into the app (spec v 29.09.26-1, as PQ1). The app
 # itself is signed when wedgie.dev publishes it, so nothing here needs a key. Two roots:
-#   a: descriptors an auditor we trust attested (ERC-8176, EAS offchain, checked here), ours (descriptors/), tokens
+#   a: descriptors an auditor we trust attested (ERC-8176, EAS offchain, checked here), ours (clear-descriptors), tokens
 #   b: every other descriptor: the wedgie shows "not audited"
 # Leaf = SHA-256(0x00 || message), node = SHA-256(0x01 || the smaller hash || the bigger), an odd one out goes up
 # as is; message = the structure with its envelope cut to [4, leaf index, issued-at] (wire.signed_message).
@@ -29,7 +29,8 @@ CLEAR_MAX = 10000   # bytes of bundle the app made with this release takes (safe
 # with when no descriptor is under its own address. Only ERC-20 for now: ERC-721's approve has the same selector.
 GENERIC = {"ercs/calldata-erc20-tokens.json"}
 ANY = "0x7730773077307730773077307730773077307730"
-OURS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "descriptors")   # ours, on top of the registry
+# ours, on top of the registry: a clawdbotatg/clear-descriptors checkout beside this repo (its show.json "add")
+OURS = os.environ.get("CLEAR_DESCRIPTORS") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "clear-descriptors")
 TOKEN_LIST = "https://tokens.uniswap.org"
 # then CoinGecko's top 1,000 coins by market cap, on the chains it lists (decimals from its per-chain token lists).
 # A ticker already taken on that chain by another address is left out: no second "USDC".
@@ -143,13 +144,15 @@ def descriptors(reg):
 
 
 def ours(root=OURS):
-    """Our own descriptors (wedgie-dev descriptors/): root a, and over the registry's for the same function.
-    Compiled in full here: a file that won't compile stops the release."""
+    """Our own descriptors (clear-descriptors, the files its show.json adds): root a, and over the registry's for
+    the same function. Compiled in full here: a file that won't compile stops the release."""
+    with open(os.path.join(root, "show.json")) as fh:
+        add = json.load(fh)["add"]
     out = []
-    for fn in from7730.files(root):
+    for rel in add:
+        fn = os.path.join(root, rel)
         doc = from7730.load(fn)
-        out += [(c, a, s, b, ["wedgie"], os.path.relpath(fn, os.path.dirname(root)))
-                for c, a, s, b in from7730.convert(fn, doc=doc, seal=lambda body: body) if c in CHAINS]
+        out += [(c, a, s, b, ["wedgie"], rel) for c, a, s, b in from7730.convert(fn, doc=doc, seal=lambda body: body) if c in CHAINS]
     return out
 
 

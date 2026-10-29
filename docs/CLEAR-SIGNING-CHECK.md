@@ -1,7 +1,7 @@
 # Clear signing: what shipped, what a human must see
 
 Goal (Austin, 10-27): every Safe Signer screen comes from an ERC-7730 descriptor (the EF registry's or ours in
-`descriptors/`), one reader, no hand-written dapp code. Shipped first, tested after: every item below passed on
+[clear-descriptors](https://github.com/clawdbotatg/clear-descriptors)), one reader, no hand-written dapp code. Shipped first, tested after: every item below passed on
 the virtual wedgie (`tools/safechip.mjs`), and **none has been seen on a real wedgie yet**. Screens of each:
 wedgie.dev/clear.
 
@@ -41,9 +41,9 @@ the end unless you mean it. Tick each when it looks right.
 ## Open
 
 - **Batches** (MultiSend): still the hand-written reader. Next: our ERC-8362 MultiSend descriptor
-  (`descriptors/safe/calldata-MultiSend.json`, written, not shipped). Someone's uncommitted fix for the 10-27 batch
+  (clear-descriptors `registry/safe/calldata-MultiSend.json`, written, not shipped). Someone's uncommitted fix for the 10-27 batch
   crash (`clear_buf`, `safe_7730.reads`) sits in the wedgie-safe worktree; no live session owns it.
 - **Daily limit** (Zodiac Roles, Instant Wallet) and LI.FI: still hand-written.
-- **Upstream:** PR the solid descriptors to the EF registry (descriptors/README.md). Open: SwapRouter02 multicall + 4 chains, ethereum/clear-signing-erc7730-registry#3161. Next: Candide recovery, passkey factory.
+- **Upstream:** PR the solid descriptors to the EF registry (clear-descriptors STATUS.md). Open: SwapRouter02 multicall + 4 chains, ethereum/clear-signing-erc7730-registry#3161. Next: Candide recovery, passkey factory.
 - One-pool V4 swaps name their tokens (a switch on `zeroForOne`); v4's 0 is hidden, the intent says it ("Take out
   what the swap gives"). Standard only: data b9845390, Safe Signer safe-43 (not yet signed).
