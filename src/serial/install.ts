@@ -231,6 +231,8 @@ async function checkedHave(r: Repl, m: Manifest, hash?: string[], late: boolean 
   // installs ran out of memory on real boards (0.3.6, 0.3.11). They get there once through full access
   // (Austin, 2026-10-02: one "full access" question is fine); 0.3.12+ installs on a clean heap.
   if (!h.version || cmpVersion(h.version, "0.3.12") < 0) return null;
+  // 0.3.54 and older trust only the release key 0.3.55 dropped: every list now is "not signed" to them (10-28)
+  if (cmpVersion(h.version, NEW_KEYS) < 0) throw new Error(OLD_KEY);
   if (h.jobs >= 2 && (late === true || (late === "update" && h.version !== m.version))) {
     const v = await r.request({ type: "sums", names: [], exists: allNames(m) }, 30000).catch(() => null);
     if (v?.sums) return { hashes: v.sums, files: Object.keys(v.sums).filter((n) => v.sums[n]), apps: v.apps || [], late: true };
@@ -262,6 +264,8 @@ function mineOf(m: Manifest, have: Have) {
  *  can only update its firmware (apps.json left as it is), then install apps. */
 export const APP_LIST = "0.3.66";
 export const UPDATE_FIRST = "Update the firmware first.";
+export const NEW_KEYS = "0.3.55";
+export const OLD_KEY = "This wedgie's firmware is too old to update here. Install it at wedgie.dev/reset";
 export const NOT_SIGNED = "this firmware isn't signed yet. Your wedgie stays as it is";
 /** Its hello, waiting out a busy app: an app in the middle of a fetch (ETH Price's TLS: seconds of Trust M
  *  math) answers late, and a 0.7 s hello read that as old firmware and asked FULL CONTROL (Austin 10-26). */

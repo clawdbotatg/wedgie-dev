@@ -52,3 +52,15 @@ def run(mid, app, v, tick, poll):
     if named == "apps":                 # named in the app list: only if that's the list it signed
         named = binascii.hexlify(ah.digest()).decode() == tag
     return n > 1 and named and W.release_ok(None, sg, tick, h.digest())
+
+
+def unsigned(d):
+    """After a yes on a list no release key signed (the question's warning sign, or job.check after the yes):
+    nothing changed, and the screen says where to put it on anyway (Austin, 10-28: a wedgie that only restarted
+    read as a crash). Here, not in slot.py: that one stays loaded beside every app."""
+    import lcd, ui
+    ui.page(d, "Not signed", [("Nothing changed.", ui.INK), ("To install anyway:", ui.INK), ("wedgie.dev/reset", ui.RED)], show=False)
+    if d.width >= 240:
+        ui.warn(d, 112, 52)
+    d.show()
+    ui.wait(lcd.Keys(physical=True), 8000)

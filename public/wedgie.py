@@ -536,6 +536,9 @@ def checked(wg, m):
     # USB line a char at a time): those take full access once, then install on a clean heap (install.ts)
     if tuple(int(x) for x in (h.get("version") or "0").split(".")[:3] if x.isdigit()) < (0, 3, 12):
         return None
+    # 0.3.54 and older trust only the release key 0.3.55 dropped: nothing signed now goes on them
+    if tuple(int(x) for x in (h.get("version") or "0").split(".")[:3] if x.isdigit()) < (0, 3, 55):
+        raise RuntimeError("this wedgie's firmware is too old to update here. Install it at https://wedgie.dev/reset")
     names = sorted(with_twins(set(m["core"]) | {n for c in m["carts"] for n in c["files"]}))
     v = wg.request({"type": "sums", "names": names}, 30)
     return {"hashes": v["sums"], "apps": v.get("apps") or [], "files": [n for n, s in v["sums"].items() if s]}

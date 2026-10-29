@@ -254,6 +254,8 @@ def _nope(mid, e):
     try:
         import lcd, ui
         d = lcd.LCD()
+        if "not signed" in str(e):
+            return __import__("listcheck").unsigned(d)
         ui.page(d, "Not installed", [(str(e)[:56], ui.RED)], show=False)
         if d.width >= 240:
             ui.warn(d, 112, 52)
