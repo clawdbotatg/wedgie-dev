@@ -15,14 +15,14 @@ or an ATECC608) **wedged** between the boards on I2C. It runs MicroPython plus t
 into one app, and asks on its own screen before anything that matters. Games, tools, and a hardware signer for a
 Safe multisig. Everything is MIT. Home: https://wedgie.dev
 
-**The current firmware is 0.3.74.** If a wedgie's `hello` says older, update it first: everything here assumes
+**The current firmware is 0.3.75.** If a wedgie's `hello` says older, update it first: everything here assumes
 current firmware.
 
 ```yaml
 name: wedgie
 site: https://wedgie.dev
 skill_index: https://wedgie.dev/skill.md          # this file
-firmware: 0.3.74
+firmware: 0.3.75
 license: MIT (hardware design, case, firmware, site, art)
 source: https://github.com/clawdbotatg/wedgie-dev
 made_by: Austin Griffith and Gus Griffith, with @ClawdBotATG; sold by BuidlGuidl DAO LLC
@@ -223,7 +223,7 @@ https://instantwallet.io. Details: safe.md.
 
 # Talk to a wedgie over USB
 
-Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.74**; if `hello`
+Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.75**; if `hello`
 says older, run `wedgie.py update` first.
 
 ## Talk to it directly
@@ -348,7 +348,7 @@ from answering. Hold **Y**: no WEDGIE drive this time (debugging only).
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.74","fw":"wedgie-0.3.74","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.75","fw":"wedgie-0.3.75","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":3,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -761,8 +761,8 @@ few big words per page, and signs only on **green (A)**. **Red (Y)**, or no answ
   (`safe_clear`) with a Merkle proof to a root built into the app. The host can leave something out (the page
   then says it can't read it), never change it. Audited descriptors (ERC-8176, Cyfrin) and the rest; the rest end
   in red "not audited". Works inside MultiSend (Morpho's approve + deposit).
-- **Warn, don't block.** What it can't read is a big red line or a red page, and A still signs. LI.FI swaps and
-  bridges show who gets paid, then a big red "trust LI.FI". An unlimited approval says "ALL", red.
+- **Warn, don't block.** What it can't read is a big red line or a red page, and A still signs. A LI.FI swap's
+  receiver is red when it isn't this Safe. An unlimited approval says "ALL", red.
 - **Refused outright** (the screen can't show them honestly): a DELEGATECALL to anything but Safe's MultiSend
   ("can take all"), a gas refund (gasPrice > 0: send with gasPrice 0), an empty batch.
 - A press made before a page is up never answers it (no answer in a page's first 0.6 s).
@@ -928,6 +928,7 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md
 | 0.3.57 | Yes is grey until the check ends; installs end in a hard reset |
 | 0.3.64 | Release signatures checked on the Trust M (0.2 s, was 2.4 s); pure Python only without one, or if it says no |
 | 0.3.66 | Apps in their own list, named by its hash in the signed one (no size limit) |
+| 0.3.75 | A yes on an unsigned list says "Not signed", nothing changed, and points to wedgie.dev/reset (was a silent restart). 0.3.54 and older can't update on wedgie.dev (they trust only the old key): the page sends them to /reset |
 
 Report a problem: wedgie@buidlguidl.com, or **Send a bug report** on a wedgie's page at wedgie.dev/connect.
 

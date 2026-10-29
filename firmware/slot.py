@@ -408,10 +408,7 @@ def _job(mid, m):
         return False
     if ui.signed is False:              # the warning sign was up: a yes changes nothing
         W.send({"id": mid, "type": "error", "error": "not signed by wedgie.dev"})
-        try:
-            __import__("listcheck").unsigned(d)     # where to go to put it on anyway
-        except Exception as e:
-            print("slot: unsigned:", e)
+        __import__("listcheck").unsigned(d)     # where to go to put it on anyway (a failure: _handle restarts)
         return False
     if not W.SEALED:                    # the emulator: its flash is new at every restart, so no install
         import job                      # mode there; the job runs in place (its heap is big anyway)
