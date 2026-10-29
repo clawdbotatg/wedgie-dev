@@ -29,6 +29,37 @@ if (appDir) {               // a local checkout instead of the shelf's copy: its
   F.app(a, Object.fromEntries(a.files.filter((n) => existsSync(join(appDir, n))).map((n) => [n, readFileSync(join(appDir, n))])));
 }
 const cart = F.carts.find((c) => c.mod === "safe");
+// --frag [bytes]: once the app has started, fill the heap and free it again in holes of that size (default 6144),
+// with a small block kept between each two. A heap after hours of use, at its worst: no allocation after the start
+// can be bigger than a hole. A pass means it works on any heap, not on this build's luck (10-28: one more sector in
+// the WEDGIE drive, or 3 lines in slot.py, made an 8 KB transaction fail; the build before passed).
+const fragAt = args.indexOf("--frag");
+if (fragAt >= 0) {
+  const size = Number(args[fragAt + 1]) || 6144;
+  const src = F.file("safe.py").toString();
+  const start = '    _keep()\n    W.send(W.hello(None, type="ready"';
+  if (!src.includes(start) || !src.includes("\ndef run():")) throw new Error("--frag: safe.py's run() changed; update safechip");
+  F.extra["safe.py"] = Buffer.from(src.replace("\ndef run():", `
+_held = []
+
+
+def _frag():
+    gc.collect()
+    big = []
+    try:
+        while True:
+            big.append(bytearray(${size}))
+            _held.append(bytearray(16))
+    except MemoryError:
+        pass
+    big = None
+    gc.collect()
+    print("frag: holes of ${size} B, %d B free" % gc.mem_free())
+
+
+def run():`).replace(start, '    _keep()\n    _frag()\n    W.send(W.hello(None, type="ready"'));
+  console.log(`--frag: the heap in ${size} B holes once the app has started`);
+}
 console.log(`Safe Signer (${appDir || "the shelf's copy"}): ${cart.files.join(" ")}`);
 
 // The virtual board has no secure chip, so atecc.mpy is swapped for a stand-in ATECC608 whose slot 0 holds a

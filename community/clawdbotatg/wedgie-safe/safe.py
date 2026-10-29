@@ -43,7 +43,7 @@ import save
 import ui
 from ui import WHITE, INK, MUTED, GREY, GREEN_D, RED
 
-FW = "safe-45"         # and "version" in wedgie.json: the site shows it (v45)
+FW = "safe-46"         # and "version" in wedgie.json: the site shows it (v45)
 RP_ID = b"wedgie.dev"
 FIELDS = '"origin":"https://wedgie.dev"'
 ASK_MS = 120000
@@ -151,15 +151,16 @@ def hx(b):
 pieces = []             # a big tx's data, sent ahead in safe_data lines (bytes, one per piece)
 have = 0                # bytes of it so far
 # The join needs one free block of up to MAX_DATA, and any code change moves what's left of a used heap (a
-# change to the screens alone made 8 KB fail every run). So the first piece takes that block, before the
-# pieces scatter the heap, and parse frees it just before the join, which then lands in it.
+# change to the screens alone made 8 KB fail every run; 10-28, one more sector in the firmware's drive did too).
+# So that block is taken at start, while the heap is in one piece, and kept: parse frees it just before the join,
+# which then lands in it, and _keep takes it again once the tx is done. Given back only on a MemoryError (_lend).
 room = None
 
 
 def hold():
     global room
     if room is None:
-        _lend()
+        gc.collect()
         try:
             room = bytearray(MAX_DATA + 64)
         except MemoryError:
@@ -207,18 +208,23 @@ CLEAR_MAX = 10000       # bytes: a descriptor (the spec's minimum is 4 KB; our U
 
 
 def _lend():
-    """clear_buf's room back to the heap while no bundle is coming in: a big tx (a 5.7 KB USB line, 8 KB of data)
-    needs it (safechip 10-27: the 17-send MultiSend's line was "bad json" with it held). _keep takes it again."""
-    global clear_buf
+    """On a MemoryError: the blocks kept for later (room, clear_buf) back to the heap, where nothing is using
+    them. _keep takes them again once the request is done."""
+    global clear_buf, room
     if clear_buf and not clear_have and not isinstance(clear, memoryview):
         clear_buf = None
+    if not have:
+        room = None
     gc.collect()
 
 
 def _keep():
-    """clear_buf again once nothing big is in flight (after a request is done)."""
+    """room and clear_buf again once nothing big is in flight (after a request is done; at start)."""
     global clear_buf
-    if clear_buf is None and not have and room is None and not clear_have:
+    if have or clear_have:
+        return
+    hold()
+    if clear_buf is None:
         gc.collect()
         try:
             clear_buf = bytearray(CLEAR_BUF)
@@ -886,11 +892,6 @@ def pump():
         _lend()
         W.send({"type": "error", "error": "no room for that line: send it again"})
         return
-    # a line bigger than any piece (a 17-send batch in one line, 5.7 KB): its copy at the end needs one block
-    # that size, so clear_buf's room goes back first (safechip 10-28, firmware 0.3.74: MemoryError in that
-    # copy). Not for a safe_clear / safe_data piece (CHUNK hex, ~4.1 KB): the bundle's first one needs clear_buf.
-    if line is None and R.n > CHUNK + 500 and clear_buf is not None and not clear_have:
-        _lend()
     if R.intr:                          # a Ctrl-C while sealed: the red question (hatch.py)
         R.intr = False
         if W.SEALED and not W.is_open():

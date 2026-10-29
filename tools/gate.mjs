@@ -62,7 +62,7 @@ const all = [
   ["test_docs", ["python3", "tools/test_docs.py"]],
   ["test_tls", ["uv", "run", "-q", "--with", "cryptography", "python3", "tls/test_tls.py"]],
   ["test_safekey", ["uv", "run", "-q", "--with", "cryptography", "python3", "tools/test_safekey.py"]],
-  ["safechip", ["node", "tools/safechip.mjs"]],
+  ["safechip", ["node", "tools/safechip.mjs", "--frag"]],
   ["mpy --check", [...UV, "tools/mpy.py", "--check"]],
   ["chip: install Buttons + update", ["node", "tools/chipprobe.mjs", "--from", "hello", "--to", "buttons"]],
   ["chip: install over Buttons + update", ["node", "tools/chipprobe.mjs", "--from", "buttons", "--to", "hello"]],
