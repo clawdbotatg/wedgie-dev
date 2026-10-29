@@ -928,7 +928,6 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md
 | 0.3.57 | Yes is grey until the check ends; installs end in a hard reset |
 | 0.3.64 | Release signatures checked on the Trust M (0.2 s, was 2.4 s); pure Python only without one, or if it says no |
 | 0.3.66 | Apps in their own list, named by its hash in the signed one (no size limit) |
-| 0.3.75 | A yes on an unsigned list says "Not signed", nothing changed, and points to wedgie.dev/reset (was a silent restart). 0.3.54 and older can't update on wedgie.dev (they trust only the old key): the page sends them to /reset |
 
 Report a problem: wedgie@buidlguidl.com, or **Send a bug report** on a wedgie's page at wedgie.dev/connect.
 
