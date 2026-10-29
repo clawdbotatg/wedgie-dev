@@ -13,6 +13,8 @@ background tab) or `node tools/sign.mjs --gate-only` (firmware/apps). A FAIL mea
 - App rules: `src/apps/appjson.mjs`, `folder_app` in `public/wedgie.py`, `public/code.md`. Keep in step.
 - Style: `docs/STYLE.md`, enforced by `tools/test_style.py`. Apps: `docs/APPS.md`. Memory: `docs/PLAN-MEMORY.md`.
 - Clear signing (ERC-7730 wire format, used by Safe Signer) and its next steps: `wire/README.md`.
+  Our own descriptors live in clawdbotatg/clear-descriptors (a checkout beside this repo), never here; write them
+  there, then PR them to the EF registry.
 
 ## Accounts
 
