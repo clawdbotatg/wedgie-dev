@@ -52,7 +52,7 @@ const was = byApp(read("apps.txt")), now = byApp(appsText());
 const coreSame = !process.argv.includes("--all") && read("firmware.txt") && core(read("firmware.txt")) === core(releaseText(0));
 const changed = Object.keys(now).filter((m) => now[m] !== was[m]);
 const want = (name) => !coreSame || ["test_job", "test_memory", "test_style", "test_docs", "mpy --check"].includes(name)
-  || (/^(safechip|test_safekey)$/.test(name) && changed.includes("safe"))
+  || (/^(safechip|test_safekey)/.test(name) && changed.includes("safe"))
   || (/^chip: /.test(name) && changed.some((m) => m === "buttons" || m === "hello"))
   || changed.some((m) => name === `fresh plug-in: ${m}`);
 const all = [
@@ -63,6 +63,8 @@ const all = [
   ["test_tls", ["uv", "run", "-q", "--with", "cryptography", "python3", "tls/test_tls.py"]],
   ["test_safekey", ["uv", "run", "-q", "--with", "cryptography", "python3", "tools/test_safekey.py"]],
   ["safechip", ["node", "tools/safechip.mjs", "--frag"]],
+  // what Instant Wallet sends, on a broken-up heap (10-30: safe-47 ran out of memory on a real wedgie's IW swap)
+  ["safechip: Instant Wallet swap", ["node", "tools/safechip.mjs", "--frag", "--txs", "tools/fixtures/iw-swap.json"]],
   ["mpy --check", [...UV, "tools/mpy.py", "--check"]],
   ["chip: install Buttons + update", ["node", "tools/chipprobe.mjs", "--from", "hello", "--to", "buttons"]],
   ["chip: install over Buttons + update", ["node", "tools/chipprobe.mjs", "--from", "buttons", "--to", "hello"]],
@@ -80,7 +82,8 @@ const results = await Promise.all(jobs.map(([name, cmd]) => new Promise((res) =>
   p.stdout.on("data", (d) => (out += d));
   p.stderr.on("data", (d) => (out += d));
   p.on("close", (code) => {
-    const fails = out.split("\n").filter((l) => /^FAIL|FAILED|out of date|Error/.test(l)).slice(0, 3);
+    // never an ok line: safechip's say "OSError" (the virtual chip has no key), and those hid the real FAIL (10-30)
+    const fails = out.split("\n").filter((l) => !/^\s*ok\s/.test(l) && /^FAIL|FAILED|out of date|Error/.test(l)).slice(0, 3);
     console.log(`${code === 0 ? "ok  " : "FAIL"} ${name} (${Math.round((Date.now() - t0) / 1000)} s)${code === 0 ? "" : "\n       " + (fails.join("\n       ") || out.slice(-300))}`);
     res(code === 0 ? null : name);
   });
