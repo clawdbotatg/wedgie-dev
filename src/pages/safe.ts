@@ -918,8 +918,9 @@ export function safe(main: HTMLElement) {
       if (r.wedgie || r.wallet) tellOurs(r.chain, r.addr);
     }
     if (me !== signer) { listing = false; findAgain = false; return findSafes(); }
-    // a Safe the chain couldn't be read for stays listed (as its sources said): never hidden by a busy RPC
-    rows = list.filter((r) => (!r.info && !r.gone) || r.wedgie || r.wallet)
+    // a Safe the chain couldn't be read for stays listed (as its sources said): never hidden by a busy RPC.
+    // No Safe there at all (an address on the wedgie's own list that isn't one): never listed
+    rows = list.filter((r) => !r.gone && (!r.info || r.wedgie || r.wallet))
       .sort((a, b) => +b.wedgie - +a.wedgie || +!!CHAINS[a.chain].test - +!!CHAINS[b.chain].test || a.chain - b.chain);
     listing = false;
     paintList();
