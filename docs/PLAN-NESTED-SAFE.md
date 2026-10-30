@@ -26,6 +26,17 @@ only path without firmware work. It's a normal Safe tx on the owner Safe: the we
 
 **Use `approveHash` everywhere first.** Off-chain signatures are a later step.
 
+## Status (10-30)
+
+Steps 1–4 are built. Next: 5 and 6.
+
+## Found in review (10-30)
+
+- An on-chain approval must carry its v=1 signature, or `readyRun` (Execute all) skips the tx. `addApprovals` does.
+- No `approveHash` descriptor exists (clear-descriptors or the EF registry). Step 5 needs one, for 1.4.1 and 1.5.0.
+- Instant Wallet's `TxPage.tsx:79` ignores `?h=` when opened inside the app. Test step 6's link there.
+- Instant Wallet = a 1.5 Safe with one of Instant Wallet's recovery modules (`RECOVERY_DAYS` in `safe.ts`).
+
 ## Steps
 
 1. **eth.ts:** `approveHashData(hash)` (calldata), `approvedHashes(owner, hash)` read (via `/api/rpc`), and the

@@ -7,6 +7,7 @@
 //   - the Safe tx hash eth.ts works out = the Safe's getTransactionHash
 //   - adding an owner, signed by the wallet and the wedgie, packed by packSignatures, executed
 //   - a wedgie-only Safe (1 of 1) runs a transaction on the wedgie's signature alone
+//   - a Safe that owns a Safe: A (the wedgie's) approveHash-es B's tx, then B runs it (docs/PLAN-NESTED-SAFE.md)
 // Needs anvil (foundry) and a Base RPC (BASE_RPC, default https://mainnet.base.org). Node 23+ (it imports .ts).
 import { spawn } from "node:child_process";
 import crypto from "node:crypto";
@@ -119,6 +120,18 @@ const bad = wedgieSign(E.safeTxHash(chain, solo, t2));          // signed the ol
 let refused = false;
 try { await send(solo, E.execData(t3, E.packSignatures([{ owner: signer, signature: E.safeSignature(signer, bad) }]))); } catch { refused = true; }
 ok(refused, "a signature for another transaction is refused on chain");
+
+// a Safe owns a Safe: B = A (the wedgie's 1 of 1) + the wallet, 2 of 2. A approves B's tx hash on chain (a normal A tx
+// the wedgie signs); the wallet signs; anyone sends B's tx with A's v=1 signature
+const nest = await makeSafe([solo, E.checksum(me)], 2);
+await rpc("anvil_setBalance", [nest, "0xde0b6b3a7640000"]);
+const t5 = { ...tx(newbie, "0x", 0), value: "4000" }, h5 = E.safeTxHash(chain, nest, t5);
+const a5 = tx(nest, E.approveHashData(h5), Number(await word(solo, "nonce()")));
+await send(solo, E.execData(a5, E.packSignatures([{ owner: signer, signature: E.safeSignature(signer, wedgieSign(E.safeTxHash(chain, solo, a5))) }])));
+ok((await word(nest, "approvedHashes(address,bytes32)", [E.aword(solo), E.bytes(h5)])) === 1n, "Safe A approveHash-es Safe B's tx (wedgie signs A's tx)");
+const w5 = E.ecdsa(await rpc("eth_signTypedData_v4", [me, JSON.stringify(E.typedData(chain, nest, t5))]));
+await send(nest, E.execData(t5, E.packSignatures([{ owner: me, signature: w5 }, { owner: solo, signature: E.approvedSig(solo) }])));
+ok(BigInt(await rpc("eth_getBalance", [newbie, "latest"])) === 7000n, "Safe B runs on the wallet + Safe A's on-chain approval");
 
 console.log(fails ? `${fails} failed` : "all passed");
 process.exit(fails ? 1 : 0);

@@ -280,6 +280,11 @@ export function packSignatures(sigs: { owner: string; signature: string }[]) {
   return hex(cat(...heads, ...tails));
 }
 
+/** An owner (often a Safe) approves a tx hash on chain: any Safe version takes it. Then its signature is approvedSig. */
+export const approveHashData = (h: string) => call("approveHash(bytes32)", [bytes(h)]);
+export const approvedHashesData = (owner: string, h: string) => call("approvedHashes(address,bytes32)", [aword(owner), bytes(h)]);
+export const approvedSig = (owner: string) => hex(cat(aword(owner), word(0), new Uint8Array([1])));
+
 /** execTransaction(to, value, data, operation, safeTxGas, baseGas, gasPrice, gasToken, refundReceiver, signatures) */
 export function execData(t: SafeTx, sigs: string) {
   const pad = (b: Uint8Array) => cat(b, new Uint8Array((32 - (b.length % 32)) % 32));

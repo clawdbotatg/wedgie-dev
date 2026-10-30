@@ -317,6 +317,33 @@ function rolesLimit(d: string, sym: string, dec: number): Limit | null {
   const b = balance + n * refill;
   return { sym, dec, max, left: b > max ? (balance > max ? balance : max) : b, days: Number(period) / 86400 };
 }
+/** Which owners are Safes themselves (VERSION() and getThreshold() answer): their version, and whether it's an Instant
+ *  Wallet (1.5 with one of Instant Wallet's recovery modules). Such an owner signs by approveHash on chain. */
+type OwnerSafe = { version: string; iw: boolean };
+async function readOwnerSafes(c: number, owners: string[]): Promise<Record<string, OwnerSafe>> {
+  const calls = owners.flatMap((o) => [E.selector("VERSION()"), E.selector("getThreshold()"),
+    E.call("getModulesPaginated(address,uint256)", [E.aword(E.SENTINEL), E.word(20)])].map((data) => ({ to: o, allowFailure: true, data })));
+  const got = E.unaggregate(await view(c, E.MULTICALL3, E.aggregate3(calls))), out: Record<string, OwnerSafe> = {};
+  for (const [k, o] of owners.entries()) {
+    const [v, th, mods] = got.slice(k * 3, k * 3 + 3);
+    if (!v.ok || v.data.length < 194 || !th.ok || th.data.length < 66) continue;      // no code (a wallet), or not a Safe
+    const version = str(v.data);
+    if (!/^\d+\.\d+/.test(version)) continue;
+    const ms = mods.ok && mods.data.length >= 194 ? arrAt(mods.data, 0) : [];
+    out[o.toLowerCase()] = { version, iw: version.startsWith("1.5") && ms.some((m) => RECOVERY_DAYS[m.toLowerCase()] !== undefined) };
+  }
+  return out;
+}
+/** Owners' on-chain approvals (approveHash) on waiting txs: each counts as that owner's signature (v = 1). */
+async function addApprovals(c: number, safe: string, owners: string[], q: any[]) {
+  const ask = q.flatMap((t) => owners.filter((o) => !(t.confirmations || []).some((x: any) => x.owner && x.owner.toLowerCase() === o.toLowerCase()))
+    .map((o) => ({ t, o }))).slice(0, 200);
+  if (!ask.length) return;
+  const got = E.unaggregate(await view(c, E.MULTICALL3, E.aggregate3(ask.map(({ t, o }) =>
+    ({ to: safe, allowFailure: true, data: E.approvedHashesData(o, t.safeTxHash) })))));
+  for (const [k, { t, o }] of ask.entries())
+    if (got[k].ok && got[k].data.length >= 66 && BigInt(got[k].data) !== 0n) t.confirmations.push({ owner: o, signature: E.approvedSig(o), approved: true });
+}
 async function readAddons(c: number, safe: string): Promise<Addons> {
   const many = async (calls: { to: string; data: string }[]) => calls.length ? E.unaggregate(await view(c, E.MULTICALL3, E.aggregate3(calls.map((x) => ({ ...x, allowFailure: true }))))) : [];
   const [mods, ...gs] = await many([{ to: safe, data: E.call("getModulesPaginated(address,uint256)", [E.aword(E.SENTINEL), E.word(20)]) },
@@ -423,6 +450,7 @@ export function safe(main: HTMLElement) {
   let assets: Asset[] | null = null;              // what the open Safe holds (null: not read yet)
   let activity: any[] | null = null, activityErr = "";
   let addons: Addons | null = null;               // its modules and guards (null: not read yet)
+  let ownerSafes: Record<string, OwnerSafe> = {};  // owners that are Safes (lowercase address)
   const ethPx: Record<number, number | null> = {};   // the native coin's dollar price per chain, for the list's totals
   // Each Safe's full dollars per chain (every token, as its page counts them), saved with the coin and USDC balances it
   // was read at: the card shows the same number as the Safe's page. Balances changed since: coin + USDC till read again.
@@ -491,7 +519,8 @@ export function safe(main: HTMLElement) {
   const iwMark = `<img class="iw-mark" src="/img/instantwallet.png" alt="Instant Wallet" title="Instant Wallet">`;
   const nextNonce = () => Math.max(info!.nonce, ...queue.map((t) => +t.nonce + 1));
   const threshOpts = (n: number, at: number) => Array.from({ length: n }, (_, i) => `<option${i + 1 === at ? " selected" : ""}>${i + 1}</option>`).join("");
-  const label = (a: string) => mine(a) ? " <b>this wedgie</b>" : eqA(a, account) ? " <b>your wallet</b>" : "";
+  const label = (a: string) => mine(a) ? " <b>this wedgie</b>" : eqA(a, account) ? " <b>your wallet</b>"
+    : ownerSafes[a.toLowerCase()] ? ` <span class="sx-pill">${ownerSafes[a.toLowerCase()].iw ? "Instant Wallet" : "Safe"}</span>` : "";
   const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
   const chainOpts = (at: number) => IDS.map((id) => [id, CHAINS[id]] as const).map(([id, c]) => `<option value="${id}"${+id === at ? " selected" : ""}>${esc(c.name)}${c.test ? " (test)" : ""}</option>`).join("");
   /** Run one thing at a time; buttons say so while it runs. */
@@ -649,7 +678,7 @@ export function safe(main: HTMLElement) {
       const was = chain, sameAddr = eqA(m[2], safeAddr);    // another chain of this Safe: keep what's known of the others
       chain = KEYS[m[1]]; safeAddr = E.checksum(m[2]); info = null; queue = []; recipe = null;
       if (sameAddr) copies[was] = true; else { copies = seenOn(m[2]); worths = {}; looked = false; }
-      assets = null; assetsErr = false; activity = null; activityErr = ""; addons = null;
+      assets = null; assetsErr = false; activity = null; activityErr = ""; addons = null; ownerSafes = {};
       $("s-new").innerHTML = ""; $("s-owner").innerHTML = ""; $("s-wc").innerHTML = "";
       stale = false; loadView(chain, safeAddr);
       paintAll();
@@ -1221,7 +1250,9 @@ export function safe(main: HTMLElement) {
       loadAssets(c, a, i).catch(() => { if (c === chain && a === safeAddr) { assetsErr = true; paintSpin(); } });
       loadActivity(c, a, { bg, fresh });
       readAddons(c, a).then((x) => { if (c === chain && a === safeAddr) { addons = x; paintSafe(); paintAddons(); } }, () => {});
+      readOwnerSafes(c, i.owners).then((x) => { if (c === chain && a === safeAddr) { ownerSafes = x; paintOwners(); } }, () => {});
       const q = await readQueue(c, a, i.nonce, { bg, fresh });
+      await addApprovals(c, a, i.owners, q).catch(() => {});
       if (c !== chain || a !== safeAddr) return;
       queue = q; queueOf = `${c}:${a}`;
       takeAsks();
@@ -1908,7 +1939,7 @@ export function safe(main: HTMLElement) {
     if (+t.nonce !== info!.nonce) throw new Error(`#${info!.nonce} runs first: a Safe runs its transactions in order.`);
     say("Getting it ready.", 2);
     const sigs = (t.confirmations || []).map((c: any) => ({ owner: c.owner,
-      signature: c.signature || E.hex(E.cat(E.aword(c.owner), E.word(0), new Uint8Array([1]))) }));   // an approveHash on chain
+      signature: c.signature || E.approvedSig(c.owner) }));   // an approveHash on chain
     const rc = await send(chain, safeAddr, E.execData(t, E.packSignatures(sigs)), say);
     if (t.wc) await tellApp(chain, safeAddr, String(t.safeTxHash).toLowerCase(), t.wc, rc.transactionHash).catch(() => {});
     await settle(+t.nonce);
