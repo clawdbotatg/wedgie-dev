@@ -95,6 +95,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
         <p class="fine wd-hint" id="d-hint"></p></div>
       <div class="wd-main">
         <div class="beta-warn"><b>Beta.</b> We're making it delightful, and it changes every day, often every few hours. Keep only small amounts on your wedgie for now.</div>
+        <div class="wd-job card" id="d-job" hidden><p><b id="d-job-h"></b></p><div class="meter"><div class="meter-track"><div class="meter-fill"></div></div><span id="d-job-w"></span></div><div class="status recess" id="d-job-t" hidden></div></div>
         <div class="wd-missing card" id="d-missing" hidden></div>
         <div id="d-body">
           <div class="card wd-sec">
@@ -105,7 +106,6 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
           <div class="card wd-sec wd-fw">
             <h3>Firmware</h3>
             <div id="d-fw"></div>
-            <div class="meter" id="d-meter" hidden><div class="meter-track"><div class="meter-fill"></div></div><span id="d-meter-t"></span></div>
           </div>
           <div class="card wd-sec carts">
             <h3>Software</h3>
@@ -325,14 +325,49 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
   }
 
   // ---- painting --------------------------------------------------------------------------------------
-  const status = (s: string, at = "#d-status") => { const el = $(at); if (!el) return; el.hidden = !s; el.innerHTML = s; if (/Question on its screen/.test(s)) el.dataset.ask = el.textContent || ""; };   // data-ask: for the probes
+  const status = (s: string, at = "#d-status") => {
+    if (at === "#d-status") { const t = $("#d-job-t"); t.hidden = !s; t.innerHTML = s; }   // a job hides the body: its card says it
+    const el = $(at); if (!el) return; el.hidden = !s; el.innerHTML = s; if (/Question on its screen/.test(s)) el.dataset.ask = el.textContent || "";   // data-ask: for the probes
+  };
   const tstatus = (s: string) => status(s, "#d-tstatus");   // the Developer section's own line (tests, Run, Save)
   setAskHint((s) => status(s && `<b>${esc(s)}.</b> It asks on its screen.`));
-  const meter = (p: number | null, t = "") => {
-    const el = $("#d-meter"); if (!el) return; el.hidden = p === null; if (p === null) return;
-    el.classList.toggle("done", p >= 1);
-    $<HTMLElement>(".meter-fill").style.width = `${8 + 92 * p}%`; $("#d-meter-t").textContent = t;
+  // One bar per job (an install, an update, an uninstall), start to finish: the install fills it to 70%, the
+  // restart after it runs on toward 97%, and it fills green once the wedgie is back for good. The drops in
+  // between (a checked install's yes restarts it; its USB blinks again ~1 s after power-up) never start it over.
+  const INSTALL_PART = 0.7, SETTLE_MS = 2000;
+  let job = "", jobAt = 0, jobRestarting = false, jobBack = 0, jobTimer = 0;
+  const jobTo = (p: number, ms = 250, ease = "linear") => {
+    if (p <= jobAt) return;
+    jobAt = p;
+    const f = $<HTMLElement>("#d-job .meter-fill");
+    f.style.transition = `width ${ms}ms ${ease}`; f.style.width = `${8 + 92 * p}%`;
   };
+  const jobStart = (title: string) => {
+    job = title; jobAt = 0; jobRestarting = false; jobBack = 0;
+    const f = $<HTMLElement>("#d-job .meter-fill"); f.style.transition = "none"; f.style.width = "8%";
+    $("#d-job .meter").classList.remove("done"); $("#d-job-h").textContent = title; $("#d-job-w").textContent = ""; status("");
+    paint();
+    // the question, the restart into the install and the signature check say no progress: creep meanwhile
+    setTimeout(() => { if (job === title) jobTo(0.3, 30000, "cubic-bezier(.2,.7,.4,1)"); }, 50);
+  };
+  const meter = (p: number, what = "") => { jobTo(INSTALL_PART * p); $("#d-job-w").textContent = what; };
+  const jobRestart = () => {       // the install is done; the wedgie restarts. The bar slows as it nears the end.
+    jobRestarting = true; jobBack = 0;
+    jobTo(0.97, BACK_MS, "cubic-bezier(.25,.7,.45,1)");
+    clearInterval(jobTimer); jobTimer = setInterval(paint, 400) as unknown as number;
+  };
+  const jobEnd = () => { job = ""; jobRestarting = false; clearInterval(jobTimer); paint(); };
+  function paintJob(here: boolean, coming: boolean) {
+    if (!job || !jobRestarting || jobBack < 0) return;
+    if (!here) { jobBack = 0; if (!coming) { status(""); jobEnd(); } return; }   // past the time: the missing card says so
+    if (!jobBack) jobBack = Date.now();
+    if (Date.now() - jobBack < SETTLE_MS) return;     // back, but it may blink once more
+    jobBack = -1;
+    $("#d-job .meter").classList.add("done"); jobTo(1, 400);
+    $("#d-job-w").textContent = "Back.";
+    const t = job;
+    setTimeout(() => { if (job === t && jobBack < 0) { status(""); jobEnd(); } }, 1500);
+  }
   function paint() {
     if (!alive) return;                 // left the page while something was still finishing
     const there = !!w && w.state !== "gone";
@@ -340,8 +375,11 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     else if (!there && wasHere) { wasHere = false; expectBack(); }      // it dropped: give it time to come back
     const coming = backBy > Date.now(), late = !!backBy && !coming && seenOnce;
     const here = there && !coming;
-    $("#d-missing").hidden = here && w!.state !== "error";
-    $("#d-body").hidden = !here || w!.state === "error";
+    paintJob(here, coming);
+    $("#d-job").hidden = !job;
+    $("#d-missing").hidden = !!job || (here && w!.state !== "error");
+    $("#d-body").hidden = !!job || !here || w!.state === "error";
+    if (job && !here) { $("#d-light").className = "light wait"; $("#d-hint").textContent = ""; return; }
     if (!here || w!.state === "error") {
       const html = coming ? `<p><b>${seenOnce ? "Restarting" : "Looking for"} ${esc(id)}</b></p><div class="meter back-meter" style="--back:${backBy - Date.now()}ms"><div class="meter-track"><div class="meter-fill"></div></div></div>`
         : w?.state === "error" ? `<p class="bad">${esc(w.error || "Can't talk to it.")}</p>`
@@ -538,25 +576,25 @@ Not covered: apps and MicroPython itself.
     // An app for another chip: the first tap says so; a second puts it on anyway (it's their wedgie).
     if ((wrongChip(c) || oldFw(c)) && confirmChip !== c.mod) { confirmChip = c.mod; paint(); return; }
     confirmChip = "";
-    busy = "cart"; inserting[c.mod] = 0; paint();
+    busy = "cart"; inserting[c.mod] = 0; jobStart(`Installing ${c.name}`);
     traceStart(`install ${c.mod} on ${x.short} ${x.version} running ${x.running}`);
     const T = `Installing ${c.name}`, sub = appVer(c);
     setScreen({ kind: "loading", p: 0, title: T, sub });
     try {
-      const res = await useApp(r, c, (p, what) => { inserting[c.mod] = p; setScreen(what === ASK_TEXT ? { kind: "ask", job: `Install ${c.name}`, ver: sub } : { kind: "loading", p, title: T, what, sub }); paint(); }, { manifest: view() });
+      const res = await useApp(r, c, (p, what) => { inserting[c.mod] = p; meter(p, what === ASK_TEXT ? "" : what); setScreen(what === ASK_TEXT ? { kind: "ask", job: `Install ${c.name}`, ver: sub } : { kind: "loading", p, title: T, what, sub }); paint(); }, { manifest: view() });
       delete inserting[c.mod];
       status(`Restarting it into <b>${esc(c.name)}</b>…${askTime()}`);
       // The soft reset: a fresh heap for the new app (a checked install restarts itself). The port may drop;
       // attach() finds it by ID either way.
       if (!res.restarted) await r.leave();
-      expectBack();
+      expectBack(); jobRestart();
       W.reidentify(x);
       release?.(); release = null; link = null;
-      setTimeout(() => status(""), 6000);
       traceEnd("ok");
     } catch (e: any) {
       traceEnd("FAILED: " + (e?.message || e));
       delete inserting[c.mod];
+      jobEnd();
       status(`<b class="bad">${esc(c.name)} didn't go on:</b> ${esc(e?.message || e)}`);
       await backToApp(r).catch(() => {});
       setScreen(home());
@@ -567,12 +605,12 @@ Not covered: apps and MicroPython itself.
   async function eject() {
     if (!link || busy || !w) return;
     const r = link;
-    busy = "cart"; paint();
+    busy = "cart"; jobStart("Uninstalling");
     const x = w;
     let restarted = false;
     try { restarted = (await removeApp(r, { manifest: view() })).restarted; } catch (e: any) { status(`<b class="bad">Couldn't uninstall it:</b> ${esc(e?.message || e)}`); }
-    if (restarted) { expectBack(); W.reidentify(x); release?.(); release = null; link = null; }   // it restarted itself (a checked job)
-    else await backToApp(r).catch(() => {});
+    if (restarted) { meter(1); expectBack(); jobRestart(); W.reidentify(x); release?.(); release = null; link = null; }   // it restarted itself (a checked job)
+    else { jobEnd(); await backToApp(r).catch(() => {}); }
     busy = ""; paint(); W.touch();
   }
 
@@ -720,31 +758,30 @@ Not covered: apps and MicroPython itself.
   async function updateFw() {
     if (!link || busy || !w) return;
     const r = link, x = w;
-    busy = "fw"; fwErr = ""; paint(); meter(0, "starting");
+    busy = "fw"; fwErr = ""; jobStart(`Updating firmware to ${m?.version || ""}`); meter(0, "starting");
     traceStart(`update ${x.short} ${x.version} -> ${m?.version} running ${x.running}`);
     try {
       if (x.kind === "micropython") { await r.enter({ reset: true }); }   // bare MicroPython: no drive, a reset is safe
       setScreen({ kind: "loading", p: 0, title: "Updating firmware" });
       let drawn = 0;
       const res = await installCore(r, (p, what) => { meter(p, what); if (what === ASK_TEXT || p - drawn >= 0.05 || p === 1) { drawn = p; setScreen(what === ASK_TEXT ? { kind: "ask", job: `Update firmware to ${m?.version || ""}` } : { kind: "loading", p, title: "Updating firmware", what }); } });
-      if (res.untouched) { meter(1, "Already up to date."); setScreen(home()); busy = ""; paint(); setTimeout(() => meter(null), 4000); return; }
+      if (res.untouched) { jobEnd(); status("Already up to date."); setScreen(home()); busy = ""; paint(); setTimeout(() => status(""), 4000); return; }
       meter(1, res.written ? `wedgie ${res.version} installed. Restarting it…` : "Already up to date. Restarting it…");
       // The one soft reset: the new firmware only runs after one. The port drops and the wedgie comes back as a
       // new port (the drive re-enumerates USB on firmware older than 0.1.3); attach() finds it by its ID.
       // A checked install (0.3.0+) restarts itself.
       if (!res.restarted) await r.leave();
-      expectBack();
+      expectBack(); jobRestart();
       status("Restarting it on the new firmware. It comes back here in a few seconds." + askTime());
       // Identify it again (queued behind this session, so it starts once the port is let go). On 0.1.3+ the
       // port survives a soft reset; if it doesn't, the disconnect marks it gone and the replug is a new one.
       W.reidentify(x);
       release?.(); release = null; link = null;
-      setTimeout(() => { status(""); meter(null); }, 8000);
       traceEnd("ok");
     } catch (e: any) {
       traceEnd("FAILED: " + (e?.message || e));
       fwErr = String(e?.message || e);
-      meter(null);
+      jobEnd();
       setScreen(home());                // never left on "Updating firmware" (10-27: it looked stuck, nothing said why)
       status(`<b class="bad">Update failed:</b> ${esc(e?.message || e)}. It's safe to try again.`);
       busy = ""; paint();               // said now: backToApp on a port that's gone can take a long time

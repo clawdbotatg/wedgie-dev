@@ -224,7 +224,10 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 22px; }
 .back-meter .meter-fill { animation: back-fill var(--back) linear forwards; }
 @keyframes back-fill { to { width: 100%; } }
 .meter.done .meter-fill { background: var(--green-fill); }
-#d-meter-t { font-size: 14px; color: var(--muted); font-family: var(--mono); }
+#d-job-w { font-size: 14px; color: var(--muted); font-family: var(--mono); }
+.wd-job { display: grid; gap: 10px; }
+.wd-job[hidden] { display: none; }
+.wd-job p { margin: 0; }
 .name { border: 0; height: 44px; padding: 0 14px; font: 700 15px var(--font); color: var(--ink); width: 150px; outline: none; }
 .wedgie.remote .k { cursor: pointer; }
 .wedgie.remote .k:active .cap { filter: brightness(1.4); }
