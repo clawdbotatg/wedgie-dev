@@ -73,13 +73,9 @@ const api = (chain: number) => `https://api.safe.global/tx-service/${CHAINS[chai
 const IWQ = "https://instantwallet.io/api/safe/queue";
 const SLOW_MS = 8000;
 const appLink = (chain: number, safe: string, path = "home") => `https://app.safe.global/${path}?safe=${CHAINS[chain].app || CHAINS[chain].key}:${safe}`;
-// The wedgie drops a USB line over 6 KB, but one near it needs that much RAM in one piece: a 5.7 KB MultiSend ran out
-// of memory after the drive grew by a sector (0.3.74, safechip). Over 3 KB, the data goes in safe_data pieces.
-const LINE_MAX = 3000;
 // clear-sim (github.com/clawdbotatg/clear-sim): runs the tx and signs what goes in and out. The wedgie picks the
 // nonce, checks the signature against its own list of simulator keys, and shows a short page first (safe-28+).
 const SIM_URL = "https://sim.wedgie.dev";
-const DATA_MAX = 8000;      // wedgie-safe safe_data pieces: up to this many bytes (what an RP2040 heap joins safely)
 
 // Safe's service goes through /api/safe (our key: without one Safe allows 5,000 reads a month per IP, and one person's
 // page used that up, 10-21), at most 3 at a time (the key: 5 a second). A local preview has no /api: straight there.
@@ -1820,50 +1816,18 @@ export function safe(main: HTMLElement) {
     const tx = { chainId: chain, safe: safeAddr, to: t.to, value: String(t.value), data: t.data || "0x", operation: +t.operation,
       safeTxGas: String(t.safeTxGas), baseGas: String(t.baseGas), gasPrice: String(t.gasPrice), gasToken: t.gasToken || Z,
       refundReceiver: t.refundReceiver || Z, nonce: +t.nonce };      // only the fields: the wedgie reads one line of at most 6 KB
-    const big = JSON.stringify({ id: 1000, type: "safe_sign", tx }).length > LINE_MAX;
-    const n = (tx.data.length - 2) / 2;
-    if (big && (!chunk || n > DATA_MAX))
-      throw new Error(chunk ? `This transaction has ${n} bytes of data: a wedgie takes up to ${DATA_MAX}. Sign it another way.`
-        : "This transaction is too big for the wedgie to read in one go: update the Safe Signer app on it (its page, Software).");
     asking = true; paintAll();
     say("Look at the wedgie: check what it shows, then press the green button to sign (red says no).");
-    // what the registry says about it (ERC-7730), sent ahead: the wedgie checks it against its own roots
-    const cb = clearTag && chunk ? await Clear.bundle(clearTag, chain, { ...t, safe: safeAddr }, reviewRound).catch(() => null) : null;
     const close = pressModal("Check it", "then sign", "sign");     // its pages say next, then sign
     try {
-      const g = await ask(wedgie, async (r) => {
-        for (let o = 0; cb && o < cb.length; o += chunk) {
-          const a = await r.request({ type: "safe_clear", at: o / 2, hex: cb.slice(o, o + chunk) }, 20000);
-          if (a.type !== "safe_clear") break;           // it can still sign; it just can't read the call
-        }
-        // a simulation, asked with the wedgie's own nonce. None (no internet, a revert, too big): the usual pages
-        // a batch too (Safe Signer 47+: older ones ignore a batch's and show the usual pages)
-        const sim = simOk ? await simulate(r, tx).catch(() => null) : null;
-        if (!big) {
-          const withSim = sim ? { ...tx, sim } : tx;
-          return r.request({ type: "safe_sign", tx: JSON.stringify({ id: 1000, type: "safe_sign", tx: withSim }).length > LINE_MAX ? tx : withSim }, 200000);
-        }
-        say("Sending the transaction to the wedgie in pieces.");
-        const hex = tx.data.slice(2);
-        for (let o = 0; o < hex.length; o += chunk) {        // its data first, then the tx with data "@"
-          const a = await r.request({ type: "safe_data", at: o / 2, hex: hex.slice(o, o + chunk) }, 20000);
-          if (a.type !== "safe_data") throw new Error(a.error || "The wedgie didn't take a piece.");
-        }
-        say("Look at the wedgie: check what it shows, then press the green button to sign (red says no).");
-        return r.request({ type: "safe_sign", tx: { ...tx, data: "@", ...(sim ? { sim } : {}) } }, 200000);
-      });
+      // the one way both sites send it (clear-signing-safe-kit): bundle, simulation with its nonce, data in pieces, safe_sign
+      const g = await ask(wedgie, (r) => Sim.wedgieSign({ ask: (m, ms) => r.request(m, ms), tx, simUrl: SIM_URL,
+        hello: { safe_chunk: chunk, safe_clear: clearTag, safe_sim: simOk ? "p256" : undefined, safe_review: reviewRound } }));
       if (g.type === "refused") throw new Error("The wedgie said no.");
       if (g.type !== "safe_sig") throw new Error(g.error || "The wedgie didn't sign.");
       if (g.safeTxHash !== E.safeTxHash(chain, safeAddr, t)) throw new Error("The wedgie signed a different hash: not sent.");
       return slots.map((a) => ({ owner: a, signature: E.safeSignature(a, g as E.WedgieSig) }));
     } finally { asking = false; close(); }
-  }
-  /** clear-sim's signed answer for tx, from the Safe, with a nonce the wedgie just picked (the wedgie checks it). */
-  async function simulate(r: Drive.Asker, tx: { chainId: number; safe: string; to: string; value: string; data: string; operation: number }) {
-    const n = await r.request({ type: "safe_nonce" }, 5000);
-    if (n.type !== "safe_nonce") return null;
-    return Sim.simulate({ chain: tx.chainId, safe: tx.safe, tx: { to: tx.to, value: BigInt(tx.value), data: tx.data as `0x${string}`, operation: tx.operation },
-      url: SIM_URL, nonce: n.nonce, check: false, timeout: 15000 });
   }
   async function walletSig(t: E.SafeTx) {
     const from = account = await wallet(chain);
