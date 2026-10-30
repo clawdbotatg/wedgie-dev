@@ -844,5 +844,275 @@
     ]
    }
   ]
+ },
+ {
+  "slug": "candide-7d",
+  "title": "Candide recovery, 7 days (Candide's module)",
+  "note": "Candide's social recovery module: add or remove a recovery helper, cancel a recovery, and what helpers send. Our descriptors, for a registry PR (not open yet). Not on wedgies yet: today's Safe Signer has an older draft. Cases marked synthetic are built by hand, not mined.",
+  "cases": [
+   {
+    "name": "Add helper (a Safe's call, from tx 0x0a760b4c)",
+    "chainId": 1,
+    "to": "0x088f6cfd8bb1ddb1bb069ccb3fc1a98927d233f2",
+    "pages": [
+     "screens/candide-7d/01-1.png",
+     "screens/candide-7d/01-2.png",
+     "screens/candide-7d/01-3.png"
+    ]
+   },
+   {
+    "name": "Remove helper (a Safe's call, from tx 0xb4601241)",
+    "chainId": 8453,
+    "to": "0x088f6cfd8bb1ddb1bb069ccb3fc1a98927d233f2",
+    "pages": [
+     "screens/candide-7d/02-1.png",
+     "screens/candide-7d/02-2.png"
+    ]
+   },
+   {
+    "name": "Cancel recovery (a Safe's call, from tx 0xd99cc529)",
+    "chainId": 1,
+    "to": "0x088f6cfd8bb1ddb1bb069ccb3fc1a98927d233f2",
+    "pages": [
+     "screens/candide-7d/03-1.png"
+    ]
+   },
+   {
+    "name": "Change helpers needed to 2 (synthetic)",
+    "chainId": 8453,
+    "to": "0x088f6cfd8bb1ddb1bb069ccb3fc1a98927d233f2",
+    "pages": [
+     "screens/candide-7d/04-1.png"
+    ]
+   },
+   {
+    "name": "Void helper votes (synthetic)",
+    "chainId": 8453,
+    "to": "0x088f6cfd8bb1ddb1bb069ccb3fc1a98927d233f2",
+    "pages": [
+     "screens/candide-7d/05-1.png"
+    ]
+   },
+   {
+    "name": "Submit helper votes and start the wait (tx 0xb7af8ecd)",
+    "chainId": 1,
+    "to": "0x088f6cfd8bb1ddb1bb069ccb3fc1a98927d233f2",
+    "pages": [
+     "screens/candide-7d/06-1.png",
+     "screens/candide-7d/06-2.png",
+     "screens/candide-7d/06-3.png",
+     "screens/candide-7d/06-4.png"
+    ]
+   },
+   {
+    "name": "Finish recovery (tx 0x978f9fba)",
+    "chainId": 1,
+    "to": "0x088f6cfd8bb1ddb1bb069ccb3fc1a98927d233f2",
+    "pages": [
+     "screens/candide-7d/07-1.png",
+     "screens/candide-7d/07-2.png"
+    ]
+   },
+   {
+    "name": "One helper votes, no start (synthetic, votes of tx 0xb7af8ecd)",
+    "chainId": 1,
+    "to": "0x088f6cfd8bb1ddb1bb069ccb3fc1a98927d233f2",
+    "pages": [
+     "screens/candide-7d/08-1.png",
+     "screens/candide-7d/08-2.png",
+     "screens/candide-7d/08-3.png"
+    ]
+   },
+   {
+    "name": "Start the wait (synthetic, votes of tx 0xb7af8ecd)",
+    "chainId": 1,
+    "to": "0x088f6cfd8bb1ddb1bb069ccb3fc1a98927d233f2",
+    "pages": [
+     "screens/candide-7d/09-1.png",
+     "screens/candide-7d/09-2.png",
+     "screens/candide-7d/09-3.png"
+    ]
+   }
+  ]
+ },
+ {
+  "slug": "candide-14d",
+  "title": "Candide recovery, 14 days (our deployment, same code)",
+  "note": "Candide's social recovery module: add or remove a recovery helper, cancel a recovery, and what helpers send. Our descriptors, for a registry PR (not open yet). Not on wedgies yet: today's Safe Signer has an older draft. Cases marked synthetic are built by hand, not mined.",
+  "cases": [
+   {
+    "name": "Add helper (a Safe's call, from tx 0x0e2a123b)",
+    "chainId": 8453,
+    "to": "0x9bacd92f4687db306d7ded5d4513a51ea05df25b",
+    "pages": [
+     "screens/candide-14d/01-1.png",
+     "screens/candide-14d/01-2.png",
+     "screens/candide-14d/01-3.png"
+    ]
+   },
+   {
+    "name": "Remove helper (a Safe's call, from tx 0xb4601241) (calldata from the 7-day module; synthetic)",
+    "chainId": 8453,
+    "to": "0x9bacd92f4687db306d7ded5d4513a51ea05df25b",
+    "pages": [
+     "screens/candide-14d/02-1.png",
+     "screens/candide-14d/02-2.png"
+    ]
+   },
+   {
+    "name": "Cancel recovery (a Safe's call, from tx 0xd99cc529) (calldata from the 7-day module; synthetic)",
+    "chainId": 1,
+    "to": "0x9bacd92f4687db306d7ded5d4513a51ea05df25b",
+    "pages": [
+     "screens/candide-14d/03-1.png"
+    ]
+   },
+   {
+    "name": "Change helpers needed to 2 (synthetic)",
+    "chainId": 8453,
+    "to": "0x9bacd92f4687db306d7ded5d4513a51ea05df25b",
+    "pages": [
+     "screens/candide-14d/04-1.png"
+    ]
+   },
+   {
+    "name": "Void helper votes (synthetic)",
+    "chainId": 8453,
+    "to": "0x9bacd92f4687db306d7ded5d4513a51ea05df25b",
+    "pages": [
+     "screens/candide-14d/05-1.png"
+    ]
+   },
+   {
+    "name": "Submit helper votes and start the wait (calldata from the 7-day module; synthetic)",
+    "chainId": 1,
+    "to": "0x9bacd92f4687db306d7ded5d4513a51ea05df25b",
+    "pages": [
+     "screens/candide-14d/06-1.png",
+     "screens/candide-14d/06-2.png",
+     "screens/candide-14d/06-3.png",
+     "screens/candide-14d/06-4.png"
+    ]
+   },
+   {
+    "name": "Finish recovery (calldata from the 7-day module; synthetic)",
+    "chainId": 1,
+    "to": "0x9bacd92f4687db306d7ded5d4513a51ea05df25b",
+    "pages": [
+     "screens/candide-14d/07-1.png",
+     "screens/candide-14d/07-2.png"
+    ]
+   },
+   {
+    "name": "One helper votes, no start (synthetic, votes of tx 0xb7af8ecd)",
+    "chainId": 1,
+    "to": "0x9bacd92f4687db306d7ded5d4513a51ea05df25b",
+    "pages": [
+     "screens/candide-14d/08-1.png",
+     "screens/candide-14d/08-2.png",
+     "screens/candide-14d/08-3.png"
+    ]
+   },
+   {
+    "name": "Start the wait (synthetic, votes of tx 0xb7af8ecd)",
+    "chainId": 1,
+    "to": "0x9bacd92f4687db306d7ded5d4513a51ea05df25b",
+    "pages": [
+     "screens/candide-14d/09-1.png",
+     "screens/candide-14d/09-2.png",
+     "screens/candide-14d/09-3.png"
+    ]
+   }
+  ]
+ },
+ {
+  "slug": "candide-60d",
+  "title": "Candide recovery, 60 days (our deployment, same code)",
+  "note": "Candide's social recovery module: add or remove a recovery helper, cancel a recovery, and what helpers send. Our descriptors, for a registry PR (not open yet). Not on wedgies yet: today's Safe Signer has an older draft. Cases marked synthetic are built by hand, not mined.",
+  "cases": [
+   {
+    "name": "Add helper (a Safe's call, from tx 0xb4601241)",
+    "chainId": 8453,
+    "to": "0x6aa9a8ad0582db61a97a6e30eba22ba143d1e960",
+    "pages": [
+     "screens/candide-60d/01-1.png",
+     "screens/candide-60d/01-2.png",
+     "screens/candide-60d/01-3.png"
+    ]
+   },
+   {
+    "name": "Remove helper (a Safe's call, from tx 0xb4601241) (calldata from the 7-day module; synthetic)",
+    "chainId": 8453,
+    "to": "0x6aa9a8ad0582db61a97a6e30eba22ba143d1e960",
+    "pages": [
+     "screens/candide-60d/02-1.png",
+     "screens/candide-60d/02-2.png"
+    ]
+   },
+   {
+    "name": "Cancel recovery (a Safe's call, from tx 0xd99cc529) (calldata from the 7-day module; synthetic)",
+    "chainId": 1,
+    "to": "0x6aa9a8ad0582db61a97a6e30eba22ba143d1e960",
+    "pages": [
+     "screens/candide-60d/03-1.png"
+    ]
+   },
+   {
+    "name": "Change helpers needed to 2 (synthetic)",
+    "chainId": 8453,
+    "to": "0x6aa9a8ad0582db61a97a6e30eba22ba143d1e960",
+    "pages": [
+     "screens/candide-60d/04-1.png"
+    ]
+   },
+   {
+    "name": "Void helper votes (synthetic)",
+    "chainId": 8453,
+    "to": "0x6aa9a8ad0582db61a97a6e30eba22ba143d1e960",
+    "pages": [
+     "screens/candide-60d/05-1.png"
+    ]
+   },
+   {
+    "name": "Submit helper votes and start the wait (calldata from the 7-day module; synthetic)",
+    "chainId": 1,
+    "to": "0x6aa9a8ad0582db61a97a6e30eba22ba143d1e960",
+    "pages": [
+     "screens/candide-60d/06-1.png",
+     "screens/candide-60d/06-2.png",
+     "screens/candide-60d/06-3.png",
+     "screens/candide-60d/06-4.png"
+    ]
+   },
+   {
+    "name": "Finish recovery (calldata from the 7-day module; synthetic)",
+    "chainId": 1,
+    "to": "0x6aa9a8ad0582db61a97a6e30eba22ba143d1e960",
+    "pages": [
+     "screens/candide-60d/07-1.png",
+     "screens/candide-60d/07-2.png"
+    ]
+   },
+   {
+    "name": "One helper votes, no start (synthetic, votes of tx 0xb7af8ecd)",
+    "chainId": 1,
+    "to": "0x6aa9a8ad0582db61a97a6e30eba22ba143d1e960",
+    "pages": [
+     "screens/candide-60d/08-1.png",
+     "screens/candide-60d/08-2.png",
+     "screens/candide-60d/08-3.png"
+    ]
+   },
+   {
+    "name": "Start the wait (synthetic, votes of tx 0xb7af8ecd)",
+    "chainId": 1,
+    "to": "0x6aa9a8ad0582db61a97a6e30eba22ba143d1e960",
+    "pages": [
+     "screens/candide-60d/09-1.png",
+     "screens/candide-60d/09-2.png",
+     "screens/candide-60d/09-3.png"
+    ]
+   }
+  ]
  }
 ]

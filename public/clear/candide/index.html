@@ -1,0 +1,26 @@
+<!doctype html>
+<!-- wedgie.dev/clear and every /clear/<dapp>/ (the same file): real transactions as a wedgie shows them, page by page.
+     clear.js draws it from screens/index.json (tools/clear_page.py, from safechip --shots: a virtual RP2040 running the
+     real firmware and Safe Signer). A new dapp: tools/clear_page.py makes its folder. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clear signing on a wedgie</title>
+<meta name="description" content="Real transactions, page by page, as a wedgie shows them before it signs.">
+<link rel="icon" href="/img/favicon.png">
+<link rel="stylesheet" href="/clear/clear.css">
+</head>
+<body>
+<main>
+  <a class="top" href="/"><img src="/img/favicon.png" alt="">wedgie</a>
+  <h1>Clear signing on a wedgie</h1>
+  <p class="lead">Real mainnet transactions, page by page, as a wedgie shows them before you press sign. The
+    wedgie reads the transaction itself, from <a href="https://github.com/ethereum/clear-signing-erc7730-registry">the public ERC-7730 registry</a>,
+    and checks every descriptor against roots built into its app. None of these were sent.</p>
+  <p class="lead">Screens from the real firmware and Safe Signer on a virtual RP2040.</p>
+  <div id="sections"></div>
+</main>
+<script src="/clear/clear.js"></script>
+</body>
+</html>
