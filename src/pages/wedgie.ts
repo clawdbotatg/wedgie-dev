@@ -294,6 +294,9 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     // An install has it: a checked install's yes restarts it, the port may drop, and the install finds it
     // again by its ID and goes on (install.ts job()). Holding its new port here would stall that.
     if (busy) { paint(); return; }
+    // Its USB dropped (a restart, the drive's blink ~1 s after boot): close our side now. Held, the port
+    // stays open here and its comeback (often the same port) can't be opened: "didn't come back" (10-30).
+    if (w && w.state === "gone" && release) { release(); release = null; link = null; }
     const found = W.wedgies().find((x) => x.short === id && x.state !== "gone") || null;
     if (found !== w) {
       release?.(); release = null; link = null; w = found;
@@ -334,7 +337,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
   // One bar per job (an install, an update, an uninstall), start to finish: the install fills it to 70%, the
   // restart after it runs on toward 97%, and it fills green once the wedgie is back for good. The drops in
   // between (a checked install's yes restarts it; its USB blinks again ~1 s after power-up) never start it over.
-  const INSTALL_PART = 0.7, SETTLE_MS = 2000;
+  const INSTALL_PART = 0.7, SETTLE_MS = 6000;
   let job = "", jobAt = 0, jobRestarting = false, jobBack = 0, jobTimer = 0;
   const jobTo = (p: number, ms = 250, ease = "linear") => {
     if (p <= jobAt) return;
@@ -596,7 +599,7 @@ Not covered: apps and MicroPython itself.
       delete inserting[c.mod];
       jobEnd();
       status(`<b class="bad">${esc(c.name)} didn't go on:</b> ${esc(e?.message || e)}`);
-      await backToApp(r).catch(() => {});
+      await afterFail(r, x);
       setScreen(home());
     }
     busy = ""; paint(); W.touch();
@@ -610,7 +613,7 @@ Not covered: apps and MicroPython itself.
     let restarted = false;
     try { restarted = (await removeApp(r, { manifest: view() })).restarted; } catch (e: any) { status(`<b class="bad">Couldn't uninstall it:</b> ${esc(e?.message || e)}`); }
     if (restarted) { meter(1); expectBack(); jobRestart(); W.reidentify(x); release?.(); release = null; link = null; }   // it restarted itself (a checked job)
-    else { jobEnd(); await backToApp(r).catch(() => {}); }
+    else { jobEnd(); await afterFail(r, x); }
     busy = ""; paint(); W.touch();
   }
 
@@ -754,6 +757,15 @@ Not covered: apps and MicroPython itself.
     if (h && w) { if (String(h.fw || "").startsWith("wedgie-")) w.kind = "wedgie"; w.slot = !!h.slot; w.version = h.version; w.apps = h.apps; w.carts = h.carts; w.free = h.free ?? w.free; w.ram = h.ram ?? w.ram; w.running = h.running ?? null; w.firmware = `wedgie ${h.version}`; }
   }
 
+  /** A job that didn't go through (a no, an error): its app again, then let go of the port and look for it
+   *  afresh, as after an install. A no restarts it; held, the old session blocks finding it again (10-30:
+   *  "didn't come back" while /connect showed it). backToApp on a port that's gone can take a long time. */
+  async function afterFail(r: Repl, x: W.Wedgie) {
+    await Promise.race([backToApp(r).catch(() => {}), sleep(15000)]);
+    W.reidentify(x);
+    release?.(); release = null; link = null;
+  }
+
   // ---- firmware ---------------------------------------------------------------------------------------
   async function updateFw() {
     if (!link || busy || !w) return;
@@ -785,7 +797,7 @@ Not covered: apps and MicroPython itself.
       setScreen(home());                // never left on "Updating firmware" (10-27: it looked stuck, nothing said why)
       status(`<b class="bad">Update failed:</b> ${esc(e?.message || e)}. It's safe to try again.`);
       busy = ""; paint();               // said now: backToApp on a port that's gone can take a long time
-      await Promise.race([backToApp(r).catch(() => {}), new Promise((res) => setTimeout(res, 15000))]);
+      await afterFail(r, x);
     }
     busy = ""; paint(); W.touch();      // attach() again (it waited while the update had it)
   }
