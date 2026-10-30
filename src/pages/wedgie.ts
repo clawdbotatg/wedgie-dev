@@ -338,7 +338,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
   // restart after it runs on toward 97%, and it fills green once the wedgie is back for good. The drops in
   // between (a checked install's yes restarts it; its USB blinks again ~1 s after power-up) never start it over.
   const INSTALL_PART = 0.7, SETTLE_MS = 6000;
-  let job = "", jobAt = 0, jobRestarting = false, jobBack = 0, jobTimer = 0;
+  let job = "", jobAt = 0, jobRestarting = false, jobBack = 0, jobTimer = 0, jobKeep = false;   // jobKeep: its line says why it failed
   const jobTo = (p: number, ms = 250, ease = "linear") => {
     if (p <= jobAt) return;
     jobAt = p;
@@ -346,7 +346,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     f.style.transition = `width ${ms}ms ${ease}`; f.style.width = `${8 + 92 * p}%`;
   };
   const jobStart = (title: string) => {
-    job = title; jobAt = 0; jobRestarting = false; jobBack = 0;
+    job = title; jobAt = 0; jobRestarting = false; jobBack = 0; jobKeep = false;
     const f = $<HTMLElement>("#d-job .meter-fill"); f.style.transition = "none"; f.style.width = "8%";
     $("#d-job .meter").classList.remove("done"); $("#d-job-h").textContent = title; $("#d-job-w").textContent = ""; status("");
     paint();
@@ -362,14 +362,14 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
   const jobEnd = () => { job = ""; jobRestarting = false; clearInterval(jobTimer); paint(); };
   function paintJob(here: boolean, coming: boolean) {
     if (!job || !jobRestarting || jobBack < 0) return;
-    if (!here) { jobBack = 0; if (!coming) { status(""); jobEnd(); } return; }   // past the time: the missing card says so
+    if (!here) { jobBack = 0; if (!coming) { if (!jobKeep) status(""); jobEnd(); } return; }   // past the time: the missing card says so
     if (!jobBack) jobBack = Date.now();
     if (Date.now() - jobBack < SETTLE_MS) return;     // back, but it may blink once more
     jobBack = -1;
     $("#d-job .meter").classList.add("done"); jobTo(1, 400);
     $("#d-job-w").textContent = "Back.";
     const t = job;
-    setTimeout(() => { if (job === t && jobBack < 0) { status(""); jobEnd(); } }, 1500);
+    setTimeout(() => { if (job === t && jobBack < 0) { if (!jobKeep) status(""); jobEnd(); } }, 1500);
   }
   function paint() {
     if (!alive) return;                 // left the page while something was still finishing
@@ -597,7 +597,6 @@ Not covered: apps and MicroPython itself.
     } catch (e: any) {
       traceEnd("FAILED: " + (e?.message || e));
       delete inserting[c.mod];
-      jobEnd();
       status(`<b class="bad">${esc(c.name)} didn't go on:</b> ${esc(e?.message || e)}`);
       await afterFail(r, x);
       setScreen(home());
@@ -613,7 +612,7 @@ Not covered: apps and MicroPython itself.
     let restarted = false;
     try { restarted = (await removeApp(r, { manifest: view() })).restarted; } catch (e: any) { status(`<b class="bad">Couldn't uninstall it:</b> ${esc(e?.message || e)}`); }
     if (restarted) { meter(1); expectBack(); jobRestart(); W.reidentify(x); release?.(); release = null; link = null; }   // it restarted itself (a checked job)
-    else { jobEnd(); await afterFail(r, x); }
+    else await afterFail(r, x);
     busy = ""; paint(); W.touch();
   }
 
@@ -761,7 +760,13 @@ Not covered: apps and MicroPython itself.
    *  afresh, as after an install. A no restarts it; held, the old session blocks finding it again (10-30:
    *  "didn't come back" while /connect showed it). backToApp on a port that's gone can take a long time. */
   async function afterFail(r: Repl, x: W.Wedgie) {
-    await Promise.race([backToApp(r).catch(() => {}), sleep(15000)]);
+    // A no restarts it: the port drops at once. Don't wait on the old port then (it took ~15 s to give up).
+    let gone = false;
+    const dropped = (async () => { while (!gone && x.state !== "gone") await sleep(150); })();
+    await Promise.race([backToApp(r).catch(() => {}), sleep(15000), dropped]);
+    if (x.state === "gone") { $("#d-job-h").textContent = "Restarting"; jobKeep = true; expectBack(); jobRestart(); }   // the same bar, on
+    else jobEnd();
+    gone = true;
     W.reidentify(x);
     release?.(); release = null; link = null;
   }
@@ -793,7 +798,6 @@ Not covered: apps and MicroPython itself.
     } catch (e: any) {
       traceEnd("FAILED: " + (e?.message || e));
       fwErr = String(e?.message || e);
-      jobEnd();
       setScreen(home());                // never left on "Updating firmware" (10-27: it looked stuck, nothing said why)
       status(`<b class="bad">Update failed:</b> ${esc(e?.message || e)}. It's safe to try again.`);
       busy = ""; paint();               // said now: backToApp on a port that's gone can take a long time
