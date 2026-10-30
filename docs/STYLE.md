@@ -77,8 +77,11 @@ them too. An app that draws text without `import ui` fails the test.
   Y" mean nothing to the person holding it. Show the button's color: in any text through `ui.say`
   (`ui.page` lines and hint, `ui.ask` lines), `{g}` `{r}` `{k}` draw a green, red, grey square. Hosts
   say "the green button", never "A". test_style.py fails on a drawn letter.
-- **The site's buttons** (Austin, 2026-10-22): the main action is on the right, the other on the left. One
-  green button per page: the thing to click. A no or cancel next to it is red.
+- **The site's buttons** (Austin, 2026-10-22, 10-30; same as Instant Wallet): the main action is on the right,
+  the other on the left. Green: the one obvious action, never two in sight. Dark gray (`btn-grey`): the clear
+  runner-up (copy a waiting tx's link). Red: anything that kills or ends something (remove, delete, cancel,
+  close, disconnect, sign out, stop; a red ✕ on the far left). White: everything else, Reject and Back too.
+  Same action, same look everywhere.
 - The hint sits at the bottom in `ui.MUTED`: "{g} play again".
 - Text: 8 px font. Scale 1 fits 28 characters across, scale 2 fits 15 (`ui.COLS_SMALL`, `ui.COLS_BIG`).
   `ui.wrap` breaks lines, `ui.title` draws a big one.

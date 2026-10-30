@@ -528,9 +528,14 @@ export function safe(main: HTMLElement) {
       if (!m && !asked.has(a.toLowerCase())) { asked.add(a.toLowerCase()); const c = chain; tokenMeta(c, a, (m, p) => rpc(c, m, p)).then((x) => { if (x && c === chain) paintAll(); }); }
       return m;
     },
+    price: (t) => priceOf(t),
   });
+  /** A coin's dollar price from the Assets card, when it's already loaded (null: the coin itself). */
+  const priceOf = (token: string | null) => assets?.find((a) => token === null ? a.token === null : !!a.token && eqA(a.token, token))?.price ?? null;
   // what describe.ts can't read: clear signing, else 🤖 (src/safe/explain.ts)
   const said = (t: any) => { const s = describe(t, ctx(), t.dataDecoded?.method); return explain(s, callsOf(t, s), chain, safeAddr, ctx().addr, paintAll); };
+  // the copy icon, the same one Instant Wallet draws
+  const COPY_ICON = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2.5"/><path d="M5 15H4.5A1.5 1.5 0 0 1 3 13.5v-9A1.5 1.5 0 0 1 4.5 3h9A1.5 1.5 0 0 1 15 4.5V5"/></svg>`;
   const ICON: Record<Said["kind"], string> = { send: "↑", approve: "✓", owners: "👥", cancel: "⨯", batch: "≡", call: "⚙", danger: "!" };
   const subsOf = (s: Said) => s.subs?.length ? `<ol class="sx-subs">${s.subs.map((x) => `<li>${x.title}</li>`).join("")}</ol>` : "";
   /** The Safe's total in dollars, when every price that matters is known; else null. */
@@ -694,7 +699,7 @@ export function safe(main: HTMLElement) {
     $("s-first").hidden = !big;
   }
   // No wedgie here: the way back to get one (same as /connect without one).
-  const HOME = `<a class="btn btn-green" href="/">Back to wedgie.dev</a>`;
+  const HOME = `<a class="btn" href="/">Back to wedgie.dev</a>`;
   function paintWedgie() {
     // the wedgie whose key we read was unplugged: read the next one's (another wedgie = another list)
     if (wedgie && wedgie !== DRIVE && !present(wedgie)) { wedgie = null; key = null; }
@@ -704,7 +709,7 @@ export function safe(main: HTMLElement) {
     // with a saved list nothing at all: the list is already there (Austin, 10-21: no boxes that push the page down).
     const known = !!signer, all = Drive.inApp() ? [] : W.wedgies().filter((w) => w.state !== "gone");
     const bad = all.find((w) => w.state === "error");
-    const gone = `<p class="sx-row">${HOME}<a class="btn" href="/connect">Connect a wedgie</a></p>`;
+    const gone = `<p class="sx-row">${HOME}<a class="btn btn-green" href="/connect">Connect a wedgie</a></p>`;
     let h = "";
     if (Drive.inApp() && !ws.length) h += driveState === "unpicked"
       ? `<p>Plug in your wedgie, then <button class="btn btn-sm btn-green" id="s-drive">Find it</button></p>`
@@ -818,7 +823,7 @@ export function safe(main: HTMLElement) {
     box.hidden = false;
     box.innerHTML = !account ? `<button class="btn btn-sm btn-wallet" id="w-go"${dis()}>Connect wallet</button>`
       : `<span class="safe-id-tag">wallet</span>${address(account)}${isOwner(account) ? `<span class="good">owner</span>` : ""}
-      <button class="btn btn-sm" id="w-off">Disconnect</button>`;
+      <button class="btn btn-sm btn-red" id="w-off">Disconnect</button>`;
     $("w-go")?.addEventListener("click", () => job(async () => {
       account = await wallet(safeAddr ? chain : newChain);
       (await rainbow()).watch(onWallet); hear(wcp);
@@ -1030,7 +1035,7 @@ export function safe(main: HTMLElement) {
     const addRow = (v = "") => {                  // one input per owner; × takes it off
       const d = document.createElement("div");
       d.className = "safe-owner";
-      d.innerHTML = `${addressInput("c-o" + ++rowN, "0x… or ENS name")} <button class="btn btn-sm" type="button" aria-label="Take this owner off">×</button>`;
+      d.innerHTML = `${addressInput("c-o" + ++rowN, "0x… or ENS name")} <button class="btn btn-sm btn-red" type="button" aria-label="Take this owner off">×</button>`;
       list.append(d);
       const inp = d.querySelector("input")!;
       if (v) { inp.value = v; inp.dispatchEvent(new Event("input")); }
@@ -1093,7 +1098,7 @@ export function safe(main: HTMLElement) {
     iw.hidden = !(safeAddr && info && isIW(info.owners));
     // with its recovery and daily limit under it (repainted only when they change: the button stays put under a tap)
     const iwh = iw.hidden ? "" : `<div class="sx-iw-top"><img src="/img/instantwallet.png" alt=""><b>Instant Wallet</b>
-      <a class="btn btn-green btn-sm sx-end" href="https://instantwallet.io" target="_blank" rel="noopener">Open</a></div>`
+      <a class="btn btn-sm sx-end" href="https://instantwallet.io" target="_blank" rel="noopener">Open ↗</a></div>`
       + (addons ? `<ul class="sx-rows">${addonRows(addons.mods.filter((m) => m.kind === "recovery" || m.kind === "limit"), false)}</ul>` : "");
     if (iw.dataset.h !== iwh) { iw.dataset.h = iwh; iw.innerHTML = iwh; }
     if (box.hidden) { paintSpin(); return; }
@@ -1163,7 +1168,7 @@ export function safe(main: HTMLElement) {
     if (box.hidden) return;
     const i = info!, c = CHAINS[chain], change = can() && i.owners.length > 1;
     box.innerHTML = `<h3>Owners</h3>
-      <ul class="sx-rows">${i.owners.map((o) => `<li>${address(o, { link: c.scan, chain })}${label(o)}${change ? `<button class="btn btn-sm sx-end" data-rm="${esc(o)}"${dis()}>Remove</button>` : ""}</li>`).join("")}</ul>
+      <ul class="sx-rows">${i.owners.map((o) => `<li>${address(o, { link: c.scan, chain })}${label(o)}${change ? `<button class="btn btn-sm btn-red sx-end" data-rm="${esc(o)}"${dis()}>Remove</button>` : ""}</li>`).join("")}</ul>
       <p class="sx-row"><b>${i.threshold} of ${i.owners.length}</b>&nbsp;must sign${change ? `<span class="sx-end"><select id="o-th"${dis()}>${threshOpts(i.owners.length, i.threshold)}</select> <button class="btn btn-sm" id="o-th-go"${dis()}>Change</button></span>` : ""}</p>`;
     box.querySelectorAll<HTMLButtonElement>("[data-rm]").forEach((b) => b.onclick = () => removeOwner(b.dataset.rm!));
     $("o-th-go")?.addEventListener("click", () => changeThreshold(+($("o-th") as HTMLSelectElement).value));
@@ -1582,16 +1587,18 @@ export function safe(main: HTMLElement) {
       }
       if (account && isOwner(account)) signed(t, account) ? marks.push("wallet ✓")
         : n < need && (btns.push(`<button class="btn btn-sm${green ? " btn-green" : ""}" data-wsign="${k}"${dis()}>Sign with wallet</button>`), green = false);
-      if (n >= need) btns.push(first ? `<button class="btn btn-sm ${run.length > 1 ? "btn-grey" : "btn-green"}" data-exec="${k}"${dis()}>Execute</button>` : `<span class="fine">runs after #${i.nonce}</span>`);
-      const rej = t.wc && !n ? `<button class="btn btn-sm btn-grey" data-wcno="${k}"${dis()}>Reject</button>`      // only here: nothing to cancel
-        // Remove (red) far left, then Reject (Austin). Any owner here can remove (removeQueued says where it's gone from)
-        : (can() ? `<button class="btn btn-sm btn-red" data-remove="${k}"${dis()}>Remove</button> ` : "")
-        + (can() && s.kind !== "cancel" && !cancelled(+t.nonce) ? `<button class="btn btn-sm btn-grey" data-reject="${k}"${dis()}>Reject</button>` : "");
+      // Execute's green is the bottom bar's (one green on the page): here it's white
+      if (n >= need) btns.push(first ? `<button class="btn btn-sm" data-exec="${k}"${dis()}>Execute</button>` : `<span class="fine">runs after #${i.nonce}</span>`);
+      const rej = t.wc && !n ? `<button class="btn btn-sm" data-wcno="${k}"${dis()}>Reject</button>`      // only here: nothing to cancel
+        // a red ✕ (Remove) far left, then a white Reject (Austin, as in Instant Wallet). Any owner here can remove
+        : (can() ? `<button class="btn btn-sm btn-red sx-x" data-remove="${k}" title="Remove" aria-label="Remove"${dis()}>✕</button> ` : "")
+        + (can() && s.kind !== "cancel" && !cancelled(+t.nonce) ? `<button class="btn btn-sm" data-reject="${k}"${dis()}>Reject</button>` : "");
+      const app = t.inSafe ? appLink(chain, safeAddr, "transactions/tx") + `&id=multisig_${safeAddr}_${t.safeTxHash}` : "";
       const dots = Array.from({ length: need }, (_, d) => `<i class="${d < n ? "on" : ""}"></i>`).join("");
       return `<li class="sx-tx sx-k-${s.kind}">
-        <div class="sx-tx-head"><span class="sx-ic">${ICON[s.kind]}</span><span class="sx-tx-what">${s.title}</span><span class="sx-tx-n">#${esc(t.nonce)}</span></div>
+        <div class="sx-tx-head"><span class="sx-ic">${ICON[s.kind]}</span><span class="sx-tx-what">${s.title}</span><span class="sx-tx-n">#${esc(t.nonce)}</span>${app ? `<a class="pill sx-pill" href="${esc(app)}" target="_blank" rel="noopener" title="Open in Safe{Wallet}">Safe ↗</a>` : ""}<button class="btn btn-grey sx-copy" data-link="${k}" title="Copy a link to it" aria-label="Copy a link to it">${COPY_ICON}</button></div>
         ${t.wc ? `<p class="fine">From ${esc(t.wc.dapp.name)}: it gets the result when this runs.</p>` : ""}${subsOf(s)}${s.more || ""}${s.kind === "danger" ? `<p class="sx-warn">This can change how the Safe works. Only sign if you know why.</p>` : ""}
-        <div class="sx-tx-sigs"><span class="sx-dots">${dots}</span>${n} of ${need} signed${marks.length ? ` · ${marks.join(" · ")}` : ""}<button class="btn btn-sm btn-grey sx-end" data-link="${k}">Copy link</button></div>
+        <div class="sx-tx-sigs"><span class="sx-dots">${dots}</span>${n} of ${need} signed${marks.length ? ` · ${marks.join(" · ")}` : ""}</div>
         ${btns.length || rej ? `<div class="sx-row">${rej}<span class="sx-row sx-end">${btns.map((b) => [+/btn-green/.test(b) * 10 + (/data-wsign/.test(b) ? 0 : /data-sign/.test(b) ? 1 : 2), b] as const)
           .sort((x, y) => x[0] - y[0]).map((x) => x[1]).join(" ")}</span></div>` : ""}
         <details class="sx-more"><summary>Details</summary><dl class="sx-dl">
@@ -1602,7 +1609,7 @@ export function safe(main: HTMLElement) {
           <dt>Hash</dt><dd><code>${esc(String(t.safeTxHash).slice(0, 10))}…${esc(String(t.safeTxHash).slice(-8))}</code></dd></dl></details></li>`;
     }).join("");
     const ready = /data-exec/.test(items);
-    box.innerHTML = `<h3 class="sx-row">${ready ? "Ready: press Execute" : "Waiting"}${queue.length ? ` <span class="sx-count">${queue.length}</span>` : ""}${run.length > 1 ? `<button class="btn btn-sm btn-green sx-end" id="s-execall"${dis()}>Execute all ${run.length}</button>` : ""}</h3>
+    box.innerHTML = `<h3 class="sx-row">${ready ? "Ready: press Execute" : "Waiting"}${queue.length ? ` <span class="sx-count">${queue.length}</span>` : ""}${run.length > 1 ? `<button class="btn btn-sm sx-end" id="s-execall"${dis()}>Execute all ${run.length}</button>` : ""}</h3>
       ${items ? `<ul class="sx-txs">${items}</ul>` : `<p class="fine">Nothing waiting.</p>`}
       ${queueNote ? `<p class="fine">${esc(queueNote)}</p>` : ""}
       <p class="sx-foot"><button class="btn btn-sm" id="s-refresh"${dis()}>Refresh</button></p>`;
@@ -1625,7 +1632,7 @@ export function safe(main: HTMLElement) {
       say(`Rejected. ${t.wc.dapp.name} was told no.`);
     }));
     box.querySelectorAll<HTMLButtonElement>("[data-link]").forEach((b) => b.onclick = () =>
-      navigator.clipboard.writeText(txLink(queue[+b.dataset.link!])).then(() => say("Link copied. Send it to another owner: it opens this transaction for them to sign."),
+      navigator.clipboard.writeText(txLink(queue[+b.dataset.link!])).then(() => say("Link copied. Share it with the other signers."),
         () => say("Couldn't copy the link.", true)));
     box.querySelectorAll<HTMLButtonElement>("[data-remove]").forEach((b) => b.onclick = () => job(() => removeQueued(queue[+b.dataset.remove!])));
     paintDock();
@@ -1756,7 +1763,9 @@ export function safe(main: HTMLElement) {
         if (!eqA(x.to, safeAddr) || x.value === "0" || !x.value) continue;
         const tok = x.type === "ETHER_TRANSFER" ? { symbol: nat(chain), decimals: 18 } : x.tokenInfo?.trusted && x.tokenInfo.type === "ERC20" ? x.tokenInfo : null;
         if (!tok) continue;
-        rows.push(`<li><span class="sx-ic sx-in">↓</span><span class="sx-act-what"><b>Received ${esc(E.fmt(BigInt(x.value), tok.decimals, 4))} ${esc(tok.symbol)}</b><span class="fine">from ${address(x.from, { size: "sm", chain })} · ${esc(when)}</span></span>${link ? `<a class="sx-end fine" href="${link}" target="_blank" rel="noopener">↗</a>` : ""}</li>`);
+        const p = priceOf(x.type === "ETHER_TRANSFER" ? null : x.tokenAddress || x.tokenInfo?.address || "-");
+        const $usd = p !== null ? ` <span class="fine">(${esc(usd(Number(BigInt(x.value)) / 10 ** tok.decimals * p))})</span>` : "";
+        rows.push(`<li><span class="sx-ic sx-in">↓</span><span class="sx-act-what"><b>Received ${esc(E.fmt(BigInt(x.value), tok.decimals, 4))} ${esc(tok.symbol)}${$usd}</b><span class="fine">from ${address(x.from, { size: "sm", chain })} · ${esc(when)}</span></span>${link ? `<a class="sx-end fine" href="${link}" target="_blank" rel="noopener">↗</a>` : ""}</li>`);
       }
     }
     box.innerHTML = `<h3>Activity</h3>${rows.length ? `<ul class="sx-acts">${rows.join("")}</ul>`
@@ -2094,7 +2103,7 @@ export function safe(main: HTMLElement) {
     const mine = wcSessions.filter((x) => eqA(x.safe, safeAddr) && x.chainId === chain);
     box.hidden = !(safeAddr && info && mine.length && sub === "home");
     if (box.hidden) return;
-    box.innerHTML = `<h3>Connected</h3><ul class="sx-rows">${mine.map((x) => `<li class="wc-app">${icon(x.dapp)}<span class="sx-asset-name"><b>${esc(x.dapp.name)}</b><span class="fine">${esc(x.dapp.url.replace(/^https?:\/\//, ""))}</span></span><button class="btn btn-sm sx-end" data-wcoff="${esc(x.topic)}"${dis()}>Disconnect</button></li>`).join("")}</ul>`;
+    box.innerHTML = `<h3>Connected</h3><ul class="sx-rows">${mine.map((x) => `<li class="wc-app">${icon(x.dapp)}<span class="sx-asset-name"><b>${esc(x.dapp.name)}</b><span class="fine">${esc(x.dapp.url.replace(/^https?:\/\//, ""))}</span></span><button class="btn btn-sm btn-red sx-end" data-wcoff="${esc(x.topic)}"${dis()}>Disconnect</button></li>`).join("")}</ul>`;
     box.querySelectorAll<HTMLButtonElement>("[data-wcoff]").forEach((b) => b.onclick = () => job(() => wcm!.disconnect(b.dataset.wcoff!)));
   }
 

@@ -295,7 +295,7 @@ function explain() {
     el.innerHTML = `<div class="card bt-ask" role="dialog" aria-label="Bluetooth access">
       <h3>Your Mac will ask about Bluetooth</h3>
       <p>To find your wedgie, Chrome looks at this computer's serial ports, and macOS counts that as Bluetooth. When it asks, press <b>Allow</b>. wedgie.dev only talks to wedgies plugged into USB.</p>
-      <div class="row"><button class="btn btn-red" id="bt-no">Not now</button><button class="btn btn-green" id="bt-go">OK, find my wedgie</button></div>
+      <div class="row"><button class="btn" id="bt-no">Not now</button><button class="btn btn-green" id="bt-go">OK, find my wedgie</button></div>
     </div>`;
     const close = (go: boolean) => { el.remove(); done(go); };
     el.addEventListener("click", (e) => { if (e.target === el) close(false); });

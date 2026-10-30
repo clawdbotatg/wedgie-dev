@@ -134,7 +134,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
             <div class="status recess" id="d-tstatus" hidden></div>
             <textarea class="recess editor" spellcheck="false"></textarea>
             <div class="row">
-              <button class="btn btn-sm" data-act="stop">Stop</button>
+              <button class="btn btn-sm btn-red" data-act="stop">Stop</button>
               <button class="btn btn-sm" data-act="run">Run on it</button>
               <input id="d-appname" class="recess name" placeholder="app name" maxlength="12" value="My app">
               <button class="btn btn-sm" data-act="saveapp">Make it its app</button>
@@ -147,7 +147,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
             <h4>Console</h4>
             <pre class="recess out log" id="d-log"></pre>
           </details>
-          <div class="wd-report"><p class="crash-q">Something wrong?</p><button class="btn btn-lg btn-red" id="d-report">Send a bug report</button></div>
+          <div class="wd-report"><p class="crash-q">Something wrong?</p><button class="btn btn-lg" id="d-report">Send a bug report</button></div>
         </div>
       </div>
     </div>
@@ -189,8 +189,8 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     ul.dataset.sig = sig;
     ul.innerHTML = repos.map((r) => `<li><a href="https://github.com/${esc(r.repo)}/tree/${esc(r.sha)}" target="_blank" rel="noopener">${esc(r.repo)}</a>
         <span class="fine">${r.carts.length} app${r.carts.length === 1 ? "" : "s"} · ${esc(r.sha.slice(0, 7))}</span>
-        <button class="btn btn-sm" data-repo-re="${esc(r.repo)}">Reload</button><button class="btn btn-sm" data-repo-rm="${esc(r.repo)}">Remove</button></li>`).join("") +
-      Object.entries(repoErr).map(([s, e]) => `<li class="bad"><b>${esc(s)}</b>: ${esc(e)} <button class="btn btn-sm" data-repo-rm="${esc(s)}">Remove</button></li>`).join("");
+        <button class="btn btn-sm" data-repo-re="${esc(r.repo)}">Reload</button><button class="btn btn-sm btn-red" data-repo-rm="${esc(r.repo)}">Remove</button></li>`).join("") +
+      Object.entries(repoErr).map(([s, e]) => `<li class="bad"><b>${esc(s)}</b>: ${esc(e)} <button class="btn btn-sm btn-red" data-repo-rm="${esc(s)}">Remove</button></li>`).join("");
     ul.querySelectorAll<HTMLButtonElement>("[data-repo-rm]").forEach((b) => (b.onclick = () => {
       const k = b.dataset.repoRm!.toLowerCase();
       forgetRepo(b.dataset.repoRm!);
@@ -483,7 +483,7 @@ Not covered: apps and MicroPython itself.
         slotEl.dataset.v = c.v;
         slotEl.className = "cart-slot";
         slotEl.dataset.mod = c.mod;
-        slotEl.innerHTML = `<button class="cart" title="${esc(c.about || "")}">${cartHtml(c)}</button><p class="cart-about">${esc(c.about || "")}</p>${c.repo ? `<p class="cart-from${c.unreviewed ? " unreviewed" : ""}">${c.unreviewed ? "not reviewed · " : "by "}<a href="https://github.com/${esc(c.repo)}" target="_blank" rel="noopener">${esc(c.repo)}</a>${c.sha && /^[0-9a-f]{40}$/.test(c.sha) ? ` · ${verLink(c.repo, { sha: c.sha, at: c.at, version: c.version }, esc)}` : ""}</p>` : ""}<p class="cart-needs" hidden></p><p class="cart-ver" hidden></p><div class="cart-acts">${PAGES[c.mod] ? `<a class="btn btn-xs btn-green" data-cart="page" href="${PAGES[c.mod].href}" hidden>${esc(PAGES[c.mod].label)}</a>` : ""}<button class="btn btn-xs btn-green" data-cart="update" hidden>Update</button><button class="btn btn-xs" data-cart="uninstall" hidden>Uninstall</button></div>`;
+        slotEl.innerHTML = `<button class="cart" title="${esc(c.about || "")}">${cartHtml(c)}</button><p class="cart-about">${esc(c.about || "")}</p>${c.repo ? `<p class="cart-from${c.unreviewed ? " unreviewed" : ""}">${c.unreviewed ? "not reviewed · " : "by "}<a href="https://github.com/${esc(c.repo)}" target="_blank" rel="noopener">${esc(c.repo)}</a>${c.sha && /^[0-9a-f]{40}$/.test(c.sha) ? ` · ${verLink(c.repo, { sha: c.sha, at: c.at, version: c.version }, esc)}` : ""}</p>` : ""}<p class="cart-needs" hidden></p><p class="cart-ver" hidden></p><div class="cart-acts">${PAGES[c.mod] ? `<a class="btn btn-xs btn-green" data-cart="page" href="${PAGES[c.mod].href}" hidden>${esc(PAGES[c.mod].label)}</a>` : ""}<button class="btn btn-xs btn-green" data-cart="update" hidden>Update</button><button class="btn btn-xs btn-red" data-cart="uninstall" hidden>Uninstall</button></div>`;
         // A tap on the cart puts it on (or updates it). The app on it comes off only by its Uninstall button.
         slotEl.querySelector<HTMLButtonElement>(".cart")!.onclick = () => (active() === c.mod && (w?.carts || [])[0]?.v === c.v ? undefined : pick(c));
         slotEl.querySelector<HTMLButtonElement>('[data-cart="update"]')!.onclick = () => pick(c);
@@ -619,7 +619,7 @@ Not covered: apps and MicroPython itself.
       note.querySelector<HTMLElement>('[data-sv="load"]')?.addEventListener("click", (e) => { e.preventDefault(); loadSaves(); });
     }
     const html = [...games].map(([g, e]) => `<div class="save-row"><div><b>${esc(gameName(g))}</b> <span class="fine">${e.files} file${e.files > 1 ? "s" : ""} · ${kb(e.size)}</span></div>
-      <div class="row"><button class="btn btn-sm" data-sv-dl="${esc(g)}">Download</button><button class="btn btn-sm${confirmSave === g ? " sure" : ""}" data-sv-rm="${esc(g)}">${confirmSave === g ? "Delete them?" : "Delete"}</button></div></div>`).join("");
+      <div class="row"><button class="btn btn-sm" data-sv-dl="${esc(g)}">Download</button><button class="btn btn-sm btn-red" data-sv-rm="${esc(g)}">${confirmSave === g ? "Delete them?" : "Delete"}</button></div></div>`).join("");
     if (box.dataset.html !== html) {
       box.dataset.html = html; box.innerHTML = html;
       box.querySelectorAll<HTMLButtonElement>("[data-sv-dl]").forEach((b) => (b.onclick = () => downloadSaves(b.dataset.svDl!)));
@@ -670,7 +670,7 @@ Not covered: apps and MicroPython itself.
       const name = f.path.split("/").pop();
       return f.dir ? `<div class="fs-row dir" style="--d:${depth}">${esc(name)}/</div>`
         : `<div class="fs-row${fsOpen === f.path ? " open" : ""}" style="--d:${depth}"><a href="#" data-fs-open="${esc(f.path)}">${esc(name)}</a><span class="fine">${f.size < 1024 ? f.size + " B" : kb(f.size)}</span>
-          <button class="btn btn-xs" data-fs-dl="${esc(f.path)}">Download</button><button class="btn btn-xs${confirmFs === f.path ? " sure" : ""}" data-fs-rm="${esc(f.path)}">${confirmFs === f.path ? "Delete it?" : "Delete"}</button></div>`;
+          <button class="btn btn-xs" data-fs-dl="${esc(f.path)}">Download</button><button class="btn btn-xs btn-red" data-fs-rm="${esc(f.path)}">${confirmFs === f.path ? "Delete it?" : "Delete"}</button></div>`;
     }).join("") || `<p class="fine">No files.</p>`;
     box.querySelectorAll<HTMLElement>("[data-fs-open]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); viewFile(a.dataset.fsOpen!); }));
     box.querySelectorAll<HTMLButtonElement>("[data-fs-dl]").forEach((b) => (b.onclick = async () => {
@@ -693,7 +693,7 @@ Not covered: apps and MicroPython itself.
     const v = $("#d-fs-view");
     const text = /\.(py|json|txt|log|md|csv)$/.test(p) || !bytes.some((b) => b === 0) ? new TextDecoder().decode(bytes.subarray(0, 64 * 1024)) : null;
     v.hidden = false;
-    v.innerHTML = `<div class="row"><b class="mono">${esc(p)}</b> <span class="fine">${bytes.length} bytes</span><button class="btn btn-xs" id="d-fs-close">Close</button></div>` +
+    v.innerHTML = `<div class="row"><b class="mono">${esc(p)}</b> <span class="fine">${bytes.length} bytes</span><button class="btn btn-xs btn-red" id="d-fs-close">Close</button></div>` +
       (text !== null ? `<pre class="recess out">${esc(text)}</pre>` : `<p class="fine">Not text. Download it to look inside.</p>`);
     $("#d-fs-close").onclick = () => { fsOpen = ""; v.hidden = true; paintFiles(); };
     paintFiles();

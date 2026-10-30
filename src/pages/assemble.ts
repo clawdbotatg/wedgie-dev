@@ -161,7 +161,7 @@ export function assemble(main: HTMLElement) {
         ${TROUBLE.map(([q, a]) => `<dt>${q}</dt><dd>${a}</dd>`).join("")}
       </dl>
     </div>
-    <dialog class="asm-big"><img alt=""><button type="button" class="btn">Close</button></dialog>
+    <dialog class="asm-big"><img alt=""><button type="button" class="btn btn-red">Close</button></dialog>
   </section>`;
 
   const big = main.querySelector<HTMLDialogElement>(".asm-big")!, bigImg = big.querySelector("img")!;

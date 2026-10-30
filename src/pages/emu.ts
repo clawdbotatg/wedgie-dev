@@ -49,7 +49,7 @@ export function emu(main: HTMLElement) {
     <div class="row emu-actions">
       <button class="btn btn-sm" id="emu-shot">Screenshot</button>
       <button class="btn btn-sm" id="emu-power">Replug</button>
-      <button class="btn btn-sm" id="emu-wipe">Wipe</button>
+      <button class="btn btn-sm btn-red" id="emu-wipe">Wipe</button>
     </div>
     <b class="emu-id" id="emu-id"></b>
     <div id="emu-status" hidden>Starting…</div>

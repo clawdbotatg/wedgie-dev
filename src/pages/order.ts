@@ -314,7 +314,7 @@ function claim(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
     </div>
     ${shipHtml("larv.ai and the blockchain")}
     <div class="safe-box recess">
-      <p><button class="btn btn-green" id="c-go" disabled>Burn CV for a wedgie</button></p>
+      <p><button class="btn" id="c-go" disabled>Burn CV for a wedgie</button></p>
       <p class="fine">Can't be undone. By claiming you agree to the <a href="/terms" target="_blank">Terms of Sale</a>.</p>
     </div>`;
   const { shipTo } = shipForm(box, say, (abroad) => { if (abroad) cart.abroad = true; else delete cart.abroad; });
@@ -341,6 +341,7 @@ function claim(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
     else bal.innerHTML = short + `<b class="good">${cvn(cv.balance)} CV.</b> Enough for a wedgie.`;
     ready = !cv.claimed && cv.balance >= cost && !!r.left?.wedgie;
     connectB.hidden = true;
+    go.classList.add("btn-green");   // one green: Connect wallet's, then this one
     go.disabled = !ready;
   };
   look().catch((e) => say(msgOf(e), true));
@@ -437,7 +438,7 @@ function status(id: string, box: HTMLElement, say: (s: string, bad?: boolean) =>
     if (v.status === "expired" && !got && !v.checking) {
       count("expired");
       h += `<p><b>Time ran out.</b> Nothing was charged.</p>
-      <p><a class="btn" href="/order">Start over</a> <button class="btn btn-green" id="o-renew"${busy ? " disabled" : ""}>Refresh price</button></p>
+      <p><a class="btn btn-red" href="/order">Start over</a> <button class="btn btn-green" id="o-renew"${busy ? " disabled" : ""}>Refresh price</button></p>
       <p class="fine o-why">${asked ? "Thanks." : `Didn't buy? Why: ${WHYNOT.map(([k, t]) => `<button class="btn btn-sm" data-why="${k}">${t}</button>`).join(" ")}`}</p>`;
     }
     if (v.status === "paid" || v.status === "shipped") h += steps(v);

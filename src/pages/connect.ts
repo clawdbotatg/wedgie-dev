@@ -70,7 +70,7 @@ function list(main: HTMLElement, go: (path: string) => void) {
     if (!tg.hidden && !tgCounted) { tgCounted = true; tgShow(); }
     if (!W.supported()) {
       rows.innerHTML = `<div class="empty"><p><b>This browser can't see USB devices.</b><br>Open wedgie.dev in Chrome or Edge on a computer to plug in a wedgie.</p></div>`;
-      actions.innerHTML = `<a class="btn btn-green" href="/">Back to wedgie.dev</a>`;
+      actions.innerHTML = `<a class="btn" href="/">Back to wedgie.dev</a>`;
       return;
     }
     if (!ws.length) {
@@ -94,7 +94,7 @@ function list(main: HTMLElement, go: (path: string) => void) {
           el.innerHTML = `<div class="wrow-dev"></div>
             <div class="wrow-body"><div class="wrow-head"><span class="light"></span><span class="idtag"></span><span class="vtag" hidden>virtual</span></div>
             <dl class="facts"><dt>Hardware</dt><dd data-f="hw"></dd><dt>Firmware</dt><dd data-f="fw"></dd><dt>Software</dt><dd data-f="pl"></dd></dl></div>
-            <span class="btn btn-green wrow-go">Configure ›</span>`;
+            <span class="btn wrow-go">Configure ›</span>`;
           el.addEventListener("click", (e) => { if (e.metaKey || e.ctrlKey || e.shiftKey || !el!.dataset.id) return; e.preventDefault(); go(el!.getAttribute("href")!); });
           rows.appendChild(el);
           (el as any)._w3d = place3D(el.querySelector<HTMLElement>(".wrow-dev")!, { interactive: false, screen: screenFor(w), side: w.key % 2 ? 1 : -1 });
@@ -115,7 +115,7 @@ function list(main: HTMLElement, go: (path: string) => void) {
     actions.innerHTML = `<button class="btn ${ws.length ? "" : "btn-green"}" id="connect">${ws.length ? "Connect another" : "Connect a wedgie"}</button>` +
       (ws.length ? "" : `<div class="reset-tip"><p class="fine">Can't find your wedgie? It may need a reset.</p><a class="btn" href="/reset">Reset a wedgie</a></div>`) +
       ("usb" in navigator ? `<p class="fine unplug-tip">A brand-new Pico doesn't show up? <a href="#" id="pick-new">Pick it</a> (it's called RP2 Boot or RP2350 Boot).</p>` : "") +
-      `<div class="crash"><p class="crash-q">Did your wedgie crash?</p><button class="btn btn-lg btn-red" id="report">Send a bug report</button></div>`;
+      `<div class="crash"><p class="crash-q">Did your wedgie crash?</p><button class="btn btn-lg" id="report">Send a bug report</button></div>`;
     document.getElementById("connect")!.onclick = () => W.connectNew().catch(() => {});
     document.getElementById("report")!.onclick = (e) => {   // with the log of a plugged-in wedgie (0.3.52+: readable while locked)
       e.preventDefault();

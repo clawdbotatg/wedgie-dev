@@ -153,7 +153,7 @@ export function home(main: HTMLElement): Promise<unknown> {
     <div class="parts">
       <div class="card part dev"><div class="num">1</div><h3>Write it</h3><p>How apps work, step by step.</p><a class="btn btn-sm" href="/code">How to write code →</a></div>
       <div class="card part dev"><div class="num">2</div><h3>Or let your agent</h3><p>Give it the skill file and let it rip.</p><a class="btn btn-sm" href="/skill.md" target="_blank">skill.md →</a></div>
-      <div class="card part dev"><div class="num">3</div><h3>Test it</h3><p>A virtual wedgie in its own window. No hardware needed.</p><button class="btn btn-sm btn-green" id="pop-emu">Pop out a virtual wedgie</button></div>
+      <div class="card part dev"><div class="num">3</div><h3>Test it</h3><p>A virtual wedgie in its own window. No hardware needed.</p><button class="btn btn-sm" id="pop-emu">Pop out a virtual wedgie</button></div>
     </div>
   </section>
 

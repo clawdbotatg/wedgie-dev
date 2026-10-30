@@ -13,6 +13,7 @@ export type Ctx = {
   owners: number;                        // how many owners the Safe has now
   native?: string;                       // the chain's coin (ETH, POL, …)
   past?: boolean;                        // history: today's owner count says nothing about then
+  price?: (token: string | null) => number | null;   // a coin's dollar price, when already in hand (not for history)
 };
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
@@ -32,10 +33,13 @@ const wNum = (d: string, i: number) => BigInt("0x" + (word(d, i) || "0"));
 
 /** How much of a token, in its own units when it's known ("100 USDC"), else raw. */
 export function amount(v: bigint, token: string | null, ctx: Ctx) {
-  if (!token) return `${E.fmt(v, 18, 6)} ${esc(ctx.native || "ETH")}`;
+  const p = ctx.past ? null : ctx.price?.(token) ?? null;
+  const inUsd = (d: number) => p !== null ? ` <span class="fine">(${dollars(Number(v) / 10 ** d * p)})</span>` : "";
+  if (!token) return `${E.fmt(v, 18, 6)} ${esc(ctx.native || "ETH")}${inUsd(18)}`;
   const t = ctx.token(token);
-  return t ? `${E.fmt(v, t.decimals, Math.min(6, t.decimals))} ${esc(t.symbol)}` : `${v} of token ${ctx.addr(token)}`;
+  return t ? `${E.fmt(v, t.decimals, Math.min(6, t.decimals))} ${esc(t.symbol)}${inUsd(t.decimals)}` : `${v} of token ${ctx.addr(token)}`;
 }
+const dollars = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: n >= 1000 ? 0 : 2 });
 
 /** The calls in a MultiSend batch: operation, to, value, data each. */
 export function unbatch(data: string): { operation: number; to: string; value: bigint; data: string }[] {

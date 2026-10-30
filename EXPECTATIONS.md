@@ -42,6 +42,8 @@ Where it lives: CLAUDE.md firmware rule 3, `tools/test_memory.py`, `tools/chippr
 - Everything looks the same: the wedgie, the website, every app.
 - Reuse what exists: the wedgie logo, the loader bar, the palette, the screens in
   `firmware/ui.py`. Never recreate them.
+- Buttons: green = the one obvious action, dark gray = the runner-up, red = kills or ends
+  something, white = the rest (Reject too). Same as Instant Wallet. `docs/STYLE.md` section 4.
 - Nothing does its own thing. Busy always means the boot logo + a title + the loader bar.
   Never "working...", never a second bar.
 

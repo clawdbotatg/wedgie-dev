@@ -9,9 +9,9 @@ export const WHY = `<div class="why" hidden>
   <p class="fine">It's a <a href="https://www.paradigm.xyz/2022/08/vrgda" target="_blank" rel="noopener">VRGDA</a> (variable rate gradual Dutch auction),
     the pricing rule onchain projects use to sell at a steady pace: sell faster than we can build and the price climbs, slower and it falls.</p>
   <div class="why-alert" hidden>
-    <p class="why-ask-row"><button class="btn btn-red btn-sm why-ask">Email alert</button></p>
+    <p class="why-ask-row"><button class="btn btn-sm why-ask">Email alert</button></p>
     <form class="why-form row" hidden><input name="email" type="email" autocomplete="email" maxlength="100" placeholder="you@email.com" required>
-      <button class="btn btn-red btn-sm">Email me</button></form>
+      <button class="btn btn-sm">Email me</button></form>
     <p class="fine why-say" hidden></p>
   </div>
 </div>`;
