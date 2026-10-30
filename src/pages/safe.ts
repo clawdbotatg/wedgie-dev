@@ -30,6 +30,7 @@ import { explain, callsOf } from "../safe/explain";
 import { readAssets, tokenMeta, knownMeta, usd, type Asset } from "../safe/assets";
 import { canScan, scan } from "../safe/scan";
 import * as Clear from "../safe/clear";
+import * as Sim from "clear-signing-safe-kit";
 import { addressQr } from "../safe/qr";
 import * as Hist from "../safe/history";
 
@@ -1815,13 +1816,12 @@ export function safe(main: HTMLElement) {
       return slots.map((a) => ({ owner: a, signature: E.safeSignature(a, g as E.WedgieSig) }));
     } finally { asking = false; close(); }
   }
-  /** clear-sim's signed answer for tx, from the Safe, with a nonce the wedgie just picked. */
-  async function simulate(r: Drive.Asker, tx: { chainId: number; safe: string; to: string; value: string; data: string }) {
+  /** clear-sim's signed answer for tx, from the Safe, with a nonce the wedgie just picked (the wedgie checks it). */
+  async function simulate(r: Drive.Asker, tx: { chainId: number; safe: string; to: string; value: string; data: string; operation: number }) {
     const n = await r.request({ type: "safe_nonce" }, 5000);
     if (n.type !== "safe_nonce") return null;
-    const a = await fetch(SIM_URL, { method: "POST", headers: { "Content-Type": "application/json" }, signal: AbortSignal.timeout(15000),
-      body: JSON.stringify({ chain: tx.chainId, from: tx.safe, to: tx.to, value: tx.value, data: tx.data, nonce: n.nonce }) }).then((x) => x.json());
-    return a?.r ? a : null;
+    return Sim.simulate({ chain: tx.chainId, safe: tx.safe, tx: { to: tx.to, value: BigInt(tx.value), data: tx.data as `0x${string}`, operation: tx.operation },
+      url: SIM_URL, nonce: n.nonce, check: false, timeout: 15000 });
   }
   async function walletSig(t: E.SafeTx) {
     const from = account = await wallet(chain);

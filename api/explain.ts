@@ -2,15 +2,15 @@
 //   POST {chain, safe, calls: [{to, value, data}], need: [i]}   need: the calls describe.ts couldn't read
 //   -> {calls: [{what, fields: [{label, value, address?}]} | null], bot: string | null}
 // Two tiers, in order:
-//   1. Clear signing (ERC-7730): the contract team's own words, from the public registry, through Sourcify's
-//      formatter (@ethereum-sourcify/clear-signing). No guessing.
+//   1. A Uniswap swap from its own commands, else clear signing (ERC-7730): the contract team's own words, from the
+//      registry with clear-descriptors on top, through Sourcify's formatter. clear-signing-safe-kit/explain, the same
+//      as Instant Wallet's. No guessing.
 //   2. 🤖: if any call in need has no descriptor, a model writes one line for the whole transaction. It sees the
 //      calls, their function names (Sourcify's signature list), the contracts' names (Sourcify), and what the Safe
 //      would send and get (eth_simulateV1 through Alchemy, from the Safe). A guess: the page marks it 🤖.
 // Each answer is kept in the database (explained, by a hash of the request): the same transaction costs once.
 // New 🤖 answers: BOT_DAY a day per IP (the model costs money). Never log a body here.
-import { fetchPrebuiltRegistryIndex, format, isFieldGroup } from "@ethereum-sourcify/clear-signing";
-import type { ExternalDataProvider, RegistryIndex, TokenResult } from "@ethereum-sourcify/clear-signing";
+import { explainer, type Token } from "clear-signing-safe-kit/explain";
 import { keccak256, toHex } from "viem";
 import { env, json, oops, crossSite, db, ipOf, sha256 } from "./_shop.js";
 import { HOSTS, key } from "./rpc.js";
@@ -20,6 +20,8 @@ const MODEL = () => env("BANKR_LLM_MODEL") || "claude-sonnet-5.5";
 const NATIVE: Record<number, string> = { 137: "POL", 43114: "AVAX", 56: "BNB", 100: "xDAI", 42220: "CELO", 146: "S", 5042: "USDC" };
 const ADDR = /^0x[0-9a-fA-F]{40}$/, HEX = /^0x[0-9a-fA-F]*$/;
 const TRANSFER = keccak256(toHex("Transfer(address,address,uint256)"));
+const USDC: Record<number, string> = { 1: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", 8453: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+  10: "0x0b2c639c533813f4aa9d7837caf62653d097ff85", 42161: "0xaf88d065e77c8cc2239327c5d4a5d2b2c9df5c4e" };
 const ETH_LOG = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";   // eth_simulateV1 traceTransfers: the coin's moves
 
 type Call = { to: string; value: string; data: string };
@@ -35,11 +37,9 @@ async function alchemy(chain: number, method: string, params: unknown[]) {
 }
 
 // ---- kept while this function instance is warm ----
-let index: Promise<RegistryIndex | undefined> | null = null;
-const registry = () => index ||= fetchPrebuiltRegistryIndex().catch(() => { index = null; return undefined; });
-const TOKENS = new Map<string, TokenResult | null>(), NAMES = new Map<string, string>(), SIGS = new Map<string, string>();
+const TOKENS = new Map<string, Token | null>(), NAMES = new Map<string, string>(), SIGS = new Map<string, string>();
 
-async function token(chain: number, a: string): Promise<TokenResult | null> {
+async function token(chain: number, a: string): Promise<Token | null> {
   const k = chain + ":" + a.toLowerCase();
   if (!TOKENS.has(k)) {
     const m = await alchemy(chain, "alchemy_getTokenMetadata", [a]).catch(() => null);
@@ -47,25 +47,14 @@ async function token(chain: number, a: string): Promise<TokenResult | null> {
   }
   return TOKENS.get(k)!;
 }
-const provider = (chain: number): ExternalDataProvider => ({
-  resolveToken: (c, a) => token(c || chain, a),
-  resolveChainInfo: async (c) => ({ name: `chain ${c}`, nativeCurrency: { name: NATIVE[c] || "Ether", symbol: NATIVE[c] || "ETH", decimals: 18 } }),
-});
-
-/** Tier 1: a call in the descriptor's words, or null if the registry has nothing for it. */
-async function clear(chain: number, c: Call): Promise<Told> {
-  try {
-    const m = await format({ chainId: chain, to: c.to, data: c.data, value: BigInt(c.value || 0) },
-      { externalDataProvider: provider(chain), descriptorResolverOptions: { type: "github", index: await registry() } as any });
-    if (!m.intent && !m.interpolatedIntent) return null;
-    if (m.warnings?.some((w) => w.code === "NO_DESCRIPTOR" || w.code === "CALLDATA_DECODE_ERROR" || w.code === "NO_FORMAT_MATCH")) return null;
-    const fields: Field[] = [];
-    for (const f of m.fields || []) for (const x of isFieldGroup(f) ? f.fields : [f])
-      fields.push({ label: x.label, value: x.value, ...(x.rawAddress ? { address: x.rawAddress } : {}) });
-    const intent = typeof m.intent === "string" ? m.intent : m.intent ? Object.values(m.intent)[0] : "";
-    return { what: m.interpolatedIntent || intent, fields };
-  } catch { return null; }
-}
+/** Tier 1 (clear-signing-safe-kit/explain, the same as Instant Wallet's): a Uniswap swap from its commands, else the
+ * descriptor's words. null: nothing for that call. */
+const clearWords = explainer({ token, chain: (c) => ({ name: `chain ${c}`, native: NATIVE[c] || "ETH" }),
+  trusted: { 1: [USDC[1]], 8453: [USDC[8453]], 10: [USDC[10]], 42161: [USDC[42161]] } });
+const clear = async (chain: number, safe: string, c: Call): Promise<Told> => {
+  const t = await clearWords(chain, safe, c);
+  return t && { what: t.what, fields: t.fields };
+};
 
 // ---- tier 2 ----
 async function contractName(chain: number, a: string) {
@@ -179,7 +168,7 @@ export async function POST(req: Request) {
     if (hit) return json(hit.v);
   }
   const told: Told[] = calls.map(() => null);
-  await Promise.all(need.map(async (i) => { told[i] = await clear(chain, calls[i]); }));
+  await Promise.all(need.map(async (i) => { told[i] = await clear(chain, safe, calls[i]); }));
   const said = need.some((i) => !told[i]) && await botAllowed(req) ? await bot(chain, safe, calls).catch(() => null) : null;
   const v = { calls: told, bot: said };
   // a 🤖 that didn't answer isn't kept: the next look tries again
