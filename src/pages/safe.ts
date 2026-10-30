@@ -1796,7 +1796,8 @@ export function safe(main: HTMLElement) {
           if (a.type !== "safe_clear") break;           // it can still sign; it just can't read the call
         }
         // a simulation, asked with the wedgie's own nonce. None (no internet, a revert, too big): the usual pages
-        const sim = simOk && !tx.operation ? await simulate(r, tx).catch(() => null) : null;
+        // a batch too (Safe Signer 47+: older ones ignore a batch's and show the usual pages)
+        const sim = simOk ? await simulate(r, tx).catch(() => null) : null;
         if (!big) {
           const withSim = sim ? { ...tx, sim } : tx;
           return r.request({ type: "safe_sign", tx: JSON.stringify({ id: 1000, type: "safe_sign", tx: withSim }).length > LINE_MAX ? tx : withSim }, 200000);

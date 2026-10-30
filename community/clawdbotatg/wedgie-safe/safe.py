@@ -671,11 +671,15 @@ def confirm(tx):
             if tx["operation"] and acts is None or acts and any(a["operation"] for a in acts):
                 raise ValueError("a DELEGATECALL: Safe Signer won't sign that")
             pages = [safe_read.describe(tx)] if acts is None else safe_read.fold(acts)
+            if acts:                    # a simulation checks a batch against all its calls: the ETH they send
+                tx["out"], tx["calls"] = tx["value"] + sum(a["value"] for a in acts), len(acts)
         finally:
             del acts
             del sys.modules["safe_read"]
             _unclear()
-    sim = bool(tx["sim"]) and not tx["operation"]      # a signed simulation: a short page first, the usual under it
+    # a signed simulation: a short page first, the usual under it. A DELEGATECALL got here only as Safe's own MultiSend
+    # of plain calls (safe_read.batch, above): clear-sim runs it as the Safe would (its hash says so, safe_sim._txhash)
+    sim = bool(tx["sim"])
     # A page that doesn't fit goes on over more pages: every line is seen before the press (wedgie-dev 10-15:
     # an unknown token's recipient fell off the bottom).
     pages = [(head, part) for head, lines in pages for part in _fit(lines)]

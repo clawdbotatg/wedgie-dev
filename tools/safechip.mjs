@@ -249,7 +249,7 @@ for (const [what, t, pages, clear, keys] of cases) {
   if (t.sim === "live") {   // as /safe does: the wedgie's nonce, then a clear-sim server (SIM_URL) simulates it
     const n = h.req({ id: ++id, type: "safe_nonce" }, 5000);
     const go = () => fetch(process.env.SIM_URL || "https://sim.wedgie.dev", { method: "POST", body: JSON.stringify({ chain: t.chainId,
-      from: t.safe, to: t.to, value: String(t.value), data: t.data, nonce: n?.nonce }) }).then((x) => x.json());
+      from: t.safe, to: t.to, value: String(t.value), data: t.data, nonce: n?.nonce, ...(t.operation ? { operation: 1 } : {}) }) }).then((x) => x.json());
     const r = await go().catch(go);     // once more: a kept-alive connection can close during a long case
     console.log(`     ${what}: nonce ${n?.nonce?.slice(0, 8)}…, sim ${r.ok || r.error} ${(r.changes || []).map((c) => c.amount + " " + c.symbol).join(", ")}`);
     t.sim = r;
