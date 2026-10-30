@@ -208,13 +208,15 @@ CLEAR_MAX = 10000       # bytes: a descriptor (the spec's minimum is 4 KB; our U
 
 
 def _lend():
-    """On a MemoryError: the blocks kept for later (room, clear_buf) back to the heap, where nothing is using
-    them. _keep takes them again once the request is done."""
+    """On a MemoryError: a block kept for later back to the heap, where nothing is using it. room first (only an
+    8 KB tx needs it); clear_buf on the next one (every clear-signed tx needs it, and on a broken-up heap _keep
+    can't take it again: safechip --frag, a V4 swap after the daily limit). _keep takes them again once the
+    request is done, if it can."""
     global clear_buf, room
-    if clear_buf and not clear_have and not isinstance(clear, memoryview):
-        clear_buf = None
-    if not have:
+    if room is not None and not have:
         room = None
+    elif clear_buf and not clear_have and not isinstance(clear, memoryview):
+        clear_buf = None
     gc.collect()
 
 
@@ -686,18 +688,28 @@ def confirm(tx):
     if not pages:                       # nothing on the screen: never a signature (audit 10-18)
         raise ValueError("nothing to show")
     if sim:
-        try:
-            import safe_sim
-            sim = safe_sim.check(tx, tx["sim"], nonce)
-            if not sim[1]:              # nothing moves (an approval, a vote): the usual pages say it better
-                raise ValueError("nothing moves")
-            out, warns = safe_sim.pages(tx, tx["sim"], sim[0], sim[1], info)
-        except (ValueError, KeyError, TypeError) as e:
-            print("simulation:", e)     # can't use it: the usual pages
-            sim = None
-        finally:
-            sys.modules.pop("safe_sim", None)
-            gc.collect()
+        for again in (True, False):     # a MemoryError: clear_buf's room, then once more (safe-47 on a real wedgie,
+            try:                        # an Instant Wallet swap: MemoryError, 1280 bytes, loading safe_sim)
+                import safe_sim
+                sim = safe_sim.check(tx, tx["sim"], nonce)
+                if not sim[1]:          # nothing moves (an approval, a vote): the usual pages say it better
+                    raise ValueError("nothing moves")
+                out, warns = safe_sim.pages(tx, tx["sim"], sim[0], sim[1], info)
+                break
+            except MemoryError:
+                sys.modules.pop("safe_sim", None)
+                _lend()
+                if again:
+                    continue
+                print("simulation: no room")    # never an error on the screen: the usual pages
+                sim = None
+            except (ValueError, KeyError, TypeError) as e:
+                print("simulation:", e)     # can't use it: the usual pages
+                sim = None
+                break
+            finally:
+                sys.modules.pop("safe_sim", None)
+                gc.collect()
     if sim:
         who = sim[0]
         n = len(warns) + sum(1 for _, ls in pages if any(l[1] == RED for l in ls))
@@ -760,14 +772,27 @@ def on_sign(mid, t):
     if tx["gasPrice"]:                  # a refund the screen can't show in full (token, receiver, how much)
         W.send({"id": mid, "type": "error", "error": "pays a gas refund (gasPrice > 0): Safe Signer won't sign that"})
         return
-    ui.progress("Reading the transaction", "Safe tx hash", False)
-    h = safe_tx_hash(tx)
-    gc.collect()
     try:
-        yes = confirm(tx)
+        for again in (True, True, False):       # room, then clear_buf (_lend), then it's an error
+            try:
+                ui.progress("Reading the transaction", "Safe tx hash", False)
+                h = safe_tx_hash(tx)
+                gc.collect()
+                yes = confirm(tx)
+                break
+            except MemoryError:         # never an error for want of memory (Instant Wallet's EXPECTATIONS, rule 0):
+                if not again:           # what's kept back to the heap, then the usual pages from the top, without
+                    raise               # the extras (a real wedgie, safe-47, an IW swap: MemoryError, 1280 bytes)
+                tx["sim"] = tx["clear"] = None
+                _unclear()
+                _lend()
     except ValueError as e:             # a bad batch, a DELEGATECALL: nothing on screen to say yes to
         W.send({"id": mid, "type": "error", "error": str(e)})
         return
+    # the data's block back now, before anything small lands in it: kept back for the next big tx (room). Taken
+    # later, the small things signing leaves behind had broken it up (safechip: an 8 KB tx after a 17-send batch)
+    tx["data"] = None
+    _keep()
     if not yes:
         note = "said no"
         W.send({"id": mid, "type": "refused", "safeTxHash": hx(h)})
