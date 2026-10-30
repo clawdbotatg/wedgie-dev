@@ -57,7 +57,7 @@ export function bugReport(w?: Wedgie, readLog?: () => Promise<string>) {
         body: JSON.stringify({ note: $<HTMLTextAreaElement>(".note").value, email: $<HTMLInputElement>(".email").value, report: text }) });
       const v = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(v.error || `HTTP ${r.status}`);
-      el.querySelector(".report")!.innerHTML = `<h3>Sent. Thank you.</h3><p>${v.n ? `Report #${esc(String(v.n))}. ` : ""}We'll look at it.</p><div class="row"><button class="btn btn-green close">Done</button></div>`;
+      el.querySelector(".report")!.innerHTML = `<h3>Sent. Thank you.</h3><p>${v.n ? `Report #${esc(String(v.n))}. ` : ""}We'll look at it.</p><div class="row"><button class="btn btn-red close">Done</button></div>`;
       $(".close").onclick = close;
     } catch (e: any) {
       said.hidden = false; said.innerHTML = `<b class="bad">Didn't send:</b> ${esc(e?.message || String(e))}`;

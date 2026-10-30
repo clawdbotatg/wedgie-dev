@@ -42,7 +42,7 @@ export function setupCard(el: HTMLElement, opts: { reset?: boolean } = {}) {
       el.innerHTML = `<div class="setup card${tone}"><h3>${esc(job.text)}</h3><p class="fine">${esc(job.detail)}</p>
         <div class="meter" ${job.p === null ? "hidden" : ""}><div class="meter-track"><div class="meter-fill" style="width:${8 + 92 * (job.p || 0)}%"></div></div></div>
         ${job.pick ? `<div class="row"><button class="btn btn-green" id="setup-pick">Pick it</button><span class="fine">It's called <b>${job.pick === "boot" ? "RP2 Boot or RP2350 Boot" : "Board in FS mode"}</b>.</span></div>` : ""}
-        ${job.stage === "done" || job.stage === "fail" ? `<div class="row"><button class="btn btn-green" id="setup-ok">OK</button></div>` : ""}</div>`;
+        ${job.stage === "done" || job.stage === "fail" ? `<div class="row"><button class="btn btn-red" id="setup-ok">OK</button></div>` : ""}</div>`;
       el.querySelector<HTMLElement>("#setup-pick")?.addEventListener("click", () =>
         void (job?.pick === "boot" ? pickBoot().then(() => { usb = true; if (job) job.pick = undefined; look(); }) : W.connectNew().then(() => { if (job) job.pick = undefined; paint(); })).catch(() => {}));
       el.querySelector<HTMLElement>("#setup-ok")?.addEventListener("click", () => { job = null; look(); });

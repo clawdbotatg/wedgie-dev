@@ -699,7 +699,7 @@ export function safe(main: HTMLElement) {
     $("s-first").hidden = !big;
   }
   // No wedgie here: the way back to get one (same as /connect without one).
-  const HOME = `<a class="btn" href="/">Back to wedgie.dev</a>`;
+  const HOME = `<a class="btn btn-red" href="/">Back to wedgie.dev</a>`;   // Back = an exit: red
   function paintWedgie() {
     // the wedgie whose key we read was unplugged: read the next one's (another wedgie = another list)
     if (wedgie && wedgie !== DRIVE && !present(wedgie)) { wedgie = null; key = null; }
@@ -821,7 +821,7 @@ export function safe(main: HTMLElement) {
     // up top, under the wedgie: the browser wallet (pays gas, can sign as an owner too)
     const box = $("s-wallet");
     box.hidden = false;
-    box.innerHTML = !account ? `<button class="btn btn-sm btn-wallet" id="w-go"${dis()}>Connect wallet</button>`
+    box.innerHTML = !account ? `<button class="btn btn-sm btn-grey btn-wallet" id="w-go"${dis()}>Connect wallet</button>`
       : `<span class="safe-id-tag">wallet</span>${address(account)}${isOwner(account) ? `<span class="good">owner</span>` : ""}
       <button class="btn btn-sm btn-red" id="w-off">Disconnect</button>`;
     $("w-go")?.addEventListener("click", () => job(async () => {
@@ -1603,7 +1603,7 @@ export function safe(main: HTMLElement) {
           .sort((x, y) => x[0] - y[0]).map((x) => x[1]).join(" ")}</span></div>` : ""}
         <details class="sx-more"><summary>Details</summary><dl class="sx-dl">
           <dt>To</dt><dd>${address(t.to, { link: CHAINS[chain].scan, size: "sm", chain })}</dd>
-          ${BigInt(t.value || 0) ? `<dt>${nat(chain)}</dt><dd>${esc(E.fmt(BigInt(t.value), 18))}</dd>` : ""}
+          ${BigInt(t.value || 0) ? `<dt>${nat(chain)}</dt><dd>${esc(E.fmt(BigInt(t.value), 18))}${priceOf(null) !== null ? ` <span class="fine">(${esc(usd(Number(BigInt(t.value)) / 1e18 * priceOf(null)!))})</span>` : ""}</dd>` : ""}
           ${t.data && t.data !== "0x" ? `<dt>Data</dt><dd><code>${esc(t.data.length > 202 ? t.data.slice(0, 202) + `… (${(t.data.length - 2) / 2} bytes)` : t.data)}</code></dd>` : ""}
           ${+t.operation === 1 ? `<dt>Kind</dt><dd>delegate call</dd>` : ""}
           <dt>Hash</dt><dd><code>${esc(String(t.safeTxHash).slice(0, 10))}…${esc(String(t.safeTxHash).slice(-8))}</code></dd></dl></details></li>`;
@@ -2081,12 +2081,10 @@ export function safe(main: HTMLElement) {
         <p class="fine">In the app (Uniswap, Aave, …) pick WalletConnect and copy its link. Paste it here (or anywhere on this page). Its requests come here, and your wedgie signs them.</p>
         ${canScan() ? `<p><button class="btn btn-grey sx-wide" id="wc-scan">Scan its code</button></p><div class="sx-cam" id="wc-cam" hidden></div>` : ""}
         <p class="sx-label">Or paste its link</p>
-        <p class="sx-row wc-pair"><input id="wc-uri" class="sx-mono" placeholder="wc:…" spellcheck="false" autocomplete="off"> <button class="btn btn-sm" id="wc-go">Connect</button></p>
+        <p class="sx-row wc-pair"><input id="wc-uri" class="sx-mono" placeholder="wc:…" spellcheck="false" autocomplete="off"> <button class="btn btn-sm btn-green" id="wc-go">Connect</button></p>
 `;
       const uri = $("wc-uri") as HTMLInputElement, go = $("wc-go");
-      const ready = () => go.classList.toggle("btn-green", /^wc:[0-9a-f]+@2\?.*symKey=[0-9a-f]+/i.test(uri.value.trim()));   // green once it's a real link
-      uri.oninput = ready;
-      go.onclick = () => job(async () => { await pairWith(uri.value); uri.value = ""; ready(); });
+      go.onclick = () => job(async () => { await pairWith(uri.value); uri.value = ""; });
       $("wc-scan")?.addEventListener("click", () => {
         if (scanning) return stopScan();
         const cam = $("wc-cam"); cam.hidden = false;

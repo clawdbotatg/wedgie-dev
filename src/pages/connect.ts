@@ -70,7 +70,7 @@ function list(main: HTMLElement, go: (path: string) => void) {
     if (!tg.hidden && !tgCounted) { tgCounted = true; tgShow(); }
     if (!W.supported()) {
       rows.innerHTML = `<div class="empty"><p><b>This browser can't see USB devices.</b><br>Open wedgie.dev in Chrome or Edge on a computer to plug in a wedgie.</p></div>`;
-      actions.innerHTML = `<a class="btn" href="/">Back to wedgie.dev</a>`;
+      actions.innerHTML = `<a class="btn btn-red" href="/">Back to wedgie.dev</a>`;
       return;
     }
     if (!ws.length) {
