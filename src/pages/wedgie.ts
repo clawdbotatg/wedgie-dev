@@ -221,7 +221,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
   // Its USB drops for a few seconds whenever it restarts (an install, an update, on its own), and at page
   // open it takes a moment to be found. Till it's back (or the time runs out) the page shows a bar
   // ("Restarting" / "Looking for"), never "isn't plugged in".
-  const BACK_MS = 15000, FIND_MS = 6000;
+  const BACK_MS = 30000, FIND_MS = 6000;
   let backBy = 0, backTimer = 0, wasHere = false, seenOnce = false;
   const expectBack = (ms = BACK_MS) => {
     backBy = Date.now() + ms;
