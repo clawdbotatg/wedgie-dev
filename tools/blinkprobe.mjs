@@ -14,7 +14,7 @@ const shell = readdirSync(cache).filter((d) => d.startsWith("chromium_headless_s
 const browser = await chromium.launch({ executablePath: `${cache}/${shell}/${process.platform === "linux" ? "chrome-headless-shell-linux64" : "chrome-headless-shell-mac-arm64"}/chrome-headless-shell` });
 const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
 await ctx.addInitScript(fakeWedgies, [
-  { uid: "aa11bb22cc3d9f01", machine: "Raspberry Pi Pico with RP2040", files: { "main.py": 1, "slot.py": 1, "wedgiedrive.py": 1, "wedgie.py": 'VERSION = "0.3.50"', "apps.json": "[]" }, blink: true },
+  { uid: "aa11bb22cc3d9f01", machine: "Raspberry Pi Pico with RP2040", files: { "main.py": 1, "slot.py": 1, "wedgiedrive.py": 1, "wedgie.py": 'VERSION = "0.3.55"', "apps.json": "[]" }, blink: true },
 ]);
 // the fakes don't check signatures: an unsigned tree is served as signed (fakeserial.mjs does the same)
 const man = JSON.parse(readFileSync(new URL("../public/fw/manifest.json", import.meta.url), "utf8"));
@@ -40,7 +40,7 @@ check(/Restarting/.test(done), `the update went through anyway (${((Date.now() -
 await ctx.close();
 const ctx2 = await browser.newContext({ viewport: { width: 1200, height: 900 } });
 await ctx2.addInitScript(fakeWedgies, [
-  { uid: "aa11bb22cc3d9f01", machine: "Raspberry Pi Pico with RP2040", files: { "main.py": 1, "slot.py": 1, "wedgiedrive.py": 1, "wedgie.py": 'VERSION = "0.3.50"', "apps.json": "[]" }, blink: "always" },
+  { uid: "aa11bb22cc3d9f01", machine: "Raspberry Pi Pico with RP2040", files: { "main.py": 1, "slot.py": 1, "wedgiedrive.py": 1, "wedgie.py": 'VERSION = "0.3.55"', "apps.json": "[]" }, blink: "always" },
 ]);
 if (!man.signed) {
   await ctx2.route("**/fw/manifest.json", (r) => r.fulfill({ contentType: "application/json", body: JSON.stringify({ ...man, signed: true }) }));

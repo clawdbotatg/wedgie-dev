@@ -21,7 +21,7 @@ await ctx.addInitScript(() => {
   window.setInterval = (f, ms, ...a) => si(f, Math.max(1000, ms || 0), ...a);
 });
 await ctx.addInitScript(fakeWedgies, [
-  { uid: "aa11bb22cc3d9f01", machine: "Raspberry Pi Pico with RP2040", files: { "main.py": 1, "slot.py": 1, "wedgiedrive.py": 1, "wedgie.py": 'VERSION = "0.3.50"', "apps.json": "[]" } },
+  { uid: "aa11bb22cc3d9f01", machine: "Raspberry Pi Pico with RP2040", files: { "main.py": 1, "slot.py": 1, "wedgiedrive.py": 1, "wedgie.py": 'VERSION = "0.3.55"', "apps.json": "[]" } },
 ]);
 // the fakes don't check signatures: an unsigned tree is served as signed (fakeserial.mjs does the same)
 const man = JSON.parse(readFileSync(new URL("../public/fw/manifest.json", import.meta.url), "utf8"));
