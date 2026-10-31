@@ -28,7 +28,8 @@ export const cableBox = () => `
   </div>`;
 
 /** Wire up the box made by cableBox() inside `root`. */
-export function mountCableBox(root: HTMLElement, onChange: (w: string[]) => void) {
+/** onChange may return its work (the page repainting drawings): Done waits for it, filling a bar (progress 0..1). */
+export function mountCableBox(root: HTMLElement, onChange: (w: string[], progress: (f: number) => void) => Promise<unknown> | void) {
   const box = root.querySelector<HTMLElement>(".cbl")!;
   const q = <T extends HTMLElement = HTMLElement>(s: string) => box.querySelector<T>(s)!;
   const map = q(".cbl-map"), open = q(".cbl-open"), stage = q(".cbl-3d");
@@ -58,7 +59,16 @@ export function mountCableBox(root: HTMLElement, onChange: (w: string[]) => void
     if (!c3d) import("../ui/cable3d").then(async ({ mountCable3D }) => { c3d = await mountCable3D(stage, w.map(hex)); })
       .catch((err) => { console.error("cable 3D:", err); stage.hidden = true; });
   });
-  const set = (nw: string[]) => { w = nw; setWires(w); c3d?.setColors(w.map(hex)); paint(); onChange(w); };
+  const done = q<HTMLButtonElement>(".cbl-done");
+  let job = 0;
+  const set = (nw: string[]) => {
+    w = nw; setWires(w); c3d?.setColors(w.map(hex)); paint();
+    const my = ++job;
+    const work = onChange(w, (f) => { if (my === job) done.style.setProperty("--p", String(f)); });
+    if (!work) return;
+    done.disabled = true; done.textContent = "Coloring"; done.classList.add("cbl-busy"); done.style.setProperty("--p", "0");
+    work.finally(() => { if (my !== job) return; done.disabled = false; done.textContent = "Done"; done.classList.remove("cbl-busy"); });
+  };
   map.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-c]");
     if (!b) return;
@@ -72,7 +82,7 @@ export function mountCableBox(root: HTMLElement, onChange: (w: string[]) => void
     set(w.map((c, j) => j === i ? inp.value.toLowerCase() : c));
   });
   q(".cbl-kitbtn").addEventListener("click", () => set([...KIT]));
-  q(".cbl-done").addEventListener("click", () => { map.hidden = true; open.hidden = false; c3d?.destroy(); c3d = null; stage.innerHTML = ""; });
+  done.addEventListener("click", () => { map.hidden = true; open.hidden = false; c3d?.destroy(); c3d = null; stage.innerHTML = ""; });
 
   const big = q<HTMLDialogElement>(".asm-big");
   q(".cbl-ph").addEventListener("click", () => { big.querySelector("img")!.src = `${IMG}p/${PHOTO}.webp`; big.showModal(); });

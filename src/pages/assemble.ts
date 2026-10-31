@@ -153,6 +153,7 @@ function recolor(d: string, w: string[]) {
     const [img, msk] = await Promise.all([loadImg(`${IMG}d${d}.webp`), loadImg(`${IMG}d${d}.m.png`)]);
     const c = document.createElement("canvas"); c.width = img.naturalWidth; c.height = img.naturalHeight;
     const g = c.getContext("2d", { willReadFrequently: true })!;
+    await new Promise((r) => setTimeout(r));                   // one drawing at a time: the page stays live
     g.drawImage(msk, 0, 0); const m = g.getImageData(0, 0, c.width, c.height).data;
     g.drawImage(img, 0, 0); const px = g.getImageData(0, 0, c.width, c.height);
     const dif = KIT.map((k, i) => { const a = rgbOf(hex(k)), b = rgbOf(hex(w[i])); return b.map((v, j) => v - a[j]); });
@@ -195,7 +196,7 @@ export function assemble(main: HTMLElement) {
 
   const $ = (id: string) => main.querySelector<HTMLElement>("#" + id)!;
   const list = $("asm-steps");
-  function paint() {
+  function paint(progress?: (f: number) => void): Promise<unknown> | void {
     const kit = isKit(w);
     list.innerHTML = stepsFor(w).map((s, i) => `
       <li class="card asm-step" id="step-${i + 1}">
@@ -212,16 +213,17 @@ export function assemble(main: HTMLElement) {
           <figcaption class="photos">${s.ph.map((f) => `<button type="button" data-ph="${f}" aria-label="Photo"><img src="${IMG}t/${f}.webp" alt="" loading="lazy"></button>`).join("")}</figcaption>
         </figure>
       </li>`).join("");
-    if (!kit) {
-      const now = w.join();
-      list.querySelectorAll<HTMLImageElement>("img[data-wd]").forEach((im) =>
-        recolor(im.dataset.wd!, w).then((u) => { if (w.join() === now) im.src = u; }).catch((e) => console.error("recolor", e)));
-    }
     main.querySelectorAll<HTMLAnchorElement>('a[href^="/assemble/3d"]').forEach((a) => { a.href = "/assemble/3d" + location.search + (a.hash || ""); });
+    if (kit) return;
+    const now = w.join(), ims = [...list.querySelectorAll<HTMLImageElement>("img[data-wd]")];
+    let n = 0;
+    return Promise.all(ims.map((im) => recolor(im.dataset.wd!, w)
+      .then((u) => { if (w.join() === now) im.src = u; }, (e) => console.error("recolor", e))
+      .finally(() => progress?.(++n / ims.length))));
   }
   paint();
 
-  mountCableBox(main, (nw) => { w = nw; paint(); });
+  mountCableBox(main, (nw, progress) => { w = nw; return paint(progress); });
 
   const big = main.querySelector<HTMLDialogElement>(":scope > section > .asm-big")!, bigImg = big.querySelector("img")!;
   main.addEventListener("click", (e) => {
