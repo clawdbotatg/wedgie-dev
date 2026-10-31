@@ -68,7 +68,7 @@ NATIVE = {56: "BNB", 100: "XDAI", 137: "POL", 146: "S", 999: "HYPE", 5042: "USDC
 def coin(tx):
     return NATIVE.get(tx["chainId"], "ETH")
 SAFES_MAX = 32          # Safes the wedgie remembers (save "safes")
-CHUNK = 4000            # hex chars per safe_data line (a USB line is at most 6 KB)
+CHUNK = 2000            # hex chars per piece: a 4 KB line didn't fit a real wedgie's broken-up heap (10-30, safe-49)
 # bytes of tx data the wedgie takes in pieces. Joining them needs one free block that size, and how big a
 # block a used RP2040 heap still has varies: on a virtual RP2040 (wedgie-dev tools/safechip.mjs) 12 KB
 # passed one run and failed another, 16 KB once, 20 KB never. 8 KB passes every run, with room.
@@ -218,6 +218,20 @@ def _lend():
     elif clear_buf and not clear_have and not isinstance(clear, memoryview):
         clear_buf = None
     gc.collect()
+
+
+def _line_id(b):
+    """The id at the end of a line json.loads couldn't read (the site puts it last), or None."""
+    i = b.rfind(b'"id":')
+    if i < 0:
+        return None
+    j = i + 5
+    while j < len(b) and b[j] == 32:
+        j += 1
+    k = j
+    while k < len(b) and 48 <= b[k] <= 57:
+        k += 1
+    return int(b[j:k]) if k > j else None
 
 
 def _keep():
@@ -943,10 +957,11 @@ def pump():
             except MemoryError:         # clear_buf's room, then once more
                 _lend()
                 m = json.loads(line)
-        except Exception:
+        except Exception as e:          # say why, to the request that sent it: "bad json" with no id hid a
+            mid = _line_id(line)        # MemoryError (10-30, a real wedgie, a 4 KB piece: "didn't answer")
             line = None
             gc.collect()
-            W.send({"type": "error", "error": "bad json"})
+            W.send({"id": mid, "type": "error", "error": "%s: %s" % (type(e).__name__, e) if isinstance(e, MemoryError) else "bad json"})
             return
         line = None
         if not isinstance(m, dict):
