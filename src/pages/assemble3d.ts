@@ -3,14 +3,16 @@
 // arrows: it plays once and holds. Drag to look around, scroll or pinch to zoom. #7 opens step 7.
 import "./assemble.css";
 import "./assemble3d.css";
-import { STEPS, NO_3D } from "./assemble";
+import { STEPS as KIT_STEPS, NO_3D, stepsFor } from "./assemble";
+import { wires } from "./cablecolors";
 import type { Playground } from "../ui/playground3d";
 
 const IMG = "/img/assemble/";
 // The manual's steps that have a 3D animation (step numbers stay the manual's).
-const IDS = STEPS.map((_, i) => i).filter((i) => !NO_3D.includes(STEPS[i].t));
+const IDS = KIT_STEPS.map((_, i) => i).filter((i) => !NO_3D.includes(KIT_STEPS[i].t));
 
 export function assemble3d(main: HTMLElement) {
+  const STEPS = stepsFor(wires());   // in your cable's colors (the box at the top of /assemble)
   main.innerHTML = `
   <section class="pg">
     <div class="pg-stage recess" id="pg-stage">
@@ -34,7 +36,7 @@ export function assemble3d(main: HTMLElement) {
       <ol class="pg-list" id="pg-list">
         ${IDS.map((i) => `<li><button type="button" data-i="${i}"><b>${i + 1}</b>${STEPS[i].t}</button></li>`).join("")}
       </ol>
-      <p class="fine pg-back"><a href="/assemble">The step-by-step page with photos</a> · <a href="/assemble.pdf" download>Print (PDF)</a></p>
+      <p class="fine pg-back"><a href="/assemble${location.search}">The step-by-step page with photos</a> · <a href="/assemble.pdf" download>Print (PDF)</a></p>
     </aside>
     <dialog class="asm-big"><img alt=""><button type="button" class="btn">Close</button></dialog>
   </section>`;
@@ -125,6 +127,6 @@ export function assemble3d(main: HTMLElement) {
     tick();
   }).catch((err) => {
     console.error("3D playground:", err);
-    stage.innerHTML = `<p class="pg-fail">3D didn't load here. <a href="/assemble">The step-by-step page</a> has every step with photos.</p>`;
+    stage.innerHTML = `<p class="pg-fail">3D didn't load here. <a href="/assemble${location.search}">The step-by-step page</a> has every step with photos.</p>`;
   });
 }

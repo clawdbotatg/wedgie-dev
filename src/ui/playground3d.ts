@@ -8,6 +8,8 @@ import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { loadGeo, partGeometry, COLORS } from "./wedgie3d";
+import { wires, hex } from "../pages/cablecolors";
+import { say } from "../pages/assemble";
 import { PART_COLORS, ROW_L, ROW_R, pinY, picoPins, chipBoard, PLUG, copper } from "./parts-geo";
 
 type V3 = [number, number, number];
@@ -34,7 +36,9 @@ const FLAT_UP = -20.8;                                      // face up: the mat,
 const holeXY = (x: number, n: number): V3 => [x, pinY(n), HDR];
 // the manual's cable: white R3, yellow R5, black L6, red L7 (top to bottom in the plug)
 const HOLES = [holeXY(ROW_R, 3), holeXY(ROW_R, 5), holeXY(ROW_L, 6), holeXY(ROW_L, 7)];
-const WIRES = [0xf4f4ef, 0xf2c417, 0x232323, 0xd8262a];
+// in your cable's colors (cablecolors.ts); label words {W0}..{W3} too, as in pages/assemble.ts
+const W_NAMES = wires();
+const WIRES = W_NAMES.map((c) => new THREE.Color(hex(c)).getHex());
 // wedged: tilted on its long edge between the two socket rows, face toward the Pico. The gap between the
 // rows (inside the tape) and between the boards is about 13 x 12 mm: an 18 mm board only fits on a slant.
 const CHIP_IN: V3 = [13.22, 18, -8.1];
@@ -115,7 +119,7 @@ const STEPS3D: Step3D[] = [
   },
   { // 4 White and yellow
     dur: 3.6, view: { at: [8, 38, -10], az: -25, el: 52, d: 120 },
-    labels: [{ txt: "White: 3rd", at: HOLES[0], t: [0.08, 0.47] }, { txt: "Yellow: 5th", at: HOLES[1], t: [0.47, 1] }],
+    labels: [{ txt: "{W0}: 3rd", at: HOLES[0], t: [0.08, 0.47] }, { txt: "{W1}: 5th", at: HOLES[1], t: [0.47, 1] }],
     run(s, t) {
       num(s, "w0", 1, E(t, 0.08, 0.5));
       num(s, "w1", 1, E(t, 0.45, 0.9));
@@ -148,7 +152,7 @@ const STEPS3D: Step3D[] = [
   },
   { // 7 Black and red
     dur: 5.4, view: { at: [20, 37, -10], az: 25, el: 52, d: 125 },
-    labels: [{ txt: "Black: 6th", at: HOLES[2], t: [0.03, 0.27] }, { txt: "Red: 7th", at: HOLES[3], t: [0.27, 0.55] }, { txt: "Tape, then poke", at: [ROW_L, 36.2, -11], t: [0.6, 1] }],
+    labels: [{ txt: "{W2}: 6th", at: HOLES[2], t: [0.03, 0.27] }, { txt: "{W3}: 7th", at: HOLES[3], t: [0.27, 0.55] }, { txt: "Tape, then poke", at: [ROW_L, 36.2, -11], t: [0.6, 1] }],
     run(s, t) {
       num(s, "w2", 1, E(t, 0.04, 0.28));
       num(s, "w3", 1, E(t, 0.26, 0.5));
@@ -718,7 +722,8 @@ export async function mountPlayground(el: HTMLElement): Promise<Playground> {
     ls.forEach((l, j) => {
       const d = getLabel(j);
       const span = d.firstElementChild as HTMLElement;
-      if (span.textContent !== l.txt) span.textContent = l.txt;
+      const txt = say(l.txt, W_NAMES);
+      if (span.textContent !== txt) span.textContent = txt;
       d.classList.toggle("bad", !!l.bad);
       const [a, b] = l.t || [0, 1];
       const show = t < a || t > b ? 0 : Math.min(a === 0 ? 1 : clamp((t - a) / 0.06), b >= 1 ? 1 : clamp((b - t) / 0.06));
