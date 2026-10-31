@@ -2,7 +2,7 @@
 // step, and the real photos under it (tap one to see it big). Source of truth for the steps:
 // clawd-pico-case/assembly/ASSEMBLY.md. Drawings and photos: public/img/assemble/ (tools/asmimg.py).
 import "./assemble.css";
-import { KIT, PALETTE, hex, wires, setWires, isKit } from "./cablecolors";
+import { KIT, PALETTE, hex, label, wires, setWires, isKit } from "./cablecolors";
 
 type Step = { t: string; p: string; d?: string; ph: string[]; art?: string; tip?: string; warn?: string; end?: string };
 
@@ -16,7 +16,7 @@ const JOBS = [
   { job: "SDA", to: "left 6th", hole: "L5" },
   { job: "SCL", to: "left 7th", hole: "L6" },
 ];
-export const say = (s: string, w: string[]) => s.replace(/\{([wW])([0-3])\}/g, (_, c, i) => c === "W" ? w[+i] : w[+i].toLowerCase());
+export const say = (s: string, w: string[]) => s.replace(/\{([wW])([0-3])\}/g, (_, c, i) => c === "W" ? label(w[+i]) : label(w[+i]).toLowerCase());
 const badge = (x: number, y: number, hex: string) => `<circle class="bd" cx="${x}" cy="${y}" r="11" style="fill:${hex}"/>`;
 
 // The screen board's sockets seen from above (board face down, USB end up): the top 8 holes of each
@@ -24,7 +24,7 @@ const badge = (x: number, y: number, hex: string) => `<circle class="bd" cx="${x
 export function headerArt(w: string[]) {
   const L = ["GP0", "GP1", "GND", "GP2", "GP3", "GP4", "GP5", "GND"];
   const R = ["VBUS", "VSYS", "GND", "3V3_EN", "3V3", "VREF", "GP28", "AGND"];
-  const use = Object.fromEntries(JOBS.map((j, i) => [j.hole, { c: w[i], hex: hex(w[i]) }]));
+  const use = Object.fromEntries(JOBS.map((j, i) => [j.hole, { c: label(w[i]), hex: hex(w[i]) }]));
   const y = (i: number) => 58 + i * 30;
   let s = "";
   for (let i = 0; i < 8; i++) {
@@ -165,7 +165,7 @@ export function assemble(main: HTMLElement) {
         <div class="cbl-3d recess" id="cbl-3d"></div>
         <ol class="cbl-rows">
           ${KIT.map((k, i) => `<li><span class="cbl-kit">${sw(k)}<b>${k}</b></span><span class="cbl-arrow">→</span>
-            <span class="cbl-pick" data-i="${i}">${Object.keys(PALETTE).map((c) => `<button type="button" data-c="${c}" style="background:${hex(c)}" aria-label="${k} is ${c}" title="${c}"></button>`).join("")}</span></li>`).join("")}
+            <span class="cbl-pick" data-i="${i}">${Object.keys(PALETTE).map((c) => `<button type="button" data-c="${c}" style="background:${hex(c)}" aria-label="${k} is ${c}" title="${c}"></button>`).join("")}<label class="cbl-own" title="Any color"><input type="color" aria-label="${k} is another color" value="#ff66aa"></label></span></li>`).join("")}
         </ol>
         <p class="note bad" id="cbl-same" hidden>Two wires have the same color.</p>
         <div class="row cbl-btns"><button type="button" class="btn" id="cbl-kit">Kit colors</button><button type="button" class="btn" id="cbl-done">Done</button></div>
@@ -189,11 +189,17 @@ export function assemble(main: HTMLElement) {
   function paint() {
     const kit = isKit(w);
     $("cbl-title").textContent = kit ? "Cable not these colors?" : "Your cable";
-    $("cbl-now").innerHTML = kit ? "" : KIT.map((k, i) => `<span>${sw(k)}→${sw(w[i])}<b>${w[i]}</b></span>`).join("");
-    map.querySelectorAll<HTMLElement>(".cbl-pick").forEach((p) => p.querySelectorAll<HTMLElement>("button").forEach((b) => {
-      const on = b.dataset.c === w[+p.dataset.i!];
-      b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on));
-    }));
+    $("cbl-now").innerHTML = kit ? "" : KIT.map((k, i) => `<span>${sw(k)}→${sw(w[i])}<b>${label(w[i])}</b></span>`).join("");
+    map.querySelectorAll<HTMLElement>(".cbl-pick").forEach((p) => {
+      const c = w[+p.dataset.i!], own = c.startsWith("#");
+      p.querySelectorAll<HTMLElement>("button").forEach((b) => {
+        const on = b.dataset.c === c;
+        b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on));
+      });
+      const l = p.querySelector<HTMLElement>(".cbl-own")!;        // the picker: rainbow, or the color picked
+      l.classList.toggle("on", own); l.style.background = own ? c : "";
+      if (own) l.querySelector("input")!.value = c;
+    });
     $("cbl-same").hidden = new Set(w).size === 4;
     list.innerHTML = stepsFor(w).map((s, i) => `
       <li class="card asm-step" id="step-${i + 1}">
@@ -227,6 +233,12 @@ export function assemble(main: HTMLElement) {
     if (!b) return;
     const i = +b.closest<HTMLElement>(".cbl-pick")!.dataset.i!;
     set(w.map((c, j) => j === i ? b.dataset.c! : c));
+  });
+  map.addEventListener("input", (e) => {
+    const inp = e.target as HTMLInputElement;
+    if (inp.type !== "color") return;
+    const i = +inp.closest<HTMLElement>(".cbl-pick")!.dataset.i!;
+    set(w.map((c, j) => j === i ? inp.value.toLowerCase() : c));
   });
   $("cbl-kit").addEventListener("click", () => set([...KIT]));
   $("cbl-done").addEventListener("click", () => { map.hidden = true; open.hidden = false; c3d?.destroy(); c3d = null; $("cbl-3d").innerHTML = ""; });

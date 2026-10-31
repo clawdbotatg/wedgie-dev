@@ -96,6 +96,10 @@
   box-shadow: inset 0 0 0 1.5px rgba(0,0,0,.25); }
 .cbl-pick button.on { box-shadow: inset 0 0 0 1.5px rgba(0,0,0,.25), 0 0 0 3px #fff, 0 0 0 6px #22c452; }
 .cbl-btns { justify-content: space-between; margin-top: 16px; }
+.cbl-own { position: relative; width: 34px; height: 34px; border-radius: 50%; cursor: pointer; flex-shrink: 0;
+  background: conic-gradient(#e3312c, #f2c417, #22a64a, #22c3e6, #2f6fd6, #8a3fd1, #e0218a, #e3312c); box-shadow: inset 0 0 0 1.5px rgba(0,0,0,.25); }
+.cbl-own.on { box-shadow: inset 0 0 0 1.5px rgba(0,0,0,.25), 0 0 0 3px #fff, 0 0 0 6px #22c452; }
+.cbl-own input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
 #cbl-same { margin: 12px 0 0; }
 .cbl-key { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-weight: 800; font-size: 15px; margin: 0 0 12px; }
 @media (max-width: 700px) {
@@ -104,5 +108,5 @@
   .cbl-kit { min-width: 0; width: 100%; }
   .cbl-arrow { display: none; }
   .cbl-pick { gap: 4px; }
-  .cbl-pick button { width: 27px; height: 27px; }
+  .cbl-pick button, .cbl-own { width: 25px; height: 25px; }
 }
