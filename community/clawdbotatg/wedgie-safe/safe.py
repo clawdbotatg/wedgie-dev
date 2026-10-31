@@ -43,7 +43,7 @@ import save
 import ui
 from ui import WHITE, INK, MUTED, GREY, GREEN_D, RED
 
-FW = "safe-50"         # and "version" in wedgie.json: the site shows it (v50)
+FW = "safe-52"         # and "version" in wedgie.json: the site shows it (v52)
 RP_ID = b"wedgie.dev"
 FIELDS = '"origin":"https://wedgie.dev"'
 ASK_MS = 120000
@@ -69,6 +69,9 @@ def coin(tx):
     return NATIVE.get(tx["chainId"], "ETH")
 SAFES_MAX = 32          # Safes the wedgie remembers (save "safes")
 CHUNK = 2000            # hex chars per piece: a 4 KB line didn't fit a real wedgie's broken-up heap (10-30, safe-49)
+RAW = 4096              # bytes per raw piece (hello's safe_raw): the bytes right after the line, read in one C loop. A
+                        # real wedgie, 10-30: 2000 hex chars took 0.75 s a char at a time, and their text broke the heap
+                        # up until a swap's bundle had no block (MemoryError, 6325 bytes)
 # bytes of tx data the wedgie takes in pieces. Joining them needs one free block that size, and how big a
 # block a used RP2040 heap still has varies: on a virtual RP2040 (wedgie-dev tools/safechip.mjs) 12 KB
 # passed one run and failed another, 16 KB once, 20 KB never. 8 KB passes every run, with room.
@@ -167,28 +170,40 @@ def hold():
             pass
 
 
+def _piece(m):
+    """A piece's bytes: {"raw": k} and k bytes after the line (safe-52+), else its "hex". None for a bad one. Raw bytes
+    are read even when the piece is no good, so the next line starts clean."""
+    k = m.get("raw")
+    if k is None:
+        try:
+            return binascii.unhexlify(str(m.get("hex") or ""))
+        except Exception:
+            return None
+    if not isinstance(k, int) or not 0 < k <= RAW:
+        return None
+    b = bytearray(k)
+    W.lines().raw(memoryview(b), _poll)
+    return b
+
+
 def on_data(mid, m):
-    """{"type":"safe_data","at":<bytes so far>,"hex":"..."}: a piece of the next tx's data. at 0 starts over."""
+    """{"type":"safe_data","at":<bytes so far>,"hex":"..."} (or "raw": k, the bytes after the line): a piece of the
+    next tx's data. at 0 starts over."""
     global pieces, have
-    at, h = m.get("at"), str(m.get("hex") or "")
+    at = m.get("at")
+    b = _piece(m)
     if at == 0:
         pieces, have = [], 0
         hold()
-    if have + len(h) // 2 > MAX_DATA:
+    if b is not None and have + len(b) > MAX_DATA:
         pieces, have = [], 0
         W.send({"id": mid, "type": "error", "error": "too big: a wedgie takes up to %d bytes of tx data" % MAX_DATA})
         return
-    if at != have or len(h) % 2 or len(h) > CHUNK:
+    if b is None or at != have or len(b) > (CHUNK // 2 if m.get("raw") is None else RAW):
         pieces, have = [], 0
         W.send({"id": mid, "type": "error", "error": "bad piece"})
         return
-    try:
-        b = binascii.unhexlify(h)
-    except Exception:
-        pieces, have = [], 0
-        W.send({"id": mid, "type": "error", "error": "bad piece"})
-        return
-    h = m = None
+    m = None
     pieces.append(b)
     have += len(b)
     W.send({"id": mid, "type": "safe_data", "have": have})
@@ -280,7 +295,7 @@ def on_clear(mid, m):
     and every piece goes straight in: joining pieces at sign time needed a free block that size on top of them (a real
     wedgie on a phone, 10-27: MemoryError, 1784 bytes)."""
     global clear, clear_have
-    at, h = m.get("at"), str(m.get("hex") or "")
+    at = m.get("at")
     if at == 0:
         clear, clear_have = [], 0
         n = m.get("n")
@@ -293,17 +308,18 @@ def on_clear(mid, m):
                     clear = memoryview(bytearray(n))
                 except MemoryError:     # no block that big: pieces, joined at sign time if there's room then
                     pass
-    if at != clear_have or len(h) % 2 or len(h) > CHUNK or clear_have + len(h) // 2 > (len(clear) if isinstance(clear, memoryview) else CLEAR_MAX):
+    k, mv = m.get("raw"), isinstance(clear, memoryview)
+    if mv and at == clear_have and isinstance(k, int) and 0 < k <= RAW and clear_have + k <= len(clear):
+        W.lines().raw(clear[clear_have:clear_have + k], _poll)     # straight into its block: nothing new on the heap
+        clear_have += k
+        W.send({"id": mid, "type": "safe_clear", "have": clear_have})
+        return
+    b = _piece(m)
+    if b is None or at != clear_have or len(b) > (CHUNK // 2 if k is None else RAW) or clear_have + len(b) > (len(clear) if mv else CLEAR_MAX):
         clear, clear_have = [], 0
         W.send({"id": mid, "type": "error", "error": "bad clear piece (a bundle is up to %d bytes)" % CLEAR_MAX})
         return
-    try:
-        b = binascii.unhexlify(h)
-    except Exception:
-        clear, clear_have = [], 0
-        W.send({"id": mid, "type": "error", "error": "bad clear piece"})
-        return
-    h = m = None
+    m = None
     if isinstance(clear, memoryview):
         clear[clear_have:clear_have + len(b)] = b
     else:
@@ -320,7 +336,10 @@ def parse(t):
         room = None                     # the block, and on a broken-up heap _keep found none (safe-49, safechip --frag)
     # used up first, whatever happens: a join that ran out of memory left them for the next tx, which failed too
     parts, n, clear, clear_have = clear, clear_have, [], 0
-    cb = (parts if n == len(parts) else None) if isinstance(parts, memoryview) else _join(parts) if parts else None
+    try:
+        cb = (parts if n == len(parts) else None) if isinstance(parts, memoryview) else _join(parts) if parts else None
+    except MemoryError:                 # no block for it: the usual pages, never an error (a real wedgie, safe-50, after
+        cb = None                       # clear_buf was lent and not had again: "bad tx: ... allocating 6325 bytes")
     parts = None
     data = t.get("data") or "0x"
     if data == "@":
@@ -918,7 +937,7 @@ def handle(m):
         W.send({"id": mid, "type": "ok", "safes": n})
     elif t == "hello":
         W.send(W.hello(mid, running="safe", app=FW, safe=key if state == "ok" else None, signer=signer if state == "ok" else None,
-                       safe_state=state, safe_chunk=CHUNK,
+                       safe_state=state, safe_chunk=CHUNK, safe_raw=RAW,
                        safe_clear=clear_tag(), safe_sim="p256", safe_review=review_round()))
     else:                               # hello's cousins, shots, jobs, open: the slot's
         import slot
