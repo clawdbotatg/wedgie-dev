@@ -141,6 +141,36 @@ export const TROUBLE: [string, string][] = [
 
 const IMG = "/img/assemble/";
 
+// Drawings whose wires take your colors: dNN.webp (kit colors) + dNN.m.png (which wire: R / 50, how much: G),
+// both from tools/asmwires.py. A pixel is a * kit color + the rest, so yours = pixel + a * (yours - kit).
+const WIRE_DRAW = ["01", "03", "05", "06", "06t", "08", "09h", "10p"];
+const rgbOf = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+const loadImg = (src: string) => new Promise<HTMLImageElement>((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = src; });
+const recolored = new Map<string, Promise<string>>();
+function recolor(d: string, w: string[]) {
+  const id = d + "|" + w.join();
+  for (const [k, u] of recolored) if (!k.endsWith("|" + w.join())) { recolored.delete(k); u.then((x) => URL.revokeObjectURL(x), () => {}); }   // only the current colors
+  if (!recolored.has(id)) recolored.set(id, (async () => {
+    const [img, msk] = await Promise.all([loadImg(`${IMG}d${d}.webp`), loadImg(`${IMG}d${d}.m.png`)]);
+    const c = document.createElement("canvas"); c.width = img.naturalWidth; c.height = img.naturalHeight;
+    const g = c.getContext("2d", { willReadFrequently: true })!;
+    g.drawImage(msk, 0, 0); const m = g.getImageData(0, 0, c.width, c.height).data;
+    g.drawImage(img, 0, 0); const px = g.getImageData(0, 0, c.width, c.height);
+    const dif = KIT.map((k, i) => { const a = rgbOf(hex(k)), b = rgbOf(hex(w[i])); return b.map((v, j) => v - a[j]); });
+    const p = px.data;
+    for (let i = 0; i < p.length; i += 4) {
+      const a = m[i + 1];
+      if (!a) continue;
+      const dk = dif[Math.round(m[i] / 50) - 1];
+      if (!dk) continue;
+      p[i] += dk[0] * a / 255; p[i + 1] += dk[1] * a / 255; p[i + 2] += dk[2] * a / 255;
+    }
+    g.putImageData(px, 0, 0);
+    return new Promise<string>((ok) => c.toBlob((b) => ok(URL.createObjectURL(b!)), "image/png"));
+  })());
+  return recolored.get(id)!;
+}
+
 const sw = (c: string) => `<i class="sw" style="background:${hex(c)}"></i>`;
 const CABLE_PHOTO = "02-trust-m-plug";
 
@@ -213,10 +243,15 @@ export function assemble(main: HTMLElement) {
           ${s.end || ""}
         </div>
         <figure class="draw">
-          <img src="${s.d ? `${IMG}d${s.d}.webp` : `${IMG}p/${s.ph[0]}.webp`}" alt="Step ${i + 1}: ${s.t}" loading="lazy">
+          <img src="${s.d ? `${IMG}d${s.d}.webp` : `${IMG}p/${s.ph[0]}.webp`}" alt="Step ${i + 1}: ${s.t}" loading="lazy"${s.d && WIRE_DRAW.includes(s.d) ? ` data-wd="${s.d}"` : ""}>
           <figcaption class="photos">${s.ph.map((f) => `<button type="button" data-ph="${f}" aria-label="Photo"><img src="${IMG}t/${f}.webp" alt="" loading="lazy"></button>`).join("")}</figcaption>
         </figure>
       </li>`).join("");
+    if (!kit) {
+      const now = w.join();
+      list.querySelectorAll<HTMLImageElement>("img[data-wd]").forEach((im) =>
+        recolor(im.dataset.wd!, w).then((u) => { if (w.join() === now) im.src = u; }).catch((e) => console.error("recolor", e)));
+    }
     main.querySelectorAll<HTMLAnchorElement>('a[href^="/assemble/3d"]').forEach((a) => { a.href = "/assemble/3d" + location.search + (a.hash || ""); });
   }
   paint();
@@ -234,7 +269,7 @@ export function assemble(main: HTMLElement) {
     const i = +b.closest<HTMLElement>(".cbl-pick")!.dataset.i!;
     set(w.map((c, j) => j === i ? b.dataset.c! : c));
   });
-  map.addEventListener("input", (e) => {
+  map.addEventListener("change", (e) => {   // the picker: once it's closed
     const inp = e.target as HTMLInputElement;
     if (inp.type !== "color") return;
     const i = +inp.closest<HTMLElement>(".cbl-pick")!.dataset.i!;
