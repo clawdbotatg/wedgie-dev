@@ -1677,6 +1677,8 @@ export function safe(main: HTMLElement) {
       }
       for (const A of viaSafes())      // an owner Safe the wedgie owns: it signs through it (approveHash)
         if (!signed(t, A)) { btns.push(`<button class="btn btn-sm${green ? " btn-green" : ""}" data-via="${k}:${A}"${dis()}>Sign with wedgie via ${short(A)}</button>`); green = false; }
+      for (const [A, os] of Object.entries(ownerSafes))      // an Instant Wallet owner: its passkey lives on instantwallet.io
+        if (os.iw && !os.owners.some(mine) && !signed(t, A)) btns.push(`<a class="btn btn-sm" href="https://instantwallet.io/tx/${chain}/${safeAddr}?h=${esc(t.safeTxHash)}" target="_blank" rel="noopener">Sign in Instant Wallet ↗</a>`);
       if (account && isOwner(account)) signed(t, account) ? marks.push("wallet ✓")
         : n < need && (btns.push(`<button class="btn btn-sm${green ? " btn-green" : ""}" data-wsign="${k}"${dis()}>Sign with wallet</button>`), green = false);
       // Execute's green is the bottom bar's (one green on the page): here it's white
