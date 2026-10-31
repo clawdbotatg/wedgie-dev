@@ -43,7 +43,7 @@ import save
 import ui
 from ui import WHITE, INK, MUTED, GREY, GREEN_D, RED
 
-FW = "safe-54"         # and "version" in wedgie.json: the site shows it (v54)
+FW = "safe-55"         # and "version" in wedgie.json: the site shows it (v54)
 RP_ID = b"wedgie.dev"
 FIELDS = '"origin":"https://wedgie.dev"'
 ASK_MS = 120000
@@ -888,7 +888,7 @@ def on_sign(mid, t, again_ok=True, fresh=False):
         W.send({"id": mid, "type": "error", "error": "pays a gas refund (gasPrice > 0): Safe Signer won't sign that"})
         return
     try:
-        for again in (True, True, False):       # room, then clear_buf (_lend), then it's an error
+        for again in (2, 1, 0):                 # room, then clear_buf (_lend), then a restart
             try:
                 ui.progress("Reading the transaction", "Safe tx hash", False)
                 h = safe_tx_hash(tx)
@@ -901,7 +901,9 @@ def on_sign(mid, t, again_ok=True, fresh=False):
                                              "out of memory: again on a clean heap"):     # the extras (a real wedgie,
                         return          # safe-47, an IW swap: MemoryError, 1280 bytes); then a restart on a clean heap
                     raise
-                tx["sim"] = tx["clear"] = None
+                tx["sim"] = None        # the simulation first, the screens only the next time: dropped together, a
+                if again < 2:           # guardian add read "can't read this" (a real wedgie, safe-54, wedgie.dev)
+                    tx["clear"] = None
                 _unclear()
                 _lend()
     except ValueError as e:             # a bad batch, a DELEGATECALL: nothing on screen to say yes to

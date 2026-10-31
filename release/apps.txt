@@ -22,7 +22,7 @@ f0224e865a8f55c77b0c13d353b4663e6d9642e99439d98c3045dea3f594ef91  grove.py
 @app  {"mod":"poidh","name":"Poidh Bounties","entry":"run","usb":true,"files":["poidh.py"]}
 9333052151fee99ff38ba0bd4d696f10707f3837abcf019d057fb7740c54e0a1  poidh.py
 @app  {"mod":"safe","name":"Safe Signer","entry":"run","usb":true,"files":["safe.py","safe_read.mpy","safe_7730.mpy","safe_8362.mpy","safe_book.mpy","safe_wire.mpy","safe_roots.py","safe_keccak.py","safe_addr.py","safe_blockie.py","safe_key.py","safe_msg.mpy","safe_sim.mpy","safe_icons.py","safe_icons.bin"]}
-c5d841fc12aa4d356cc1b5f2e3b2b8f71a90c3f6752747a7324dd8d41a6c469f  safe.py
+856ae13ef5d88ee7f79a2610243b83146e3457bc92cf36efd8846393d237c63f  safe.py
 ad84be5b314ddbdfdd2376e2b265b71e79054326b2b3b5757d4d357692aeee68  safe_read.mpy
 47db073044e0e7f241af28e6ef967d5a781ebcea541da621e20df3c253d6042a  safe_7730.mpy
 343ee1ecbe6837968a2fba670f5e824f8985b7927c78e44508c79b40d84d2920  safe_8362.mpy
