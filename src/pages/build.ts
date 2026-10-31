@@ -239,7 +239,7 @@ export async function build(main: HTMLElement) {
         <div class="card bld-stage"><div id="bld-dev"></div></div>
         <div class="card bld-link">
           <p class="fine">This wedgie's link</p>
-          <div class="row"><code class="mono" id="bld-url"></code><button class="btn btn-sm btn-green" id="bld-copy">Copy link</button></div>
+          <div class="row"><code class="mono" id="bld-url"></code><button class="btn btn-sm btn-grey" id="bld-copy">Copy link</button></div>
         </div>
       </div>
       <div class="bld-pick">

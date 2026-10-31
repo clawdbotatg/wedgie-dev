@@ -166,7 +166,7 @@ export function secret(main: HTMLElement) {
     all.sort((a, b) => last(b) - last(a));
     box.innerHTML = `<h2>Chats</h2>` + (all.length ? all.map((p) => {
       const u = unread(p), name = book!.names[p] || (p ? "New " + p.slice(2, 8) : "No name");
-      return `<p class="row"><button class="btn btn-sm${open === p ? " btn-green" : ""}" data-pub="${esc(p)}">${esc(name)}</button>${u ? ` <span class="badge">${u}</span>` : ""}</p>`;
+      return `<p class="row"><button class="btn btn-sm"${open === p ? ' aria-current="true"' : ""} data-pub="${esc(p)}">${esc(name)}</button>${u ? ` <span class="badge">${u}</span>` : ""}</p>`;
     }).join("") : `<p class="fine">None yet. Add someone with their link, or give out yours.</p>`);
     box.querySelectorAll<HTMLButtonElement>("[data-pub]").forEach((b) => b.onclick = () => show(b.dataset.pub!));
   }
