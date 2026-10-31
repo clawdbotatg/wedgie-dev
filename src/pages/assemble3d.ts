@@ -5,6 +5,7 @@ import "./assemble.css";
 import "./assemble3d.css";
 import { STEPS as KIT_STEPS, NO_3D, stepsFor } from "./assemble";
 import { wires } from "./cablecolors";
+import { cableBox, mountCableBox } from "./cablebox";
 import type { Playground } from "../ui/playground3d";
 
 const IMG = "/img/assemble/";
@@ -12,8 +13,9 @@ const IMG = "/img/assemble/";
 const IDS = KIT_STEPS.map((_, i) => i).filter((i) => !NO_3D.includes(KIT_STEPS[i].t));
 
 export function assemble3d(main: HTMLElement) {
-  const STEPS = stepsFor(wires());   // in your cable's colors (the box at the top of /assemble)
+  let STEPS = stepsFor(wires());   // in your cable's colors (the box at the top)
   main.innerHTML = `
+  <div class="pg-cbl">${cableBox()}</div>
   <section class="pg">
     <div class="pg-stage recess" id="pg-stage">
       <p class="pg-hint">${matchMedia("(pointer: coarse)").matches ? "Drag to turn · Pinch to zoom · Two fingers to move" : "Drag to turn · Scroll to zoom · Right-drag to move"}</p>
@@ -44,7 +46,7 @@ export function assemble3d(main: HTMLElement) {
   const $ = <T extends HTMLElement>(id: string) => main.querySelector<T>("#" + id)!;
   const stage = $("pg-stage"), play = $<HTMLButtonElement>("pg-play"), scrub = $<HTMLInputElement>("pg-scrub");
   const list = $("pg-list"), all = $<HTMLInputElement>("pg-all");
-  const big = main.querySelector<HTMLDialogElement>(".asm-big")!, bigImg = big.querySelector("img")!;
+  const big = main.querySelector<HTMLDialogElement>(".pg > .asm-big")!, bigImg = big.querySelector("img")!;
   big.addEventListener("click", () => big.close());
 
   let pg: Playground | null = null;
@@ -101,6 +103,13 @@ export function assemble3d(main: HTMLElement) {
   addEventListener("hashchange", () => { const n = parseInt(location.hash.slice(1)) - 1; if (n >= 0 && n < STEPS.length && near(n) !== step) go(near(n)); });
 
   paint();
+  mountCableBox(main, (w) => {
+    STEPS = stepsFor(w);
+    list.querySelectorAll<HTMLElement>("[data-i]").forEach((b) => { b.innerHTML = `<b>${+b.dataset.i! + 1}</b>${STEPS[+b.dataset.i!].t}`; });
+    paint();
+    pg?.setWires(w);
+    main.querySelectorAll<HTMLAnchorElement>('a[href^="/assemble"]').forEach((a) => { if (!a.href.endsWith(".pdf")) a.href = "/assemble" + location.search; });
+  });
   // Drop the hint once they've touched it.
   stage.addEventListener("pointerdown", () => stage.classList.add("touched"), { once: true });
 

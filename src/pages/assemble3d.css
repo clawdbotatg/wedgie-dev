@@ -53,3 +53,8 @@
   #pg-play { min-width: 76px; }
   .pg-label span { font-size: 13px; padding: 5px 10px; }
 }
+
+/* the "Cable not these colors?" box (cablebox.ts) above the stage */
+.pg-cbl { padding-top: 20px; }
+.pg-cbl .cbl { margin: 0; }
+@media (max-width: 900px) { .pg-cbl { padding-top: 10px; } }

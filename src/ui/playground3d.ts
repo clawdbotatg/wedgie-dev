@@ -23,6 +23,8 @@ export type Playground = {
   /** Pose step `i` at t (0..1). A new step also swings the camera to that step's view. */
   show(i: number, t: number): void;
   resetView(): void;
+  /** Your cable's colors (cablecolors.ts names): the wires, the socket rings and the labels. */
+  setWires(w: string[]): void;
   steps: number;
   durations: number[];
   destroy(): void;
@@ -37,8 +39,10 @@ const holeXY = (x: number, n: number): V3 => [x, pinY(n), HDR];
 // the manual's cable: white R3, yellow R5, black L6, red L7 (top to bottom in the plug)
 const HOLES = [holeXY(ROW_R, 3), holeXY(ROW_R, 5), holeXY(ROW_L, 6), holeXY(ROW_L, 7)];
 // in your cable's colors (cablecolors.ts); label words {W0}..{W3} too, as in pages/assemble.ts
-const W_NAMES = wires();
-const WIRES = W_NAMES.map((c) => new THREE.Color(hex(c)).getHex());
+let W_NAMES = wires();
+let WIRES = W_NAMES.map((c) => new THREE.Color(hex(c)).getHex());
+// a socket's ring in its wire's color; grey for a wire too dark to see on the black sockets
+const ringColor = (i: number) => new THREE.Color(WIRES[i]).getHSL({ h: 0, s: 0, l: 0 }).l < 0.18 ? 0x8a8a8a : WIRES[i];
 // wedged: tilted on its long edge between the two socket rows, face toward the Pico. The gap between the
 // rows (inside the tape) and between the boards is about 13 x 12 mm: an 18 mm board only fits on a slant.
 const CHIP_IN: V3 = [13.22, 18, -8.1];
@@ -515,12 +519,12 @@ export async function mountPlayground(el: HTMLElement): Promise<Playground> {
   const off: THREE.Mesh[] = WIRES.map((c, i) => {            // the cut-off half of the cable, on the far plug
     const x = -(i - 1.5) * 1.1;
     const curve = new THREE.CatmullRomCurve3([new THREE.Vector3(x, 2.1, 0), new THREE.Vector3(x, 25, 0.4), new THREE.Vector3(x, 50, 0)]);
-    return new THREE.Mesh(new THREE.TubeGeometry(curve, 30, 0.5, 8, false), std(c, 0.45));
+    const m = new THREE.Mesh(new THREE.TubeGeometry(curve, 30, 0.5, 8, false), std(c, 0.45)); m.userData.wire = i; return m;
   });
   obj("plug2", "stack", [jstPlug(), ...off]);
-  const ins = WIRES.map((c) => new THREE.Mesh(new THREE.BufferGeometry(), std(c, 0.45)));
+  const ins = WIRES.map((c, i) => { const m = new THREE.Mesh(new THREE.BufferGeometry(), std(c, 0.45)); m.userData.wire = i; return m; });
   const cu = WIRES.map(() => { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 1, 8), copper()); return m; });
-  const slugs = WIRES.map((c) => new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 5, 10), std(c, 0.45)));
+  const slugs = WIRES.map((c, i) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 5, 10), std(c, 0.45)); m.userData.wire = i; return m; });
   obj("wires", "stack", [...ins, ...cu]);
   obj("slugs", "stack", slugs);
   const tapeM = new THREE.MeshStandardMaterial({ color: 0x141414, roughness: 0.35, transparent: true, opacity: 0.9 });
@@ -536,8 +540,8 @@ export async function mountPlayground(el: HTMLElement): Promise<Playground> {
   // the four sockets the wires use, ringed in their colors; the 4th on the right, struck out
   const marks: THREE.Mesh[] = [];
   HOLES.forEach(([x, y], i) => {
-    const r = new THREE.Mesh(new THREE.RingGeometry(1.05, 1.6, 28), new THREE.MeshBasicMaterial({ color: i === 2 ? 0x8a8a8a : WIRES[i], side: THREE.DoubleSide, toneMapped: false, transparent: true }));
-    r.position.set(x, y, HDR - 0.05); r.userData.noShadow = true; marks.push(r);
+    const r = new THREE.Mesh(new THREE.RingGeometry(1.05, 1.6, 28), new THREE.MeshBasicMaterial({ color: ringColor(i), side: THREE.DoubleSide, toneMapped: false, transparent: true }));
+    r.position.set(x, y, HDR - 0.05); r.userData.noShadow = true; r.userData.ring = i; marks.push(r);
   });
   for (const a of [PI / 4, -PI / 4]) {
     const x = box(3.2, 0.5, 0.05, new THREE.MeshBasicMaterial({ color: 0xe3312c, toneMapped: false, transparent: true }), ROW_R, pinY(4), HDR - 0.08);
@@ -816,6 +820,14 @@ export async function mountPlayground(el: HTMLElement): Promise<Playground> {
   return {
     show,
     resetView() { if (cur >= 0) swing(cur); },
+    setWires(w) {
+      W_NAMES = w; WIRES = w.map((c) => new THREE.Color(hex(c)).getHex());
+      scene.traverse((o) => {
+        const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
+        if (o.userData.wire !== undefined) m!.color.set(WIRES[o.userData.wire]);
+        else if (o.userData.ring !== undefined) m!.color.set(ringColor(o.userData.ring));
+      });
+    },
     steps: STEPS3D.length,
     durations: STEPS3D.map((s) => s.dur),
     destroy() {

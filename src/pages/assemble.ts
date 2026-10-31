@@ -2,7 +2,8 @@
 // step, and the real photos under it (tap one to see it big). Source of truth for the steps:
 // clawd-pico-case/assembly/ASSEMBLY.md. Drawings and photos: public/img/assemble/ (tools/asmimg.py).
 import "./assemble.css";
-import { KIT, PALETTE, hex, label, wires, setWires, isKit } from "./cablecolors";
+import { KIT, hex, label, wires, isKit } from "./cablecolors";
+import { cableBox, mountCableBox } from "./cablebox";
 
 type Step = { t: string; p: string; d?: string; ph: string[]; art?: string; tip?: string; warn?: string; end?: string };
 
@@ -128,8 +129,6 @@ export function stepsFor(w: string[]): Step[] {
 }
 /** The kit's cable (the printed manual). */
 export const STEPS = stepsFor(KIT);
-// The steps whose photos show the cable: with your own colors, each says which of the kit's is yours.
-const WIRE_STEPS = 9;
 
 // "If something's off", on the page and in the printed manual.
 export const TROUBLE: [string, string][] = [
@@ -171,8 +170,6 @@ function recolor(d: string, w: string[]) {
   return recolored.get(id)!;
 }
 
-const sw = (c: string) => `<i class="sw" style="background:${hex(c)}"></i>`;
-const CABLE_PHOTO = "02-trust-m-plug";
 
 export function assemble(main: HTMLElement) {
   let w = wires();
@@ -184,23 +181,7 @@ export function assemble(main: HTMLElement) {
       <p>No soldering. ${RAW.length} steps. Take your time on the wires (2 to 9); the rest just clicks. <a href="/assemble.pdf" download>Print the manual (PDF)</a></p>
       <p class="row"><a class="btn btn-green" href="/assemble/3d">Every step in 3D →</a></p>
     </div>
-    <div class="card cbl" id="cbl">
-      <button type="button" class="cbl-ph" data-ph="${CABLE_PHOTO}" aria-label="Photo"><img src="${IMG}p/${CABLE_PHOTO}.webp" alt="The kit's cable in the Trust M's left socket: white, yellow, black, red, top to bottom"></button>
-      <div class="cbl-ask">
-        <h3 id="cbl-title"></h3>
-        <p class="cbl-now" id="cbl-now"></p>
-        <button type="button" class="btn" id="cbl-open">Map wire colors</button>
-      </div>
-      <div class="cbl-map" id="cbl-map" hidden>
-        <div class="cbl-3d recess" id="cbl-3d"></div>
-        <ol class="cbl-rows">
-          ${KIT.map((k, i) => `<li><span class="cbl-kit">${sw(k)}<b>${k}</b></span><span class="cbl-arrow">→</span>
-            <span class="cbl-pick" data-i="${i}">${Object.keys(PALETTE).map((c) => `<button type="button" data-c="${c}" style="background:${hex(c)}" aria-label="${k} is ${c}" title="${c}"></button>`).join("")}<label class="cbl-own" title="Any color"><input type="color" aria-label="${k} is another color" value="#ff66aa"></label></span></li>`).join("")}
-        </ol>
-        <p class="note bad" id="cbl-same" hidden>Two wires have the same color.</p>
-        <div class="row cbl-btns"><button type="button" class="btn" id="cbl-kit">Kit colors</button><button type="button" class="btn" id="cbl-done">Done</button></div>
-      </div>
-    </div>
+    ${cableBox()}
     <ol class="asm-steps" id="asm-steps"></ol>
 
     <div class="card asm-trouble">
@@ -213,31 +194,15 @@ export function assemble(main: HTMLElement) {
   </section>`;
 
   const $ = (id: string) => main.querySelector<HTMLElement>("#" + id)!;
-  const list = $("asm-steps"), map = $("cbl-map"), open = $("cbl-open");
-  // A step's photos show the kit's colors: with yours, the cable steps say which is which.
-  const key = () => isKit(w) ? "" : `<p class="cbl-key">In the photos: ${KIT.map((k, i) => `<span>${sw(k)}→${sw(w[i])}</span>`).join("")}</p>`;
+  const list = $("asm-steps");
   function paint() {
     const kit = isKit(w);
-    $("cbl-title").textContent = kit ? "Cable not these colors?" : "Your cable";
-    $("cbl-now").innerHTML = kit ? "" : KIT.map((k, i) => `<span>${sw(k)}→${sw(w[i])}<b>${label(w[i])}</b></span>`).join("");
-    map.querySelectorAll<HTMLElement>(".cbl-pick").forEach((p) => {
-      const c = w[+p.dataset.i!], own = c.startsWith("#");
-      p.querySelectorAll<HTMLElement>("button").forEach((b) => {
-        const on = b.dataset.c === c;
-        b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on));
-      });
-      const l = p.querySelector<HTMLElement>(".cbl-own")!;        // the picker: rainbow, or the color picked
-      l.classList.toggle("on", own); l.style.background = own ? c : "";
-      if (own) l.querySelector("input")!.value = c;
-    });
-    $("cbl-same").hidden = new Set(w).size === 4;
     list.innerHTML = stepsFor(w).map((s, i) => `
       <li class="card asm-step" id="step-${i + 1}">
         <div class="asm-copy">
           <div class="asm-head"><span class="num">${i + 1}</span><h3>${s.t}</h3>${NO_3D.includes(RAW[i].t) ? "" : `<a class="asm-3d" href="/assemble/3d${location.search}#${i + 1}">See it in 3D →</a>`}</div>
           <p>${s.p}</p>
           ${s.art ? `<div class="asm-art recess">${s.art}</div>` : ""}
-          ${i < WIRE_STEPS ? key() : ""}
           ${s.tip ? `<p class="note">${s.tip}</p>` : ""}
           ${s.warn ? `<p class="note bad">${s.warn}</p>` : ""}
           ${s.end || ""}
@@ -256,29 +221,9 @@ export function assemble(main: HTMLElement) {
   }
   paint();
 
-  let c3d: import("../ui/cable3d").Cable3D | null = null;
-  open.addEventListener("click", () => {
-    map.hidden = false; open.hidden = true;
-    if (!c3d) import("../ui/cable3d").then(async ({ mountCable3D }) => { c3d = await mountCable3D($("cbl-3d"), w.map(hex)); })
-      .catch((err) => { console.error("cable 3D:", err); $("cbl-3d").hidden = true; });
-  });
-  const set = (nw: string[]) => { w = nw; setWires(w); c3d?.setColors(w.map(hex)); paint(); };
-  map.addEventListener("click", (e) => {
-    const b = (e.target as HTMLElement).closest<HTMLElement>("[data-c]");
-    if (!b) return;
-    const i = +b.closest<HTMLElement>(".cbl-pick")!.dataset.i!;
-    set(w.map((c, j) => j === i ? b.dataset.c! : c));
-  });
-  map.addEventListener("change", (e) => {   // the picker: once it's closed
-    const inp = e.target as HTMLInputElement;
-    if (inp.type !== "color") return;
-    const i = +inp.closest<HTMLElement>(".cbl-pick")!.dataset.i!;
-    set(w.map((c, j) => j === i ? inp.value.toLowerCase() : c));
-  });
-  $("cbl-kit").addEventListener("click", () => set([...KIT]));
-  $("cbl-done").addEventListener("click", () => { map.hidden = true; open.hidden = false; c3d?.destroy(); c3d = null; $("cbl-3d").innerHTML = ""; });
+  mountCableBox(main, (nw) => { w = nw; paint(); });
 
-  const big = main.querySelector<HTMLDialogElement>(".asm-big")!, bigImg = big.querySelector("img")!;
+  const big = main.querySelector<HTMLDialogElement>(":scope > section > .asm-big")!, bigImg = big.querySelector("img")!;
   main.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-ph]");
     if (b) { bigImg.src = `${IMG}p/${b.dataset.ph}.webp`; big.showModal(); }
