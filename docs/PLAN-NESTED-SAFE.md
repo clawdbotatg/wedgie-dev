@@ -30,7 +30,7 @@ only path without firmware work. It's a normal Safe tx on the owner Safe: the we
 
 Steps 1–4 are built. The `approveHash` descriptor is written (clear-descriptors
 `registry/safe/calldata-AnySafe.json`, bound to the any-contract stand-in; screens on wedgie.dev/clear). Wedgies get it
-with the next Safe Signer release. Next: 5 and 6.
+with the next Safe Signer release. Step 5 is built (`signThrough`; `tools/safeprobe.mjs` 4b runs it on a fork). Next: 6.
 
 ## Found in review (10-30)
 

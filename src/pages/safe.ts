@@ -321,18 +321,20 @@ function rolesLimit(d: string, sym: string, dec: number): Limit | null {
 }
 /** Which owners are Safes themselves (VERSION() and getThreshold() answer): their version, and whether it's an Instant
  *  Wallet (1.5 with one of Instant Wallet's recovery modules). Such an owner signs by approveHash on chain. */
-type OwnerSafe = { version: string; iw: boolean };
+type OwnerSafe = { version: string; iw: boolean; owners: string[]; threshold: number; nonce: number };
 async function readOwnerSafes(c: number, owners: string[]): Promise<Record<string, OwnerSafe>> {
   const calls = owners.flatMap((o) => [E.selector("VERSION()"), E.selector("getThreshold()"),
-    E.call("getModulesPaginated(address,uint256)", [E.aword(E.SENTINEL), E.word(20)])].map((data) => ({ to: o, allowFailure: true, data })));
+    E.call("getModulesPaginated(address,uint256)", [E.aword(E.SENTINEL), E.word(20)]), E.selector("getOwners()"), E.selector("nonce()")]
+    .map((data) => ({ to: o, allowFailure: true, data })));
   const got = E.unaggregate(await view(c, E.MULTICALL3, E.aggregate3(calls))), out: Record<string, OwnerSafe> = {};
   for (const [k, o] of owners.entries()) {
-    const [v, th, mods] = got.slice(k * 3, k * 3 + 3);
-    if (!v.ok || v.data.length < 194 || !th.ok || th.data.length < 66) continue;      // no code (a wallet), or not a Safe
+    const [v, th, mods, os, n] = got.slice(k * 5, k * 5 + 5);
+    if (!v.ok || v.data.length < 194 || !th.ok || th.data.length < 66 || !os.ok || os.data.length < 130 || !n.ok) continue;   // a wallet, or not a Safe
     const version = str(v.data);
     if (!/^\d+\.\d+/.test(version)) continue;
     const ms = mods.ok && mods.data.length >= 194 ? arrAt(mods.data, 0) : [];
-    out[o.toLowerCase()] = { version, iw: version.startsWith("1.5") && ms.some((m) => RECOVERY_DAYS[m.toLowerCase()] !== undefined) };
+    out[o.toLowerCase()] = { version, iw: version.startsWith("1.5") && ms.some((m) => RECOVERY_DAYS[m.toLowerCase()] !== undefined),
+      owners: E.addrs(os.data), threshold: Number(BigInt(th.data)), nonce: Number(BigInt(n.data)) };
   }
   return out;
 }
@@ -517,6 +519,8 @@ export function safe(main: HTMLElement) {
   /** The wedgie's owner slots on this Safe: one, or Instant Wallet's two (one press signs for both). */
   const ownedBy = () => (info ? info.owners.filter(mine) : []);
   const wedgieOwns = () => ownedBy().length > 0;
+  /** Owner Safes the wedgie owns: it signs here through them (approveHash). */
+  const viaSafes = () => Object.entries(ownerSafes).filter(([, os]) => os.owners.some(mine)).map(([a]) => a);
   /** Instant Wallet's Safe: the wedgie is an owner through one of IW's two signer addresses. */
   const isIW = (owners: string[]) => signers.slice(1).some((s) => owners.some((o) => eqA(o, s)));
   const iwMark = `<img class="iw-mark" src="/img/instantwallet.png" alt="Instant Wallet" title="Instant Wallet">`;
@@ -1142,7 +1146,7 @@ export function safe(main: HTMLElement) {
     // no number till the dollars are known (a coin amount first, then dollars, is a jump); no price at all: the coin
     const worthOf = !i || (!assets && !assetsErr) ? "" : $t !== null ? usd($t) : `${E.fmt(i.balance, 18, 4)} ${nat(chain)}`;
     const who = !i ? "" : `${i.threshold} of ${plural(i.owners.length, "owner")}`
-      + (signer ? wedgieOwns() ? " · your wedgie is one" : " · your wedgie isn't one" : "");
+      + (signer ? wedgieOwns() ? " · your wedgie is one" : viaSafes().length ? ` · your wedgie, through ${short(viaSafes()[0])}` : " · your wedgie isn't one" : "");
     let h = `<div class="sx-hero-top">${sub === "settings" ? `<a class="sx-back" data-nav href="${home}">← Back</a>` : `<a class="sx-back" data-nav href="/safe">← Safes</a>`}
       ${sub === "home" ? `<a class="sx-gear" id="a-settings" data-nav href="${home}/settings">${i ? `<span class="sx-faces">${i.owners.map((o) => face(o, chain)).join("")}</span>` : ""}Settings</a>` : ""}</div>
       <div class="sx-hero-id">${address(safeAddr, { size: "lg", long: true, chain })}${g !== null ? `<span class="sx-grand"><b>${esc(usd(g))}</b> on all chains</span>` : ""}</div>
@@ -1256,7 +1260,7 @@ export function safe(main: HTMLElement) {
       loadAssets(c, a, i).catch(() => { if (c === chain && a === safeAddr) { assetsErr = true; paintSpin(); } });
       loadActivity(c, a, { bg, fresh });
       readAddons(c, a).then((x) => { if (c === chain && a === safeAddr) { addons = x; paintSafe(); paintAddons(); paintGuard(); } }, () => {});
-      readOwnerSafes(c, i.owners).then((x) => { if (c === chain && a === safeAddr) { ownerSafes = x; paintOwners(); } }, () => {});
+      readOwnerSafes(c, i.owners).then((x) => { if (c === chain && a === safeAddr) { ownerSafes = x; paintAll(); } }, () => {});
       const q = await readQueue(c, a, i.nonce, { bg, fresh });
       await addApprovals(c, a, i.owners, q).catch(() => {});
       if (c !== chain || a !== safeAddr) return;
@@ -1471,8 +1475,8 @@ export function safe(main: HTMLElement) {
   }
 
   /** A transaction and its signatures, everywhere the queue lives. Fine as long as one place took it. */
-  async function share(t: E.SafeTx, sigs: { owner: string; signature: string }[], known?: any) {
-    const c = chain, a = safeAddr, h = E.safeTxHash(c, a, t);
+  async function share(t: E.SafeTx, sigs: { owner: string; signature: string }[], known?: any, a = safeAddr) {
+    const c = chain, h = E.safeTxHash(c, a, t);
     // the signatures already known (from either place) go along, so each place ends up with all of them
     const all = [...(known?.confirmations || []).filter((x: any) => x.signature), ...sigs]
       .filter((s, k, l) => l.findIndex((x) => eqA(x.owner, s.owner)) === k);
@@ -1503,7 +1507,7 @@ export function safe(main: HTMLElement) {
   // ---- add the wedgie as an owner, from a browser wallet that already is one ----
   function paintAdd() {
     const box = $("s-add");
-    box.hidden = !(safeAddr && info && signer && !wedgieOwns());
+    box.hidden = !(safeAddr && info && signer && !wedgieOwns() && !viaSafes().length);
     if (box.hidden) return;
     const i = info!, n = i.owners.length;
     box.innerHTML = `<p><b>Add your wedgie as an owner</b></p>
@@ -1671,6 +1675,8 @@ export function safe(main: HTMLElement) {
         if (ownedBy().every((o) => signed(t, o))) marks.push("wedgie ✓");
         else { btns.push(`<button class="btn btn-sm${green ? " btn-green" : ""}" data-sign="${k}"${dis()}>Sign with wedgie</button>`); green = false; }
       }
+      for (const A of viaSafes())      // an owner Safe the wedgie owns: it signs through it (approveHash)
+        if (!signed(t, A)) { btns.push(`<button class="btn btn-sm${green ? " btn-green" : ""}" data-via="${k}:${A}"${dis()}>Sign with wedgie via ${short(A)}</button>`); green = false; }
       if (account && isOwner(account)) signed(t, account) ? marks.push("wallet ✓")
         : n < need && (btns.push(`<button class="btn btn-sm${green ? " btn-green" : ""}" data-wsign="${k}"${dis()}>Sign with wallet</button>`), green = false);
       // Execute's green is the bottom bar's (one green on the page): here it's white
@@ -1706,6 +1712,7 @@ export function safe(main: HTMLElement) {
       try { await executeAll(run); } finally { running = null; runningAll = []; }
     }));
     box.querySelectorAll<HTMLButtonElement>("[data-sign]").forEach((b) => b.onclick = () => job(() => signQueued(queue[+b.dataset.sign!], "wedgie")));
+    box.querySelectorAll<HTMLButtonElement>("[data-via]").forEach((b) => b.onclick = () => { const [k, A] = b.dataset.via!.split(":"); job(() => signThrough(queue[+k], A)); });
     box.querySelectorAll<HTMLButtonElement>("[data-wsign]").forEach((b) => b.onclick = () => job(() => signQueued(queue[+b.dataset.wsign!], "wallet")));
     box.querySelectorAll<HTMLButtonElement>("[data-exec]").forEach((b) => b.onclick = () => job(async () => { running = queue[+b.dataset.exec!]; paintDock(); try { await execute(running); } finally { running = null; } }));
     box.querySelectorAll<HTMLButtonElement>("[data-reject]").forEach((b) => b.onclick = () => {
@@ -1898,12 +1905,12 @@ export function safe(main: HTMLElement) {
    * The wedgie signs t; the page checks it signed the same hash, and that its signer contract can be checked on chain.
    * One signature per owner slot it has here: Instant Wallet's two slots take the same press.
    */
-  async function wedgieSig(t: E.SafeTx) {
+  async function wedgieSig(t: E.SafeTx, at = safeAddr, owners = info ? info.owners : []) {     // at: another Safe (an owner Safe)
     if (!wedgie || !key) throw new Error(noWedgie());
-    const slots = ownedBy();
+    const slots = owners.filter(mine);
     if (!slots.length) throw new Error("Your wedgie isn't an owner of this Safe.");
     for (const a of slots) if (!(await hasCode(chain, a))) { deployed[chain] = false; throw new Error(`The wedgie's signer contract isn't on ${CHAINS[chain].name} yet: Deploy it (above) first. Safe checks its signatures through it.`); }
-    const tx = { chainId: chain, safe: safeAddr, to: t.to, value: String(t.value), data: t.data || "0x", operation: +t.operation,
+    const tx = { chainId: chain, safe: at, to: t.to, value: String(t.value), data: t.data || "0x", operation: +t.operation,
       safeTxGas: String(t.safeTxGas), baseGas: String(t.baseGas), gasPrice: String(t.gasPrice), gasToken: t.gasToken || Z,
       refundReceiver: t.refundReceiver || Z, nonce: +t.nonce };      // only the fields: the wedgie reads one line of at most 6 KB
     asking = true; paintAll();
@@ -1915,7 +1922,7 @@ export function safe(main: HTMLElement) {
         hello: { safe_chunk: chunk, safe_clear: clearTag, safe_sim: simOk ? "p256" : undefined, safe_review: reviewRound } }));
       if (g.type === "refused") throw new Error("The wedgie said no.");
       if (g.type !== "safe_sig") throw new Error(g.error || "The wedgie didn't sign.");
-      if (g.safeTxHash !== E.safeTxHash(chain, safeAddr, t)) throw new Error("The wedgie signed a different hash: not sent.");
+      if (g.safeTxHash !== E.safeTxHash(chain, at, t)) throw new Error("The wedgie signed a different hash: not sent.");
       return slots.map((a) => ({ owner: a, signature: E.safeSignature(a, g as E.WedgieSig) }));
     } finally { asking = false; close(); }
   }
@@ -1953,6 +1960,30 @@ export function safe(main: HTMLElement) {
     toQueue();
     const u = queue.find((x) => x.safeTxHash === t.safeTxHash);
     say(u && (u.confirmations || []).length >= (u.confirmationsRequired ?? info!.threshold) ? "Signed. That's enough: press Execute." : "Signed. Execute it here: Safe{Wallet} can't yet.");
+  }
+
+  /**
+   * The wedgie signs t for this Safe through owner Safe A (the wedgie owns A): a tx on A, approveHash(t's hash) here.
+   * A needs only the wedgie and it's A's next: it runs now (a browser wallet pays). Else it waits in A's queue.
+   */
+  async function signThrough(t: any, A: string) {
+    const c = chain, b = safeAddr, os = ownerSafes[A.toLowerCase()], h = String(t.safeTxHash);
+    if (E.safeTxHash(c, b, txOf(t)).toLowerCase() !== h.toLowerCase()) throw new Error("The queue has a different hash for this one: not sent.");
+    const note = queueNote, q = await readQueue(c, A, os.nonce);      // A's own queue: its next free number, or this approval already in it
+    queueNote = note;
+    const data = E.approveHashData(h).toLowerCase(), known = q.find((x) => eqA(x.to, b) && String(x.data || "").toLowerCase() === data);
+    const at = known ? txOf(known) : safeTx(b, "0", E.approveHashData(h), Math.max(os.nonce, ...q.map((x) => +x.nonce + 1)));
+    const sigs = await wedgieSig(at, A, os.owners);
+    const all = [...(known?.confirmations || []).filter((x: any) => x.signature && !sigs.some((s) => eqA(s.owner, x.owner))), ...sigs];
+    if (all.length >= os.threshold && +at.nonce === os.nonce) {
+      say(`Approving #${t.nonce} through ${short(A)}: your wallet sends it (it pays the gas).`);
+      await send(c, A, E.execData(at, E.packSignatures(all)), say);
+      await load(true);
+      toQueue();
+      return say(`Approved through ${short(A)}.`);
+    }
+    await share(at, sigs, known, A);
+    say(`In ${short(A)}'s queue: ${plural(Math.max(0, os.threshold - all.length), "more owner")} to sign there, then Execute. Then it counts here.`);
   }
 
   /** After nonce n ran: the RPC and Safe's API catch up seconds later, so read again until both have moved on. */

@@ -12,7 +12,7 @@
 //      Then Safe's service, Instant Wallet AND /api/rpc down (reads through the wallet): the wedgie signs, Copy link, this browser's copy wiped (nothing
 //      waiting), the link opened: back in the queue, its signature checked on chain; the wallet signs; Execute
 //   4. back to the list: the Safe is the wedgie's now. Make a new Safe: wallet + wedgie, 2 of 2, one
-//      transaction, then its page; the list has both
+//      transaction, then its page; the list has both. 4b: a Safe owned by the wedgie's Safe: sign through it
 // (Safe's real API: tools/safelive.mjs.) Needs anvil and Node 23+.
 // Serve dist first (npm run build && npx vite preview --port 4173), then (ALCHEMY_API_KEY from .env): node tools/safeprobe.mjs [url] [outdir]
 import { chromium } from "playwright-core";
@@ -421,6 +421,34 @@ await page.goBack();
 await wait((a) => [...document.querySelectorAll("#s-list .safe-row")].filter((r) => a.some((x) => r.getAttribute("href").endsWith(x))).length === 2, [mine, made], 30000, "the list has both (Back button)");
 check(true, "Back: the list has both Safes (the new one before Safe's API has it)");
 check(onWedgie.includes(`8453:${made.toLowerCase()}`) && onWedgie.includes(`8453:${mine.toLowerCase()}`), "the wedgie was told (safe_note): its own list has the new Safe and the one it joined");
+
+// 4b: a Safe that owns a Safe (docs/PLAN-NESTED-SAFE.md): B = the wedgie's Safe A (1 of 1) + the wallet, 2 of 2. The
+// wallet's tx waits in B's queue; "Sign with wedgie via A": the wedgie signs A's approveHash, the wallet runs it, B counts it
+const setupB = E.call("setup(address[],uint256,address,bytes,address,address,uint256,address)",
+  [E.dynAddrs([hidden, me]), E.word(2), Z32, E.dynBytes("0x"), E.aword(E.FALLBACK_HANDLER), Z32, Z32, Z32]);
+const hB = await rpc("eth_sendTransaction", [{ from: me, to: E.SAFE_FACTORY, data: E.call("createProxyWithNonce(address,bytes,uint256)", [E.aword(E.SAFE_L2), E.dynBytes(setupB), E.word(9)]) }]);
+let rcB = null;
+while (!rcB) rcB = await rpc("eth_getTransactionReceipt", [hB]);
+const nest = E.checksum("0x" + rcB.logs.find((l) => l.topics[0] === E.PROXY_CREATION).topics[1].slice(26));
+await rpc("anvil_setBalance", [nest, "0xde0b6b3a7640000"]);
+const toNest = E.checksum(E.hex(crypto.randomBytes(20)));
+const tN = { to: toNest, value: "5000000000000000", data: "0x", operation: 0, safeTxGas: "0", baseGas: "0", gasPrice: "0", gasToken: E.checksum("0x" + "0".repeat(40)), refundReceiver: E.checksum("0x" + "0".repeat(40)), nonce: "0" };
+const hN = E.safeTxHash(8453, nest, tN);
+txs.set(hN, { ...tN, safe: nest, safeTxHash: hN, confirmations: [{ owner: E.checksum(me), signature: E.ecdsa(await rpc("eth_signTypedData_v4", [me, JSON.stringify(E.typedData(8453, nest, tN))])) }] });
+await page.goto(`${base}/safe/base:${nest}`);
+await wait(() => document.querySelector("[data-via]"), null, 30000, "nested: the Sign with wedgie via A button");
+check(/via 0x/i.test(await page.textContent("[data-via]")) && /1 of 2/.test(await page.textContent("#s-queue")) && await page.isHidden("#s-add"), "nested: B's tx, 1 of 2, a button to sign through Safe A (no Add your wedgie)");
+await connectWallet();
+await page.click("[data-via]");
+await says(/Approved through/, "nested: approved through A");
+check(await num(hidden, "nonce()") === 1, "on chain: A ran its approveHash");
+await wait(() => /2 of 2/.test(document.querySelector("#s-queue").textContent) && document.querySelector("[data-exec]"), null, 30000, "nested: B counts A's approval");
+await page.click("[data-exec]");
+await says(/Done: it ran/, "nested: B ran");
+check(BigInt(await rpc("eth_getBalance", [toNest, "latest"])) === 5n * 10n ** 15n, "on chain: B sent 0.005 ETH on the wallet + A's on-chain approval");
+await page.goto(`${base}/safe`);
+await wait((a) => [...document.querySelectorAll("#s-list .safe-row")].filter((r) => a.some((x) => r.getAttribute("href").endsWith(x))).length === 2, [mine, made], 30000, "back on the list");
+await connectWallet();
 
 // 5: Disconnect: the wallet is gone, and stays gone after a reload
 await page.click("#w-off");
