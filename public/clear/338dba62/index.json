@@ -1,0 +1,16 @@
+{
+ "tag": "338dba62",
+ "registry": "171b6b5bf137e2433a4bde35cffd64d4d7fe25bd",
+ "issued": 1793407311,
+ "roots": {
+  "a": "f0c3044a680e1c73e795eb8bd3a213ace3b9ee90c0c573cbfcedacbcc4fe64ab",
+  "b": "0adb2daa9f4028056e21da1210072dc342cbc2f211eb4dc4d41f0c84e940c751"
+ },
+ "audited": 1535,
+ "notAudited": 6487,
+ "tokens": 2482,
+ "auditors": [
+  "Cyfrin"
+ ],
+ "clearMax": 10000
+}

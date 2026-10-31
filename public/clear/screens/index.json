@@ -848,25 +848,23 @@
  {
   "slug": "candide-7d",
   "title": "Candide recovery, 7 days (Candide's module)",
-  "note": "Candide's social recovery module: add or remove a recovery helper, cancel a recovery, and what helpers send. Our descriptors, for a registry PR (not open yet). On wedgies with Safe Signer safe-49. Cases marked synthetic are built by hand, not mined.",
+  "note": "Candide's social recovery module: add or remove a recovery guardian, cancel a recovery, and what guardians send. Our descriptors, for a registry PR (not open yet). On wedgies with Safe Signer safe-50. Cases marked synthetic are built by hand, not mined.",
   "cases": [
    {
-    "name": "Add helper (a Safe's call, from tx 0x0a760b4c)",
+    "name": "Add guardian (a Safe's call, from tx 0x0a760b4c)",
     "chainId": 1,
     "to": "0x088f6cfd8bb1ddb1bb069ccb3fc1a98927d233f2",
     "pages": [
      "screens/candide-7d/01-1.png",
-     "screens/candide-7d/01-2.png",
-     "screens/candide-7d/01-3.png"
+     "screens/candide-7d/01-2.png"
     ]
    },
    {
-    "name": "Remove helper (a Safe's call, from tx 0xb4601241)",
+    "name": "Remove guardian (a Safe's call, from tx 0xb4601241)",
     "chainId": 8453,
     "to": "0x088f6cfd8bb1ddb1bb069ccb3fc1a98927d233f2",
     "pages": [
-     "screens/candide-7d/02-1.png",
-     "screens/candide-7d/02-2.png"
+     "screens/candide-7d/02-1.png"
     ]
    },
    {
@@ -878,7 +876,7 @@
     ]
    },
    {
-    "name": "Change helpers needed to 2 (synthetic)",
+    "name": "Change guardians needed to 2 (synthetic)",
     "chainId": 8453,
     "to": "0x088f6cfd8bb1ddb1bb069ccb3fc1a98927d233f2",
     "pages": [
@@ -886,7 +884,7 @@
     ]
    },
    {
-    "name": "Void helper votes (synthetic)",
+    "name": "Void guardian votes (synthetic)",
     "chainId": 8453,
     "to": "0x088f6cfd8bb1ddb1bb069ccb3fc1a98927d233f2",
     "pages": [
@@ -894,7 +892,7 @@
     ]
    },
    {
-    "name": "Submit helper votes and start the wait (tx 0xb7af8ecd)",
+    "name": "Submit guardian votes and start the wait (tx 0xb7af8ecd)",
     "chainId": 1,
     "to": "0x088f6cfd8bb1ddb1bb069ccb3fc1a98927d233f2",
     "pages": [
@@ -909,12 +907,11 @@
     "chainId": 1,
     "to": "0x088f6cfd8bb1ddb1bb069ccb3fc1a98927d233f2",
     "pages": [
-     "screens/candide-7d/07-1.png",
-     "screens/candide-7d/07-2.png"
+     "screens/candide-7d/07-1.png"
     ]
    },
    {
-    "name": "One helper votes, no start (synthetic, votes of tx 0xb7af8ecd)",
+    "name": "One guardian votes, no start (synthetic, votes of tx 0xb7af8ecd)",
     "chainId": 1,
     "to": "0x088f6cfd8bb1ddb1bb069ccb3fc1a98927d233f2",
     "pages": [
@@ -938,25 +935,23 @@
  {
   "slug": "candide-14d",
   "title": "Candide recovery, 14 days (our deployment, same code)",
-  "note": "Candide's social recovery module: add or remove a recovery helper, cancel a recovery, and what helpers send. Our descriptors, for a registry PR (not open yet). On wedgies with Safe Signer safe-49. Cases marked synthetic are built by hand, not mined.",
+  "note": "Candide's social recovery module: add or remove a recovery guardian, cancel a recovery, and what guardians send. Our descriptors, for a registry PR (not open yet). On wedgies with Safe Signer safe-50. Cases marked synthetic are built by hand, not mined.",
   "cases": [
    {
-    "name": "Add helper (a Safe's call, from tx 0x0e2a123b)",
+    "name": "Add guardian (a Safe's call, from tx 0x0e2a123b)",
     "chainId": 8453,
     "to": "0x9bacd92f4687db306d7ded5d4513a51ea05df25b",
     "pages": [
      "screens/candide-14d/01-1.png",
-     "screens/candide-14d/01-2.png",
-     "screens/candide-14d/01-3.png"
+     "screens/candide-14d/01-2.png"
     ]
    },
    {
-    "name": "Remove helper (a Safe's call, from tx 0xb4601241) (calldata from the 7-day module; synthetic)",
+    "name": "Remove guardian (a Safe's call, from tx 0xb4601241) (calldata from the 7-day module; synthetic)",
     "chainId": 8453,
     "to": "0x9bacd92f4687db306d7ded5d4513a51ea05df25b",
     "pages": [
-     "screens/candide-14d/02-1.png",
-     "screens/candide-14d/02-2.png"
+     "screens/candide-14d/02-1.png"
     ]
    },
    {
@@ -968,7 +963,7 @@
     ]
    },
    {
-    "name": "Change helpers needed to 2 (synthetic)",
+    "name": "Change guardians needed to 2 (synthetic)",
     "chainId": 8453,
     "to": "0x9bacd92f4687db306d7ded5d4513a51ea05df25b",
     "pages": [
@@ -976,7 +971,7 @@
     ]
    },
    {
-    "name": "Void helper votes (synthetic)",
+    "name": "Void guardian votes (synthetic)",
     "chainId": 8453,
     "to": "0x9bacd92f4687db306d7ded5d4513a51ea05df25b",
     "pages": [
@@ -984,7 +979,7 @@
     ]
    },
    {
-    "name": "Submit helper votes and start the wait (calldata from the 7-day module; synthetic)",
+    "name": "Submit guardian votes and start the wait (calldata from the 7-day module; synthetic)",
     "chainId": 1,
     "to": "0x9bacd92f4687db306d7ded5d4513a51ea05df25b",
     "pages": [
@@ -999,12 +994,11 @@
     "chainId": 1,
     "to": "0x9bacd92f4687db306d7ded5d4513a51ea05df25b",
     "pages": [
-     "screens/candide-14d/07-1.png",
-     "screens/candide-14d/07-2.png"
+     "screens/candide-14d/07-1.png"
     ]
    },
    {
-    "name": "One helper votes, no start (synthetic, votes of tx 0xb7af8ecd)",
+    "name": "One guardian votes, no start (synthetic, votes of tx 0xb7af8ecd)",
     "chainId": 1,
     "to": "0x9bacd92f4687db306d7ded5d4513a51ea05df25b",
     "pages": [
@@ -1028,25 +1022,23 @@
  {
   "slug": "candide-60d",
   "title": "Candide recovery, 60 days (our deployment, same code)",
-  "note": "Candide's social recovery module: add or remove a recovery helper, cancel a recovery, and what helpers send. Our descriptors, for a registry PR (not open yet). On wedgies with Safe Signer safe-49. Cases marked synthetic are built by hand, not mined.",
+  "note": "Candide's social recovery module: add or remove a recovery guardian, cancel a recovery, and what guardians send. Our descriptors, for a registry PR (not open yet). On wedgies with Safe Signer safe-50. Cases marked synthetic are built by hand, not mined.",
   "cases": [
    {
-    "name": "Add helper (a Safe's call, from tx 0xb4601241)",
+    "name": "Add guardian (a Safe's call, from tx 0xb4601241)",
     "chainId": 8453,
     "to": "0x6aa9a8ad0582db61a97a6e30eba22ba143d1e960",
     "pages": [
      "screens/candide-60d/01-1.png",
-     "screens/candide-60d/01-2.png",
-     "screens/candide-60d/01-3.png"
+     "screens/candide-60d/01-2.png"
     ]
    },
    {
-    "name": "Remove helper (a Safe's call, from tx 0xb4601241) (calldata from the 7-day module; synthetic)",
+    "name": "Remove guardian (a Safe's call, from tx 0xb4601241) (calldata from the 7-day module; synthetic)",
     "chainId": 8453,
     "to": "0x6aa9a8ad0582db61a97a6e30eba22ba143d1e960",
     "pages": [
-     "screens/candide-60d/02-1.png",
-     "screens/candide-60d/02-2.png"
+     "screens/candide-60d/02-1.png"
     ]
    },
    {
@@ -1058,7 +1050,7 @@
     ]
    },
    {
-    "name": "Change helpers needed to 2 (synthetic)",
+    "name": "Change guardians needed to 2 (synthetic)",
     "chainId": 8453,
     "to": "0x6aa9a8ad0582db61a97a6e30eba22ba143d1e960",
     "pages": [
@@ -1066,7 +1058,7 @@
     ]
    },
    {
-    "name": "Void helper votes (synthetic)",
+    "name": "Void guardian votes (synthetic)",
     "chainId": 8453,
     "to": "0x6aa9a8ad0582db61a97a6e30eba22ba143d1e960",
     "pages": [
@@ -1074,7 +1066,7 @@
     ]
    },
    {
-    "name": "Submit helper votes and start the wait (calldata from the 7-day module; synthetic)",
+    "name": "Submit guardian votes and start the wait (calldata from the 7-day module; synthetic)",
     "chainId": 1,
     "to": "0x6aa9a8ad0582db61a97a6e30eba22ba143d1e960",
     "pages": [
@@ -1089,12 +1081,11 @@
     "chainId": 1,
     "to": "0x6aa9a8ad0582db61a97a6e30eba22ba143d1e960",
     "pages": [
-     "screens/candide-60d/07-1.png",
-     "screens/candide-60d/07-2.png"
+     "screens/candide-60d/07-1.png"
     ]
    },
    {
-    "name": "One helper votes, no start (synthetic, votes of tx 0xb7af8ecd)",
+    "name": "One guardian votes, no start (synthetic, votes of tx 0xb7af8ecd)",
     "chainId": 1,
     "to": "0x6aa9a8ad0582db61a97a6e30eba22ba143d1e960",
     "pages": [
