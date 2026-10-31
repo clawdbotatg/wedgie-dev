@@ -43,7 +43,7 @@ import save
 import ui
 from ui import WHITE, INK, MUTED, GREY, GREEN_D, RED
 
-FW = "safe-46"         # and "version" in wedgie.json: the site shows it (v45)
+FW = "safe-49"         # and "version" in wedgie.json: the site shows it (v49)
 RP_ID = b"wedgie.dev"
 FIELDS = '"origin":"https://wedgie.dev"'
 ASK_MS = 120000
@@ -302,7 +302,8 @@ def parse(t):
     """The fields, checked and normalized. Raises ValueError on anything off. data "@" = the pieces sent ahead.
     A clear-signing bundle sent ahead comes along as tx["clear"] (and is used up)."""
     global pieces, have, room, clear, clear_have
-    room = None
+    if t.get("data") == "@":            # only the join needs room. Freed for every tx, a small one's screens took
+        room = None                     # the block, and on a broken-up heap _keep found none (safe-49, safechip --frag)
     # used up first, whatever happens: a join that ran out of memory left them for the next tx, which failed too
     parts, n, clear, clear_have = clear, clear_have, [], 0
     cb = (parts if n == len(parts) else None) if isinstance(parts, memoryview) else _join(parts) if parts else None
