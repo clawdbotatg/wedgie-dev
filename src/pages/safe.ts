@@ -1867,8 +1867,8 @@ export function safe(main: HTMLElement) {
         const s = describe(t, { ...ctx(), past: true }, t.dataDecoded?.method), failed = t.isSuccessful === false;
         const calls = t.to ? callsOf(t, s) : [];
         const lines = intent(s, calls, chain, safeAddr!, CHAINS[chain].usdc, paintActivity);
-        // one line: its mark is the tile; more: each line its own mark
-        const head = !lines ? null : lines.length === 1 ? lines[0].text : lines.map((l) => mark(l.src) + l.text).join(" · ");
+        // one step: its mark is the tile; more: each step its own mark, on its own line
+        const head = !lines ? null : lines.length === 1 ? lines[0].text : lines.map((l) => mark(l.src) + l.text).join("<br>"); // one step per line (Austin, 10-31)
         const ic = lines?.length === 1 ? MARKS[lines[0].src][0] : lines ? ICON.batch : tile(s);
         const m = !failed && t.transactionHash ? movesOf(chain, t, calls) : null;
         const coins = m && (m.pay.length || m.get.length) ? `<span class="sx-mv${head ? "" : " sx-mv-big"}">${coinLine(m.pay, false)}${coinLine(m.get, true)}</span>` : "";
