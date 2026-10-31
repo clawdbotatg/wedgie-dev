@@ -18,7 +18,7 @@ Repaint ONLY the colored plastic insulation of those four wires with flat, pure 
 - the YELLOW wire -> pure green #00FF00
 - the BLACK wire -> pure cyan #00FFFF
 - the RED wire -> pure blue #0000FF
-Keep the wires' exact shape, path and width. Do not recolor the bare copper tips, the white plastic plug, connectors, sockets, tape, boards, tools or background. Everything else must stay exactly the same, pixel for pixel, same framing, same size."""
+The cable has exactly four wires: never add, split or duplicate one; each key color appears on exactly one wire. Keep the wires' exact shape, path and width. Do not recolor the bare copper tips, the white plastic plug, connectors, sockets, tape, boards, tools or background. Everything else must stay exactly the same, pixel for pixel, same framing, same size."""
 
 
 def key(d):
@@ -55,7 +55,13 @@ def split(d, src=None):
         lab, n = ndimage.label(raw[..., k] > (0.7 if strict else 0.45))
         sizes = ndimage.sum(np.ones_like(lab), lab, range(1, n + 1))
         core = np.isin(lab, 1 + np.flatnonzero(sizes > (150 if strict else 25)))
-        a[..., k] = raw[..., k] * ndimage.binary_dilation(core, iterations=3)
+        weak, m = ndimage.label(raw[..., k] > 0.15)                      # paler bits of it (highlights, thin ends) touching a run
+        ids = np.unique(weak[core & (weak > 0)])
+        wsz = ndimage.sum(np.ones_like(weak), weak, ids) if len(ids) else []
+        csz = ndimage.sum(core, weak, ids) if len(ids) else []
+        ok = [i for i, w_, c_ in zip(ids, wsz, csz) if w_ < 1.6 * c_]      # mostly wire, not a board it touches
+        keep = np.isin(weak, ok) | ndimage.binary_dilation(core, iterations=1)
+        a[..., k] = raw[..., k] * ndimage.binary_dilation(keep, iterations=2)
     which = a.argmax(-1); al = a.max(-1)
     al[al < 0.04] = 0
     K, T = KEYS[which], KIT[which]
