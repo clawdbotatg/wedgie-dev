@@ -204,6 +204,7 @@ export function fakeWedgies(specs) {
         return setTimeout(() => { st.open = p.say !== "no"; push(JSON.stringify({ id, type: st.open ? "open" : "refused" }) + "\r\n"); }, p.ms ?? 300);
       }
       if (msg.type === "net" && msg.rid == null) { st.netAt = st.netAt || Date.now(); return; }    // the page carries its net now
+      if (msg.type === "chip") st.chipAskAt = st.chipAskAt || Date.now();    // the page first asked for the chip
       // chipBusy: its app has the chip until someone carries its net (an app waiting on a fetch, 10-27)
       if (msg.type === "chip" && st.chipBusy && !st.netAt) return push(JSON.stringify({ id, type: "chip", busy: 1, kind: null }) + "\r\n");
       if (msg.type === "chip" && v >= "0.1.4") {

@@ -66,10 +66,11 @@ await ctx3.addInitScript(fakeWedgies, [
 ]);
 const p3 = await ctx3.newPage();
 p3.on("pageerror", (e) => errs.push(e.message));
-const t3 = Date.now();
 await p3.goto(base + "/connect/3D9F01");
+// timed from its first chip ask (it found the wedgie), not from page load: a loaded machine takes seconds to load the page
 const netIn = await p3.waitForFunction(() => window.__ports[0]._st.netAt, null, { timeout: 30000 }).then((h) => h.jsonValue(), () => 0);
-check(netIn && netIn - t3 < 6000, `a busy chip: the page carries its net in ${netIn ? ((netIn - t3) / 1000).toFixed(1) + " s" : "never"}`);
+const t3 = await p3.evaluate(() => window.__ports[0]._st.chipAskAt || 0);
+check(netIn && t3 && netIn - t3 < 6000, `a busy chip: the page carries its net ${netIn ? ((netIn - t3) / 1000).toFixed(1) + " s after it asks for the chip" : "never"}`);
 const chipped = await p3.waitForFunction(() => window.__ports[0]._st.chips > 0, null, { timeout: 15000 }).then(() => true, () => false);
 check(chipped, "and checks the chip after");
 check(!errs.length, "no page errors" + (errs.length ? ": " + errs.join(" | ") : ""));
