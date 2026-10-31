@@ -5,6 +5,8 @@ Push to main = deploy (Vercel). **Ship first, test after** (Austin, 10-27), for 
 push, then in the background `node tools/loadprobe.mjs` (site: every page on a phone, a firmware update from a
 background tab) or `node tools/sign.mjs --gate-only` (firmware/apps). A FAIL means it's live: patch it now.
 
+**Clear signing:** read `../clear-descriptors/MAP.md` first (all the repos, the marks). A call no one can read gets a descriptor, never new code.
+
 ## Docs that must stay true
 
 - `public/skill.md` (the index) + `usb.md`, `build.md`, `safe.md`, `shop.md`, `virtual.md`, `security.md`, `code.md`,
