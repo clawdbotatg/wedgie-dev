@@ -296,6 +296,11 @@ type Addon = { addr: string; kind: "recovery" | "limit" | "roles" | "allowance" 
 type Addons = { mods: Addon[]; guards: string[] };
 const RECOVERY_DAYS: Record<string, number> = { "0x088f6cfd8bb1ddb1bb069ccb3fc1a98927d233f2": 7,
   "0x9bacd92f4687db306d7ded5d4513a51ea05df25b": 14, "0x6aa9a8ad0582db61a97a6e30eba22ba143d1e960": 60 };
+// where each is deployed (verified on Sourcify; clear-descriptors registry/candide)
+const RECOVERY_CHAINS: Record<string, number[]> = {
+  "0x088f6cfd8bb1ddb1bb069ccb3fc1a98927d233f2": [1, 10, 100, 137, 8453, 42161, 42220, 84532, 11155111],
+  "0x9bacd92f4687db306d7ded5d4513a51ea05df25b": [1, 10, 100, 137, 8453, 42161, 42220, 84532, 11155111],
+  "0x6aa9a8ad0582db61a97a6e30eba22ba143d1e960": [1, 10, 100, 8453, 42161, 42220, 43114] };
 const IW_KEYS = { usdc: E.hex(E.keccakText("instant-wallet.burner.usdc")), eth: E.hex(E.keccakText("instant-wallet.burner.eth")) };
 // Safe's storage slots: the guard (checks every transaction), the module guard (Safe 1.5: checks module calls)
 const GUARD_SLOTS = ["guard_manager.guard.address", "module_manager.module_guard.address"].map((k) => E.hex(E.keccakText(k)));
@@ -404,6 +409,7 @@ export function safe(main: HTMLElement) {
     <div class="sx-card" id="s-owners" hidden></div>
     <div class="sx-card" id="s-addons" hidden></div>
     <div class="sx-card" id="s-owner" hidden></div>
+    <div class="sx-card" id="s-guard" hidden></div>
     <div class="sx-card" id="s-chains" hidden></div>
     <p class="safe-msg" id="s-msg" hidden></p>
     <div class="safe-dock" id="s-dock" hidden><div class="safe-dock-row" id="s-dock-tx"></div><div id="s-dock-msg"></div></div>
@@ -675,7 +681,7 @@ export function safe(main: HTMLElement) {
       chain = KEYS[m[1]]; safeAddr = E.checksum(m[2]); info = null; queue = []; recipe = null;
       if (sameAddr) copies[was] = true; else { copies = seenOn(m[2]); worths = {}; looked = false; }
       assets = null; assetsErr = false; activity = null; activityErr = ""; addons = null; ownerSafes = {};
-      $("s-new").innerHTML = ""; $("s-owner").innerHTML = ""; $("s-wc").innerHTML = "";
+      $("s-new").innerHTML = ""; $("s-owner").innerHTML = ""; $("s-guard").innerHTML = ""; $("s-wc").innerHTML = "";
       stale = false; loadView(chain, safeAddr);
       paintAll();
       checkDeployed();
@@ -1245,7 +1251,7 @@ export function safe(main: HTMLElement) {
       if (!quiet) checkCopies(c, a);
       loadAssets(c, a, i).catch(() => { if (c === chain && a === safeAddr) { assetsErr = true; paintSpin(); } });
       loadActivity(c, a, { bg, fresh });
-      readAddons(c, a).then((x) => { if (c === chain && a === safeAddr) { addons = x; paintSafe(); paintAddons(); } }, () => {});
+      readAddons(c, a).then((x) => { if (c === chain && a === safeAddr) { addons = x; paintSafe(); paintAddons(); paintGuard(); } }, () => {});
       readOwnerSafes(c, i.owners).then((x) => { if (c === chain && a === safeAddr) { ownerSafes = x; paintOwners(); } }, () => {});
       const q = await readQueue(c, a, i.nonce, { bg, fresh });
       await addApprovals(c, a, i.owners, q).catch(() => {});
@@ -1551,6 +1557,55 @@ export function safe(main: HTMLElement) {
     await propose(safeTx(safeAddr, "0", E.addOwnerData(E.checksum(a), th)), who, `add owner ${short(a)}, then ${th} of ${info!.owners.length + 1} must sign`);
     ($("ow-addr") as HTMLInputElement).value = "";
     $("ow-addr").dispatchEvent(new Event("input"));
+  }
+
+  // ---- recovery guardians (Candide's module): add, remove; the first one turns recovery on (Austin 10-30). Its own
+  // box, built once per Safe so typing survives repaints. Never while a recovery runs: a guardian change drops it.
+  function paintGuard() {
+    const box = $("s-guard");
+    box.hidden = !(safeAddr && info && addons && can() && sub === "settings");
+    if (box.hidden) return;
+    const recs = addons!.mods.filter((m) => m.kind === "recovery" && m.days);
+    if (!document.getElementById("gd-addr")) {
+      box.innerHTML = `<h3>Recovery guardians</h3>
+        <p class="fine">If you lose your wedgie, enough guardians can make new owners, after a wait. You can cancel it in that time.</p>
+        <ul class="sx-rows" id="gd-list"></ul>
+        <p>${addressInput("gd-addr", "0x… or ENS name")}</p>
+        <p class="sx-row"><select id="gd-mod"></select><button class="btn btn-green sx-end" id="gd-add">Add guardian</button></p>`;
+      $("gd-add").addEventListener("click", () => job(addGuardian));
+    }
+    $("gd-list").innerHTML = recs.map((m) => m.guardians!.map((g) => `<li>${address(g, { chain })}<span class="sx-end fine">${m.days} days</span>`
+      + `<button class="btn btn-sm btn-red" data-gd="${esc(m.addr)}|${esc(g)}"${dis()}>Remove</button></li>`).join("")).join("") || `<li class="fine">No one yet.</li>`;
+    $("gd-list").querySelectorAll<HTMLButtonElement>("[data-gd]").forEach((b) => b.onclick = () => job(() => removeGuardian(...b.dataset.gd!.split("|") as [string, string])));
+    const sel = $("gd-mod") as HTMLSelectElement, keep = sel.value;
+    const on = recs.map((m) => [m.addr, `${m.days} days`]);
+    const off = recs.length ? [] : Object.keys(RECOVERY_DAYS).filter((m) => RECOVERY_CHAINS[m].includes(chain)).map((m) => [m, `${RECOVERY_DAYS[m]} days (turns recovery on)`]);
+    sel.innerHTML = [...on, ...off].map(([v, t]) => `<option value="${esc(v)}"${eqA(v, keep) ? " selected" : ""}>Wait ${t}</option>`).join("");
+    ($("gd-add") as HTMLButtonElement).disabled = !!dis() || !sel.options.length;
+  }
+  async function addGuardian() {
+    const a = addressOf($("gd-addr") as HTMLInputElement), mod = ($("gd-mod") as HTMLSelectElement).value;
+    if (!a) throw new Error("That isn't an address (or an ENS name that has one).");
+    if (!mod) throw new Error("Recovery isn't on this chain yet.");
+    if (isOwner(a) || eqA(a, safeAddr)) throw new Error("An owner can't be a guardian.");
+    const m = addons!.mods.find((x) => x.kind === "recovery" && eqA(x.addr, mod));
+    if (m?.running) throw new Error("A recovery is running. Cancel it or let it finish first.");
+    if (m?.guardians!.some((g) => eqA(g, a))) throw new Error("That's already a guardian.");
+    const add = E.call("addGuardianWithThreshold(address,uint256)", [E.aword(a), E.word(Math.max(1, m?.need || 0))]);
+    await propose(m ? safeTx(mod, "0", add) : { ...safeTx(E.MULTISEND_CALL_ONLY, "0", E.multiSendData([
+      { to: safeAddr, value: 0n, data: E.call("enableModule(address)", [E.aword(mod)]) }, { to: mod, value: 0n, data: add }])), operation: 1 },
+      by(), `${m ? "" : "turn on recovery, "}add guardian ${short(a)}`);
+    ($("gd-addr") as HTMLInputElement).value = "";
+    $("gd-addr").dispatchEvent(new Event("input"));
+  }
+  async function removeGuardian(mod: string, g: string) {
+    const m = addons!.mods.find((x) => x.kind === "recovery" && eqA(x.addr, mod));
+    if (!m) throw new Error("That recovery is off now.");
+    if (m.running) throw new Error("A recovery is running. Cancel it or let it finish first.");
+    const list = m.guardians!, i = list.findIndex((x) => eqA(x, g)), left = list.length - 1;
+    const th = left ? Math.max(1, Math.min(m.need!, left)) : 0;
+    await propose(safeTx(mod, "0", E.call("revokeGuardianWithThreshold(address,address,uint256)",
+      [E.aword(i ? list[i - 1] : E.SENTINEL), E.aword(g), E.word(th)])), by(), `remove guardian ${short(g)}`);
   }
 
   function changeThreshold(th: number) {
@@ -2165,7 +2220,7 @@ export function safe(main: HTMLElement) {
 
   function paintAll() {
     paintWedgie(); paintWallet(); paintList(); paintCreate(); paintSafe(); paintAdd(); paintQueue(); paintApps(); paintAssets(); paintActivity();
-    paintOwners(); paintAddons(); paintOwner(); paintChains(); paintNew(); paintReceive(); paintWc();
+    paintOwners(); paintAddons(); paintOwner(); paintGuard(); paintChains(); paintNew(); paintReceive(); paintWc();
     if (wcLink && safeAddr && info && !busy) { const u = wcLink; wcLink = ""; setTimeout(() => job(() => pairWith(u), false)); }
   }
   // A wc: link pasted anywhere on a Safe's page (not into a box) connects that app: copy it in the app, Cmd+V here.
