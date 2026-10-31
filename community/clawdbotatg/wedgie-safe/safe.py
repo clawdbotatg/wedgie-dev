@@ -43,7 +43,7 @@ import save
 import ui
 from ui import WHITE, INK, MUTED, GREY, GREEN_D, RED
 
-FW = "safe-55"         # and "version" in wedgie.json: the site shows it (v54)
+FW = "safe-56"         # and "version" in wedgie.json: the site shows it (v56)
 RP_ID = b"wedgie.dev"
 FIELDS = '"origin":"https://wedgie.dev"'
 ASK_MS = 120000
@@ -574,7 +574,9 @@ def draw_home():
     else:
         _draw([("No key", INK, BIG)], 90, 180)
     if note:
-        d.center_text(note[:ui.COLS_SMALL], 226 if state == "ok" else 170, MUTED)
+        d.center_text(note[:ui.COLS_SMALL], 216 if state == "ok" else 170, MUTED)
+    if state not in ("none", "lock"):   # which app and firmware, for a report (Austin, 10-31)
+        d.center_text("v%s  firmware %s" % (FW[5:], W.VERSION), 230, GREY)
     if state == "none":
         ui.buttons(d, "make a key", "not now")
     elif state == "lock":
