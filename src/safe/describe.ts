@@ -2,10 +2,12 @@
 // "Cancel #4". What it can't read it says so ("Call 0x12…"), and what changes how the Safe works is marked
 // danger. Used by the queue, the Execute dock and Activity (src/pages/safe.ts).
 import * as E from "./eth";
+import type { Mark } from "clear-signing-safe-kit";
 
 export type Token = { symbol: string; decimals: number };
 export type Said = { title: string; kind: "send" | "approve" | "owners" | "cancel" | "batch" | "call" | "danger"; subs?: Said[];
-  more?: string };   // more: HTML under the title (src/safe/explain.ts)
+  more?: string;     // more: HTML under the title (src/safe/explain.ts)
+  src?: Mark };      // where the words came from (clear-signing-safe-kit MARKS); unset: describe.ts itself (markOf)
 export type Ctx = {
   safe: string;
   addr: (a: string) => string;           // an address as HTML (the address component)

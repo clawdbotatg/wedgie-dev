@@ -840,7 +840,8 @@ body.dock-running #s-msg { display: none; }
 .sx-k-cancel .sx-ic { background: #fde3e2; color: var(--coral); }
 .sx-warn { margin: 0 !important; color: #b8201b; font-weight: 800; font-size: 14px; }
 .sx-warn-soft { padding: 10px 14px; border-radius: 14px; background: #fff8e1; font-size: 14px; }
-.sx-subs { margin: 0; padding-left: 48px; font-size: 14px; }
+.sx-subs { margin: 0; padding-left: 46px; font-size: 14px; list-style: none; }
+.sx-mark { margin-right: 6px; }   /* a step's source mark (src/safe/explain.ts mark), in place of its number */
 .sx-subs li { margin: 4px 0; }
 .sx-bot { margin: 0 !important; padding-left: 46px; font-weight: 700; font-size: 15px; }   /* src/safe/explain.ts */
 .sx-bot-wait { color: var(--muted); }

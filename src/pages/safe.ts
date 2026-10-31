@@ -26,7 +26,8 @@ import * as Drive from "../serial/drive";
 import * as E from "../safe/eth";
 import { address, addressInput, addressOf, face, watch } from "../safe/address";
 import { describe, type Ctx, type Said } from "../safe/describe";
-import { explain, callsOf, intent } from "../safe/explain";
+import { explain, callsOf, intent, mark, markOf } from "../safe/explain";
+import { MARKS } from "clear-signing-safe-kit";
 import { readAssets, tokenMeta, knownMeta, usd, type Asset } from "../safe/assets";
 import { canScan, scan } from "../safe/scan";
 import * as Clear from "../safe/clear";
@@ -568,7 +569,10 @@ export function safe(main: HTMLElement) {
   // the copy icon, the same one Instant Wallet draws
   const COPY_ICON = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2.5"/><path d="M5 15H4.5A1.5 1.5 0 0 1 3 13.5v-9A1.5 1.5 0 0 1 4.5 3h9A1.5 1.5 0 0 1 15 4.5V5"/></svg>`;
   const ICON: Record<Said["kind"], string> = { send: "↑", approve: "✓", owners: "👥", cancel: "⨯", batch: "≡", call: "⚙", danger: "!" };
-  const subsOf = (s: Said) => s.subs?.length ? `<ol class="sx-subs">${s.subs.map((x) => `<li>${x.title}</li>`).join("")}</ol>` : "";
+  // each step starts with where its words came from (markOf: the kit's MARKS, as Instant Wallet), never a number
+  const subsOf = (s: Said) => s.subs?.length ? `<ul class="sx-subs">${s.subs.map((x) => `<li>${mark(markOf(x))}${x.title}</li>`).join("")}</ul>` : "";
+  /** The tile at a tx's left: a batch's ≡, else its one step's mark. */
+  const tile = (s: Said) => s.subs?.length ? ICON.batch : MARKS[markOf(s)][0];
   /** The Safe's total in dollars, when every price that matters is known; else null. */
   const total = () => assets && assets[0].price !== null ? assets.reduce((n, a) => n + (a.usd || 0), 0) : null;
   const ago = (iso: string) => {
@@ -1679,7 +1683,7 @@ export function safe(main: HTMLElement) {
       const dots = Array.from({ length: need }, (_, d) => `<i class="${d < n ? "on" : ""}"></i>`).join("");
       return `<li class="sx-tx sx-k-${s.kind}">
         <div class="sx-tx-top"><span class="sx-tx-n">#${esc(t.nonce)}</span>${app ? `<a class="pill sx-pill" href="${esc(app)}" target="_blank" rel="noopener" title="Open in Safe{Wallet}">Safe ↗</a>` : ""}<button class="btn btn-grey sx-copy" data-link="${k}" title="Copy a link to it" aria-label="Copy a link to it">${COPY_ICON}</button></div>
-        <div class="sx-tx-head"><span class="sx-ic">${ICON[s.kind]}</span><span class="sx-tx-what">${s.title}</span></div>
+        <div class="sx-tx-head"><span class="sx-ic" title="${s.subs?.length ? "" : MARKS[markOf(s)][1]}">${tile(s)}</span><span class="sx-tx-what">${s.title}</span></div>
         ${t.wc ? `<p class="fine">From ${esc(t.wc.dapp.name)}: it gets the result when this runs.</p>` : ""}${subsOf(s)}${s.more || ""}${s.kind === "danger" ? `<p class="sx-warn">This can change how the Safe works. Only sign if you know why.</p>` : ""}
         <div class="sx-tx-sigs"><span class="sx-dots">${dots}</span>${n} of ${need} signed${marks.length ? ` · ${marks.join(" · ")}` : ""}</div>
         ${btns.length || rej ? `<div class="sx-row">${rej}<span class="sx-row sx-end">${btns.map((b) => [+/btn-green/.test(b) * 10 + (/data-wsign/.test(b) ? 0 : /data-sign/.test(b) ? 1 : 2), b] as const)
@@ -1798,7 +1802,7 @@ export function safe(main: HTMLElement) {
     $("s-dock-tx").innerHTML = all.length > 1
       ? `<span class="safe-dock-what"><b>#${esc(all[0].nonce)}–#${esc(all.at(-1).nonce)}</b> ${all.length} transactions, in one go</span>
         ${running ? "" : `<button class="btn btn-green" id="s-dock-all"${dis()}>Execute all ${all.length}</button>`}`
-      : `<span class="safe-dock-what"><b>#${esc(t.nonce)}</b> ${said(t).title}</span>
+      : `<span class="safe-dock-what"><b>#${esc(t.nonce)}</b> ${((s) => (s.subs?.length ? "" : mark(markOf(s))) + s.title)(said(t))}</span>
         ${running ? "" : `<button class="btn btn-green" id="s-dock-go"${dis()}>Execute</button>`}`;
     $("s-dock-msg").hidden = !running;
     $("s-dock-go")?.addEventListener("click", () => job(async () => { running = t; paintDock(); try { await execute(t); } finally { running = null; } }));
@@ -1862,10 +1866,13 @@ export function safe(main: HTMLElement) {
       if (t.txType === "MULTISIG_TRANSACTION") {
         const s = describe(t, { ...ctx(), past: true }, t.dataDecoded?.method), failed = t.isSuccessful === false;
         const calls = t.to ? callsOf(t, s) : [];
-        const head = intent(s, calls, chain, safeAddr!, CHAINS[chain].usdc, paintActivity);
+        const lines = intent(s, calls, chain, safeAddr!, CHAINS[chain].usdc, paintActivity);
+        // one line: its mark is the tile; more: each line its own mark
+        const head = !lines ? null : lines.length === 1 ? lines[0].text : lines.map((l) => mark(l.src) + l.text).join(" · ");
+        const ic = lines?.length === 1 ? MARKS[lines[0].src][0] : lines ? ICON.batch : tile(s);
         const m = !failed && t.transactionHash ? movesOf(chain, t, calls) : null;
         const coins = m && (m.pay.length || m.get.length) ? `<span class="sx-mv${head ? "" : " sx-mv-big"}">${coinLine(m.pay, false)}${coinLine(m.get, true)}</span>` : "";
-        rows.push(`<li><span class="sx-ic">${ICON[s.kind]}</span><span class="sx-act-what"><span class="fine">#${esc(t.nonce)} · ${esc(when)} · ${chainLogo(chain)}${esc(CHAINS[chain].name)}${failed ? ` · <span class="bad">failed</span>` : ""}</span>${head || !coins ? `<b>${head || s.title}</b>` : ""}${coins}</span>${link ? `<a class="sx-end fine" href="${link}" target="_blank" rel="noopener">↗</a>` : ""}</li>`);
+        rows.push(`<li><span class="sx-ic">${ic}</span><span class="sx-act-what"><span class="fine">#${esc(t.nonce)} · ${esc(when)} · ${chainLogo(chain)}${esc(CHAINS[chain].name)}${failed ? ` · <span class="bad">failed</span>` : ""}</span>${head || !coins ? `<b>${head || s.title}</b>` : ""}${coins}</span>${link ? `<a class="sx-end fine" href="${link}" target="_blank" rel="noopener">↗</a>` : ""}</li>`);
         continue;
       }
       // in: the coin, or a token Safe's API trusts (a 0-value or untrusted "transfer" is address poisoning: never shown)
