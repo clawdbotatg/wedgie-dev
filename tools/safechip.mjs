@@ -60,6 +60,41 @@ def _frag():
 def run():`).replace(start, '    _keep()\n    _frag()\n    W.send(W.hello(None, type="ready"'));
   console.log(`--frag: the heap in ${size} B holes once the app has started`);
 }
+// --drive [bytes]: what a real wedgie with its WEDGIE drive up has less than this board (default 13800), held from the
+// app's start: the drive is up from power-up on a real wedgie, and only there (the virtual board has none). 10-31:
+// Safe Signer's hello said ram 82768 on a real wedgie (drive up), 96528 here; its log said 105248 at power-up with
+// the drive, 128176 after a soft reset without it. A fresh real wedgie ran out on an Instant Wallet swap that
+// passed here. A soft reset drops the drive until the next power-up, so after one (a
+// tx saved to _safe_sign.bin) nothing is held, as on a real wedgie. A fake wedgiedrive module says it's up.
+const driveAt = args.indexOf("--drive");
+if (driveAt >= 0) {
+  const size = Number(args[driveAt + 1]) || 13800;
+  const src = (F.extra["safe.py"] || F.file("safe.py")).toString();
+  if (!src.includes("\ndef run():\n")) throw new Error("--drive: safe.py's run() changed; update safechip");
+  F.extra["safe.py"] = Buffer.from(src.replace("\ndef run():\n", `
+_drive_held = None
+
+
+def _drive():
+    global _drive_held
+    import os
+    try:
+        os.stat("_safe_sign.bin")
+        return                          # after a soft reset: no drive
+    except OSError:
+        pass
+    _drive_held = [bytearray(512) for _ in range(${size} // 512)]     # sectors, as the drive holds them
+    class _D:
+        drive = True
+    sys.modules["wedgiedrive"] = _D
+    print("drive: %d B held, %d B free" % (${size}, gc.mem_free()))
+
+
+def run():
+    _drive()
+`));
+  console.log(`--drive: ${size} B held from the app's start, as the WEDGIE drive takes`);
+}
 console.log(`Safe Signer (${appDir || "the shelf's copy"}): ${cart.files.join(" ")}`);
 
 // The virtual board has no secure chip, so atecc.mpy is swapped for a stand-in ATECC608 whose slot 0 holds a
@@ -211,7 +246,7 @@ const cases = txsFile ? JSON.parse(readFileSync(txsFile, "utf8")).map((c) =>
 ];
 /** Send one safe_sign, press k once a second (the app drops presses made before its question is up) until
  *  it answers; the answer and how long it took in chip time. */
-function ask(t, k, msg = { type: "safe_sign", tx: t }, cb = null, shot = null, keys = []) {
+function ask(t, k, msg = { type: "safe_sign", tx: t, fresh: 1 }, cb = null, shot = null, keys = []) {     // fresh: as Instant Wallet (it reopens the port after a restart)
   keys = [...(keys || [])];          // pressed first, one a second (a case's "keys": the d-pad through its details)
   for (let o = 0; cb && o < cb.length; o += hi.safe_chunk) {     // a clear-signing bundle first, in pieces
     const a = h.req({ id: ++id, type: "safe_clear", at: o / 2, hex: cb.slice(o, o + hi.safe_chunk), ...(o ? {} : { n: cb.length / 2 }) }, 20000);

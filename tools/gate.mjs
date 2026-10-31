@@ -65,6 +65,8 @@ const all = [
   ["safechip", ["node", "tools/safechip.mjs", "--frag"]],
   // what Instant Wallet sends, on a broken-up heap (10-30: safe-47 ran out of memory on a real wedgie's IW swap)
   ["safechip: Instant Wallet swap", ["node", "tools/safechip.mjs", "--frag", "--txs", "tools/fixtures/iw-swap.json"]],
+  // the WEDGIE drive's ~23 KB held, as on a real wedgie from power-up (10-31: a fresh one ran out on this swap)
+  ["safechip: Instant Wallet swap, drive up", ["node", "tools/safechip.mjs", "--drive", "--txs", "tools/fixtures/iw-swap.json"]],
   ["mpy --check", [...UV, "tools/mpy.py", "--check"]],
   ["chip: install Buttons + update", ["node", "tools/chipprobe.mjs", "--from", "hello", "--to", "buttons"]],
   ["chip: install over Buttons + update", ["node", "tools/chipprobe.mjs", "--from", "buttons", "--to", "hello"]],

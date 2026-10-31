@@ -43,7 +43,7 @@ import save
 import ui
 from ui import WHITE, INK, MUTED, GREY, GREEN_D, RED
 
-FW = "safe-53"         # and "version" in wedgie.json: the site shows it (v53)
+FW = "safe-54"         # and "version" in wedgie.json: the site shows it (v54)
 RP_ID = b"wedgie.dev"
 FIELDS = '"origin":"https://wedgie.dev"'
 ASK_MS = 120000
@@ -794,25 +794,33 @@ def _browse(pages, k, foot, sf):
 AGAIN = "_safe_sign.bin"
 
 
-def _again(mid, t, tx):
-    """Out of memory on every try: the tx to the flash and a restart on a clean heap (a soft reset: USB stays, the host
-    is still waiting), where run() shows it again and answers this id, without the extras. A real wedgie, safe-51, an
-    Instant Wallet swap: even the usual pages found no 1280 bytes. False: the file couldn't be written."""
+def _drive_on():
+    """The WEDGIE drive is up (it is from power-up until a soft reset) and no phone is using it: ~23 KB of the heap
+    (a real wedgie's log, 10-31: ram 105248 with it, 128176 without), and with it a fresh wedgie ran out reading an
+    Instant Wallet swap."""
+    return getattr(sys.modules.get("wedgiedrive"), "drive", None) is not None and not getattr(sys.modules.get("inbox"), "fed", False)
+
+
+def _restart(mid, t, cl, data, why):
+    """The request to the flash and a restart on a clean heap; run() then reads it (_replay) and answers this id. cl:
+    the clear-signing bundle (bytes or pieces), data: the tx's data sent ahead (pieces), both kept. A real wedgie's
+    soft reset drops USB (the drive goes): the host opens the port again and waits (it said "fresh"). The screen
+    stays as it is (firmware 0.3.76+, boot.py: this file). False: the file couldn't be written."""
     try:
-        t = dict(t)
-        t.pop("sim", None)
-        t["data"] = "@"
-        h = json.dumps({"id": mid, "tx": t})
-        t = None
+        h = json.dumps({"id": mid, "tx": t, "nonce": sim_nonce,
+                        "clear": sum(len(x) for x in cl), "data": sum(len(x) for x in data)})
         gc.collect()
         with open(AGAIN, "wb") as f:
             f.write(h)
             f.write("\n")
-            f.write(tx["data"])
+            for x in cl:
+                f.write(x)
+            for x in data:
+                f.write(x)
     except Exception as e:
         sys.print_exception(e)
         return False
-    W.log("out of memory: again on a clean heap")
+    W.log(why)
     import machine
     W.restarting = True                 # main.py lets this SystemExit through: the reset happens
     machine.soft_reset()
@@ -820,15 +828,29 @@ def _again(mid, t, tx):
 
 
 def _replay():
-    """A tx _again saved: shown now, on a clean heap, answering the request that sent it. Once: the file goes first."""
-    global pieces, have
+    """A request _restart saved: read now, on a clean heap, answering the request that sent it. Once: the file goes
+    first, whatever happens."""
+    global pieces, have, clear, clear_have, sim_nonce
     try:
         f = open(AGAIN, "rb")
     except OSError:
         return
+    a = None
     try:
         a = json.loads(f.readline())
-        data = f.read()
+        n, k = a.get("clear") or 0, a.get("data") or 0
+        if n:
+            if clear_buf and n <= len(clear_buf):
+                clear = memoryview(clear_buf)[:n]
+                f.readinto(clear)
+            else:
+                clear = [f.read(n)]
+            clear_have = n
+        if k:
+            b = bytearray(k)
+            f.readinto(b)
+            pieces, have = [b], k
+        sim_nonce = a.get("nonce")
     except Exception as e:
         sys.print_exception(e)
         a = None
@@ -837,20 +859,26 @@ def _replay():
         import os
         os.remove(AGAIN)
     if a:
-        pieces, have = [data], len(data)
         try:
             on_sign(a.get("id"), a.get("tx"), False)
         except Exception as e:          # answered, as pump does: not out of run()
             W.failed(a.get("id"), e)
 
 
-def on_sign(mid, t, again_ok=True):
+def on_sign(mid, t, again_ok=True, fresh=False):
     global note
     if state != "ok":
         W.send({"id": mid, "type": "error", "error": {"lock": "key not locked yet: press A on the wedgie",
                 "swap": "this chip's key is locked and isn't Safe Signer's: swap the chip"}.get(state,
                 "no key yet: press A on the wedgie to make one")})
         return
+    # the drive's 23 KB back before reading, once per power-up: a restart without it, everything kept, when the host
+    # can wait through it (fresh: it reopens the port). Read with the drive up, a swap ran out of memory.
+    if again_ok and fresh and _drive_on():
+        ui.progress("Reading the transaction", "", False)
+        cl = (clear[:clear_have],) if isinstance(clear, memoryview) else clear
+        if _restart(mid, t, cl, pieces if t and t.get("data") == "@" else (), "the drive's room back: reading on a clean heap"):
+            return
     try:
         tx = parse(t or {})
     except Exception as e:
@@ -869,8 +897,9 @@ def on_sign(mid, t, again_ok=True):
                 break
             except MemoryError:         # never an error for want of memory (Instant Wallet's EXPECTATIONS, rule 0):
                 if not again:           # what's kept back to the heap, then the usual pages from the top, without
-                    if again_ok and _again(mid, t, tx):    # the extras (a real wedgie, safe-47, an IW swap:
-                        return          # MemoryError, 1280 bytes); then a restart on a clean heap
+                    if again_ok and _restart(mid, dict(t, sim=None, data="@"), (), (tx["data"],),
+                                             "out of memory: again on a clean heap"):     # the extras (a real wedgie,
+                        return          # safe-47, an IW swap: MemoryError, 1280 bytes); then a restart on a clean heap
                     raise
                 tx["sim"] = tx["clear"] = None
                 _unclear()
@@ -954,7 +983,7 @@ def handle(m):
     global dirty, sim_nonce
     mid, t = m.get("id"), m.get("type")
     if t == "safe_sign":
-        on_sign(mid, m.get("tx"))
+        on_sign(mid, m.get("tx"), fresh=bool(m.get("fresh")))
         dirty = True
     elif t == "safe_data":
         on_data(mid, m)

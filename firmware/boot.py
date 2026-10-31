@@ -24,7 +24,14 @@ try:
     except Exception:
         _cold = False
     try:
-        _keep = not _cold and machine.mem32[_scr] == 0x57ED61E0 and bool(os.stat("_job.json"))
+        _keep = False
+        if not _cold and machine.mem32[_scr] == 0x57ED61E0:
+            for _f in ("_job.json", "_safe_sign.bin"):  # an install, or Safe Signer reading a tx on a clean heap
+                try:                                     # (safe.py _restart): its "Reading the transaction" stays up
+                    _keep = bool(os.stat(_f))
+                    break
+                except OSError:
+                    pass
     except Exception:                   # no job file; or no mem32 (the emulator)
         _keep = False
     splash.show(keep=_keep)
