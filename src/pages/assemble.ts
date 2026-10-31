@@ -159,7 +159,7 @@ export function assemble(main: HTMLElement) {
       <div class="cbl-ask">
         <h3 id="cbl-title"></h3>
         <p class="cbl-now" id="cbl-now"></p>
-        <button type="button" class="btn btn-green" id="cbl-open">Map wire colors</button>
+        <button type="button" class="btn" id="cbl-open">Map wire colors</button>
       </div>
       <div class="cbl-map" id="cbl-map" hidden>
         <div class="cbl-3d recess" id="cbl-3d"></div>
