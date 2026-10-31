@@ -43,7 +43,7 @@ import save
 import ui
 from ui import WHITE, INK, MUTED, GREY, GREEN_D, RED
 
-FW = "safe-52"         # and "version" in wedgie.json: the site shows it (v52)
+FW = "safe-53"         # and "version" in wedgie.json: the site shows it (v53)
 RP_ID = b"wedgie.dev"
 FIELDS = '"origin":"https://wedgie.dev"'
 ASK_MS = 120000
@@ -791,7 +791,60 @@ def _browse(pages, k, foot, sf):
 
 # ---- requests ---------------------------------------------------------------------------------
 
-def on_sign(mid, t):
+AGAIN = "_safe_sign.bin"
+
+
+def _again(mid, t, tx):
+    """Out of memory on every try: the tx to the flash and a restart on a clean heap (a soft reset: USB stays, the host
+    is still waiting), where run() shows it again and answers this id, without the extras. A real wedgie, safe-51, an
+    Instant Wallet swap: even the usual pages found no 1280 bytes. False: the file couldn't be written."""
+    try:
+        t = dict(t)
+        t.pop("sim", None)
+        t["data"] = "@"
+        h = json.dumps({"id": mid, "tx": t})
+        t = None
+        gc.collect()
+        with open(AGAIN, "wb") as f:
+            f.write(h)
+            f.write("\n")
+            f.write(tx["data"])
+    except Exception as e:
+        sys.print_exception(e)
+        return False
+    W.log("out of memory: again on a clean heap")
+    import machine
+    W.restarting = True                 # main.py lets this SystemExit through: the reset happens
+    machine.soft_reset()
+    return True                         # the emulator's soft_reset returns: it restarts once this request does
+
+
+def _replay():
+    """A tx _again saved: shown now, on a clean heap, answering the request that sent it. Once: the file goes first."""
+    global pieces, have
+    try:
+        f = open(AGAIN, "rb")
+    except OSError:
+        return
+    try:
+        a = json.loads(f.readline())
+        data = f.read()
+    except Exception as e:
+        sys.print_exception(e)
+        a = None
+    finally:
+        f.close()
+        import os
+        os.remove(AGAIN)
+    if a:
+        pieces, have = [data], len(data)
+        try:
+            on_sign(a.get("id"), a.get("tx"), False)
+        except Exception as e:          # answered, as pump does: not out of run()
+            W.failed(a.get("id"), e)
+
+
+def on_sign(mid, t, again_ok=True):
     global note
     if state != "ok":
         W.send({"id": mid, "type": "error", "error": {"lock": "key not locked yet: press A on the wedgie",
@@ -816,7 +869,9 @@ def on_sign(mid, t):
                 break
             except MemoryError:         # never an error for want of memory (Instant Wallet's EXPECTATIONS, rule 0):
                 if not again:           # what's kept back to the heap, then the usual pages from the top, without
-                    raise               # the extras (a real wedgie, safe-47, an IW swap: MemoryError, 1280 bytes)
+                    if again_ok and _again(mid, t, tx):    # the extras (a real wedgie, safe-47, an IW swap:
+                        return          # MemoryError, 1280 bytes); then a restart on a clean heap
+                    raise
                 tx["sim"] = tx["clear"] = None
                 _unclear()
                 _lend()
@@ -1015,6 +1070,7 @@ def run():
     W.send(W.hello(None, type="ready", running="safe", app=FW, safe=key if state == "ok" else None,
                    signer=signer if state == "ok" else None, safe_state=state, safe_chunk=CHUNK,
                    safe_clear=clear_tag()))
+    _replay()
     while True:
         for k in keys.pressed():
             if k == "A" and state == "lock":
