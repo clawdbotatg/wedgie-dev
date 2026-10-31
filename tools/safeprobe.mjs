@@ -303,7 +303,7 @@ await page.click("#n-wedgie");
 await says(/In the queue with the wedgie's signature/, "queued");
 check(await asks() === asked + 1, "the wedgie was asked again");
 await wait(() => document.querySelector("[data-wsign]"), null, 10000, "Sign with wallet");
-check(new RegExp(`Send 0\\.001 ETH to[\\s\\S]*${to.slice(-4)}`).test(await page.textContent("#s-queue")) && /1 of 2 signed/.test(await page.textContent("#s-queue")), "the queue says it in words: Send 0.001 ETH to …, 1 of 2 signed");
+check(new RegExp(`Send 0\\.001 ETH (?:\\(\\$[\\d.,]+\\) )?to[\\s\\S]*${to.slice(-4)}`).test(await page.textContent("#s-queue")) && /1 of 2 signed/.test(await page.textContent("#s-queue")), "the queue says it in words: Send 0.001 ETH to …, 1 of 2 signed");
 if (out) await page.screenshot({ path: `${out}/safe-3-queue.png`, fullPage: true });
 await page.click("[data-wsign]");
 await says(/That's enough: press Execute/, "wallet signed");

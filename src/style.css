@@ -827,8 +827,11 @@ body.dock-running #s-msg { display: none; }
 .sx-tx-head { display: flex; align-items: center; gap: 10px; }
 .sx-tx-what { flex: 1; min-width: 0; font-weight: 800; font-size: 16px; line-height: 1.5; }
 .sx-tx-n { color: var(--muted); font-weight: 800; font-size: 14px; }
-.sx-tx-head .sx-pill { flex: none; height: 32px; padding: 0 10px; font-size: 13px; }
-.sx-tx-head .sx-copy { flex: none; width: 32px; height: 32px; padding: 0; border-radius: 50%; display: inline-grid; place-items: center; }   /* Instant Wallet's CopyLink */
+/* the card's top row, as Instant Wallet's: #nonce on the left, Safe ↗ + copy on the right; the title gets the full width under it */
+.sx-tx-top { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-bottom: 6px; }
+.sx-tx-top .sx-tx-n { margin-right: auto; }
+.sx-tx-top .sx-pill { flex: none; height: 32px; padding: 0 10px; font-size: 13px; }
+.sx-tx-top .sx-copy { flex: none; width: 32px; height: 32px; padding: 0; border-radius: 50%; display: inline-grid; place-items: center; }   /* Instant Wallet's CopyLink */
 .sx-rm { flex: none; width: 52px; padding: 0; font-size: 18px; }   /* Remove: a red ✕ far left */
 .sx-ic { flex-shrink: 0; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 12px; background: #e9ebe6; font-weight: 900; font-size: 16px; }
 .sx-ic.sx-in { background: #dff5e5; color: var(--mint-d); }
