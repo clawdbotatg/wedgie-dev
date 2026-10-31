@@ -80,7 +80,7 @@ them too. An app that draws text without `import ui` fails the test.
 - **The site's buttons** (Austin, 2026-10-22, 10-30; same as Instant Wallet): the main action is on the right,
   the other on the left. Green: the one obvious action of each part of a page. Dark gray (`btn-grey`): the clear
   runner-up (copy a waiting tx's link). Red: it destroys something (remove, delete,
-  disconnect, sign out, stop, wipe; a red ✕ on the far left). White: everything else (Reject, Refresh, Max, and
+  disconnect, sign out, stop, wipe; a red ✕ on the far left), or something went wrong (Send a bug report). White: everything else (Reject, Refresh, Max, and
   closing a window: Back, Close, Done, Cancel). No other colors. A button keeps its color as things change. Same action, same look everywhere.
 - The hint sits at the bottom in `ui.MUTED`: "{g} play again".
 - Text: 8 px font. Scale 1 fits 28 characters across, scale 2 fits 15 (`ui.COLS_SMALL`, `ui.COLS_BIG`).

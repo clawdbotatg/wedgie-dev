@@ -147,7 +147,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
             <h4>Console</h4>
             <pre class="recess out log" id="d-log"></pre>
           </details>
-          <div class="wd-report"><p class="crash-q">Something wrong?</p><button class="btn btn-lg" id="d-report">Send a bug report</button></div>
+          <div class="wd-report"><p class="crash-q">Something wrong?</p><button class="btn btn-lg btn-red" id="d-report">Send a bug report</button></div>
         </div>
       </div>
     </div>
