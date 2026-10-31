@@ -28,12 +28,14 @@ only path without firmware work. It's a normal Safe tx on the owner Safe: the we
 
 ## Status (10-30)
 
-Steps 1–4 are built. Next: 5 and 6.
+Steps 1–4 are built. The `approveHash` descriptor is written (clear-descriptors
+`registry/safe/calldata-AnySafe.json`, bound to the any-contract stand-in; screens on wedgie.dev/clear). Wedgies get it
+with the next Safe Signer release. Next: 5 and 6.
 
 ## Found in review (10-30)
 
 - An on-chain approval must carry its v=1 signature, or `readyRun` (Execute all) skips the tx. `addApprovals` does.
-- No `approveHash` descriptor exists (clear-descriptors or the EF registry). Step 5 needs one, for 1.4.1 and 1.5.0.
+- No `approveHash` descriptor existed. Written 10-31 (any Safe version: the call is the same).
 - Instant Wallet's `TxPage.tsx:79` ignores `?h=` when opened inside the app. Test step 6's link there.
 - Instant Wallet = a 1.5 Safe with one of Instant Wallet's recovery modules (`RECOVERY_DAYS` in `safe.ts`).
 

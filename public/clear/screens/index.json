@@ -1105,5 +1105,22 @@
     ]
    }
   ]
+ },
+ {
+  "slug": "safe-approvehash",
+  "title": "Safe: approve another Safe's tx",
+  "note": "Ours, a draft (clear-descriptors registry/safe/calldata-AnySafe.json). Not on wedgies yet: comes with the next Safe Signer release.",
+  "cases": [
+   {
+    "name": "approveHash on another Safe",
+    "chainId": 8453,
+    "to": "0x1234567890abcdef1234567890abcdef12345678",
+    "pages": [
+     "screens/safe-approvehash/01-1.png",
+     "screens/safe-approvehash/01-2.png",
+     "screens/safe-approvehash/01-3.png"
+    ]
+   }
+  ]
  }
 ]
