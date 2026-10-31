@@ -733,7 +733,7 @@ Not covered: apps and MicroPython itself.
     const v = $("#d-fs-view");
     const text = /\.(py|json|txt|log|md|csv)$/.test(p) || !bytes.some((b) => b === 0) ? new TextDecoder().decode(bytes.subarray(0, 64 * 1024)) : null;
     v.hidden = false;
-    v.innerHTML = `<div class="row"><b class="mono">${esc(p)}</b> <span class="fine">${bytes.length} bytes</span><button class="btn btn-xs btn-red" id="d-fs-close">Close</button></div>` +
+    v.innerHTML = `<div class="row"><b class="mono">${esc(p)}</b> <span class="fine">${bytes.length} bytes</span><button class="btn btn-xs" id="d-fs-close">Close</button></div>` +
       (text !== null ? `<pre class="recess out">${esc(text)}</pre>` : `<p class="fine">Not text. Download it to look inside.</p>`);
     $("#d-fs-close").onclick = () => { fsOpen = ""; v.hidden = true; paintFiles(); };
     paintFiles();

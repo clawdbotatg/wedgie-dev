@@ -437,7 +437,7 @@ function status(id: string, box: HTMLElement, say: (s: string, bad?: boolean) =>
     if (v.status === "expired" && !got && !v.checking) {
       count("expired");
       h += `<p><b>Time ran out.</b> Nothing was charged.</p>
-      <p><a class="btn btn-red" href="/order">Start over</a> <button class="btn btn-green" id="o-renew"${busy ? " disabled" : ""}>Refresh price</button></p>
+      <p><a class="btn" href="/order">Start over</a> <button class="btn btn-green" id="o-renew"${busy ? " disabled" : ""}>Refresh price</button></p>
       <p class="fine o-why">${asked ? "Thanks." : `Didn't buy? Why: ${WHYNOT.map(([k, t]) => `<button class="btn btn-sm" data-why="${k}">${t}</button>`).join(" ")}`}</p>`;
     }
     if (v.status === "paid" || v.status === "shipped") h += steps(v);

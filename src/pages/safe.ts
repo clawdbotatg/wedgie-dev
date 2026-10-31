@@ -730,7 +730,7 @@ export function safe(main: HTMLElement) {
     $("s-first").hidden = !big;
   }
   // No wedgie here: the way back to get one (same as /connect without one).
-  const HOME = `<a class="btn btn-red" href="/">Back to wedgie.dev</a>`;   // Back = an exit: red
+  const HOME = `<a class="btn" href="/">Back to wedgie.dev</a>`;
   function paintWedgie() {
     // the wedgie whose key we read was unplugged: read the next one's (another wedgie = another list)
     if (wedgie && wedgie !== DRIVE && !present(wedgie)) { wedgie = null; key = null; }
@@ -1673,7 +1673,7 @@ export function safe(main: HTMLElement) {
       if (n >= need) btns.push(first ? `<button class="btn btn-sm" data-exec="${k}"${dis()}>Execute</button>` : `<span class="fine">runs after #${i.nonce}</span>`);
       const rej = t.wc && !n ? `<button class="btn btn-sm" data-wcno="${k}"${dis()}>Reject</button>`      // only here: nothing to cancel
         // a red ✕ (Remove) far left, then a white Reject (Austin, as in Instant Wallet). Any owner here can remove
-        : (can() ? `<button class="btn btn-sm btn-red sx-x" data-remove="${k}" title="Remove" aria-label="Remove"${dis()}>✕</button> ` : "")
+        : (can() ? `<button class="btn btn-sm btn-red sx-rm" data-remove="${k}" title="Remove" aria-label="Remove"${dis()}>✕</button> ` : "")
         + (can() && s.kind !== "cancel" && !cancelled(+t.nonce) ? `<button class="btn btn-sm" data-reject="${k}"${dis()}>Reject</button>` : "");
       const app = t.inSafe ? appLink(chain, safeAddr, "transactions/tx") + `&id=multisig_${safeAddr}_${t.safeTxHash}` : "";
       const dots = Array.from({ length: need }, (_, d) => `<i class="${d < n ? "on" : ""}"></i>`).join("");

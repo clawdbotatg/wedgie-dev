@@ -36,7 +36,7 @@ export function assemble3d(main: HTMLElement) {
       </ol>
       <p class="fine pg-back"><a href="/assemble">The step-by-step page with photos</a> · <a href="/assemble.pdf" download>Print (PDF)</a></p>
     </aside>
-    <dialog class="asm-big"><img alt=""><button type="button" class="btn btn-red">Close</button></dialog>
+    <dialog class="asm-big"><img alt=""><button type="button" class="btn">Close</button></dialog>
   </section>`;
 
   const $ = <T extends HTMLElement>(id: string) => main.querySelector<T>("#" + id)!;

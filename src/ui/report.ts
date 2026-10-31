@@ -38,7 +38,7 @@ export function bugReport(w?: Wedgie, readLog?: () => Promise<string>) {
     <input class="recess email" type="email" placeholder="Your email, if you want an answer (optional)" autocomplete="email">
     <details><summary class="fine">What gets sent</summary><pre class="recess out log">Reading…</pre></details>
     <p class="fine said" hidden></p>
-    <div class="row"><button class="btn btn-red close">Cancel</button><button class="btn btn-green send" disabled>Send</button></div>
+    <div class="row"><button class="btn close">Cancel</button><button class="btn btn-green send" disabled>Send</button></div>
   </div>`;
   document.body.appendChild(el);
   const $ = <T extends HTMLElement>(s: string) => el.querySelector<T>(s)!;
