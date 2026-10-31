@@ -26,7 +26,7 @@ import * as Drive from "../serial/drive";
 import * as E from "../safe/eth";
 import { address, addressInput, addressOf, face, watch } from "../safe/address";
 import { describe, type Ctx, type Said } from "../safe/describe";
-import { explain, callsOf } from "../safe/explain";
+import { explain, callsOf, intent } from "../safe/explain";
 import { readAssets, tokenMeta, knownMeta, usd, type Asset } from "../safe/assets";
 import { canScan, scan } from "../safe/scan";
 import * as Clear from "../safe/clear";
@@ -1771,6 +1771,29 @@ export function safe(main: HTMLElement) {
   }
 
   // ---- Activity: what ran, and money that came in ----
+  // Each row leads with what it was for (clear signing's words); what it moved sits small under it (Austin 10-30, as
+  // Instant Wallet): red and green alone don't say why. Moves: the tx's receipt (clear-signing-safe-kit moved()), the
+  // relay's fee apart; asked once per tx, repaint when it lands.
+  const movedOf = new Map<string, Sim.Moves | "asking" | "failed">();
+  function movesOf(c: number, t: any, calls: { to: string; value: string | bigint; data?: string | null }[]) {
+    const k = `${c}:${t.transactionHash}`, m = movedOf.get(k);
+    if (m) return m === "asking" || m === "failed" ? null : m;
+    movedOf.set(k, "asking");
+    const usdc = CHAINS[c].usdc?.toLowerCase(), fees: Record<string, bigint> = {};
+    for (const x of calls) {
+      const d = (x.data || "0x").toLowerCase();
+      if (usdc && x.to.toLowerCase() === usdc && d.startsWith("0xa9059cbb") && d.slice(34, 74) === "4cfab32186e65e2a39ec0e882e11380cbf2f8a2f")
+        fees[usdc] = (fees[usdc] ?? 0n) + BigInt("0x" + d.slice(74, 138));
+    }
+    const out = calls.reduce((n, x) => n + BigInt(x.value || 0), 0n);
+    Sim.moved(rpcOf(c), safeAddr!, t.transactionHash, out, nat(c), (a) => tokenMeta(c, a, rpcOf(c)))
+      .then((r) => movedOf.set(k, Sim.moves(r, fees)), () => movedOf.set(k, "failed")).finally(paintActivity);
+    return null;
+  }
+  const coinLine = (ms: { token: string; symbol: string; amount: string }[], get: boolean) => ms.map((m) => {
+    const p = priceOf(m.token === "eth" ? null : m.token), n = Number(m.amount);
+    return `<span class="${get ? "sx-get" : "sx-pay"}">${get ? "+" : "−"}${esc(n.toLocaleString(undefined, { maximumFractionDigits: 6 }))} ${esc(m.symbol)}${p !== null ? ` <span class="fine">(${esc(usd(n * p))})</span>` : ""}</span>`;
+  }).join("");
   function paintActivity() {
     const box = $("s-activity");
     box.hidden = !(safeAddr && info && sub === "home");
@@ -1782,7 +1805,11 @@ export function safe(main: HTMLElement) {
       const link = t.transactionHash || t.txHash ? `${scan}/tx/${t.transactionHash || t.txHash}` : "";
       if (t.txType === "MULTISIG_TRANSACTION") {
         const s = describe(t, { ...ctx(), past: true }, t.dataDecoded?.method), failed = t.isSuccessful === false;
-        rows.push(`<li><span class="sx-ic">${ICON[s.kind]}</span><span class="sx-act-what"><b>${s.title}</b><span class="fine">#${esc(t.nonce)} · ${esc(when)}${failed ? ` · <span class="bad">failed</span>` : ""}</span></span>${link ? `<a class="sx-end fine" href="${link}" target="_blank" rel="noopener">↗</a>` : ""}</li>`);
+        const calls = t.to ? callsOf(t, s) : [];
+        const head = intent(s, calls, chain, safeAddr!, CHAINS[chain].usdc, paintActivity);
+        const m = !failed && t.transactionHash ? movesOf(chain, t, calls) : null;
+        const coins = m && (m.pay.length || m.get.length) ? `<span class="sx-mv${head ? "" : " sx-mv-big"}">${coinLine(m.pay, false)}${coinLine(m.get, true)}</span>` : "";
+        rows.push(`<li><span class="sx-ic">${ICON[s.kind]}</span><span class="sx-act-what"><span class="fine">#${esc(t.nonce)} · ${esc(when)} · ${chainLogo(chain)}${esc(CHAINS[chain].name)}${failed ? ` · <span class="bad">failed</span>` : ""}</span>${head || !coins ? `<b>${head || s.title}</b>` : ""}${coins}</span>${link ? `<a class="sx-end fine" href="${link}" target="_blank" rel="noopener">↗</a>` : ""}</li>`);
         continue;
       }
       // in: the coin, or a token Safe's API trusts (a 0-value or untrusted "transfer" is address poisoning: never shown)
@@ -1792,7 +1819,7 @@ export function safe(main: HTMLElement) {
         if (!tok) continue;
         const p = priceOf(x.type === "ETHER_TRANSFER" ? null : x.tokenAddress || x.tokenInfo?.address || "-");
         const $usd = p !== null ? ` <span class="fine">(${esc(usd(Number(BigInt(x.value)) / 10 ** tok.decimals * p))})</span>` : "";
-        rows.push(`<li><span class="sx-ic sx-in">↓</span><span class="sx-act-what"><b>Received ${esc(E.fmt(BigInt(x.value), tok.decimals, 4))} ${esc(tok.symbol)}${$usd}</b><span class="fine">from ${address(x.from, { size: "sm", chain })} · ${esc(when)}</span></span>${link ? `<a class="sx-end fine" href="${link}" target="_blank" rel="noopener">↗</a>` : ""}</li>`);
+        rows.push(`<li><span class="sx-ic sx-in">↓</span><span class="sx-act-what"><span class="fine">${esc(when)} · ${chainLogo(chain)}${esc(CHAINS[chain].name)}</span><b>Received from ${address(x.from, { size: "sm", chain })}</b><span class="sx-mv"><span class="sx-get">+${esc(E.fmt(BigInt(x.value), tok.decimals, 4))} ${esc(tok.symbol)}${$usd}</span></span></span>${link ? `<a class="sx-end fine" href="${link}" target="_blank" rel="noopener">↗</a>` : ""}</li>`);
       }
     }
     box.innerHTML = `<h3>Activity</h3>${rows.length ? `<ul class="sx-acts">${rows.join("")}</ul>`

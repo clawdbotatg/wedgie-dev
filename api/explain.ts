@@ -1,6 +1,7 @@
 // /api/explain: what a Safe transaction does, for the calls /safe can't put in words itself (src/safe/describe.ts).
 //   POST {chain, safe, calls: [{to, value, data}], need: [i]}   need: the calls describe.ts couldn't read
-//   -> {calls: [{what, fields: [{label, value, address?}]} | null], bot: string | null}
+//   -> {calls: [{what, fields: [{label, value, address?}], who?} | null], bot: string | null}
+//   nobot: never ask 🤖 (Activity: clear signing or nothing)
 // Two tiers, in order:
 //   1. A Uniswap swap from its own commands, else clear signing (ERC-7730): the contract team's own words, from the
 //      registry with clear-descriptors on top, through Sourcify's formatter. clear-signing-safe-kit/explain, the same
@@ -26,7 +27,7 @@ const ETH_LOG = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";   // eth_simulateV
 
 type Call = { to: string; value: string; data: string };
 type Field = { label: string; value: string; address?: string };
-type Told = { what: string; fields: Field[] } | null;
+type Told = { what: string; fields: Field[]; who?: string } | null;
 
 async function alchemy(chain: number, method: string, params: unknown[]) {
   const r = await fetch(`https://${HOSTS[chain]}.g.alchemy.com/v2/${key()}`, { method: "POST", headers: { "Content-Type": "application/json" },
@@ -53,7 +54,7 @@ const clearWords = explainer({ token, chain: (c) => ({ name: `chain ${c}`, nativ
   trusted: { 1: [USDC[1]], 8453: [USDC[8453]], 10: [USDC[10]], 42161: [USDC[42161]] } });
 const clear = async (chain: number, safe: string, c: Call): Promise<Told> => {
   const t = await clearWords(chain, safe, c);
-  return t && { what: t.what, fields: t.fields };
+  return t && { what: t.what, fields: t.fields, ...(t.who ? { who: t.who } : {}) };
 };
 
 // ---- tier 2 ----
@@ -161,7 +162,8 @@ export async function POST(req: Request) {
     calls.push({ to, data, value });
   }
   const need: number[] = (Array.isArray(b.need) ? b.need : calls.map((_, i) => i)).filter((i: any) => Number.isInteger(i) && i >= 0 && i < calls.length);
-  const k = await sha256(JSON.stringify([chain, safe.toLowerCase(), calls, need]));
+  // "who": answers kept before who-it's-with was asked again
+  const k = await sha256(JSON.stringify([chain, safe.toLowerCase(), calls, need, "who"]));
   const sql = env("SHOP_DATABASE_URL") ? await store().catch(() => null) : null;
   if (sql) {
     const [hit] = await sql`select v from explained where k = ${k}`.catch(() => []);
@@ -169,7 +171,7 @@ export async function POST(req: Request) {
   }
   const told: Told[] = calls.map(() => null);
   await Promise.all(need.map(async (i) => { told[i] = await clear(chain, safe, calls[i]); }));
-  const said = need.some((i) => !told[i]) && await botAllowed(req) ? await bot(chain, safe, calls).catch(() => null) : null;
+  const said = !b.nobot && need.some((i) => !told[i]) && await botAllowed(req) ? await bot(chain, safe, calls).catch(() => null) : null;
   const v = { calls: told, bot: said };
   // a 🤖 that didn't answer isn't kept: the next look tries again
   if (sql && (said || !need.some((i) => !told[i]))) await sql`insert into explained (k, v) values (${k}, ${JSON.stringify(v)}::jsonb) on conflict do nothing`.catch(() => {});

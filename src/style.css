@@ -865,6 +865,11 @@ body.dock-running #s-msg { display: none; }
 .sx-acts li:last-child { border-bottom: 0; }
 .sx-act-what b { font-weight: 800; }
 .sx-act-what .addr { vertical-align: baseline; }
+.sx-mv { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 14px; font-weight: 700; }
+.sx-mv-big { font-size: 17px; }
+.sx-mv .sx-pay { color: var(--coral); }
+.sx-mv .sx-get { color: var(--mint-d); }
+.sx-mv .fine { font-weight: 400; }
 /* sheets */
 .sx-sheet { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 20px; background: rgba(20,20,20,.45); }
 .sx-sheet[hidden] { display: none; }
