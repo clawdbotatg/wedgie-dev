@@ -1685,7 +1685,7 @@ export function safe(main: HTMLElement) {
         <div class="sx-tx-top"><span class="sx-tx-n">#${esc(t.nonce)}</span>${app ? `<a class="pill sx-pill" href="${esc(app)}" target="_blank" rel="noopener" title="Open in Safe{Wallet}">Safe ↗</a>` : ""}<button class="btn btn-grey sx-copy" data-link="${k}" title="Copy a link to it" aria-label="Copy a link to it">${COPY_ICON}</button></div>
         <div class="sx-tx-head"><span class="sx-ic" title="${s.subs?.length ? "" : MARKS[markOf(s)][1]}">${tile(s)}</span><span class="sx-tx-what">${s.title}</span></div>
         ${t.wc ? `<p class="fine">From ${esc(t.wc.dapp.name)}: it gets the result when this runs.</p>` : ""}${subsOf(s)}${s.more || ""}${s.kind === "danger" ? `<p class="sx-warn">This can change how the Safe works. Only sign if you know why.</p>` : ""}
-        <div class="sx-tx-sigs"><span class="sx-dots">${dots}</span>${n} of ${need} signed${marks.length ? ` · ${marks.join(" · ")}` : ""}</div>
+        <div class="sx-tx-sigs"><span class="sx-dots">${dots}</span>Sign · ${n} of ${need}${marks.length ? ` · ${marks.join(" · ")}` : ""}</div>
         ${btns.length || rej ? `<div class="sx-row">${rej}<span class="sx-row sx-end">${btns.map((b) => [+/btn-green/.test(b) * 10 + (/data-wsign/.test(b) ? 0 : /data-sign/.test(b) ? 1 : 2), b] as const)
           .sort((x, y) => x[0] - y[0]).map((x) => x[1]).join(" ")}</span></div>` : ""}
         <details class="sx-more"><summary>Details</summary><dl class="sx-dl">
