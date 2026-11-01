@@ -134,6 +134,8 @@ const BAD = /MemoryError|memory allocation failed|wedgie broke/;
 const crash = (out) => BAD.test(out) || out.split("Traceback").slice(1).some((t) => !/OSError: (trustm|the key is in an ATECC608)/.test(t.split("\n{")[0]));
 let all = "", failed = 0, least = Infinity, leastWhere = "";
 const check = (ok, what) => { console.log(`${ok ? "ok  " : "FAIL"} ${what}`); if (!ok) failed++; };
+// a patched safe.py (--frag, --drive) goes on in place of safe.mpy: the image takes only the cart's files
+if (F.extra["safe.py"] && cart.files.includes("safe.mpy")) cart.files = cart.files.map((n) => (n === "safe.mpy" ? "safe.py" : n));
 const h = host({ fs: image(F, "safe", { "atecc.py": Buffer.from(ATECC) }, ["atecc.mpy"]), onData: (b) => { all += Buffer.from(b).toString("latin1"); } });
 for (const p of Object.values(KEYS)) h.chip.mcu.gpio[p].setInputValue(true);
 const press = (k) => { const p = h.chip.mcu.gpio[KEYS[k]]; p.setInputValue(false); h.chip.run(150); p.setInputValue(true); h.chip.run(100); };
@@ -148,6 +150,8 @@ h.chip.run(1500);
 const hi = ram("started, its key loaded");
 check(hi?.running === "safe" && hi?.safe?.x === key.x, `hello: running safe, its key (${hi?.ram} B free)`);
 if (!hi) console.log("     it said:", JSON.stringify(all.slice(-1500)));
+if (fragAt >= 0) check(all.includes("frag: holes of"), "--frag: the heap broken up on the board");
+if (driveAt >= 0) check(all.includes(" B held, "), "--drive: the drive's memory held on the board");
 if (hi?.signer !== undefined) check(E.checksum(hi.signer || "0x0") === signer, `hello: its signer address ${hi.signer} = /safe's (${signer})`);
 
 const crc = (b) => { let c = ~0; for (const x of b) { c ^= x; for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1)); } return ~c >>> 0; };
