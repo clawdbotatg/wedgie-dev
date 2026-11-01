@@ -5,7 +5,7 @@
       "name": "Safe Signer",
       "about": "Sign Safe{Wallet} transactions with your own key, made and locked for good in the secure chip. Green signs, red says no.",
       "files": [
-        "safe.py",
+        "safe.mpy",
         "safe_read.mpy",
         "safe_7730.mpy",
         "safe_8362.mpy",
@@ -21,7 +21,7 @@
         "safe_icons.py",
         "safe_icons.bin"
       ],
-      "version": "57",
+      "version": "59",
       "entry": "run",
       "fw": "0.3.17",
       "usb": true,
