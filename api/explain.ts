@@ -11,10 +11,12 @@
 //      would send and get (eth_simulateV1 through Alchemy, from the Safe). A guess: the page marks it 🤖.
 // Each answer is kept in the database (explained, by a hash of the request): the same transaction costs once.
 // New 🤖 answers: BOT_DAY a day per IP (the model costs money). Never log a body here.
+// A call nothing could read is counted in misses (_misses.ts: chain, contract, function; /api/misses).
 import { explainer, type Token } from "clear-signing-safe-kit/explain";
 import { keccak256, toHex } from "viem";
 import { env, json, oops, crossSite, db, ipOf, sha256 } from "./_shop.js";
 import { HOSTS, key } from "./rpc.js";
+import { missed } from "./_misses.js";
 
 const BOT_DAY = 200, MAX_CALLS = 20, MAX_DATA = 40_000;
 const MODEL = () => env("BANKR_LLM_MODEL") || "claude-sonnet-5.5";
@@ -171,6 +173,9 @@ export async function POST(req: Request) {
   }
   const told: Told[] = calls.map(() => null);
   await Promise.all(need.map(async (i) => { told[i] = await clear(chain, safe, calls[i]); }));
+  // ⚠️ (nothing could read it): the to-do list of descriptors to write. Once per transaction (answers are kept below),
+  // not from Activity (nobot: its answers without words aren't kept, so each look would count again)
+  if (!b.nobot) await missed(req, "wedgie.dev", chain, need.filter((i) => !told[i] && calls[i].data.length >= 10).map((i) => ({ to: calls[i].to, sel: calls[i].data.slice(0, 10) })));
   const said = !b.nobot && need.some((i) => !told[i]) && await botAllowed(req) ? await bot(chain, safe, calls).catch(() => null) : null;
   const v = { calls: told, bot: said };
   // a 🤖 that didn't answer isn't kept: the next look tries again
