@@ -1,0 +1,32 @@
+{
+  "apps": [
+    {
+      "mod": "clearsign",
+      "name": "Clear Signing",
+      "about": "The same transactions, clear signed and blind signed. Up and down switch. Nothing is signed or sent.",
+      "files": [
+        "clearsign.py",
+        "clearsign_blockie.py",
+        "clearsign_icons.bin",
+        "clearsign_txs.json"
+      ],
+      "entry": "run",
+      "fw": "0.3.36",
+      "label": "#22c452",
+      "icon": [
+        "............",
+        ".kkkkkkkkkk.",
+        ".kwwwwwwwwk.",
+        ".kwkkkkkkwk.",
+        ".kwwwwwwwwk.",
+        ".kwbbwkkkwk.",
+        ".kwbbwwwwwk.",
+        ".kwssssssswk",
+        ".kkkkkkkkkk.",
+        "............",
+        "..rr....gg..",
+        "..rr....gg.."
+      ]
+    }
+  ]
+}
