@@ -84,8 +84,10 @@ def _drive():
     except OSError:
         pass
     _drive_held = [bytearray(512) for _ in range(${size} // 512)]     # sectors, as the drive holds them
+    class _V:
+        writable = knocked = wrote = False   # what the firmware reads off a drive no host has written
     class _D:
-        drive = True
+        drive = _V()
     sys.modules["wedgiedrive"] = _D
     print("drive: %d B held, %d B free" % (${size}, gc.mem_free()))
 
@@ -142,6 +144,7 @@ if (!h.until((b) => b.includes('"ready"'), 30000, 20)) { console.log("no ready l
 h.chip.run(1500);
 const hi = ram("started, its key loaded");
 check(hi?.running === "safe" && hi?.safe?.x === key.x, `hello: running safe, its key (${hi?.ram} B free)`);
+if (!hi) console.log("     it said:", JSON.stringify(all.slice(-1500)));
 if (hi?.signer !== undefined) check(E.checksum(hi.signer || "0x0") === signer, `hello: its signer address ${hi.signer} = /safe's (${signer})`);
 
 const crc = (b) => { let c = ~0; for (const x of b) { c ^= x; for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1)); } return ~c >>> 0; };
