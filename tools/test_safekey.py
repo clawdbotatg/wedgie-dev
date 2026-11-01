@@ -150,7 +150,8 @@ sys.modules["ui"] = ui
 sys.path.insert(0, app)
 import safe_key as K
 
-src = open(os.path.join(app, "safe.py")).read() + open(os.path.join(app, "safe_key.py")).read()
+# the shelf ships safe.mpy (safe-59+): safe.py's source is the checkout beside this repo
+src = open(next(f for f in (os.path.join(app, "safe.py"), os.path.join(root, "..", "wedgie-safe", "safe.py")) if os.path.exists(f))).read() + open(os.path.join(app, "safe_key.py")).read()
 check(src.count("genkey(optiga.KEY2)") == 1, "one place makes a Trust M key (safe_key.make)")
 check("optiga.KEY3" not in src and "optiga.KEY4" not in src, "Safe Signer never touches KEY3 / KEY4 (other apps' slots)")
 

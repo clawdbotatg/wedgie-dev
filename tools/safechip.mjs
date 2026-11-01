@@ -29,6 +29,9 @@ if (appDir) {               // a local checkout instead of the shelf's copy: its
   F.app(a, Object.fromEntries(a.files.filter((n) => existsSync(join(appDir, n))).map((n) => [n, readFileSync(join(appDir, n))])));
 }
 const cart = F.carts.find((c) => c.mod === "safe");
+// safe.py's source, for --frag / --drive to patch: the shelf ships safe.mpy (safe-59+), so the checkout beside this repo.
+// The patched .py goes on as an extra and MicroPython imports it before the .mpy.
+const safeSrc = () => { try { return F.file("safe.py"); } catch { return readFileSync(join(appDir || join(import.meta.dirname, "../../wedgie-safe"), "safe.py")); } };
 // --frag [bytes]: once the app has started, fill the heap and free it again in holes of that size (default 6144),
 // with a small block kept between each two. A heap after hours of use, at its worst: no allocation after the start
 // can be bigger than a hole. A pass means it works on any heap, not on this build's luck (10-28: one more sector in
@@ -36,7 +39,7 @@ const cart = F.carts.find((c) => c.mod === "safe");
 const fragAt = args.indexOf("--frag");
 if (fragAt >= 0) {
   const size = Number(args[fragAt + 1]) || 6144;
-  const src = F.file("safe.py").toString();
+  const src = safeSrc().toString();
   const start = '    _keep()\n    W.send(W.hello(None, type="ready"';
   if (!src.includes(start) || !src.includes("\ndef run():")) throw new Error("--frag: safe.py's run() changed; update safechip");
   F.extra["safe.py"] = Buffer.from(src.replace("\ndef run():", `
@@ -69,7 +72,7 @@ def run():`).replace(start, '    _keep()\n    _frag()\n    W.send(W.hello(None, 
 const driveAt = args.indexOf("--drive");
 if (driveAt >= 0) {
   const size = Number(args[driveAt + 1]) || 13800;
-  const src = (F.extra["safe.py"] || F.file("safe.py")).toString();
+  const src = (F.extra["safe.py"] || safeSrc()).toString();
   if (!src.includes("\ndef run():\n")) throw new Error("--drive: safe.py's run() changed; update safechip");
   F.extra["safe.py"] = Buffer.from(src.replace("\ndef run():\n", `
 _drive_held = None
