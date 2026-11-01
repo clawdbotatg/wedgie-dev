@@ -23,6 +23,7 @@ import { pressModal } from "../ui/askmodal";
 import { askYes } from "../ui/askyes";
 import * as W from "../serial/wedgies";
 import * as Drive from "../serial/drive";
+import type { Repl } from "../serial/repl";
 import * as E from "../safe/eth";
 import { address, addressInput, addressOf, face, watch } from "../safe/address";
 import { describe, type Ctx, type Said } from "../safe/describe";
@@ -1920,13 +1921,41 @@ export function safe(main: HTMLElement) {
     const close = pressModal("Check it", "then sign", "sign");     // its pages say next, then sign
     try {
       // the one way both sites send it (clear-signing-safe-kit): bundle, simulation with its nonce, data in pieces, safe_sign
-      const g = await ask(wedgie, (r) => Sim.wedgieSign({ ask: (m, ms) => r.request(m, ms), tx, simUrl: SIM_URL,
+      const usb = wedgie !== DRIVE;
+      const g = await ask(wedgie, (r) => Sim.wedgieSign({ ask: (m, ms) => usb && m.type === "safe_sign" ? signAsk(r as unknown as Repl, m, ms) : r.request(m, ms),
+        fresh: usb, tx, simUrl: SIM_URL,
         hello: { safe_chunk: chunk, safe_clear: clearTag, safe_sim: simOk ? "p256" : undefined, safe_review: reviewRound } }));
       if (g.type === "refused") throw new Error("The wedgie said no.");
       if (g.type !== "safe_sig") throw new Error(g.error || "The wedgie didn't sign.");
       if (g.safeTxHash !== E.safeTxHash(chain, at, t)) throw new Error("The wedgie signed a different hash: not sent.");
       return slots.map((a) => ({ owner: a, signature: E.safeSignature(a, g as E.WedgieSig) }));
     } finally { asking = false; close(); }
+  }
+  /**
+   * safe_sign over USB says fresh: the first one after a plug-in, Safe Signer (54+) restarts to read without the
+   * WEDGIE drive's ~23 KB, and its restart drops the port. Then it's found again by its board ID and answers the
+   * same id there (Instant Wallet does the same, its wedgie.ts signAsk). Without it, a guardian add on a real
+   * wedgie ran short and read "can't read this" (10-31).
+   */
+  async function signAsk(r: Repl, m: Record<string, unknown>, ms: number): Promise<any> {
+    const sent = Date.now(), uid = wedgie?.uid;
+    const p = r.request(m, ms), id = r.lastId;
+    try { return await p; } catch (e: any) { if (r.alive || !uid || !/unplugged/.test(e?.message || "")) throw e; }
+    say("Getting your wedgie ready…");
+    await r.close();
+    for (let i = 0; ; i++) {
+      const back = await W.waitBack(uid, sent, 20000);
+      if (!back) throw new Error("The wedgie restarted and didn't come back. Unplug it, plug it in, try again.");
+      wedgie = back;
+      try {
+        return await W.withRepl(back, (r2) => new Promise((res, rej) => {
+          const t = window.setTimeout(() => rej(new Error("The wedgie didn't answer after its restart.")), Math.max(5000, sent + ms - Date.now()));
+          r2.onJson = (v) => { if (v?.id === id) { clearTimeout(t); res(v); } };
+        }));
+      } catch (e: any) {        // its USB can drop once more as the drive goes: look again
+        if (!/'open' on 'SerialPort'|open serial port/i.test(String(e?.message || e)) || i >= 5) throw e;
+      }
+    }
   }
   async function walletSig(t: E.SafeTx) {
     const from = account = await wallet(chain);

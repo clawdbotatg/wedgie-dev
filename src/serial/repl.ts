@@ -145,12 +145,14 @@ export class Repl {
   }
 
   private nextId = 100;
+  /** The last request's id: an answer to it can come on a new port (safe.ts, a restart to read on a clean heap). */
+  lastId = 0;
   private pending = new Map<number, { parts: any[]; res: (v: any) => void; rej: (e: Error) => void; t: number; list?: () => void }>();
 
   /** One JSON request to the wedgie firmware (slot.py). Shots and files arrive in parts; they're joined.
    *  list: a job's question asking for its signed list ({"type": "list"}, 0.3.56+); the answer comes after. */
   request(msg: Record<string, unknown>, ms = 5000, list?: () => void): Promise<any> {
-    const id = this.nextId++;
+    const id = this.lastId = this.nextId++;
     traceNote(`→ ${what(msg)} #${id}`);
     return new Promise((res, rej) => {
       const t = window.setTimeout(() => { this.pending.delete(id); traceNote(`✗ no answer: ${what(msg)} #${id} in ${ms} ms`); rej(new Error(`wedgie did not answer (${what(msg)})`)); }, ms);
