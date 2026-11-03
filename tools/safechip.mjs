@@ -281,7 +281,7 @@ function ask(t, k, msg = { type: "safe_sign", tx: t, fresh: 1 }, cb = null, shot
   for (let s = 0; s < 240 && !got; s++) {
     h.until((b) => { const m = b.match(re); if (m) got = JSON.parse(m[0]); return !!m; }, 1000, 20);
     if (!got && shot && !(seen.length && seen[seen.length - 1].equals(frame))) seen.push(Buffer.from(frame));
-    const kk = keys.length ? keys.shift() : k === "A" && s % 2 === 0 ? "down" : k;     // A: the joystick down a page, then A (green only signs, once every page is seen)
+    const kk = keys.length ? keys.shift() : k;
     if (!got && kk !== "wait") press(kk);     // "wait": a second with no press (a slow page)
   }
   seen.forEach((f, i) => png(`${shot}-${i + 1}.png`, f, 240, 240));     // each page it showed, in order
