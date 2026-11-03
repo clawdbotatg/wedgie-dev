@@ -39,7 +39,7 @@
     "@walletconnect/core": "^2.25.0",
     "@walletconnect/utils": "^2.25.0",
     "blo": "^2.1.1",
-    "clear-signing-safe-kit": "github:clawdbotatg/clear-signing-safe-kit#97d1e5bfd916e5205137cab72b481b35b5df7ac3",
+    "clear-signing-safe-kit": "github:clawdbotatg/clear-signing-safe-kit#75929e80e51f5826277ab6fd4a840e3c371ac040",
     "jsqr": "^1.4.0",
     "nodemailer": "^6.9.16",
     "qrcode-generator": "^1.4.4",
