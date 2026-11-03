@@ -910,12 +910,21 @@
     },
     {
       "repo": "clawdbotatg/wedgie-clearsign",
-      "sha": "773f4c43e4bbc570b9837100e74ad23a2e635e27",
-      "at": "2026-11-01T16:27:05Z",
-      "approved": "2026-11-01",
+      "sha": "8bf0dde7748c76c0c92e055cd7c0a803088f4dba",
+      "at": "2026-11-03T07:37:36Z",
+      "approved": "2026-11-03",
       "v": {
-        "clearsign": "00c85b0c6c2c"
-      }
+        "clearsign": "327ec1757301"
+      },
+      "past": [
+        {
+          "sha": "773f4c43e4bbc570b9837100e74ad23a2e635e27",
+          "at": "2026-11-01T16:27:05Z",
+          "v": {
+            "clearsign": "00c85b0c6c2c"
+          }
+        }
+      ]
     }
   ]
 }

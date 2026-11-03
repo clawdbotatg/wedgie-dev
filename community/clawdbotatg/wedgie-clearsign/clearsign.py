@@ -129,11 +129,18 @@ def stamp(yes):
     time.sleep_ms(500)
 
 
+IDLE = 15000    # ms with no press before autopilot starts
+STEP = 4000     # ms per screen in autopilot: blind, then clear, then the next transaction
+
+
 def run():
     i, clear = 0, True
     draw(i, clear)
+    last = shown = time.ticks_ms()
     while True:
+        now = time.ticks_ms()
         for k in keys.pressed():
+            last = now
             if k in ("up", "down"):
                 clear = not clear
             elif k in ("A", "Y"):
@@ -143,4 +150,12 @@ def run():
                 continue
             draw(i, clear)
             keys.pressed()                      # presses made while it drew don't count twice
+            shown = time.ticks_ms()
+        if time.ticks_diff(now, last) >= IDLE and time.ticks_diff(now, shown) >= STEP:    # autopilot
+            if not clear:                       # the raw bytes, then the same one clear, then the next one raw
+                clear = True
+            else:
+                i, clear = (i + 1) % len(TXS), False
+            draw(i, clear)
+            shown = time.ticks_ms()
         time.sleep_ms(20)
