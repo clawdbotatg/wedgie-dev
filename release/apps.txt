@@ -27,7 +27,7 @@ f0224e865a8f55c77b0c13d353b4663e6d9642e99439d98c3045dea3f594ef91  grove.py
 @app  {"mod":"poidh","name":"Poidh Bounties","entry":"run","usb":true,"files":["poidh.py"]}
 9333052151fee99ff38ba0bd4d696f10707f3837abcf019d057fb7740c54e0a1  poidh.py
 @app  {"mod":"safe","name":"Safe Signer","entry":"run","usb":true,"files":["safe.mpy","safe_read.mpy","safe_7730.mpy","safe_8362.mpy","safe_book.mpy","safe_wire.mpy","safe_roots.py","safe_keccak.py","safe_addr.py","safe_blockie.py","safe_key.py","safe_msg.mpy","safe_sim.mpy","safe_icons.py","safe_icons.bin"]}
-0258c884c7f15981fbe1a52e5e76c2bbcea168a23a5f92a5aeb3238c3c2d5868  safe.mpy
+f6c8ca38aa0a53081aae51132ec80593a1ba2fd4c0363f24f523bfad4a0d96fa  safe.mpy
 ad84be5b314ddbdfdd2376e2b265b71e79054326b2b3b5757d4d357692aeee68  safe_read.mpy
 47db073044e0e7f241af28e6ef967d5a781ebcea541da621e20df3c253d6042a  safe_7730.mpy
 343ee1ecbe6837968a2fba670f5e824f8985b7927c78e44508c79b40d84d2920  safe_8362.mpy
@@ -39,7 +39,7 @@ ebb05bac073a564d54741c5ff029132e66ca2001260c080fb9c171481901304e  safe_addr.py
 44e2ec64f5e7c9acd8c50a293ffa16d19f45deaf2201d88bc7dc4c3a5996bb1e  safe_blockie.py
 c94e3e1188f0e7a6fbf8df03066a9b6f63be336d9f81b7279a1cdcfc784e288f  safe_key.py
 8a2404ba50fb5eb86b0bc717ba0e8f1df6c371fa107666ea45b25ebb354f0aba  safe_msg.mpy
-952a68558362793d5cd94d5b8a5e47f4741c7f57d70348c0e46bafcf08aed87c  safe_sim.mpy
+914ddc03486ee382d8a352b30907930c06a8a0c8921f9bcae7a6ab333c1ff71b  safe_sim.mpy
 8039de5fb6b0250004ae979a417a65527180c6fbf7e332543309d4aa1f1e33d9  safe_icons.py
 5103284e98ba1298532b0b5a1f9bb74d1882544795678726c88dda69f63cc012  safe_icons.bin
 @app  {"mod":"secret","name":"Secrets","entry":"run","usb":true,"files":["secret.py","secret_box.py"]}
