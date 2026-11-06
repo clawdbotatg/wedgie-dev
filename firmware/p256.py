@@ -1,6 +1,5 @@
-# NIST P-256 ECDSA in pure Python. Runs on MicroPython (RP2350: ~1 s per signature).
-# Stand-in for the ATECC608 until it is wired. Same output shape: (r, s) with low s.
-import os
+# NIST P-256 ECDSA verify in pure Python, for MicroPython. Verify only: its point math is not
+# constant-time, so signing here would leak the key by timing. Keys sign on a chip, never here.
 
 P = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF
 N = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551
@@ -81,32 +80,6 @@ def _affine(pt):
 def pubkey(d):
     """Private scalar -> (x, y)."""
     return _affine(_mul(d, (GX, GY, 1)))
-
-
-def rand_scalar():
-    while True:
-        k = int.from_bytes(os.urandom(32), "big")
-        if 0 < k < N:
-            return k
-
-
-def sign(d, digest, k=None):
-    """ECDSA over a 32-byte digest. Returns (r, s) with s in the low half, as the verifier requires."""
-    z = int.from_bytes(digest, "big")
-    while True:
-        k = k or rand_scalar()
-        x, _ = _affine(_mul(k, (GX, GY, 1)))
-        r = x % N
-        if r == 0:
-            k = None
-            continue
-        s = (inv(k, N) * (z + r * d)) % N
-        if s == 0:
-            k = None
-            continue
-        if s > N // 2:
-            s = N - s
-        return r, s
 
 
 def verify(qx, qy, digest, r, s, tick=None):

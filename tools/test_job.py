@@ -32,9 +32,17 @@ sel.poll = lambda: types.SimpleNamespace(register=lambda *a: None, poll=lambda m
 sys.modules["select"] = sel
 sys.modules["micropython"] = types.ModuleType("micropython")
 
-import p256          # noqa: E402  (pure Python: signs here as it checks on the wedgie)
+import p256          # noqa: E402  (pure Python: verify, as on the wedgie; sign() below is test-only)
 import wedgie as W   # noqa: E402
 import job           # noqa: E402
+
+def sign(d, digest):
+    """Test-only ECDSA (firmware p256.py is verify only). Low s, as release_ok wants."""
+    z, k = int.from_bytes(digest, "big"), int.from_bytes(os.urandom(32), "big") % (p256.N - 1) + 1
+    r = p256._affine(p256._mul(k, (p256.GX, p256.GY, 1)))[0] % p256.N
+    s = p256.inv(k, p256.N) * (z + r * d) % p256.N
+    return r, min(s, p256.N - s)
+
 
 D = 0x1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDE
 QX, QY = p256.pubkey(D)
@@ -81,7 +89,7 @@ def release(apps=True, extra=None):
             t += "".join(app_line(c) for c in sorted(carts, key=lambda c: c["mod"]))
     if SER[0]:
         t += "@serial  %d\n" % SER[0]
-    r, s = p256.sign(D, hashlib.sha256(t.encode()).digest())
+    r, s = sign(D, hashlib.sha256(t.encode()).digest())
     return t, "%064x %064x" % (r, s)
 
 
