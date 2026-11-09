@@ -1,0 +1,32 @@
+{
+  "apps": [
+    {
+      "mod": "jiro",
+      "name": "Jiro-ikusu",
+      "about": "Jiro-ikusu: capture the field on 16 levels, at 15 Hz, with your best scores kept on this wedgie.",
+      "files": [
+        "wedgie/app/jiro.py",
+        "wedgie/app/jiro_app.mpy",
+        "wedgie/app/jiro_core.mpy",
+        "wedgie/app/jiro_levels.bin"
+      ],
+      "entry": "run",
+      "fw": "0.3.36",
+      "label": "#2850ff",
+      "icon": [
+        "............",
+        ".bbbbbbbbbb.",
+        ".bkkkkkkkkb.",
+        ".bkyyykkwkb.",
+        ".bkyyykkrkb.",
+        ".bkyyykrrbb.",
+        ".bkkkkrrbbb.",
+        ".bkkkrrbbbb.",
+        ".bkkrrbbbbb.",
+        ".bkrrbbbbbb.",
+        ".bbbbbbbbbb.",
+        "............"
+      ]
+    }
+  ]
+}
