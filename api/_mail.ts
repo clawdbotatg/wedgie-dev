@@ -4,9 +4,10 @@
 // with the order) and lock()ed (to send paid and shipped; wiped when it ships). Order tokens are tokenOf(id), so
 // a login can hand them back. All three need SHOP_MAIL_KEY: change it and old orders can't be found by email.
 // Env: SHOP_MAIL_USER, SHOP_MAIL_PASS (the app password), SHOP_MAIL_KEY (any long random string).
-// TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID: a Telegram note to the shop on each paid order (pingPaid).
+// pingPaid: a note to the shop on each paid order, by Telegram and email (_tell.ts).
 // Probes: SHOP_MAIL_FILE = append each mail there as a JSON line instead of sending it.
 import nodemailer from "nodemailer";
+import { tellShop } from "./_tell.js";
 import { appendFileSync } from "node:fs";
 import { env, hmac, sha256, randomHex, extraNow, type db } from "./_shop.js";
 import { nameOf, SHIPS, ITEMS, BUMP, type Line } from "../src/shop/catalog.js";
@@ -68,18 +69,14 @@ export async function mailPaid(sql: Awaited<ReturnType<typeof db>>, id: string, 
   catch { await sql`update orders set paid_mailed = null where id = ${id}`.catch(() => {}); }
 }
 
-/** Telegram to the shop, once per order (paid_pinged): id, items, amount, how. Never the address or email. Never throws. */
+/** A note to the shop (Telegram + email, _tell.ts), once per order (paid_pinged): id, items, amount, how. Never the
+ * address or email. Never throws. */
 async function pingPaid(sql: Awaited<ReturnType<typeof db>>, id: string) {
-  const bot = env("TELEGRAM_BOT_TOKEN"), chat = env("TELEGRAM_CHAT_ID");
-  if (!bot || !chat) return;
   const [o] = await sql`update orders set paid_pinged = now() where id = ${id} and status in ('paid', 'shipped') and paid_pinged is null
     and paid_at > now() - interval '1 day' returning id, lines, cents, pay`;
   if (!o) return;
-  try {
-    const r = await fetch(`https://api.telegram.org/bot${bot}/sendMessage`, { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chat, text: `💰 wedgie order ${o.id} paid: ${items(o.lines)} · ${usd(o.cents)} (${o.pay})` }) });
-    if (!r.ok) throw 0;
-  } catch { await sql`update orders set paid_pinged = null where id = ${id}`.catch(() => {}); }
+  if (!(await tellShop(`💰 wedgie order ${o.id} paid: ${items(o.lines)} · ${usd(o.cents)} (${o.pay})`)))
+    await sql`update orders set paid_pinged = null where id = ${id}`.catch(() => {});
 }
 
 /** Price alerts (api/alert.ts): once the surge is gone, each one gets a mail; ALERT_AGAIN later, the next time it's

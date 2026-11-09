@@ -7,6 +7,7 @@
 import { createPublicClient, http, recoverMessageAddress } from "viem";
 import { base } from "viem/chains";
 import { env, type db } from "./_shop.js";
+import { tellShop } from "./_tell.js";
 
 export const CV_MSG = "larv.ai CV Spend";   // larv.ai checks exactly this
 export const cvApi = () => (env("CV_API") || "https://larv.ai").replace(/\/+$/, "");
@@ -51,11 +52,8 @@ export async function cvClaimed(sql: Awaited<ReturnType<typeof db>>, wallet: str
 
 export const fmtCv = (n: number) => Math.floor(n).toLocaleString("en-US");
 
-/** The one bad state: larv.ai burned the CV but our write failed. Telegram the shop (no address, no email) and keep
+/** The one bad state: larv.ai burned the CV but our write failed. Tell the shop (_tell.ts) (no address, no email) and keep
  * the rows: Austin ships it by hand. Never throws. */
 export async function cvAlarm(id: string, wallet: string) {
-  const bot = env("TELEGRAM_BOT_TOKEN"), chat = env("TELEGRAM_CHAT_ID");
-  if (!bot || !chat) return;
-  await fetch(`https://api.telegram.org/bot${bot}/sendMessage`, { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chat, text: `⚠️ CV claim ${id}: larv.ai burned ${wallet}'s CV but the order didn't save as paid. Check orders.py list; mark it paid by hand.` }) }).catch(() => {});
+  await tellShop(`⚠️ CV claim ${id}: larv.ai burned ${wallet}'s CV but the order didn't save as paid. Check orders.py list; mark it paid by hand.`);
 }
