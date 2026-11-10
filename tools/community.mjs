@@ -127,6 +127,9 @@ async function main() {
       const p = parseRepo(e.repo), head = await resolve(p.owner, p.repo);
       const behind = head.sha !== e.sha;
       console.log(`${e.repo.padEnd(30)} wedgie.dev ${e.sha.slice(0, 7)} (${(e.at || "?").slice(0, 10)})  ${behind ? `GitHub ${head.sha.slice(0, 7)} (${head.at.slice(0, 10)}): newer` : "= GitHub"}`);
+      // Someone else's repo is never taken by a bare `update`: its new commit is unread code (maybe a compiled
+      // .mpy). Name it (update owner/repo), read the diff, rebuild any .mpy from its source, then sign.
+      if (behind && cmd === "update" && !arg && p.owner.toLowerCase() !== "clawdbotatg") { console.log(`  not ours: skipped. Review it, then: node tools/community.mjs update ${e.repo}`); continue; }
       if (behind && cmd === "update") { await add(list, e.repo, head); n++; }
     }
     if (cmd === "status") return;
