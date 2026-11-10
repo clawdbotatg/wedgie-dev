@@ -244,8 +244,14 @@ try {
   const lrm = await ask({ id: 63, type: "rm", path: "main.py" });
   const ldot = await ask({ id: 64, type: "rm", path: "/saves/../main.py" });
   const lsv = await ask({ id: 65, type: "ls", path: "/" });
+  // "/saves/." is every save under a name that reads as one; a hash of a save is a guess at what it holds
+  const lall = await ask({ id: 97, type: "rm", path: "/saves/." });
+  const lsum = await ask({ id: 98, type: "sums", names: ["saves/hello/best.json"] });
+  const lhid = await ask({ id: 99, type: "sums", names: [], exists: ["saves/hello"] });
+  const ltop = await ask({ id: 100, type: "sums", names: ["main.py"] });
   await page.evaluate(() => window.vw.exec("import wedgie\nwedgie.SEALED = False"));
   check([lget, lrm, ldot].every((v) => v[0]?.type === "error") && lsv[0]?.files.some(([p]) => p === "/main.py"), `locked: get / rm outside /saves/ refused, main.py still there (${[lget, lrm, ldot].map((v) => v[0]?.type).join(" ")})`);
+  check([lall, lsum, lhid].every((v) => v[0]?.type === "error") && ltop[0]?.type === "sums", `locked: rm /saves/. and sums of a save refused, sums of its software answers (${[lall, lsum, lhid, ltop].map((v) => v[0]?.type).join(" ")})`);
 
   // a request that blows up while it's decoded (too deep: MemoryError / RecursionError on a board) is
   // dropped; the slot goes on answering

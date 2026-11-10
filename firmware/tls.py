@@ -564,7 +564,7 @@ class Conn:
         self.rd = _Gcm(_label(ss, b"key", b"", 16), _label(ss, b"iv", b"", 12))
         self.log("keys")
 
-        leaf = None
+        leaf, signed = None, False              # signed: the site's CertificateVerify came (its check: _checks)
         while True:
             typ, m = next(msgs)
             if typ == 8:                                      # EncryptedExtensions
@@ -582,10 +582,16 @@ class Conn:
                     raise Error("the site's signature is wrong")
                 content = b" " * 64 + b"TLS 1.3, server CertificateVerify\x00" + th
                 self.checks.append((how, digest(how[1], content), True, bytes(m[8:]), leaf, "signed", "the site's signature is wrong"))
+                signed = True
                 tr(m)
                 th = hs.pop(0).digest()
             elif typ == 20:                                   # Finished
-                if leaf is None or hmac256(_label(ss, b"finished", b"", 32), th) != bytes(m[4:]):
+                # No Finished without the site's signature: Finished only proves the key exchange, which a computer
+                # in the middle does itself. Without this it could replay any site's public certificates, skip the
+                # signature and be that site (audit 11-09; test_tls.py "no CertificateVerify").
+                if leaf is None or not signed:
+                    raise Error("the site didn't sign")
+                if hmac256(_label(ss, b"finished", b"", 32), th) != bytes(m[4:]):
                     raise Error("bad Finished")
                 tr(m)
                 break

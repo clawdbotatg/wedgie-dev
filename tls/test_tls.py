@@ -231,6 +231,58 @@ def fetch2(site, second=None, **pipe):
     return out + [None] * (2 - len(out)), at
 
 
+class Thief:
+    """A computer that IS the site: it holds only the site's public certificates (chain, never a key), does the key
+    exchange itself, sends no CertificateVerify, and answers. send/recv: tls.py's two ends (audit 11-09: this got in)."""
+
+    def __init__(self, chain, answer=b"HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nstole"):
+        self.chain, self.answer, self.out, self.inb, self.stage, self.asked = chain, answer, [], b"", 0, False
+
+    def recv(self):
+        return self.out.pop(0) if self.out else b""
+
+    def send(self, b):
+        self.inb += bytes(b)
+        while len(self.inb) >= 5 and len(self.inb) >= 5 + int.from_bytes(self.inb[3:5], "big"):
+            n = 5 + int.from_bytes(self.inb[3:5], "big")
+            rec, self.inb = self.inb[:n], self.inb[n:]
+            self.stage += 1
+            if self.stage == 1:
+                self.hello(rec[5:])
+            elif self.stage == 3:           # (2: the wedgie's Finished) its request: read it, answer it
+                self.asked = True
+                self.out.append(self.seal(self.wr, 23, self.answer))
+
+    @staticmethod
+    def seal(g, typ, data):
+        hdr = b"\x17\x03\x03" + (len(data) + 17).to_bytes(2, "big")
+        return hdr + bytes(g.seal(hdr, data + bytes([typ])))
+
+    def hello(self, ch):
+        i = ch.find(b"\x00\x17\x00\x41\x04")
+        k = p256()
+        mine = k.public_key().public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
+        dhs = k.exchange(ec.ECDH(), ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), ch[i + 4:i + 69]))
+        ext = lambda t, d: t.to_bytes(2, "big") + len(d).to_bytes(2, "big") + d
+        exts = ext(43, b"\x03\x04") + ext(51, b"\x00\x17\x00\x41" + mine)
+        body = b"\x03\x03" + os.urandom(32) + b"\x20" + ch[39:71] + b"\x13\x01\x00" + len(exts).to_bytes(2, "big") + exts
+        sh = b"\x02" + len(body).to_bytes(3, "big") + body
+        tr = hashlib.sha256(ch + sh)
+        z, empty = bytes(32), tls.sha256(b"")
+        hsec = tls.hmac256(tls._label(tls.hmac256(z, z), b"derived", empty, 32), dhs)
+        ss = tls._label(hsec, b"s hs traffic", tr.copy().digest(), 32)
+        entries = b"".join(len(d).to_bytes(3, "big") + d + b"\x00\x00" for d in (c.public_bytes(serialization.Encoding.DER) for c in self.chain))
+        cb = b"\x00" + len(entries).to_bytes(3, "big") + entries
+        msgs = b"\x08\x00\x00\x02\x00\x00" + b"\x0b" + len(cb).to_bytes(3, "big") + cb
+        tr.update(msgs)                 # no CertificateVerify: straight to Finished
+        fin = b"\x14\x00\x00\x20" + tls.hmac256(tls._label(ss, b"finished", b"", 32), tr.copy().digest())
+        tr.update(fin)
+        sap = tls._label(tls.hmac256(tls._label(hsec, b"derived", empty, 32), z), b"s ap traffic", tr.digest(), 32)
+        self.wr = tls._Gcm(tls._label(sap, b"key", b"", 16), tls._label(sap, b"iv", b"", 12))
+        self.out.append(b"\x16\x03\x03" + len(sh).to_bytes(2, "big") + sh)
+        self.out.append(self.seal(tls._Gcm(tls._label(ss, b"key", b"", 16), tls._label(ss, b"iv", b"", 12)), 22, msgs + fin))
+
+
 def must_fail(site, what, **kw):
     r = fetch(site, **kw)
     check(r[0] == "error", "%s -> %s" % (what, r[1] if r[0] != "crash" else "CRASH " + r[1]))
@@ -317,6 +369,12 @@ def main():
         check(False, "a bad CertificateVerify was taken")
     except tls.Error as e:
         check(True, "a bad CertificateVerify -> %s" % e)
+    th = Thief([c, inter])      # the site's public certificates, no key, no CertificateVerify
+    try:
+        got = tls.Conn(HOST, th.send, th.recv, chip=Soft()).get("/")
+        check(False, "no CertificateVerify was taken: %r" % got)
+    except tls.Error as e:
+        check(not th.asked, "no CertificateVerify -> %s%s" % (e, " (but the request went out)" if th.asked else ""))
     rk = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     must_fail(Site(k, [c, inter], tls12=True), "a TLS 1.2 site")
     k16 = p384()

@@ -225,8 +225,10 @@ def _handle(m):
         W.send(dict(W.chip(), id=mid))
     elif t == "ping":
         W.send({"id": mid, "type": "pong"})
-    elif t in ("press", "shot") and W.SEALED and not W.is_open():    # locked: a computer neither sees the screen
-        W.send({"id": mid, "type": "error", "error": "locked: needs a yes on its screen (open)"})  # nor presses keys (Austin 10-19)
+    elif W.SEALED and not W.is_open() and (t in ("press", "shot") or t == "sums" and (   # locked: a computer neither sees
+            "/" in "".join((m.get("names") or []) + (m.get("exists") or [])))):    # the screen
+        # nor presses keys (Austin 10-19), and hashes only its software at the top: never a save (audit 11-09)
+        W.send({"id": mid, "type": "error", "error": "locked: needs a yes on its screen (open)"})
     elif t == "press":
         try:
             L.press(m.get("key"), m.get("ms", 80))
@@ -307,7 +309,8 @@ def _saves_only(p, t="get"):
     p = str(p or "")
     if t == "get" and p.lstrip("/") in (W.LOG, W.LOG1):
         return True
-    return p.startswith("/saves/") and ".." not in p.split("/")
+    # no "." either: /saves/. asked "Delete saves ." and deleted them all (audit 11-09)
+    return p.startswith("/saves/") and ".." not in p.split("/") and "/./" not in p + "/"
 
 
 ASK_MS = 60000      # no answer to "let this computer in?" in a minute is a no
