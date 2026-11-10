@@ -13,8 +13,16 @@ export async function GET(req: Request) {
     const r = await fetch(u, { redirect: "follow", signal: AbortSignal.timeout(5000) });
     const type = (r.headers.get("content-type") || "").split(";")[0].trim();
     if (!r.ok || !/^image\/(png|jpeg|gif|webp|x-icon|vnd\.microsoft\.icon|svg\+xml)$/.test(type)) return no(404);
-    const body = await r.arrayBuffer();
-    if (body.byteLength > MAX) return no(413);
+    if (Number(r.headers.get("content-length") || 0) > MAX) return no(413);
+    const reader = r.body!.getReader(), parts: Uint8Array[] = [];     // the cap as it comes: never a huge answer in memory
+    let n = 0;
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      if ((n += value.length) > MAX) { reader.cancel().catch(() => {}); return no(413); }
+      parts.push(value);
+    }
+    const body = Buffer.concat(parts);
     return new Response(body, { headers: {
       "Content-Type": type,
       "Cache-Control": "public, max-age=86400",

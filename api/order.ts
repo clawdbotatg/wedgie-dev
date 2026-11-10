@@ -118,7 +118,9 @@ async function claim(sql: Awaited<ReturnType<typeof db>>, b: any, origin: string
   if (!r.ok) {
     await undo();
     if (r.short != null) return oops(`This wallet has ${fmtCv(r.short)} CV. A wedgie takes ${fmtCv(cvCost())}.`, 402);
-    return oops("larv.ai didn't answer. Nothing was burned.", 502);
+    // No answer isn't a no: larv.ai may have burned it and its answer got lost. Don't promise; the shop is told.
+    await cvAlarm(id, wallet, true);
+    return oops("larv.ai didn't answer, so we can't tell if your CV was burned. If it went down, write to wedgie@buidlguidl.com.", 502);
   }
   try {
     await sql`update orders set status = 'paid', paid_at = now() where id = ${id}`;

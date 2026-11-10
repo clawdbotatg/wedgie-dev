@@ -54,6 +54,7 @@ export const fmtCv = (n: number) => Math.floor(n).toLocaleString("en-US");
 
 /** The one bad state: larv.ai burned the CV but our write failed. Tell the shop (_tell.ts) (no address, no email) and keep
  * the rows: Austin ships it by hand. Never throws. */
-export async function cvAlarm(id: string, wallet: string) {
+export async function cvAlarm(id: string, wallet: string, unsure = false) {
+  if (unsure) { await tellShop(`⚠️ CV claim ${id}: larv.ai didn't answer the burn for ${wallet}. The order was dropped; if its CV went down, it's owed a wedgie.`); return; }
   await tellShop(`⚠️ CV claim ${id}: larv.ai burned ${wallet}'s CV but the order didn't save as paid. Check orders.py list; mark it paid by hand.`);
 }
