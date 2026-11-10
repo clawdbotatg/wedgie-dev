@@ -22,6 +22,11 @@ cf5456e981f7230c0e2b3e1e6a1658c7482159708047d44f89e490aad1891d66  frog.py
 73267cc4d9bcc4cd5bd31117476f67ee7817db055e39274c5636df5a563169c0  g2048.py
 @app  {"mod":"grove","name":"Crystal Grove","entry":"run","files":["grove.py"]}
 f0224e865a8f55c77b0c13d353b4663e6d9642e99439d98c3045dea3f594ef91  grove.py
+@app  {"mod":"jiro","name":"Jiro-ikusu","entry":"run","files":["jiro.py","jiro_app.mpy","jiro_core.mpy","jiro_levels.bin"]}
+65c77f2e2a668ad9eedb0b989e9cde4eb86a4c5d55dbfcaed527e6e481797c6e  jiro.py
+fe650ebf283f78aab917848e5a383a3ef0f7ed168fbe7e0511816a83170789b0  jiro_app.mpy
+33bb2889ab1ea949834a69d3936f03ad5ff28a38b50ca016ce8f72317e70bdf7  jiro_core.mpy
+df608681fbe81de3d918c0d12f11455031ba08658865a5765369764d5d93847e  jiro_levels.bin
 @app  {"mod":"keypad","name":"Keypad","entry":"run","files":["keypad.py"]}
 0cf9561df639b610056d896dbf503f37d4df3c1ef59eab58dfd3118913be23aa  keypad.py
 @app  {"mod":"poidh","name":"Poidh Bounties","entry":"run","usb":true,"files":["poidh.py"]}
