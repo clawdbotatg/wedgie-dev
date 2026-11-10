@@ -124,7 +124,10 @@ async function main() {
     let n = 0;
     for (const e of [...list.repos]) {
       if (arg && e.repo.toLowerCase() !== arg.toLowerCase()) continue;
-      const p = parseRepo(e.repo), head = await resolve(p.owner, p.repo);
+      const p = parseRepo(e.repo);
+      let head;
+      // A repo that's gone from GitHub (deleted, private) doesn't stop the rest: the shelf keeps our signed copy.
+      try { head = await resolve(p.owner, p.repo); } catch (err) { console.log(`${e.repo.padEnd(30)} wedgie.dev ${e.sha.slice(0, 7)}  can't read GitHub (${err.message}): kept as it is`); continue; }
       const behind = head.sha !== e.sha;
       console.log(`${e.repo.padEnd(30)} wedgie.dev ${e.sha.slice(0, 7)} (${(e.at || "?").slice(0, 10)})  ${behind ? `GitHub ${head.sha.slice(0, 7)} (${head.at.slice(0, 10)}): newer` : "= GitHub"}`);
       // Someone else's repo is never taken by a bare `update`: its new commit is unread code (maybe a compiled
