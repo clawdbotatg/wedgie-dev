@@ -737,13 +737,20 @@
     },
     {
       "repo": "clawdbotatg/wedgie-bunker",
-      "sha": "4b4f2a8abe5b23e82c9aaa6a8a3a74ec7b01a125",
-      "at": "2026-10-04T20:23:06Z",
-      "approved": "2026-10-04",
+      "sha": "d9820dc7b15bc108bee49aad08363437c94e3271",
+      "at": "2026-11-10T16:01:18Z",
+      "approved": "2026-11-10",
       "v": {
-        "bunker": "7b3bf2bb4266"
+        "bunker": "9f57e751b9b5"
       },
       "past": [
+        {
+          "sha": "4b4f2a8abe5b23e82c9aaa6a8a3a74ec7b01a125",
+          "at": "2026-10-04T20:23:06Z",
+          "v": {
+            "bunker": "7b3bf2bb4266"
+          }
+        },
         {
           "sha": "ea6e1fdf9ab5c81d3d8d57c9189e6ef68ebba784",
           "at": "2026-10-04T17:03:50Z",
