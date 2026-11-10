@@ -61,6 +61,7 @@ export function home(main: HTMLElement): Promise<unknown> {
       <div>
         <h3>Print the case</h3>
         <p>A snap-together shell with no screws, designed from scratch and MIT licensed. PETG, 0.16 mm layers, 4 walls, no supports. Print the lid face down, the base floor down, and the caps flange down.</p>
+        <p class="note bad"><b>The joystick needs <a href="https://github.com/clawdbotatg/clawd-pico-case/blob/main/stl/current/JOYSTICK-PRINT.md" target="_blank" rel="noopener">special settings</a>.</b> Printed like the rest, it comes out bad.</p>
         <div class="row"><a class="btn btn-sm" href="https://github.com/clawdbotatg/clawd-pico-case/tree/main/stl/current" target="_blank" rel="noopener">The case files →</a></div>
         <p class="fine">White lid, black base, grey joystick; buttons 2 grey, 1 green, 1 red. <b>Atomic wedgie</b>: its own <a href="https://github.com/clawdbotatg/clawd-pico-case/tree/main/stl/atomic-wedgie" target="_blank" rel="noopener">base and RESET plunger</a>.</p>
         <p class="fine">Source, measurements, and every iteration: <a href="https://github.com/clawdbotatg/clawd-pico-case" target="_blank" rel="noopener">clawd-pico-case</a>. Why it's called a wedgie: <a href="/lore.md" target="_blank">the lore</a>.</p>

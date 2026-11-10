@@ -334,7 +334,7 @@ export async function build(main: HTMLElement) {
         <div class="buy">${c.buy.map(([u, t]) => link(u, t)).join("")}${i ? link("https://www.adafruit.com/product/4399", "50 mm cable") : link("https://www.adafruit.com/product/4209", "Cable")}</div></li>`).join("")}
       <li><b>Get the filament</b> <span>1.75 mm. The case in PETG; buttons and joystick in PETG or PLA.</span>
         <div class="buy">${filament()}</div></li>
-      <li><b>Print the case</b> <span>0.16 mm layers, 4 walls, no supports. Lid in ${cname("lid").toLowerCase()}, base in ${cname("base").toLowerCase()}, joystick in ${cname("stick").toLowerCase()}, buttons: ${buttons}.</span>
+      <li><b>Print the case</b> <span>0.16 mm layers, 4 walls, no supports. Lid in ${cname("lid").toLowerCase()}, base in ${cname("base").toLowerCase()}, joystick in ${cname("stick").toLowerCase()}, buttons: ${buttons}. <b>The joystick needs <a href="https://github.com/clawdbotatg/clawd-pico-case/blob/main/stl/current/JOYSTICK-PRINT.md" target="_blank" rel="noopener">special settings</a>.</b></span>
         <div class="buy">${[["lid.stl", `Lid · ${cname("lid")}`], ["base.stl", `Base · ${cname("base")}`], ["joystick.stl", `Joystick · ${cname("stick")}`], ["button.stl", "Button ×4"]]
           .map(([f, t]) => `<a class="btn btn-xs" href="${CASE}${f}" download>${t}</a>`).join("")}</div></li>
       <li><b>Put it together</b> <span>${picked.length ? `Wedge the wires in, then the ${picked.length > 1 ? "boards" : "board"}, then the case.` : "Plug the Pico into the hat, then snap the case on. Skip the chip steps."}</span>

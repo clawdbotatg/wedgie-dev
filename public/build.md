@@ -135,6 +135,8 @@ A snap-together printed shell, no screws, MIT: https://github.com/clawdbotatg/cl
 
 - **Print:** PETG, 0.16 mm layers, 4 walls, no supports. Lid face down, base floor down, caps flange down. Caps
   can be PETG or PLA.
+- **The joystick needs special settings:** https://github.com/clawdbotatg/clawd-pico-case/blob/main/stl/current/JOYSTICK-PRINT.md
+  Printed like the rest, it comes out bad.
 - **Colors:** white lid, black base, grey joystick; buttons 2 grey, 1 green (A), 1 red (Y). The buttons carry no
   letters: to people, A is "the green button", Y "the red button", B and X "the grey buttons".
 - **Atomic wedgie:** a variant with its own base and a RESET plunger, and a LiPo on VSYS.
