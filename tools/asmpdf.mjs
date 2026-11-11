@@ -23,11 +23,12 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><style>${css()}</
   </div>
   <div class="need"><h2>In your kit</h2><ul>
     <li>RP2040 Pico with headers</li><li>Screen board: Waveshare Pico-LCD-1.3</li><li>Chip board: Adafruit OPTIGA Trust M (4351)</li><li>STEMMA QT / Qwiic cable</li>
+    <li>USB cable (USB-C and USB-A)</li>
     <li>Case: black base, white lid, joystick cap, 4 buttons</li>
   </ul></div>
   <div class="need"><h2>You need</h2><ul>
     <li>Wire stripper</li><li>Electrical tape</li><li>A stiff wire or pin</li><li>Tweezers</li>
-    <li>Pliers (step 10, if needed)</li><li>USB data cable that fits your Pico</li><li>A computer with Chrome</li>
+    <li>Pliers (step 10, if needed)</li><li>A computer with Chrome</li>
   </ul></div>
 </section>
 <div class="steps">
