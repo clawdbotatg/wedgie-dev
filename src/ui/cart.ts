@@ -22,7 +22,7 @@ export function iconUrl(c: Pick<Cart, "mod" | "icon">) {
 /** The cart's inner HTML (inside a <button class="cart">). */
 export function cartHtml(c: Cart) {
   // .cart (the button) carries the shadow; .cart-body is clipped to the shell's cut corner.
-  return `<span class="cart-body"><span class="cart-ridges"></span>
+  return `<span class="cart-body${c.chipuse ? " chipuse" : ""}"><span class="cart-ridges"></span>
     <span class="cart-label" style="--label:${esc(c.label || "#8a8c8e")}">
       <img class="cart-icon" src="${iconUrl(c)}" alt="" width="48" height="48">
       <span class="cart-name">${esc(c.name)}</span>

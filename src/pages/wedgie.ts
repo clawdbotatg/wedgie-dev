@@ -110,6 +110,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
           <div class="card wd-sec carts">
             <h3>Software</h3>
             <p class="fine" id="d-carts-note"></p>
+            <p class="fine cart-legend"><i></i>Red cartridges use the secure chip.</p>
             <div class="shelf" id="d-shelf"></div>
             <div class="row build"><a class="btn btn-sm" href="/code">Build</a><span class="fine">your own software for it.</span></div>
             <details class="repo-add" id="d-repo-box">
@@ -516,7 +517,8 @@ Not covered: apps and MicroPython itself.
     const shelf = $("#d-shelf");
     const mods = new Set(m.carts.map((c) => c.mod));
     shelf.querySelectorAll<HTMLElement>(".cart-slot").forEach((el) => { if (!mods.has(el.dataset.mod!)) el.remove(); });
-    m.carts.forEach((c, i) => {
+    // red cartridges (they use the secure chip) first; the rest keep their order
+    [...m.carts.filter((c) => c.chipuse), ...m.carts.filter((c) => !c.chipuse)].forEach((c, i) => {
       let slotEl = shelf.querySelector<HTMLElement>(`.cart-slot[data-mod="${c.mod}"]`);
       if (slotEl && slotEl.dataset.v !== c.v) { slotEl.remove(); slotEl = null; }   // a reloaded repo: a new cart
       if (!slotEl) {
@@ -524,7 +526,7 @@ Not covered: apps and MicroPython itself.
         slotEl.dataset.v = c.v;
         slotEl.className = "cart-slot";
         slotEl.dataset.mod = c.mod;
-        slotEl.innerHTML = `<button class="cart" title="${esc(c.about || "")}">${cartHtml(c)}</button><p class="cart-about">${esc(c.about || "")}</p>${c.chipuse ? `<p class="cart-chip" title="Its code talks to the secure chip: it can make keys and sign with them.">Uses the secure chip</p>` : ""}${c.repo ? `<p class="cart-from${c.unreviewed ? " unreviewed" : ""}">${c.unreviewed ? "not reviewed · " : "by "}<a href="https://github.com/${esc(c.repo)}" target="_blank" rel="noopener">${esc(c.repo)}</a>${c.sha && /^[0-9a-f]{40}$/.test(c.sha) ? ` · ${verLink(c.repo, { sha: c.sha, at: c.at, version: c.version }, esc)}` : ""}</p>` : ""}<p class="cart-needs" hidden></p><p class="cart-ver" hidden></p><div class="cart-acts">${PAGES[c.mod] ? `<a class="btn btn-xs btn-green" data-cart="page" href="${PAGES[c.mod].href}" hidden>${esc(PAGES[c.mod].label)}</a>` : ""}<button class="btn btn-xs btn-green" data-cart="update" hidden>Update</button><button class="btn btn-xs btn-red" data-cart="uninstall" hidden>Uninstall</button></div>`;
+        slotEl.innerHTML = `<button class="cart" title="${esc(c.about || "")}">${cartHtml(c)}</button><p class="cart-about">${esc(c.about || "")}</p>${c.repo ? `<p class="cart-from${c.unreviewed ? " unreviewed" : ""}">${c.unreviewed ? "not reviewed · " : "by "}<a href="https://github.com/${esc(c.repo)}" target="_blank" rel="noopener">${esc(c.repo)}</a>${c.sha && /^[0-9a-f]{40}$/.test(c.sha) ? ` · ${verLink(c.repo, { sha: c.sha, at: c.at, version: c.version }, esc)}` : ""}</p>` : ""}<p class="cart-needs" hidden></p><p class="cart-ver" hidden></p><div class="cart-acts">${PAGES[c.mod] ? `<a class="btn btn-xs btn-green" data-cart="page" href="${PAGES[c.mod].href}" hidden>${esc(PAGES[c.mod].label)}</a>` : ""}<button class="btn btn-xs btn-green" data-cart="update" hidden>Update</button><button class="btn btn-xs btn-red" data-cart="uninstall" hidden>Uninstall</button></div>`;
         // A tap on the cart puts it on (or updates it). The app on it comes off only by its Uninstall button.
         slotEl.querySelector<HTMLButtonElement>(".cart")!.onclick = () => (active() === c.mod && (w?.carts || [])[0]?.v === c.v ? undefined : pick(c));
         slotEl.querySelector<HTMLButtonElement>('[data-cart="update"]')!.onclick = () => pick(c);
