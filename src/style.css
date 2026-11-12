@@ -1096,3 +1096,4 @@ p.surge, .order-body > p.surge { margin: 4px 0 0; font-size: 22px; color: var(--
 .tg-sticker.joined { width: min(110px, 28vw); animation: none; opacity: .85; }
 .tg-sticker.joined:hover { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { .tg-sticker { animation: none; } }
+.wd ~ .tg-sticker { width: min(150px, 34vw); }

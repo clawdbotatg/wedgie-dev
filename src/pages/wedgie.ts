@@ -29,6 +29,7 @@ import * as F from "../ui/facts";
 import { cmpVersion } from "../apps/appjson.mjs";
 import { loadRepo, savedRepos, saveRepo, forgetRepo, withRepos, type Repo } from "../apps/repos";
 import { bugReport, readLog } from "../ui/report";
+import { tgSticker } from "../ui/tg";
 
 const APP_SAMPLE = `# A wedgie app: draw with lcd, read the buttons, tick on a Timer so USB stays free.
 # Every button is yours. "Make it its app" puts it on as the one app the wedgie boots into.
@@ -157,6 +158,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
   const $ = <T extends Element = HTMLElement>(s: string) => main.querySelector(s) as T;
   $<HTMLAnchorElement>(".back").onclick = (e) => { e.preventDefault(); go("/connect"); };
   // Picked another: the list (two now, or a new Pico's Set up card). Cancelled, or this one is mid-job: stay.
+  const tg = tgSticker(main);
   $<HTMLButtonElement>("#d-another").onclick = () => { if (!busy && !job) W.connectNew().then(() => go("/connect"), () => {}); };
   // The bug report reads its log over live USB while we hold the port; busy or not live: the page's side only.
   $<HTMLButtonElement>("#d-report").onclick = (e) => {
@@ -382,6 +384,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     else if (!there && wasHere) { wasHere = false; expectBack(); }      // it dropped: give it time to come back
     const coming = backBy > Date.now(), late = !!backBy && !coming && seenOnce;
     const here = there && !coming;
+    tg(here && w!.state === "ready" && !w!.virtual);
     paintJob(here, coming);
     $("#d-job").hidden = !job;
     $("#d-missing").hidden = !!job || (here && w!.state !== "error");
