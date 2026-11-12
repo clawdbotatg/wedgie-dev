@@ -118,7 +118,6 @@ https://wedgie.dev/connect or `python3 wedgie.py use <mod>`. One app runs at a t
 | 2048 | g2048 | clawdbotatg/wedgie-2048 | slide the tiles |
 | Blackjack | blackjack | clawdbotatg/wedgie-blackjack | beat the dealer; the secure chip shuffles |
 | ETH Price | ethprice | clawdbotatg/wedgie-ethprice | the ETH price and the newest Ethereum and Base blocks (uses the internet, below) |
-| Poidh Bounties | poidh | swiftbotlab/wedgie-poidh | live poidh.xyz bounties and claims (needs its own bridge on the computer) |
 
 **Any public GitHub repo** with a `wedgie.json` can be added on a wedgie's page (Software, "Apps from a GitHub
 repo"). It is not signed and installs with full access: only repos you trust. Make one: code.md; starter:
