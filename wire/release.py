@@ -246,7 +246,7 @@ def main():
     with open(os.path.join(base, "index.json"), "w") as f:
         json.dump({"tag": tag, "registry": sha, "issued": issued, "roots": {k: v.hex() for k, v in roots.items()},
                    "audited": n["a"], "notAudited": n["b"], "tokens": nt, "auditors": sorted(set(AUDITORS.values())),
-                   "clearMax": CLEAR_MAX}, f, indent=1)
+                   "clearMax": CLEAR_MAX, "chains": sorted({c for c, _ in files})}, f, indent=1)
     with open(roots_py, "w") as f:
         f.write("# Safe Signer: the roots of the clear-signing data it trusts. Made by wedgie-dev wire/release.py, don't edit.\n"
                 "# Registry %s, issued %d. a: audited (%s) descriptors and tokens; b: the rest, \"not audited\".\n"

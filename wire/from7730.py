@@ -306,6 +306,10 @@ def _param(f, ctx, base):
     if isinstance(p.get("nativeCurrencyAddress"), str):
         p["nativeCurrencyAddress"] = [p["nativeCurrencyAddress"]]
     if fmt == "raw":
+        # a slice of a number's bytes is bytes, not a number ("x.[0:32]" of a uint256 key: the registry shows hex)
+        if isinstance(f.get("path"), str) and _steps(f["path"]) and _slice(_steps(f["path"])[-1]) not in (None, (None, None)) \
+                and val[0] in (1, 2) and val[2][0] == 0 and val[2][1][-1][0] == SLICE:
+            val = [7, val[1], val[2]]
         return [0, val]
     if fmt == "amount":
         return [1, val]
