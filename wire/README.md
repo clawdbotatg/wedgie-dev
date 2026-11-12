@@ -37,7 +37,22 @@ cp -r ../wedgie-safe /tmp/app && uv run ... python3 wire/release.py /tmp/reg /tm
 node tools/safechip.mjs --app /tmp/app --clear /tmp/clear --txs /tmp/v2.json --shots /tmp/v2   # <case>-<page>.png
 ```
 
-Put them on wedgie.dev/clear: `python3 tools/clear_page.py uniswap-v2 "Uniswap V2" /tmp/v2.json /tmp/v2 "<note>"`.
+Put them on wedgie.dev/clear by hand (only for what the registry doesn't have yet: ours, an open PR):
+`python3 tools/clear_page.py uniswap-v3 "Uniswap SwapRouter02" /tmp/v3.json /tmp/v3 "<note>"`.
+
+## wedgie.dev/clear: the whole registry
+
+Every test transaction in the registry, on the shelf's Safe Signer and its data, most used first, with a verdict
+each (matches the registry's test, differs, can't read) and the busiest mainnet calls with no descriptor. Redo it
+after a release (hours of virtual chips; a second run does only what's missing):
+
+```
+git clone https://github.com/ethereum/clear-signing-erc7730-registry /tmp/reg     # at the commit safe_roots.py names
+python3 tools/clear_gallery.py usage /tmp/usage.json
+python3 tools/clear_gallery.py run /tmp/reg /tmp/work --usage /tmp/usage.json
+RESULTS=/tmp/verdicts.json uv run ... python3 tools/test_clear.py /tmp/reg ../wedgie-safe
+python3 tools/clear_gallery.py publish /tmp/work /tmp/verdicts.json /tmp/usage.json
+```
 
 ## Make a release (new registry data)
 

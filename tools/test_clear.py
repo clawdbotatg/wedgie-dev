@@ -157,44 +157,55 @@ def ok_diff(label, got, want):
 
 OURS = {(c, a, s) for c, a, s, *_ in release.ours()}     # our descriptors (clear-descriptors): our words, not the test's
 stats, why = collections.Counter(), collections.defaultdict(list)
+per, nth = {}, collections.Counter()      # RESULTS=<file>: a verdict a transaction, "<test file>#<its place in it>"
 for fn, t, dp in tests:
+    key = "%s#%d" % (fn, nth[fn])
+    nth[fn] += 1
     chain, to, value, data = decode(t["rawTx"])
     if chain not in release.CHAINS or fn.replace("/testsv2/", "/").replace(".tests.json", ".json") in skipped:
+        per[key] = "out"
         stats["out of scope"] += 1          # a chain Safe Signer doesn't do, or a file the wire format can't carry
         continue
     tx = {"chainId": chain, "safe": t.get("from", "0x" + "00" * 20).lower(), "to": "0x" + to.hex(), "value": value, "data": data}
     try:
         intent, owner, trust, its = R.items(tx, bundle(chain, to, data))
     except R.Bad as e:
+        per[key] = "refused"
         stats["refused"] += 1
         why["refused: " + str(e).split(":")[0][:50]].append(fn + " :: " + t["description"])
         continue
     if (chain, to, data[:4]) in OURS:
+        per[key] = "ours"
         stats["ours: reads, in our own words"] += 1
         continue
     its = [x for x in its if x[2] != "label" and x[0]]          # group labels and our own warnings: extra lines
     want = t["expected"]
     wf = want.get("fields", [])
     if intent != want.get("intent") and not isinstance(want.get("intent"), dict):
+        per[key] = "differs"
         stats["intent"] += 1
         why["intent differs"].append("%s :: %r vs %r" % (fn, intent, want.get("intent")))
         continue
     if [l for l, _, _ in its] != [f["label"] for f in wf]:
+        per[key] = "differs"
         stats["labels"] += 1
         why["labels differ"].append("%s :: %s vs %s" % (fn + " :: " + t["description"], [l for l, _, _ in its], [f["label"] for f in wf]))
         continue
     diff = [(l, g, f["value"]) for (l, g, k), f in zip(its, wf) if not same(g, f["value"], dp, k)]
     known = [d for d in diff if not ok_diff(*d)]
     if diff and not known:
+        per[key] = "onpurpose"
         stats["match, but shows more or less on purpose"] += 1
         stats[trust] += 1
         continue
     if diff:
+        per[key] = "differs"
         stats["values"] += 1
         why["values differ"].append("%s :: %s" % (fn + " :: " + t["description"], diff[:2]))
         for l, g, wv in known:
             why["diff"].append((fn, l, g, wv))
     else:
+        per[key] = "match"
         stats["match"] += 1
         stats[trust] += 1
 
@@ -230,6 +241,8 @@ tk[3] = "USDC"
 its = R.items(tx, bytes(wire.dumps({8: [tk], 13: [wire.loads(d)]})))[3]
 check(its[0][2] == "token?", "a token renamed by the host is ignored: %r" % (its[0][1],))
 
+if os.environ.get("RESULTS"):
+    json.dump(per, open(os.environ["RESULTS"], "w"))
 if os.environ.get("DUMP"):
     json.dump(why, open(os.environ["DUMP"], "w"), indent=0, default=repr)
 n = len(tests) - stats["out of scope"]
