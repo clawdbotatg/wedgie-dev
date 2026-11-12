@@ -3,6 +3,8 @@
 // /connect/<ID> (pages/wedgie.ts): hardware, firmware update, its app, saves. Both are one page app, so
 // going between them never reloads (a reload would close every port and identify every wedgie again).
 // Above the rows: a board with no wedgie firmware yet (a new Pico in boot mode, ...) and its Set up (setup.ts).
+// One working wedgie and nothing to set up: the list is a wasted tap, so arriving here (a page load, the
+// header's Connect) goes straight to its page. "All wedgies" and Back still show the list.
 import { esc } from "../ui/device";
 import { place3D, idScreen, baseColor } from "../ui/place3d";
 import * as W from "../serial/wedgies";
@@ -12,29 +14,45 @@ import { wedgiePage } from "./wedgie";
 import { setupCard, needsSetup } from "./setup";
 import { bugReport, readLog } from "../ui/report";
 import * as FS from "../serial/files";
+import { tgSticker } from "../ui/tg";
 
 let manifest: Manifest | undefined;
 
+/** The ID of the one wedgie here, if it's the only board and it's ready. */
+const only = () => {
+  const ws = W.wedgies(), w = ws[0];
+  return ws.length === 1 && w.state === "ready" && w.short && !needsSetup(w) ? w.short : "";
+};
+
 export function connect(main: HTMLElement) {
   let cleanup: (() => void) | null = null;
+  let auto = true;     // arrived (not came back): the list may hand over to the one wedgie
   const route = () => {
     cleanup?.();
     const m = location.pathname.replace(/\/+$/, "").match(/^\/connect\/([^/]+)$/);
-    cleanup = m ? wedgiePage(main, decodeURIComponent(m[1]).toUpperCase(), go) : list(main, go);
+    const jump = auto ? (id: string) => queueMicrotask(() => {      // replace: Back never lands on a list that jumps again
+      if (location.pathname.replace(/\/+$/, "") !== "/connect") return;
+      history.replaceState(null, "", `/connect/${id}`); route();
+    }) : undefined;
+    auto = false;
+    cleanup = m ? wedgiePage(main, decodeURIComponent(m[1]).toUpperCase(), go) : list(main, go, jump);
     scrollTo(0, 0);
   };
-  const go = (path: string) => { history.pushState(null, "", path); route(); };
+  const go = (path: string, arrive = false) => { auto = arrive; history.pushState(null, "", path); route(); };
   addEventListener("popstate", route);
   // The header's Connect (once it counts wedgies it's a plain link to /connect): stay in this page app.
   document.getElementById("connect-btn")?.addEventListener("click", (e) => {
     if (e.defaultPrevented || e.metaKey || e.ctrlKey || location.pathname === "/connect") return;
-    e.preventDefault(); go("/connect");
+    e.preventDefault();
+    const id = only();
+    if (id && location.pathname === `/connect/${id}`) return;     // already on the one wedgie's page
+    go("/connect", true);
   });
   route();
   W.start();
 }
 
-function list(main: HTMLElement, go: (path: string) => void) {
+function list(main: HTMLElement, go: (path: string) => void, jump?: (id: string) => void) {
   main.innerHTML = `
   <section class="sec connect">
     <div class="sec-head">
@@ -44,20 +62,12 @@ function list(main: HTMLElement, go: (path: string) => void) {
     <div id="setup"></div>
     <div class="rows" id="rows"></div>
     <div class="row center" id="plug-actions"></div>
-  </section>
-  <a class="tg-sticker" id="tg-sticker" href="/telegram" hidden><img src="/img/telegram-sticker.webp" alt="Join the Wedgies Telegram"></a>`;
+  </section>`;
   const rows = main.querySelector<HTMLElement>("#rows")!;
   const actions = main.querySelector<HTMLElement>("#plug-actions")!;
-  const tg = main.querySelector<HTMLElement>("#tg-sticker")!;   // shows once a real wedgie is plugged in and talking
-  // Seen 3+ times: smaller, slower wiggle. Joined (tapped Join the chat on /telegram): smaller still, still.
-  let tgCounted = false;
-  const tgShow = () => {
-    let seen = 0, joined = false;
-    try { seen = +(localStorage.getItem("tg-seen") || 0) + 1; localStorage.setItem("tg-seen", String(seen)); joined = !!localStorage.getItem("tg-joined"); } catch {}
-    tg.classList.toggle("calm", seen > 3);
-    tg.classList.toggle("joined", joined);
-  };
-  const setup = setupCard(main.querySelector<HTMLElement>("#setup")!);
+  const tg = tgSticker(main);
+  const setupEl = main.querySelector<HTMLElement>("#setup")!;
+  const setup = setupCard(setupEl);
   firmwareManifest().then((m) => { manifest = m; draw(); }).catch(() => {});
 
   const screenFor = (w: W.Wedgie) => w.state === "identifying" ? idScreen("...", "finding it") : w.state === "error" ? idScreen("?", "can't talk") : idScreen(w.short || "", w.board);
@@ -65,9 +75,11 @@ function list(main: HTMLElement, go: (path: string) => void) {
   // Repaint by key: frames change several times while a wedgie identifies; keep nodes stable (each row
   // holds a 3D wedgie that must not be rebuilt).
   function draw() {
+    if (jump && W.wedgies().length > 1) jump = undefined;      // two boards seen: picking one is the point
+    const one = jump && !setupEl.firstElementChild ? only() : "";
+    if (one) { jump!(one); jump = undefined; return; }
     const ws = W.wedgies().filter((w) => !needsSetup(w));
-    tg.hidden = !ws.some((w) => w.state === "ready" && !w.virtual);
-    if (!tg.hidden && !tgCounted) { tgCounted = true; tgShow(); }
+    tg(ws.some((w) => w.state === "ready" && !w.virtual));
     if (!W.supported()) {
       rows.innerHTML = `<div class="empty"><p><b>This browser can't see USB devices.</b><br>Open wedgie.dev in Chrome or Edge on a computer to plug in a wedgie.</p></div>`;
       actions.innerHTML = `<a class="btn" href="/">Back to wedgie.dev</a>`;
