@@ -530,6 +530,25 @@ body.test-mode .top, body.test-mode .foot { display: none; }
 .wd-sec .kv summary { cursor: pointer; font-weight: 800; }
 .wd-sec .status { margin-top: 14px; }
 .wd-missing p { margin: 0; }
+/* A computer (where this page is used): the wedgie, its firmware, hardware and saves down the left; the software
+   shelf wide on the right. .wd-main and #d-body step aside so their children sit on .wd-col's grid. A firmware
+   update waiting (.need-fw) keeps the one column: only the update shows. */
+@media (min-width: 1000px) {
+  .wd:not(.need-fw) .wd-col { max-width: none; grid-template-columns: 380px minmax(0, 1fr); grid-template-rows: repeat(7, auto) 1fr auto; column-gap: 28px; align-items: start; }
+  .wd:not(.need-fw) .wd-main, .wd:not(.need-fw) #d-body:not([hidden]) { display: contents; }
+  .wd:not(.need-fw) .beta-warn { grid-column: 1 / -1; grid-row: 1; }
+  .wd:not(.need-fw) .wd-dev { grid-column: 1; grid-row: 2; }
+  .wd:not(.need-fw) .wd-fw { grid-column: 1; grid-row: 3; }
+  .wd:not(.need-fw) .wd-hw { grid-column: 1; grid-row: 4; }
+  .wd:not(.need-fw) .saves { grid-column: 1; grid-row: 5; }
+  .wd:not(.need-fw) .wd-report { grid-column: 1; grid-row: 6; margin-top: 18px; }
+  .wd:not(.need-fw) .wd-more { grid-column: 1; grid-row: 7; }
+  .wd:not(.need-fw) .wd-col:has(#d-body[hidden]) .wd-more { grid-row: 3; }
+  .wd:not(.need-fw) .wd-job, .wd:not(.need-fw) .wd-missing { grid-column: 2; grid-row: 2; }
+  .wd:not(.need-fw) .carts { grid-column: 2; grid-row: 2 / 9; }
+  .wd:not(.need-fw) .dev { grid-column: 2; grid-row: 9; }
+  .wd:not(.need-fw) .wd-fw .fwrow { margin-bottom: 0; }
+}
 .dev summary { cursor: pointer; font-weight: 900; font-size: 20px; }
 .dev[open] summary { margin-bottom: 14px; }
 .dev .row { margin: 12px 0; }

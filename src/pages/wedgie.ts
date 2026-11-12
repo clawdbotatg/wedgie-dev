@@ -29,7 +29,6 @@ import * as F from "../ui/facts";
 import { cmpVersion } from "../apps/appjson.mjs";
 import { loadRepo, savedRepos, saveRepo, forgetRepo, withRepos, type Repo } from "../apps/repos";
 import { bugReport, readLog } from "../ui/report";
-import { tgSticker } from "../ui/tg";
 
 const APP_SAMPLE = `# A wedgie app: draw with lcd, read the buttons, tick on a Timer so USB stays free.
 # Every button is yours. "Make it its app" puts it on as the one app the wedgie boots into.
@@ -99,7 +98,7 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
         <div class="wd-job card" id="d-job" hidden><p><b id="d-job-h"></b></p><div class="meter"><div class="meter-track"><div class="meter-fill"></div></div><span id="d-job-w"></span></div><div class="status recess" id="d-job-t" hidden></div></div>
         <div class="wd-missing card" id="d-missing" hidden></div>
         <div id="d-body">
-          <div class="card wd-sec">
+          <div class="card wd-sec wd-hw">
             <h3>Hardware</h3>
             <dl class="kv" id="d-hw"></dl>
             <div class="status recess" id="d-status" hidden></div>
@@ -159,7 +158,6 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
   $<HTMLAnchorElement>(".back").onclick = (e) => { e.preventDefault(); go("/connect"); };
   // Picked another: the list (two now, or a new Pico's Set up card). Cancelled, or this one is mid-job: stay.
   $<HTMLButtonElement>("#d-another").onclick = () => { if (!busy && !job) W.connectNew().then(() => go("/connect"), () => {}); };
-  const tg = tgSticker(main);
   // The bug report reads its log over live USB while we hold the port; busy or not live: the page's side only.
   $<HTMLButtonElement>("#d-report").onclick = (e) => {
     e.preventDefault();
@@ -384,7 +382,6 @@ export function wedgiePage(main: HTMLElement, id: string, go: (path: string) => 
     else if (!there && wasHere) { wasHere = false; expectBack(); }      // it dropped: give it time to come back
     const coming = backBy > Date.now(), late = !!backBy && !coming && seenOnce;
     const here = there && !coming;
-    tg(here && w!.state === "ready" && !w!.virtual);
     paintJob(here, coming);
     $("#d-job").hidden = !job;
     $("#d-missing").hidden = !!job || (here && w!.state !== "error");
