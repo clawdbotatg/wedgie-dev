@@ -458,6 +458,8 @@ n = int(net.chain(8453, "eth_blockNumber"), 16)      # a chain read: eth_call, e
 - The secure chip (ATECC608 or Trust M): random numbers above. Keys and signing: a Trust M through
   `import optiga` (trustm.md); an ATECC608 through `atecc.ATECC608` (`firmware/atecc.py` in github.com/clawdbotatg/wedgie-dev). Never lock
   a chip or make keys on it unless the person asks; locking is permanent.
+  An app whose code imports `optiga`, `trustm` or `atecc`, or uses `I2C`, is listed on wedgie.dev as
+  **Uses the secure chip**. The site reads this from the code; there's nothing to set. `rand()` doesn't count.
 
 ## Before you say it's done
 

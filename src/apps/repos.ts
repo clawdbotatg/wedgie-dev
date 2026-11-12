@@ -3,7 +3,7 @@
 // build uses for the reviewed shelf (appjson.mjs). They are carts with `unreviewed`, and their files
 // carry the raw.githubusercontent URL install.ts fetches them from. This browser remembers the repos it
 // added (localStorage); nobody else sees them. The shelf everyone sees is community.json.
-import { checkAppJson, parseRepo, MAX_APP_BYTES } from "./appjson.mjs";
+import { checkAppJson, parseRepo, usesChip, MAX_APP_BYTES } from "./appjson.mjs";
 import { cartV, type Cart, type FileInfo, type Manifest } from "../serial/install";
 
 export type Repo = { repo: string; sha: string; carts: Cart[]; files: FileInfo[]; data: Record<string, Uint8Array> };
@@ -65,7 +65,7 @@ async function fetchRepo(spec: string, m: Manifest): Promise<Repo> {
       files.push(f); data[f.name] = buf; hashes.push(f.sha256); size += buf.length;
     }
     if (size > MAX_APP_BYTES) throw new Error(`${repo}: ${a.mod} is ${Math.round(size / 1024)} KB; an app can be ${MAX_APP_BYTES / 1024} KB`);
-    carts.push({ ...a, v: await cartV(hashes), size, repo, sha, at, unreviewed: true });
+    carts.push({ ...a, ...(usesChip(a.files.map((name) => ({ name, buf: data[name] }))) ? { chipuse: true } : {}), v: await cartV(hashes), size, repo, sha, at, unreviewed: true });
   }
   return { repo, sha, carts, files, data };
 }

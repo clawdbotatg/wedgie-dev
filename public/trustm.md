@@ -31,6 +31,9 @@ Other wedgie docs: making apps https://wedgie.dev/code.md, USB https://wedgie.de
   need it, not at the top of a game that's already tight on memory; `del sys.modules["optiga"]` and
   `del sys.modules["trustm"]` give it back. Don't paste big data into code you send to a wedgie: build it
   there, or the wedgie runs out of memory compiling it.
+- **The store says so.** An app that imports `optiga`, `trustm` or `atecc`, or uses `I2C`, is listed on
+  wedgie.dev as **Uses the secure chip**. It's a label read from the code, not a lock: any app can still
+  reach the chip.
 - **One `Chip()` at a time**, and reuse it. Making a new one resets the chip's link (~45 ms) and
   forgets session secrets (`SESSION`).
 - **Speed.** Every call waits for the chip. Measured on a real Trust M V1 on a wedgie (RP2040, 400 kHz I2C):

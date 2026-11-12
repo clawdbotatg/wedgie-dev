@@ -17,6 +17,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { published, releaseText, appsText, shelf } from "./release.mjs";
+import { usesChip } from "../src/apps/appjson.mjs";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const sha = (buf) => createHash("sha256").update(buf).digest("hex");
 /** A cart's version: the same function as cartV in src/serial/install.ts. */
@@ -57,7 +58,7 @@ export function buildFirmware() {
       const f = { name, size: buf.length, sha256: sha(buf) };
       files.push(f); byName.set(name, f); hashes.push(f.sha256);
     }
-    shelfCarts.push({ ...a, v: cartV(hashes), size: a.files.reduce((s, n) => s + byName.get(n).size, 0) });
+    shelfCarts.push({ ...a, ...(usesChip(fs) ? { chipuse: true } : {}), v: cartV(hashes), size: a.files.reduce((s, n) => s + byName.get(n).size, 0) });
   }
   carts.unshift(...shelfCarts);        // the shelf's apps first on the site
   // An app's number: its wedgie.json's "version", or else which time this is on the shelf (v1, v2, ...)

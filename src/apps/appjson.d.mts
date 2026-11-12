@@ -8,6 +8,8 @@ export const MAX_APP_BYTES: number;
 export const CHIPS: string[];
 export const DEFAULT_ICON: string[];
 export function checkAppJson(j: unknown, core?: string[], taken?: string[]): { apps: RepoApp[]; errors: string[] };
+/** Does the app's code reach the secure chip itself (optiga, trustm, atecc, I2C)? */
+export function usesChip(files: { name: string; buf: Uint8Array }[]): boolean;
 export function parseRepo(s: string): { owner: string; repo: string; ref?: string } | null;
 export function cmpVersion(a: string, b: string): number;
 export function netAllows(net: string[] | undefined, url: string): boolean;

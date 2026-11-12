@@ -24,6 +24,9 @@ history before commit 020765c.
   (`update owner/repo`) and read the whole diff. A `.mpy` can't be read: rebuild it from the repo's source
   and take it only if the bytes are the same (Jiro-ikusu, 11-09: `mpy-cross -s` for bytecode; its
   `jiro_core.mpy` is machine code, rebuilt in a clean Ubuntu 24.04 container with the repo's own steps).
+- **Uses the secure chip:** the store marks an app whose code reaches the chip (`usesChip` in
+  `src/apps/appjson.mjs`: imports `optiga`/`trustm`/`atecc`, uses `I2C` or `__import__`). `community.mjs add`
+  says so too: read what it does with the chip. A label, not a lock: firmware doesn't stop an unmarked app.
 - **Review an app's `"net"` too:** the sites it may reach through its computer (firmware/net.py). The page
   and wedgie.py carry nothing else for it, so the list in the reviewed commit is the whole of its internet.
   Its sites must have ECDSA certificates (0.3.67+: the wedgie checks them itself); try them on /virtual.

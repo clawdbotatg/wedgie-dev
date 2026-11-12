@@ -589,6 +589,7 @@ body.test-mode .top, body.test-mode .foot { display: none; }
 .cart-acts { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 2px 0; }
 .cart-acts:not(:has(.btn:not([hidden]))) { display: none; }
 .cart-acts .btn[hidden] { display: none; }
+.cart-chip { display: inline-block; font-size: 12px; line-height: 1; font-weight: 800; color: #fff; background: #7a5cff; border-radius: 999px; padding: 5px 9px; margin: 8px 2px 0; }
 .cart-from { font-size: 12px; line-height: 1.3; color: var(--muted); margin: 4px 2px 0; font-weight: 700; overflow-wrap: anywhere; }
 .cart-from a { color: inherit; }
 .cart-from.unreviewed { color: #b06a00; }

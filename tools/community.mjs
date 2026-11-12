@@ -20,7 +20,7 @@ import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { checkAppJson, parseRepo, MAX_APP_BYTES } from "../src/apps/appjson.mjs";
+import { checkAppJson, parseRepo, usesChip, MAX_APP_BYTES } from "../src/apps/appjson.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const LIST = join(root, "community.json"), DIR = join(root, "community");
@@ -66,17 +66,18 @@ async function vendor(e) {
   writeFileSync(join(out, "wedgie.json"), JSON.stringify(j, null, 2) + "\n");
   for (const a of use) {
     let bytes = 0;
-    const hashes = [];
+    const hashes = [], bufs = [];
     for (const path of a.paths) {
       const buf = await raw(p.owner, p.repo, e.sha, path);
       bytes += buf.length;
+      bufs.push({ name: path.split("/").pop(), buf });
       hashes.push(createHash("sha256").update(buf).digest("hex"));
       mkdirSync(dirname(join(out, path)), { recursive: true });
       writeFileSync(join(out, path), buf);
     }
     if (bytes > MAX_APP_BYTES) throw new Error(`${e.repo}: ${a.mod} is ${Math.round(bytes / 1024)} KB; the limit is ${MAX_APP_BYTES / 1024} KB`);
     a.v = cartV(hashes);
-    console.log(`  ${a.mod}: ${a.name}, ${a.files.length} files, ${Math.round(bytes / 1024)} KB, v ${a.v}`);
+    console.log(`  ${a.mod}: ${a.name}, ${a.files.length} files, ${Math.round(bytes / 1024)} KB, v ${a.v}${usesChip(bufs) ? ", USES THE SECURE CHIP (read what it does with it)" : ""}`);
   }
   writeFileSync(join(out, ".sha"), e.sha + "\n");
   return use;

@@ -14,6 +14,18 @@
 export const MAX_APPS = 20;
 export const MAX_FILES = 30;
 export const MAX_APP_BYTES = 256 * 1024;
+/** Does this app's code reach the secure chip itself (keys, signing, its storage)? Random numbers through the
+ *  firmware's rand() don't count. files: [{ name, buf }] (.py and .mpy are read; a .mpy keeps the names as text).
+ *  A label for the store, worked out from the code so an app can't leave it off. Not a lock: see trustm.md. */
+export function usesChip(files) {
+  return files.some(({ name, buf }) => {
+    if (!/\.(py|mpy)$/.test(name)) return false;
+    let s = "";
+    for (let i = 0; i < buf.length; i++) s += String.fromCharCode(buf[i]);
+    if (name.endsWith(".mpy")) return /optiga|trustm|atecc|I2C/.test(s);
+    return /^\s*(?:import|from)\s[^#\n]*\b(?:optiga|trustm|atecc)\b/m.test(s) || /\bI2C\b|__import__/.test(s.replace(/#.*$/gm, ""));
+  });
+}
 export const CHIPS = ["ATECC608", "OPTIGA Trust M"];
 const MOD = /^[a-z][a-z0-9_]{1,19}$/;
 const FILE = /^[a-z][a-z0-9_]*\.(py|mpy|bin|json|txt)$/;
