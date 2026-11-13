@@ -53,7 +53,8 @@ Signer on a virtual RP2040) shows it, page by page, with the bundle /safe would 
 
 Every test transaction in the registry, on the shelf's Safe Signer and its data, most used first, with a verdict
 each (matches the registry's test, differs, can't read) and the busiest mainnet calls with no descriptor. Redo it
-after a release (hours of virtual chips; a second run does only what's missing):
+after a release (hours of virtual chips; a second run does only what's missing). When, how, what goes wrong, and
+the plan to make it automatic: `docs/CLEAR-GALLERY.md`. In short:
 
 ```
 git clone https://github.com/ethereum/clear-signing-erc7730-registry /tmp/reg     # at the commit safe_roots.py names
