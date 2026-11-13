@@ -116,7 +116,8 @@ def decode(raw):
 
 # ---- the bundle, the way the page picks it -------------------------------------------------------------
 def bundle(chain, to, data):
-    ds = [D[(chain, to, data[:4])]] if (chain, to, data[:4]) in D else []
+    anyone = (chain, bytes.fromhex(release.ANY[2:]), data[:4])     # none under its own address: the one for any token
+    ds = [D[k] for k in ((chain, to, data[:4]), anyone) if k in D][:1]
     words = {data[k + 12:k + 32] for k in range(4, len(data) - 31) if not any(data[k:k + 12])} | {to}
     for (c, a, s), b in D.items():          # contracts the calldata names, whose selector it carries
         if c == chain and a in words and (c, a, s) != (chain, to, data[:4]) and s in data[4:]:
