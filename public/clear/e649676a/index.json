@@ -1,0 +1,34 @@
+{
+ "tag": "e649676a",
+ "registry": "3bebbd05cbc2d2d2bf9c41a8edbf5e5cc88e4eb4",
+ "issued": 1794590234,
+ "roots": {
+  "a": "865fa9343635134d99ede954fdde210bcb805fd654971274d6d5b2e322aa4eca",
+  "b": "71244b422635979db5dab36a5ca957bb15fd05b6a76abdf043c64facda5af0e3"
+ },
+ "audited": 1769,
+ "notAudited": 6999,
+ "tokens": 2475,
+ "auditors": [
+  "Cyfrin"
+ ],
+ "clearMax": 10000,
+ "chains": [
+  1,
+  10,
+  56,
+  100,
+  137,
+  146,
+  999,
+  4663,
+  5042,
+  8453,
+  9745,
+  42161,
+  42220,
+  43114,
+  84532,
+  11155111
+ ]
+}
