@@ -37,6 +37,13 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md
 - **Safe Signer's key is locked, not exclusive:** nothing can replace it, but any code on the wedgie can sign with it.
 - **Physical access:** whoever holds the wedgie can hold BOOTSEL, flash any firmware, and sign with its key. **A
   lost wedgie is a lost key:** remove it as an owner of your Safe.
+- **The chip's wires are not encrypted (known, not fixed).** The chip and the Pico talk over two plain I2C
+  wires, and the same wires go to the spare STEMMA port. Something plugged into that port, or soldered to the
+  wires, can answer as the chip or change bytes on the way. It could: swap the hash being signed (the screen
+  shows one transaction, the signature is for another); supply the random bytes the wedgie's TLS uses (then the
+  computer can read or change what `net.get` fetches); say yes to a firmware or app list that isn't signed. The
+  firmware doesn't check the chip's answers itself: that costs about 2.4 s each time. **Build your own wedgie,
+  and keep the STEMMA port empty unless you know what's on it.**
 - **A dead chip is a lost key:** keep a second owner or recovery on every Safe.
 - **Apps decide** whether a USB press counts inside their own screens; the firmware's own questions take only real
   presses.
