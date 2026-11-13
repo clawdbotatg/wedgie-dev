@@ -29,7 +29,7 @@ fe650ebf283f78aab917848e5a383a3ef0f7ed168fbe7e0511816a83170789b0  jiro_app.mpy
 df608681fbe81de3d918c0d12f11455031ba08658865a5765369764d5d93847e  jiro_levels.bin
 @app  {"mod":"keypad","name":"Keypad","entry":"run","files":["keypad.py"]}
 0cf9561df639b610056d896dbf503f37d4df3c1ef59eab58dfd3118913be23aa  keypad.py
-@app  {"mod":"safe","name":"Safe Signer","entry":"run","usb":true,"files":["safe.mpy","safe_read.mpy","safe_7730.mpy","safe_8362.mpy","safe_book.mpy","safe_wire.mpy","safe_roots.py","safe_keccak.py","safe_addr.py","safe_blockie.py","safe_key.py","safe_msg.mpy","safe_sim.mpy","safe_icons.py","safe_icons.bin"]}
+@app  {"mod":"safe","name":"Safe Signer","entry":"run","usb":true,"chipuse":true,"files":["safe.mpy","safe_read.mpy","safe_7730.mpy","safe_8362.mpy","safe_book.mpy","safe_wire.mpy","safe_roots.py","safe_keccak.py","safe_addr.py","safe_blockie.py","safe_key.py","safe_msg.mpy","safe_sim.mpy","safe_icons.py","safe_icons.bin"]}
 ff9889a61cd82bb2ca47e74163fed369ba0e0c0375189a8bbc6fe4350517767f  safe.mpy
 56d88613054a0a644bb5b5f865b5a73c0b877f05165dd89d121408106233fd41  safe_read.mpy
 6a71f35e1bad08ce99544b5cc85552e2c0dd30deb8d4a0840e9082757c7faea7  safe_7730.mpy
@@ -45,8 +45,8 @@ c94e3e1188f0e7a6fbf8df03066a9b6f63be336d9f81b7279a1cdcfc784e288f  safe_key.py
 914ddc03486ee382d8a352b30907930c06a8a0c8921f9bcae7a6ab333c1ff71b  safe_sim.mpy
 8039de5fb6b0250004ae979a417a65527180c6fbf7e332543309d4aa1f1e33d9  safe_icons.py
 5103284e98ba1298532b0b5a1f9bb74d1882544795678726c88dda69f63cc012  safe_icons.bin
-@app  {"mod":"secret","name":"Secrets","entry":"run","usb":true,"files":["secret.py","secret_box.py"]}
+@app  {"mod":"secret","name":"Secrets","entry":"run","usb":true,"chipuse":true,"files":["secret.py","secret_box.py"]}
 ca324e0a4598275f90d016e04322efea2c4c9b47a8602a143ce6524fc57adb95  secret.py
 0dab883dbbf4b484759911880face307a66e1226474a95d47a29bc723972cab1  secret_box.py
-@app  {"mod":"welcome","name":"Welcome","entry":"run","files":["welcome.py"]}
+@app  {"mod":"welcome","name":"Welcome","entry":"run","chipuse":true,"files":["welcome.py"]}
 5178bde1e2c81e1c14f11630911499f7cfd202306e880588de6d6c23bfed0280  welcome.py
