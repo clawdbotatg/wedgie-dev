@@ -75,6 +75,33 @@ export type SafeTx = {
   gasPrice: string | number; gasToken: string; refundReceiver: string; nonce: number | string;
 };
 
+/** A Safe tx from outside (a link, Safe's service, Instant Wallet's queue, this browser's storage), or a throw.
+ * Only whole bytes, real addresses and plain numbers get in (audit 11-13): data with no 0x or half a byte was shown
+ * one way and hashed another, and a nonce that wasn't a number went into the page as HTML. */
+const DEC = /^(0|[1-9][0-9]{0,77})$/;
+const NONE = "0x" + "0".repeat(40);
+export function strictTx(t: any): SafeTx {
+  const num = (v: unknown, what: string) => {
+    const s = typeof v === "number" ? (Number.isSafeInteger(v) && v >= 0 ? String(v) : "") : typeof v === "bigint" ? v.toString() : typeof v === "string" ? v : "";
+    if (!DEC.test(s) || BigInt(s) >= 2n ** 256n) throw new Error(`bad ${what}`);
+    return s;
+  };
+  const adr = (v: unknown, what: string, none?: string) => {
+    if (v == null && none) return none;       // Safe's service leaves an unused gasToken or refundReceiver out
+    if (typeof v !== "string" || !/^0x[0-9a-fA-F]{40}$/.test(v)) throw new Error(`bad ${what}`);
+    return v;
+  };
+  const data = t?.data == null || t.data === "" ? "0x" : t.data;
+  if (typeof data !== "string" || !/^0x([0-9a-fA-F]{2})*$/.test(data)) throw new Error("bad data");
+  const op = num(t.operation ?? 0, "operation");
+  if (op !== "0" && op !== "1") throw new Error("bad operation");
+  const nonce = num(t.nonce, "nonce");
+  if (!Number.isSafeInteger(+nonce)) throw new Error("bad nonce");
+  return { to: adr(t.to, "to"), value: num(t.value ?? 0, "value"), data, operation: +op, safeTxGas: num(t.safeTxGas ?? 0, "safeTxGas"),
+    baseGas: num(t.baseGas ?? 0, "baseGas"), gasPrice: num(t.gasPrice ?? 0, "gasPrice"), gasToken: adr(t.gasToken, "gasToken", NONE),
+    refundReceiver: adr(t.refundReceiver, "refundReceiver", NONE), nonce: +nonce };
+}
+
 const DOMAIN = hex(keccakText("EIP712Domain(uint256 chainId,address verifyingContract)"));
 const SAFE_TX = hex(keccakText("SafeTx(address to,uint256 value,bytes data,uint8 operation,uint256 safeTxGas,uint256 baseGas,uint256 gasPrice,address gasToken,address refundReceiver,uint256 nonce)"));
 

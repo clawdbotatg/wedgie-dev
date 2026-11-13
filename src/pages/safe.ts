@@ -1413,15 +1413,20 @@ export function safe(main: HTMLElement) {
   const qKey = (c: number, a: string) => `wedgie.safe.q.${c}:${a.toLowerCase()}`;
   const localQ = (c: number, a: string): Record<string, any> => { try { return JSON.parse(localStorage.getItem(qKey(c, a)) || "{}"); } catch { return {}; } };
   const useIW = (c: number) => !CHAINS[c].test;
-  const TX_FIELDS = ["to", "value", "data", "operation", "safeTxGas", "baseGas", "gasPrice", "gasToken", "refundReceiver", "nonce"] as const;
-  const txOf = (t: any): E.SafeTx => Object.fromEntries(TX_FIELDS.map((k) => [k, k === "data" ? t.data || "0x" : t[k]])) as any;
+  // a tx from outside (a link, Safe's service, Instant Wallet's queue, this browser's storage): only whole bytes, real
+  // addresses and plain numbers get in, or it throws (E.strictTx, audit 11-13)
+  const txOf = (t: any): E.SafeTx => E.strictTx(t);
 
   async function readQueue(c: number, a: string, nonce: number, o = { bg: false, fresh: false }): Promise<any[]> {
     const all = new Map<string, any>(), dropped = new Set<string>();
     const add = (t: any, sigs: { owner: string; signature: string | null }[], fromSafe = false) => {
-      if (+t.nonce < nonce) return;
+      let tx: E.SafeTx;
+      try { tx = txOf(t); } catch { return; }      // a tx that doesn't read is left out
+      if (+tx.nonce < nonce) return;
       const h = String(t.safeTxHash || t.hash).toLowerCase();
-      const m = all.get(h) || { ...txOf(t), safeTxHash: t.safeTxHash || t.hash, confirmations: [], confirmationsRequired: t.confirmationsRequired, dataDecoded: t.dataDecoded };
+      if (h !== E.safeTxHash(c, a, tx).toLowerCase()) return;      // the hash a server names must be this tx's own
+      const need = Number(t.confirmationsRequired);
+      const m = all.get(h) || { ...tx, safeTxHash: h, confirmations: [], confirmationsRequired: Number.isSafeInteger(need) && need > 0 ? need : undefined, dataDecoded: t.dataDecoded };
       m.inSafe ||= fromSafe;
       if (fromSafe && t.proposer) m.proposer = t.proposer;
       if (t.dataDecoded) m.dataDecoded = t.dataDecoded;

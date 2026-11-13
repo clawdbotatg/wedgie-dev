@@ -43,15 +43,36 @@ export function amount(v: bigint, token: string | null, ctx: Ctx) {
 }
 const dollars = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: n >= 1000 ? 0 : 2 });
 
-/** The calls in a MultiSend batch: operation, to, value, data each. */
+/** Safe's MultiSend contracts (1.3.0 and 1.4.1, both deployments), lowercase: the wedgie's own list (wedgie-safe
+ * safe_read.py MULTISEND; tools/test_describe.mjs checks they're the same). A batch is a DELEGATECALL to one of these.
+ * A DELEGATECALL anywhere else runs that contract's code as the Safe, whatever its data looks like (audit 11-13). */
+export const MULTISENDS = ["0x9641d764fc13c8b624c04430c7356c1c7c8102e2", "0x38869bf66a61cf6bdb996a6ae40d5853fd43b526",
+  "0x40a2accbd92bca938b02010e17a5b8929b49130d", "0xa1dabef33b3b82c7814b6d82a79e50f4ac44102b",
+  "0xa238cbeb142c10ef7ad8442c6d1f9e89e07e7761", "0x998739bfdaadde7c933b942a68053933098f9eda"];
+
+/** The calls in a multiSend(bytes) calldata: operation, to, value, data each. Throws on anything that isn't a batch
+ * written the one way they're always written: MultiSend follows the offset word, so calls read from a fixed place
+ * could be a decoy while the chain runs the ones further on (audit 11-13). The offset is 0x20, the length exactly
+ * what's there, the padding zeros, each call whole, each operation 0 or 1, never empty. */
 export function unbatch(data: string): { operation: number; to: string; value: bigint; data: string }[] {
-  const b = E.bytes(data), n = Number(BigInt(E.hex(b.slice(36, 68))));
+  const b = E.bytes(data);
+  if (b.length < 68 || E.hex(b.slice(0, 4)) !== "0x" + S.multiSend) throw new Error("not a multiSend");
+  if (BigInt(E.hex(b.slice(4, 36))) !== 32n) throw new Error("offset");
+  const size = BigInt(E.hex(b.slice(36, 68)));
+  if (size > BigInt(b.length)) throw new Error("length");
+  const n = Number(size);
+  if (b.length !== 68 + Math.ceil(n / 32) * 32) throw new Error("length");
+  for (let i = 68 + n; i < b.length; i++) if (b[i]) throw new Error("padding");
   const p = b.slice(68, 68 + n), out = [];
-  for (let o = 0; o + 85 <= p.length;) {
-    const len = Number(BigInt(E.hex(p.slice(o + 53, o + 85))));
-    out.push({ operation: p[o], to: E.checksum(E.hex(p.slice(o + 1, o + 21))), value: BigInt(E.hex(p.slice(o + 21, o + 53))), data: E.hex(p.slice(o + 85, o + 85 + len)) });
-    o += 85 + len;
+  let o = 0;
+  while (o < n) {
+    if (o + 85 > n) throw new Error("short call");
+    const len = BigInt(E.hex(p.slice(o + 53, o + 85)));
+    if (p[o] > 1 || len > BigInt(n) || o + 85 + Number(len) > n) throw new Error("bad call");
+    out.push({ operation: p[o], to: E.checksum(E.hex(p.slice(o + 1, o + 21))), value: BigInt(E.hex(p.slice(o + 21, o + 53))), data: E.hex(p.slice(o + 85, o + 85 + Number(len))) });
+    o += 85 + Number(len);
   }
+  if (!out.length) throw new Error("empty");
   return out;
 }
 
@@ -64,7 +85,7 @@ export function describe(t: { to: string; value: string | bigint; data?: string 
     if (self && !v) return { title: `Cancel${t.nonce !== undefined ? ` #${t.nonce}` : ""}`, kind: "cancel" };
     return { title: `Send ${amount(v, null, ctx)} to ${ctx.addr(to)}`, kind: "send" };
   }
-  if (+(t.operation || 0) === 1 && s === S.multiSend) {
+  if (+(t.operation || 0) === 1 && s === S.multiSend && MULTISENDS.includes(to.toLowerCase())) {
     try {
       const subs = unbatch(t.data!).map((c) => c.operation === 1 ? { title: `Delegate call to ${ctx.addr(c.to)}`, kind: "danger" as const } : describe(c, ctx));
       return { title: `${subs.length} actions in one`, kind: subs.some((x) => x.kind === "danger") ? "danger" : "batch", subs };
