@@ -156,8 +156,10 @@ def ok_diff(label, got, want):
     """A difference a wedgie means: it has no NFT collection names (it shows "#id of 0x.."), it knows a token
     the test runner didn't ("1471.08 USDC" for "1471080000"), it marks a token it doesn't know ("(unknown token)"),
     or a call inside has no descriptor and shows its callee."""
-    if isinstance(got, tuple):
-        return got[3] is None or isinstance(want, dict)
+    if isinstance(got, tuple):          # want "0x": a call with no data, which a wedgie (safe-67) shows as the ETH it sends
+        if got[3] is None or isinstance(want, dict) or want == "0x" and got[1] in ("Send", "Call with no data"):
+            return True
+        return re.fullmatch("0x[0-9a-f]{8,}", want) is not None    # a token call inside that the test's runner left as hex
     if isinstance(want, dict):
         return False
     if " of 0x" in got and got.startswith("#") and want.endswith(got.split(" of ")[0]):
