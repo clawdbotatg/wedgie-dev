@@ -122,6 +122,9 @@ def bundle(chain, to, data):
     for (c, a, s), b in D.items():          # contracts the calldata names, whose selector it carries
         if c == chain and a in words and (c, a, s) != (chain, to, data[:4]) and s in data[4:]:
             ds.append(b)
+    for (c, a, s), b in D.items():          # a token call inside the call: the any-token one, if its selector is there
+        if c == chain and a == anyone[1] and s in data[4:] and b not in ds:
+            ds.append(b)
     named = data + b"".join(ds)             # tokens the calldata or a descriptor (a constant) names
     ts = [b for a, b in TK.get(chain, {}).items() if a in words or a in named]
     for c in sorted(release.CHAINS):        # and the same on the other chains (a bridge's token on the far side)
