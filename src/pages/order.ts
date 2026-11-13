@@ -16,6 +16,7 @@ import { transferData } from "../safe/eth";
 import { count, errKey } from "../shop/count";
 import { STEPS, sprite } from "../shop/steps";
 import { askYes } from "../ui/askyes";
+import { address, watch } from "../safe/address";
 
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 const usd = (cents: number) => "$" + (cents / 100).toFixed(cents % 100 ? 2 : 0);
@@ -299,18 +300,37 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
 
 // ---- /claim: burn CV (clawdviction, larv.ai) for one wedgie, one per wallet (api/_cv.ts). The wallet signs larv.ai's
 // fixed message; the signature goes only to our /api/order, which burns it there. Any wallet: this browser's, or
-// RainbowKit (safe/rainbow.ts: a phone over WalletConnect).
+// RainbowKit (safe/rainbow.ts: a phone over WalletConnect). Once connected, top right (like /safe's wallet bar): which
+// wallet, the address (Scaffold-ETH's: blockie or ENS avatar, ENS name), Disconnect; under it CLAWD, CV, and whether
+// that's a wedgie. The connection is remembered (CLAIM_W): a reload comes back connected, Disconnect forgets it.
 const CV_MSG = "larv.ai CV Spend";
+const CLAIM_W = "wedgie.claim.wallet";     // "injected" | "rk": how this browser last connected here
+const CLAWD = "0x9f86dB9fc6f7c9408e8Fda3Ff8ce4e78ac7a6b07", STAKING = "0xC9E377FB98a1aA6Ecf4B553cE1b57940121213bf";   // Base (larv.ai)
 const cvn = (n: number) => Math.floor(n).toLocaleString("en-US");
+const injectedName = (p: any) => p?.isRabby ? "Rabby" : p?.isCoinbaseWallet ? "Coinbase" : p?.isBraveWallet ? "Brave" : p?.isPhantom ? "Phantom" : p?.isMetaMask ? "MetaMask" : "Browser wallet";
+/** CLAWD in the wallet and staked on larv.ai (whole tokens), read on Base through /api/rpc; null: couldn't read. */
+async function clawdOf(w: string): Promise<{ held: bigint; staked: bigint } | null> {
+  const call = async (to: string, sel: string) => {
+    const r = await fetch("/api/rpc?chain=8453", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_call", params: [{ to, data: sel + w.slice(2).toLowerCase().padStart(64, "0") }, "latest"] }) });
+    const j = await r.json();
+    if (!j?.result || j.result === "0x") throw new Error("no answer");
+    return BigInt(j.result) / 10n ** 18n;
+  };
+  try { const [held, staked] = await Promise.all([call(CLAWD, "0x70a08231"), call(STAKING, "0x9bfd8d61")]); return { held, staked }; } catch { return null; }
+}
 function claim(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
   const cart: Cart = { wedgie: 1, kit: 0 };
   box.innerHTML = `
+    <div class="safe-ids claim-ids" id="c-ids" hidden>
+      <div class="safe-id safe-id-wallet" id="c-wallet"></div>
+      <div class="claim-stats" id="c-stats"></div>
+    </div>
     <div class="safe-box recess" id="c-who">
       <img class="claim-clawd" src="/img/clawd.jpg" alt="Clawd" width="160" height="160">
       <p class="claim-pitch">Staked CLAWD on <a href="https://larv.ai" target="_blank" rel="noopener">larv.ai</a>? Burn <b id="c-cost">500,000,000</b> CV for a free wedgie, shipped. One per wallet.</p>
       <p class="fine" id="c-left" hidden></p>
       <p><button class="btn btn-green" id="c-connect" disabled>Connect wallet</button></p>
-      <p id="c-bal" hidden></p>
     </div>
     ${shipHtml("larv.ai and the blockchain")}
     <div class="safe-box recess">
@@ -318,45 +338,104 @@ function claim(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
       <p class="fine">Can't be undone. By claiming you agree to the <a href="/terms" target="_blank">Terms of Sale</a>.</p>
     </div>`;
   const { shipTo } = shipForm(box, say, (abroad) => { if (abroad) cart.abroad = true; else delete cart.abroad; });
-  const connectB = box.querySelector<HTMLButtonElement>("#c-connect")!, go = box.querySelector<HTMLButtonElement>("#c-go")!;
-  const bal = box.querySelector<HTMLElement>("#c-bal")!, leftEl = box.querySelector<HTMLElement>("#c-left")!;
-  let p: any = null, wallet = "", cost = 0, ready = false;
+  const $ = (id: string) => box.querySelector<HTMLElement>("#" + id)!;
+  const connectB = $("c-connect") as HTMLButtonElement, go = $("c-go") as HTMLButtonElement, leftEl = $("c-left");
+  const ids = $("c-ids"), pill = $("c-wallet"), stats = $("c-stats");
+  box.closest("section")?.querySelector("h1")?.before(ids);    // right under the header's buttons, above the title
+  watch(ids, `${location.origin}/api/rpc?chain=1`);    // ENS name and avatar on the address
+  let p: any = null, wallet = "", how = "", name = "", cost = 0, ready = false, open = false, seq = 0;
+  const rainbow = () => import("../safe/rainbow");
 
+  const paintWallet = () => {
+    ids.hidden = !wallet;
+    connectB.hidden = !!wallet;
+    if (!wallet) { pill.innerHTML = stats.innerHTML = ""; go.disabled = true; return; }
+    if (pill.dataset.for !== wallet + name) {
+      pill.dataset.for = wallet + name;
+      pill.innerHTML = `<span class="safe-id-tag">${esc(name || "wallet")}</span>${address(wallet, { chain: 8453 })}<button class="btn btn-sm btn-red" id="c-off" type="button">Disconnect</button>`;
+      pill.querySelector<HTMLElement>("#c-off")!.onclick = off;
+    }
+  };
   const look = async () => {
-    const r = await api(undefined, "/api/order" + (wallet ? "?wallet=" + wallet : ""));
+    const my = ++seq, w = wallet;
+    paintWallet();
+    if (w) stats.innerHTML = `<p class="fine">Reading your CLAWD and CV…</p>`;
+    const [r, cl] = await Promise.all([api(undefined, "/api/order" + (w ? "?wallet=" + w : "")), w ? clawdOf(w) : null]);
+    if (my !== seq) return;      // disconnected or switched meanwhile
     const cv = r.cv || {};
-    if (!cv.open) { leftEl.textContent = "Claims open soon."; return; }
-    cost = cv.cost;
-    box.querySelector("#c-cost")!.textContent = cvn(cost);
-    leftEl.textContent = r.left?.wedgie ? "" : "Wedgies are sold out.";
-    leftEl.hidden = !leftEl.textContent;
-    connectB.disabled = !r.left?.wedgie;
-    if (!wallet) return;
-    bal.hidden = false;
-    const short = `<code class="safe-addr">${esc(wallet)}</code><br>`;
-    if (cv.claimed) bal.innerHTML = short + (mem()[cv.claimed] ? `Claimed. <a href="/order/${esc(cv.claimed)}">See your order</a>` : "This wallet already claimed its wedgie.");
-    else if (cv.balance == null) bal.innerHTML = short + `This wallet has never staked CLAWD. <a href="https://larv.ai/stake" target="_blank" rel="noopener">Stake on larv.ai</a>`;
-    else if (cv.balance < 0) bal.innerHTML = short + "larv.ai didn't answer. Try again soon.";
-    else if (cv.balance < cost) bal.innerHTML = short + `<b>${cvn(cv.balance)}</b> CV. ${cvn(cost - cv.balance)} more to go. <a href="https://larv.ai/stake" target="_blank" rel="noopener">Stake more</a>`;
-    else bal.innerHTML = short + `<b class="good">${cvn(cv.balance)} CV.</b> Enough for a wedgie.`;
-    ready = !cv.claimed && cv.balance >= cost && !!r.left?.wedgie;
-    connectB.hidden = true;
+    open = !!cv.open;
+    if (!open) { leftEl.textContent = "Claims open soon."; leftEl.hidden = false; }
+    else {
+      cost = cv.cost;
+      $("c-cost").textContent = cvn(cost);
+      leftEl.textContent = r.left?.wedgie ? "" : "Wedgies are sold out.";
+      leftEl.hidden = !leftEl.textContent;
+    }
+    connectB.disabled = open && !r.left?.wedgie;
+    if (!w) return;
+    const clawd = cl ? `<b>${cvn(Number(cl.staked))}</b> staked${cl.held ? ` · ${cvn(Number(cl.held))} in wallet` : ""}` : "couldn't read";
+    const cvTxt = cv.balance == null ? "none yet" : cv.balance < 0 ? "larv.ai didn't answer" : `<b>${cvn(cv.balance)}</b>`;
+    let verdict = "";
+    if (!open) verdict = `<span class="fine">Claims open soon.</span>`;
+    else if (cv.claimed) verdict = mem()[cv.claimed] ? `<b class="good">Claimed.</b> <a href="/order/${esc(cv.claimed)}">See your order</a>` : `<b>This wallet already claimed its wedgie.</b>`;
+    else if (cv.balance == null) verdict = `<b class="bad">Never staked CLAWD.</b> <a href="https://larv.ai/stake" target="_blank" rel="noopener">Stake on larv.ai</a>`;
+    else if (cv.balance < 0) verdict = `<span class="fine">Try again soon.</span>`;
+    else if (cv.balance < cost) verdict = `<b class="bad">${cvn(cost - cv.balance)} CV to go.</b> <a href="https://larv.ai/stake" target="_blank" rel="noopener">Stake more</a>`;
+    else if (!r.left?.wedgie) verdict = `<b class="bad">Wedgies are sold out.</b>`;
+    else verdict = `<b class="good">✓ Enough for a wedgie.</b>`;
+    stats.innerHTML = `<dl><dt>CLAWD</dt><dd>${clawd}</dd><dt>CV</dt><dd>${cvTxt}</dd></dl><p class="claim-verdict">${verdict}</p>`;
+    ready = open && !cv.claimed && cv.balance >= cost && !!r.left?.wedgie;
     go.disabled = !ready;
   };
+
+  // the wallet's side: switching accounts there shows here; disconnecting there disconnects here
+  const heard = new WeakSet<object>();
+  const hear = (q: any) => {
+    if (!q || heard.has(q)) return;
+    heard.add(q);
+    q.on?.("accountsChanged", (as: string[]) => { if (p !== q) return; if (!as?.length) return off(); wallet = String(as[0]).toLowerCase(); look().catch((e) => say(msgOf(e), true)); });
+    q.on?.("disconnect", () => { if (p === q) off(); });
+  };
+  const use = async (q: any, via: string, accounts?: string[]) => {
+    const as: string[] = accounts || await q.request({ method: "eth_accounts" });
+    if (!as?.length) return false;
+    p = q; how = via; wallet = String(as[0]).toLowerCase();
+    name = via === "rk" ? (await rainbow()).walletName() || "wallet" : injectedName(q);
+    try { localStorage.setItem(CLAIM_W, via); } catch {}
+    hear(q);
+    await look();
+    return true;
+  };
+  function off() {
+    const q = p, was = how;
+    p = null; wallet = how = name = ""; ready = false; seq++;
+    try { localStorage.removeItem(CLAIM_W); } catch {}
+    delete pill.dataset.for;
+    paintWallet();
+    connectB.disabled = false;
+    say("");
+    // the page lets go at once; the wallet hears it after (a WalletConnect wallet may never answer)
+    if (was === "injected") q?.request({ method: "wallet_revokePermissions", params: [{ eth_accounts: {} }] }).catch(() => {});
+    else if (was === "rk") rainbow().then((r) => r.disconnect()).catch(() => {});
+  }
+
   look().catch((e) => say(msgOf(e), true));
+  // came back: reconnect the way it connected last time, without asking (eth_accounts never pops the wallet)
+  let last = ""; try { last = localStorage.getItem(CLAIM_W) || ""; } catch {}
+  if (last === "injected" && eth()) use(eth(), "injected").then((ok) => { if (!ok) off(); }, () => {});
+  else if (last === "rk") rainbow().then((r) => r.start((q) => { if (q && !p) use(q, "rk").catch(() => {}); else if (!q && how === "rk") off(); })).catch(() => {});
 
   connectB.onclick = async () => {
     connectB.disabled = true;
     try {
-      p = eth() || await (await import("../safe/rainbow")).connect();
-      const [a] = await p.request({ method: "eth_requestAccounts" });
-      wallet = String(a).toLowerCase();
+      const q = eth() || await (await rainbow()).connect();
+      const as = await q.request({ method: "eth_requestAccounts" });
       say("");
-      await look();
+      if (!await use(q, eth() === q ? "injected" : "rk", as)) throw new Error("No account connected.");
     } catch (e) { say(msgOf(e), true); connectB.disabled = false; }
   };
   go.onclick = async () => {
-    if (!ready) return;
+    if (!ready || !p) return;
     const s = shipTo();
     if (!s) return;
     go.disabled = true;

@@ -1,7 +1,8 @@
 // /claim end to end: a CV claim (api/_cv.ts) through the real page and server (api/, under `vite`, in-memory
 // Postgres), against a FAKE larv.ai (a stub here: never the real one, so no real CV burns) and a fake wallet
 // (a key made here, signing in node):
-//   1. a wallet short of CV: told how far off, the button stays off, nothing burned
+//   1. a wallet short of CV: told how far off, the button stays off, nothing burned. The wallet shows top right
+//      (address, CLAWD, CV), survives a reload, and Disconnect forgets it (a reload stays disconnected)
 //   2. a wallet with enough: signs, the order is paid from the start, larv.ai saw one spend with the secret,
 //      the address never left the browser in clear, the price didn't move, a box came off the stock
 //   3. the same wallet again: the page says claimed; a straight POST gets 409; still one spend
@@ -90,7 +91,7 @@ async function as(acct) {
   await page.goto(SITE + "/claim");
   await page.waitForFunction(() => !document.querySelector("#c-connect").disabled);
   await page.locator("#c-connect").click();
-  await page.locator("#c-bal").waitFor();
+  await page.locator("#c-stats dl").waitFor();
   return page;
 }
 const NAME = "Claim Probe " + crypto.randomBytes(3).toString("hex"), STREET = "500 Conviction Way";
@@ -98,13 +99,24 @@ async function fill(page) {
   await page.fill("[name=name]", NAME); await page.fill("[name=line1]", STREET); await page.fill("[name=city]", "Testville");
   await page.selectOption("[name=state]", "CO"); await page.fill("[name=zip]", "80202"); await page.fill("#o-addr [name=email]", "claim@example.com");
 }
-const shot = (page, n) => out && page.screenshot({ path: `${out}/claim-${n}.png`, fullPage: true });
+const shot = (page, n) => out && page.screenshot({ path: `${out}/claim-${n}.png`, fullPage: false });
 
 // 1
 let page = await as(poor);
-await page.getByText("more to go").waitFor();
+await page.getByText("CV to go").waitFor();
 await shot(page, "1-short");
 ok(await page.locator("#c-go").isDisabled() && spends.length === 0, "short of CV: how far off, the button is off, nothing burned");
+ok(await page.locator(`#c-wallet [data-addr="${poor.address}"]`).isVisible() && await page.locator("#c-connect").isHidden()
+  && (await page.locator("#c-stats").textContent()).includes("100,000,000"), "connected: the address top right, its CV under it, no Connect button");
+await page.reload();
+await page.getByText("CV to go").waitFor();
+ok(await page.locator("#c-wallet .addr").isVisible(), "a reload comes back connected");
+await page.locator("#c-off").click();
+ok(await page.locator("#c-ids").isHidden() && await page.locator("#c-connect").isVisible() && await page.locator("#c-go").isDisabled(), "Disconnect: the wallet's gone, Connect is back");
+await page.reload();
+await page.waitForFunction(() => !document.querySelector("#c-connect").disabled);
+await sleep(500);
+ok(await page.locator("#c-ids").isHidden(), "after Disconnect a reload stays disconnected");
 
 // 2
 const extra0 = (await shop()).extra;

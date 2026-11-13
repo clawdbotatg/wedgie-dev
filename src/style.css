@@ -971,6 +971,15 @@ body.sx-sheet-open #s-msg { display: none; }
 .claim-clawd { display: block; width: 160px; height: 160px; margin: 0 auto 16px; border-radius: 50%; object-fit: cover; box-shadow: 0 6px 20px rgba(0, 0, 0, .18); }
 #c-who { text-align: center; }
 .claim-pitch { font-size: 20px; }
+/* /claim: the connected wallet, top right like /safe's: who, then CLAWD, CV and the verdict */
+.claim-ids { margin: 0 0 -8px; gap: 8px; max-width: 100%; }
+.claim-ids[hidden] { display: none; }
+.claim-stats { padding: 10px 16px; border-radius: 16px; background: var(--card); box-shadow: 0 1px 0 rgba(0,0,0,.06), 0 6px 16px -8px rgba(0,0,0,.3); font-size: 15px; text-align: right; }
+.claim-stats p { margin: 0; }
+.claim-stats dl { display: grid; grid-template-columns: auto auto; gap: 2px 12px; margin: 0 0 6px; justify-content: end; }
+.claim-stats dt { font-size: 13px; font-weight: 800; color: var(--muted); letter-spacing: .04em; align-self: center; }
+.claim-stats dd { margin: 0; font-family: var(--mono); }
+@media (max-width: 520px) { #c-wallet .safe-id-tag { display: none; } #c-wallet { gap: 8px; padding: 0 6px 0 12px; } }
 .signin-mail { font-size: 56px; line-height: 1; margin: 0 0 12px !important; }
 .signin-page .order-sent h2 { margin: 0 0 10px; }
 .signin-to { display: inline-block; max-width: 100%; box-sizing: border-box; padding: 8px 16px; border-radius: 999px; background: var(--card); font-weight: 800; word-break: break-all; margin: 4px 0 14px !important; }

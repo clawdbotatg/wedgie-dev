@@ -97,4 +97,7 @@ export async function connect(): Promise<any> {
   return new Promise((res, rej) => { waiting = { res, rej }; open!(); });
 }
 
+/** The connected wallet's name as RainbowKit shows it (MetaMask, Rainbow, WalletConnect…), or "". */
+export const walletName = () => String((getAccount(config).connector as any)?.name || "");
+
 export const disconnect = () => { try { localStorage.removeItem(LINK + ".late"); } catch {} return wDisconnect(config).catch(() => {}); };
