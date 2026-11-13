@@ -1,0 +1,34 @@
+{
+ "tag": "c9d66ace",
+ "registry": "3bebbd05cbc2d2d2bf9c41a8edbf5e5cc88e4eb4",
+ "issued": 1794536673,
+ "roots": {
+  "a": "368232b53cf621f2e0661b4f7b58c34dd10f9a5860e020cd906b0d9f55d18dfa",
+  "b": "0bd8da6daa9803c6b51d65c7e1f3c4b1d7c78e09b7cc2012f6bd3611a4cdedd3"
+ },
+ "audited": 1662,
+ "notAudited": 6999,
+ "tokens": 2472,
+ "auditors": [
+  "Cyfrin"
+ ],
+ "clearMax": 10000,
+ "chains": [
+  1,
+  10,
+  56,
+  100,
+  137,
+  146,
+  999,
+  4663,
+  5042,
+  8453,
+  9745,
+  42161,
+  42220,
+  43114,
+  84532,
+  11155111
+ ]
+}
