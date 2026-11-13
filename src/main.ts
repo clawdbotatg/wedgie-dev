@@ -24,6 +24,7 @@ import "./ui/report";             // from the start: it keeps the page's errors 
 import { legal } from "./pages/legal";
 import { emu } from "./pages/emu";
 import { telegram } from "./pages/telegram";
+import { sandbox } from "./pages/sandbox";
 
 // safe.wedgie.eth (the IPFS copy): its front page is /safe
 if (location.hostname.startsWith("safe.") && location.pathname === "/") history.replaceState(null, "", "/safe" + location.hash);
@@ -44,12 +45,13 @@ const onSecret = path === "/secret";
 const onOrder = path === "/order" || path.startsWith("/order/") || path === "/orders" || path === "/signin" || path === "/claim";   // buy, one order (/order/<id>), yours, sign in
 const onLegal = path === "/terms" || path === "/privacy";
 const onTelegram = path === "/telegram";
+const onSandbox = path === "/sandbox";       // paste a transaction, see a wedgie's pages
 const onEmu = path === "/virtual" || path === "/emu";   // /emu: its old name
 if (path === "/emu") history.replaceState(null, "", "/virtual" + location.search);
 // Each page its own tab title (the first path part; /order/<id> is an order, /safe/<x> a Safe).
 const TITLES: Record<string, string> = { connect: "Connect", assemble: "Assemble", test: "Test", update: "Update", prepare: "Prepare", reset: "Reset", build: "Build",
   code: "Code", debug: "Debug", safe: "Safe", secret: "Secret chat", order: "Order", orders: "Your orders", signin: "Sign in",
-  terms: "Terms", privacy: "Privacy", virtual: "Virtual wedgie", emu: "Virtual wedgie", telegram: "Telegram" };
+  terms: "Terms", privacy: "Privacy", sandbox: "Clear signing sandbox", virtual: "Virtual wedgie", emu: "Virtual wedgie", telegram: "Telegram" };
 const title = TITLES[path.split("/")[1] || ""];
 if (title) document.title = `${title} · wedgie.dev`;
 const signedIn = !!session();
@@ -149,5 +151,5 @@ const top = document.getElementById("top")!;
 // Ready when the page's first screen is really there: on the home page that includes the hero wedgie
 // (its files are in the loader's byte count, and it has drawn a frame). Other 3D waits for the page.
 if (onFormat || onUpdate || onPrepare || onReset || onTelegram) document.body.classList.add("test-mode");
-const up = onFormat ? (format(top), Promise.resolve()) : onUpdate ? (update(top), Promise.resolve()) : onPrepare ? (prepare(top), Promise.resolve()) : onReset ? (reset(top), Promise.resolve()) : onConnect ? (connect(top), Promise.resolve()) : onAssemble3d ? (assemble3d(top), Promise.resolve()) : onAssemble ? (assemble(top), Promise.resolve()) : onBuild ? (build(top), Promise.resolve()) : onCode ? (code(top), Promise.resolve()) : onDebug ? (debug(top), Promise.resolve()) : onSafe ? (safe(top), Promise.resolve()) : onSecret ? (secret(top), Promise.resolve()) : onOrder ? (order(top), Promise.resolve()) : onLegal ? (legal(top, path.slice(1) as "terms" | "privacy"), Promise.resolve()) : onEmu ? (emu(top), Promise.resolve()) : onTelegram ? (telegram(top), Promise.resolve()) : home(top);
+const up = onFormat ? (format(top), Promise.resolve()) : onUpdate ? (update(top), Promise.resolve()) : onPrepare ? (prepare(top), Promise.resolve()) : onReset ? (reset(top), Promise.resolve()) : onConnect ? (connect(top), Promise.resolve()) : onAssemble3d ? (assemble3d(top), Promise.resolve()) : onAssemble ? (assemble(top), Promise.resolve()) : onBuild ? (build(top), Promise.resolve()) : onCode ? (code(top), Promise.resolve()) : onDebug ? (debug(top), Promise.resolve()) : onSafe ? (safe(top), Promise.resolve()) : onSecret ? (secret(top), Promise.resolve()) : onOrder ? (order(top), Promise.resolve()) : onLegal ? (legal(top, path.slice(1) as "terms" | "privacy"), Promise.resolve()) : onEmu ? (emu(top), Promise.resolve()) : onTelegram ? (telegram(top), Promise.resolve()) : onSandbox ? (sandbox(top), Promise.resolve()) : home(top);
 up.then(() => (window as any).__wedgieReady?.(), () => (window as any).__wedgieReady?.());

@@ -1,0 +1,19 @@
+/* /sandbox: paste a transaction, see a wedgie's pages */
+.sandbox { max-width: 860px; margin: 0 auto; padding: 24px 16px 60px; }
+.sandbox h1 { margin-bottom: 6px; }
+.sb-form { display: grid; gap: 10px; margin: 18px 0; }
+.sb-form label { display: grid; gap: 4px; font-weight: 800; font-size: 14px; }
+.sb-form input, .sb-form select, .sb-form textarea { font: 500 14px var(--mono); padding: 9px 10px; border: 2px solid #1a1b1a; border-radius: 8px; background: #fff; color: #1a1b1a; width: 100%; box-sizing: border-box; }
+.sb-form textarea { min-height: 110px; resize: vertical; word-break: break-all; }
+.sb-row { display: grid; grid-template-columns: 170px 1fr auto; gap: 10px; align-items: end; }
+.sb-two { display: grid; grid-template-columns: 1fr 200px; gap: 10px; }
+.sb-ex { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.sb-go { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.sb-say { font-weight: 800; }
+.sb-say.bad { color: #e3312c; }
+.sb-bar { width: 180px; height: 10px; border-radius: 5px; background: #d9d9d6; overflow: hidden; }
+.sb-bar > div { height: 100%; width: 0; background: var(--green-fill); transition: width .3s; }
+.sb-pages { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+.sb-pages canvas { width: 240px; height: 240px; image-rendering: pixelated; border-radius: 8px; border: 2px solid #1a1b1a; background: #1a1b1a; }
+.sb-pages canvas.live { opacity: .55; border-style: dashed; }
+@media (max-width: 600px) { .sb-row, .sb-two { grid-template-columns: 1fr; } }

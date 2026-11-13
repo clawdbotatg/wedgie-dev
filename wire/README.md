@@ -40,6 +40,12 @@ node tools/safechip.mjs --app /tmp/app --clear /tmp/clear --txs /tmp/v2.json --s
 Put them on wedgie.dev/clear by hand (only for what the registry doesn't have yet: ours, an open PR):
 `python3 tools/clear_page.py uniswap-v3 "Uniswap SwapRouter02" /tmp/v3.json /tmp/v3 "<note>"`.
 
+## wedgie.dev/sandbox: any transaction
+
+Paste a transaction (or a hash): a wedgie in the tab (`src/chip/sandbox.ts`, the real firmware and the shelf's Safe
+Signer on a virtual RP2040) shows it, page by page, with the bundle /safe would send. Its flash:
+`public/sandbox/safe-fs.img.gz`, remade by `tools/sign.mjs` (`node tools/sandboximage.mjs`).
+
 ## wedgie.dev/clear: the whole registry
 
 Every test transaction in the registry, on the shelf's Safe Signer and its data, most used first, with a verdict

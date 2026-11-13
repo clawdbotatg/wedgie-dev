@@ -55,3 +55,5 @@ writeFileSync(join(root, "release/firmware.sig"), `${r} ${s}${k ? " " + k : ""}\
 console.log(`signed ${text.split("\n").length - 4} core files and the app list, ${text.split("\n")[1]}`);
 // the virtual wedgie's starting flash, from what was just signed (tools/emuimage.mjs)
 spawnSync("node", [join(root, "tools/emuimage.mjs")], { cwd: root, stdio: "inherit" });
+// and the sandbox's (wedgie.dev/sandbox: Safe Signer, tools/sandboximage.mjs)
+spawnSync("node", [join(root, "tools/sandboximage.mjs")], { cwd: root, stdio: "inherit" });
