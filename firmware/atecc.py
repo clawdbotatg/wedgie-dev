@@ -72,6 +72,8 @@ class AteccError(Exception):
 
 class ATECC608:
     def __init__(self, sda=None, scl=None, addr=ADDR, freq=100_000):
+        import wedgie
+        wedgie.chip_gate()              # may the app on it use the chip? (chipask.py)
         self.i2c = make_i2c(SDA if sda is None else sda, SCL if scl is None else scl, freq)
         self.addr = addr
 

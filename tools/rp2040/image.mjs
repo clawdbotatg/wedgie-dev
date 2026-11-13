@@ -25,7 +25,7 @@ export function firmware(fw = join(here, "..", "..", "firmware")) {
 }
 /** the v in apps.json: tools/fw.mjs's own cartV over the cart's file hashes (the manifest's, exactly) */
 export const cartV = (F, c) => fwCartV(c.files.map((n) => createHash("sha256").update(F.file(n)).digest("hex")));
-export const appEntry = (F, c) => ({ mod: c.mod, name: c.name, ...(c.entry ? { entry: c.entry } : {}), ...(c.usb ? { usb: true } : {}), v: cartV(F, c) });
+export const appEntry = (F, c) => ({ mod: c.mod, name: c.name, ...(c.entry ? { entry: c.entry } : {}), ...(c.usb ? { usb: true } : {}), chipuse: !!c.chipuse, v: cartV(F, c) });   // as firmware/job.py writes it
 
 /** bytes of a littlefs image with F's core + app (a cart's mod, or null for none). over: {name: bytes}
  *  replaces files (a test key in wedgie.py). */
@@ -40,7 +40,7 @@ export function image(F, app, over = {}, drop = []) {
     writeFileSync(join(dir, n), over[n] || F.extra[n]);
     return `${n}=${join(dir, n)}`;
   });
-  if (c) {
+  if (c && !over["apps.json"]) {     // over can bring its own record (chipaskprobe: one from before 0.3.79)
     writeFileSync(join(dir, "apps.json"), JSON.stringify([appEntry(F, c)]));
     args.push(`apps.json=${join(dir, "apps.json")}`);
   }

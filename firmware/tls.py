@@ -386,10 +386,14 @@ def _int(v):
 
 class Chip:
     def __init__(self):
-        import trustm
-        if trustm.i2c is None:
-            trustm.bus()
-        self.s = trustm.Session()
+        import trustm, wedgie
+        wedgie.own[0] += 1              # the firmware's own use: any app may fetch (chipask.py)
+        try:
+            if trustm.i2c is None:
+                trustm.bus()
+            self.s = trustm.Session()
+        finally:
+            wedgie.own[0] -= 1
 
     def random(self, n):
         return self.s.random(n)

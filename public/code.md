@@ -459,7 +459,8 @@ n = int(net.chain(8453, "eth_blockNumber"), 16)      # a chain read: eth_call, e
   `import optiga` (trustm.md); an ATECC608 through `atecc.ATECC608` (`firmware/atecc.py` in github.com/clawdbotatg/wedgie-dev). Never lock
   a chip or make keys on it unless the person asks; locking is permanent.
   An app whose code imports `optiga`, `trustm` or `atecc`, or uses `I2C`, gets a red cartridge on wedgie.dev,
-  listed first (the rest are grey). The site reads this from the code; there's nothing to set. `rand()` doesn't count.
+  listed first (the rest are grey). Firmware 0.3.79+ lets only those open the chip; your own app makes the
+  wedgie ask on its screen once each start (trustm.md). The site reads this from the code; there's nothing to set. `rand()` doesn't count.
 
 ## Before you say it's done
 

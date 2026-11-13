@@ -10,6 +10,7 @@
 //   - the guides match the firmware, and the WEDGIE drive's SKILL.md matches them (tools/test_docs.py)
 //   - net.get's own TLS against a computer that attacks it: bad chains, flipped/cut/dropped bytes (tls/test_tls.py;
 //     the live sites on a virtual RP2040 are tools/netchip.mjs, not here: a site's outage isn't a bad release)
+//   - only an app that says it uses the secure chip opens it; after full control the wedgie asks (tools/chipaskprobe.mjs)
 //   - Safe Signer's key is made once and locked for good, never replaced (tools/test_safekey.py, a fake Trust M and ATECC608)
 //     and its signing runs in the shelf copy's memory (tools/safechip.mjs)
 // Only apps changed since the last signed list (release/firmware.txt, apps.txt): the static checks and each changed app's
@@ -68,6 +69,7 @@ const all = [
   // the WEDGIE drive's ~23 KB held, as on a real wedgie from power-up (10-31: a fresh one ran out on this swap)
   ["safechip: Instant Wallet swap, drive up", ["node", "tools/safechip.mjs", "--drive", "--txs", "tools/fixtures/iw-swap.json"]],
   ["mpy --check", [...UV, "tools/mpy.py", "--check"]],
+  ["chipask: who may open the secure chip", ["node", "tools/chipaskprobe.mjs"]],
   ["chip: install Buttons + update", ["node", "tools/chipprobe.mjs", "--from", "hello", "--to", "buttons"]],
   ["chip: install over Buttons + update", ["node", "tools/chipprobe.mjs", "--from", "buttons", "--to", "hello"]],
   ...["none", ...carts].map((a) => [`fresh plug-in: ${a}`, ["node", "tools/bootprobe.mjs", a]]),

@@ -32,8 +32,12 @@ Other wedgie docs: making apps https://wedgie.dev/code.md, USB https://wedgie.de
   `del sys.modules["trustm"]` give it back. Don't paste big data into code you send to a wedgie: build it
   there, or the wedgie runs out of memory compiling it.
 - **The store says so.** An app that imports `optiga`, `trustm` or `atecc`, or uses `I2C`, gets a red
-  cartridge on wedgie.dev, listed first (the rest are grey). It's a mark read from the code, not a lock: any app can still
-  reach the chip.
+  cartridge on wedgie.dev, listed first (the rest are grey). The mark is read from the code and signed.
+- **Firmware 0.3.79+ holds apps to it.** A shelf app without the mark can't open the chip: `optiga.Chip()`,
+  `trustm.Session()` and `atecc.ATECC608()` raise `OSError`. Your own app (put on by wedgie.py, /code or
+  from GitHub: the wedgie has the red border) makes the wedgie ask "Use the secure chip?" once each
+  start; green says yes. `rand()` and `net` never ask. It's not a wall: code that drives the I2C pins by hand
+  gets past it.
 - **One `Chip()` at a time**, and reuse it. Making a new one resets the chip's link (~45 ms) and
   forgets session secrets (`SESSION`).
 - **Speed.** Every call waits for the chip. Measured on a real Trust M V1 on a wedgie (RP2040, 400 kHz I2C):

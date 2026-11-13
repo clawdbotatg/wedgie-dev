@@ -15,14 +15,14 @@ or an ATECC608) **wedged** between the boards on I2C. It runs MicroPython plus t
 into one app, and asks on its own screen before anything that matters. Games, tools, and a hardware signer for a
 Safe multisig. Everything is MIT. Home: https://wedgie.dev
 
-**The current firmware is 0.3.78.** If a wedgie's `hello` says older, update it first: everything here assumes
+**The current firmware is 0.3.79.** If a wedgie's `hello` says older, update it first: everything here assumes
 current firmware.
 
 ```yaml
 name: wedgie
 site: https://wedgie.dev
 skill_index: https://wedgie.dev/skill.md          # this file
-firmware: 0.3.78
+firmware: 0.3.79
 license: MIT (hardware design, case, firmware, site, art)
 source: https://github.com/clawdbotatg/wedgie-dev
 made_by: Austin Griffith and Gus Griffith, with @ClawdBotATG; sold by BuidlGuidl DAO LLC
@@ -122,7 +122,6 @@ https://wedgie.dev/connect or `python3 wedgie.py use <mod>`. One app runs at a t
 | 2048 | g2048 | clawdbotatg/wedgie-2048 | slide the tiles |
 | Blackjack | blackjack | clawdbotatg/wedgie-blackjack | beat the dealer; the secure chip shuffles |
 | ETH Price | ethprice | clawdbotatg/wedgie-ethprice | the ETH price and the newest Ethereum and Base blocks (uses the internet, below) |
-| Poidh Bounties | poidh | swiftbotlab/wedgie-poidh | live poidh.xyz bounties and claims (needs its own bridge on the computer) |
 
 **Any public GitHub repo** with a `wedgie.json` can be added on a wedgie's page (Software, "Apps from a GitHub
 repo"). It is not signed and installs with full access: only repos you trust. Make one: code.md; starter:
@@ -223,7 +222,7 @@ https://instantwallet.io. Details: safe.md.
 
 # Talk to a wedgie over USB
 
-Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.78**; if `hello`
+Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.79**; if `hello`
 says older, run `wedgie.py update` first.
 
 ## Talk to it directly
@@ -348,7 +347,7 @@ from answering. Hold **Y**: no WEDGIE drive this time (debugging only).
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.78","fw":"wedgie-0.3.78","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.79","fw":"wedgie-0.3.79","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":3,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -644,6 +643,8 @@ A snap-together printed shell, no screws, MIT: https://github.com/clawdbotatg/cl
 
 - **Print:** PETG, 0.16 mm layers, 4 walls, no supports. Lid face down, base floor down, caps flange down. Caps
   can be PETG or PLA.
+- **The joystick needs special settings:** https://github.com/clawdbotatg/clawd-pico-case/blob/main/stl/current/JOYSTICK-PRINT.md
+  Printed like the rest, it comes out bad.
 - **Colors:** white lid, black base, grey joystick; buttons 2 grey, 1 green (A), 1 red (Y). The buttons carry no
   letters: to people, A is "the green button", Y "the red button", B and X "the grey buttons".
 - **Atomic wedgie:** a variant with its own base and a RESET plunger, and a LiPo on VSYS.
@@ -928,6 +929,7 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md
 | 0.3.57 | Yes is grey until the check ends; installs end in a hard reset |
 | 0.3.64 | Release signatures checked on the Trust M (0.2 s, was 2.4 s); pure Python only without one, or if it says no |
 | 0.3.66 | Apps in their own list, named by its hash in the signed one (no size limit) |
+| 0.3.79 | Only apps that say they use the secure chip can open it: signed into each app's line, read from its code (a red cartridge on wedgie.dev). After a computer had full control, the wedgie asks on its screen instead |
 | 0.3.78 | Its own TLS refuses a site that sends no signature (a computer could pose as any site); locked: no hash of a save, and `/saves/.` can't be deleted |
 
 Report a problem: wedgie@buidlguidl.com, or **Send a bug report** on a wedgie's page at wedgie.dev/connect.
@@ -1539,6 +1541,9 @@ n = int(net.chain(8453, "eth_blockNumber"), 16)      # a chain read: eth_call, e
 - The secure chip (ATECC608 or Trust M): random numbers above. Keys and signing: a Trust M through
   `import optiga` (trustm.md); an ATECC608 through `atecc.ATECC608` (`firmware/atecc.py` in github.com/clawdbotatg/wedgie-dev). Never lock
   a chip or make keys on it unless the person asks; locking is permanent.
+  An app whose code imports `optiga`, `trustm` or `atecc`, or uses `I2C`, gets a red cartridge on wedgie.dev,
+  listed first (the rest are grey). Firmware 0.3.79+ lets only those open the chip; your own app makes the
+  wedgie ask on its screen once each start (trustm.md). The site reads this from the code; there's nothing to set. `rand()` doesn't count.
 
 ## Before you say it's done
 
@@ -1581,6 +1586,13 @@ Other wedgie docs: making apps https://wedgie.dev/code.md, USB https://wedgie.de
   need it, not at the top of a game that's already tight on memory; `del sys.modules["optiga"]` and
   `del sys.modules["trustm"]` give it back. Don't paste big data into code you send to a wedgie: build it
   there, or the wedgie runs out of memory compiling it.
+- **The store says so.** An app that imports `optiga`, `trustm` or `atecc`, or uses `I2C`, gets a red
+  cartridge on wedgie.dev, listed first (the rest are grey). The mark is read from the code and signed.
+- **Firmware 0.3.79+ holds apps to it.** A shelf app without the mark can't open the chip: `optiga.Chip()`,
+  `trustm.Session()` and `atecc.ATECC608()` raise `OSError`. Your own app (put on by wedgie.py, /code or
+  from GitHub: the wedgie has the red border) makes the wedgie ask "Use the secure chip?" once each
+  start; green says yes. `rand()` and `net` never ask. It's not a wall: code that drives the I2C pins by hand
+  gets past it.
 - **One `Chip()` at a time**, and reuse it. Making a new one resets the chip's link (~45 ms) and
   forgets session secrets (`SESSION`).
 - **Speed.** Every call waits for the chip. Measured on a real Trust M V1 on a wedgie (RP2040, 400 kHz I2C):

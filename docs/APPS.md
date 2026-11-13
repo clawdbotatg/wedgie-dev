@@ -26,7 +26,8 @@ history before commit 020765c.
   `jiro_core.mpy` is machine code, rebuilt in a clean Ubuntu 24.04 container with the repo's own steps).
 - **Uses the secure chip:** a red cartridge, listed first, for an app whose code reaches the chip (`usesChip` in
   `src/apps/appjson.mjs`: imports `optiga`/`trustm`/`atecc`, uses `I2C` or `__import__`). `community.mjs add`
-  says so too: read what it does with the chip. A label, not a lock: firmware doesn't stop an unmarked app.
+  says so too: read what it does with the chip. Signed in the app's `@app` line (`chipuse`, tools/release.mjs); firmware 0.3.79+ refuses the chip to a
+  signed app without it and asks the person for an unsigned one (`firmware/chipask.py`).
 - **Review an app's `"net"` too:** the sites it may reach through its computer (firmware/net.py). The page
   and wedgie.py carry nothing else for it, so the list in the reviewed commit is the whole of its internet.
   Its sites must have ECDSA certificates (0.3.67+: the wedgie checks them itself); try them on /virtual.

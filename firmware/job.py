@@ -193,6 +193,7 @@ def check(m, sig=True, tick=None):
             if not a or a["name"] != title[8:]:
                 raise ValueError("this job said %r but puts on %s" % (title, want and want[0].get("mod")))
             e = dict((k, a[k]) for k in ("mod", "name", "entry", "usb") if k in a)
+            e["chipuse"] = bool(a.get("chipuse"))            # signed: may it use the secure chip (chipask.py)
             e["v"] = str(want[0].get("v") or "")[:16]       # the site's: cosmetic, nothing runs them
             e["about"] = str(want[0].get("about") or "")[:100]
             m["apps"] = json.dumps([e])

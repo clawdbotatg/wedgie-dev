@@ -13,7 +13,7 @@ import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { checkAppJson, parseRepo } from "../src/apps/appjson.mjs";
+import { checkAppJson, parseRepo, usesChip } from "../src/apps/appjson.mjs";
 
 export const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 /** The files wedgie.dev publishes from firmware/ (tools/fw.mjs uses this too). A .py with a compiled
@@ -68,8 +68,11 @@ export function shelf(core, mods) {
     if (have !== e.sha) throw new Error(`community/${e.repo} isn't at ${e.sha.slice(0, 7)}: run node tools/community.mjs`);
     const { apps, errors } = checkAppJson(JSON.parse(readFileSync(join(dir, "wedgie.json"), "utf8")), core, mods);
     if (errors.length) throw new Error(`community/${e.repo}/wedgie.json:\n  ${errors.join("\n  ")}`);
-    for (const { paths, ...a } of apps.filter((a) => !e.apps || e.apps.includes(a.mod)))
-      out.push({ app: { ...a, repo: e.repo, sha: e.sha, ...(e.at ? { at: e.at } : {}) }, files: a.files.map((name, i) => ({ name, buf: readFileSync(join(dir, paths[i])) })) });
+    for (const { paths, ...a } of apps.filter((a) => !e.apps || e.apps.includes(a.mod))) {
+      const files = a.files.map((name, i) => ({ name, buf: readFileSync(join(dir, paths[i])) }));
+      // chipuse: its code reaches the secure chip. Signed in its "@app" line: firmware 0.3.79+ lets only these open it (chipask.py)
+      out.push({ app: { ...a, ...(usesChip(files) ? { chipuse: true } : {}), repo: e.repo, sha: e.sha, ...(e.at ? { at: e.at } : {}) }, files });
+    }
   }
   return out;
 }
@@ -77,6 +80,6 @@ export function shelf(core, mods) {
 /** The "@app" lines for carts (firmware/carts.json entries). No double space can occur in them. */
 export function appLines(carts) {
   return [...carts].sort((a, b) => (a.mod < b.mod ? -1 : 1)).map((c) => "@app  " + JSON.stringify({
-    mod: c.mod, name: c.name, ...(c.entry ? { entry: c.entry } : {}), ...(c.usb ? { usb: true } : {}), files: c.files,
+    mod: c.mod, name: c.name, ...(c.entry ? { entry: c.entry } : {}), ...(c.usb ? { usb: true } : {}), ...(c.chipuse ? { chipuse: true } : {}), files: c.files,
   }) + "\n").join("");
 }

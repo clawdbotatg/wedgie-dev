@@ -22,6 +22,8 @@ i2c = None
 
 def bus(sda=4, scl=5, freq=400000):
     global i2c
+    import wedgie
+    wedgie.chip_gate()                  # may the app on it use the chip? (chipask.py)
     i2c = I2C(0 if sda % 4 == 0 else 1, sda=Pin(sda), scl=Pin(scl), freq=freq)
     return i2c
 
@@ -139,6 +141,8 @@ class Session:
     """One OpenApplication session after a soft reset. Frame numbers run 0..3 (shared: link)."""
 
     def __init__(self):
+        import wedgie
+        wedgie.chip_gate()
         busy[0] += 1
         try:
             soft_reset()

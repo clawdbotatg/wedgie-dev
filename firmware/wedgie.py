@@ -3,7 +3,7 @@
 # interrupted; from the REPL they are plain calls:  import wedgie; wedgie.shot(); wedgie.press("A")
 import sys, os, json, machine
 
-VERSION = "0.3.78"
+VERSION = "0.3.79"
 
 # The lock. main.py turns Ctrl-C off before anything else and never ends by itself, so a computer
 # can only send the slot's JSON lines: it can't stop the app, reach the REPL, or make the secure chip
@@ -195,6 +195,29 @@ def free():
         return None
 
 
+own = [0]           # > 0 while the firmware itself uses the secure chip (rand, the chip check, TLS): never asked
+
+
+def chip_gate():
+    """The chip drivers call this as they open the chip. Raises OSError when the app on it may not use
+    it (slot.chip_ok, chipask.py: a signed app that doesn't say it uses the chip; or the person said no)."""
+    if own[0]:
+        return
+    s = sys.modules.get("slot")
+    if s and s.app and not s.chip_ok():
+        raise OSError("secure chip: not for this app")
+
+
+def _own(f):
+    def g(*a):
+        own[0] += 1
+        try:
+            return f(*a)
+        finally:
+            own[0] -= 1
+    return g
+
+
 _chip = None        # what the last chip() found: "ATECC608", "OPTIGA Trust M", "none" (None: not asked yet)
 
 
@@ -225,6 +248,7 @@ def hello(mid=None, **extra):
     return d
 
 
+@_own
 def chip():
     """Prove the secure chip works, without stopping anything: the host sends nothing but this
     request and checks the answer itself (wedgie.dev: src/serial/chipcheck.ts).
@@ -302,6 +326,7 @@ _rng = None         # ("atecc", ATECC608) | ("trustm", Session) | ("none", why)
 _pool = b""         # rand_below's unused random bytes
 
 
+@_own
 def _find_rng():
     from machine import Pin
     for p in (4, 5):                # no pull-ups on SDA/SCL: nothing on the bus, don't wait on timeouts

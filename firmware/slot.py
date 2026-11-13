@@ -67,10 +67,24 @@ def _ended(why=None):
         _band(name, [("ended", MUTED)], "{g} start again")
 
 
+_chip = None        # may this app use the secure chip? None: not looked at yet
+
+
+def chip_ok():
+    """May the app on it open the secure chip? Looked up (or asked) once per start: chipask.py."""
+    global _chip
+    if _chip is None:
+        import chipask
+        _chip = bool(chipask.ok(app))
+        del sys.modules["chipask"]
+    return _chip
+
+
 def open_app():
     """Import the active app (a Timer app is then running) or get its entry ready to call."""
-    global mod, state, _crashed
+    global mod, state, _crashed, _chip
     _crashed = False
+    _chip = None
     save.game = app["mod"]
     gc.collect()
     try:
