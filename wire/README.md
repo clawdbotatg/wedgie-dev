@@ -40,6 +40,9 @@ node tools/safechip.mjs --app /tmp/app --clear /tmp/clear --txs /tmp/v2.json --s
 Put them on wedgie.dev/clear by hand (only for what the registry doesn't have yet: ours, an open PR):
 `python3 tools/clear_page.py uniswap-v3 "Uniswap SwapRouter02" /tmp/v3.json /tmp/v3 "<note>"`.
 
+Contracts that get redeployed (0x Settler): a descriptor goes stale with each new address. The plan for a robot
+that keeps it current: `docs/PLAN-REDEPLOYED-CONTRACTS.md`.
+
 ## wedgie.dev/sandbox: any transaction
 
 Paste a transaction (or a hash): a wedgie in the tab (`src/chip/sandbox.ts`, the real firmware and the shelf's Safe
