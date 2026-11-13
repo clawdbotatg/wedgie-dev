@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>wedgie claim og card</title>
+<!-- The /claim social card (public/img/og-claim.png), rendered by `node tools/og.mjs claim`: Clawd holding a
+     wedgie (art/clawd-wedgie.png, gpt-image-2 from clawd-base.jpg + the og wedgie). 1200x630, dev server only. -->
+<style>
+  html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; background: #f9f8f5; }
+  body { font-family: "Nunito Variable", sans-serif; color: #1a1b1a; position: relative; }
+  #art { position: absolute; right: -75px; top: 0; height: 630px; }
+  .copy { position: absolute; left: 76px; top: 0; bottom: 26px; width: 430px; display: flex; flex-direction: column; justify-content: center; }
+  h1 { margin: 0; font-weight: 900; font-size: 112px; line-height: .93; letter-spacing: -.03em; }
+  p { margin: 26px 0 0; font-weight: 700; font-size: 27px; line-height: 1.3; color: #6b6e6b; }
+  .tag { margin-top: 30px; align-self: flex-start; display: flex; align-items: center; gap: 14px;
+    background: #fff; border-radius: 14px; padding: 9px 20px 9px 12px; font-weight: 800; font-size: 30px;
+    box-shadow: inset 0 -2px 0 #e7e7e3, 0 3px 10px rgba(0,0,0,.1); }
+  .tag img { width: 56px; height: 43px; }
+  .stripes { position: absolute; left: 0; right: 0; bottom: 0; height: 26px; background: #fff;
+    background-image: linear-gradient(#fff 5px, #22c452 5px 11px, #fff 11px 13px, #a9aaa8 13px 17px, #fff 17px 19px, #e3312c 19px 25px, #fff 25px); }
+</style>
+</head>
+<body>
+  <img id="art" src="/art/clawd-wedgie.png" alt="">
+  <div class="copy">
+    <h1>Free wedgie.</h1>
+    <p>Staked CLAWD on larv.ai?<br>Burn CV, get one shipped.</p>
+    <div class="tag"><img src="/img/sticker.webp" alt="">wedgie.dev/claim</div>
+  </div>
+  <div class="stripes"></div>
+  <script type="module">
+    import "@fontsource-variable/nunito/wght.css";
+    const art = document.getElementById("art");
+    await art.decode();
+    // the page takes the art's own background color, so there is no seam
+    const c = document.createElement("canvas"); c.width = c.height = 1;
+    const x = c.getContext("2d"); x.drawImage(art, 4, 4, 1, 1, 0, 0, 1, 1);
+    const [r, g, b] = x.getImageData(0, 0, 1, 1).data;
+    document.body.style.background = `rgb(${r},${g},${b})`;
+    await document.fonts.load("900 112px 'Nunito Variable'");
+    window.ready = true;
+  </script>
+</body>
+</html>

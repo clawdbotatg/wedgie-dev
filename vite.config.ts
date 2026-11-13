@@ -1,5 +1,5 @@
 import { defineConfig, loadEnv, type Plugin, type Connect } from "vite";
-import { readFileSync, statSync } from "node:fs";
+import { readFileSync, statSync, existsSync, writeFileSync } from "node:fs";
 // @ts-ignore plain JS build helper
 import { buildFirmware } from "./tools/fw.mjs";
 
@@ -63,6 +63,38 @@ function loaderManifest(): Plugin {
   };
 }
 
+// Pages with their own link preview: a copy of the built index.html with its og/twitter tags swapped, served by a
+// vercel.json rewrite (/claim -> /claim.html). Crawlers don't run JS, so the tags must be in the HTML.
+const CARDS: Record<string, { url: string; title: string; desc: string; img: string; alt: string }> = {
+  claim: { url: "https://wedgie.dev/claim", title: "Free wedgie for CLAWD stakers.",
+    desc: "Staked CLAWD on larv.ai? Burn CV for a free wedgie, shipped. One per wallet.",
+    img: "https://wedgie.dev/img/og-claim.png?v=1", alt: "Clawd, the red diamond in a tuxedo, holding up a wedgie with a pixel heart on its screen, next to the words Free wedgie." },
+};
+function cards(): Plugin {
+  return {
+    name: "wedgie-cards",
+    writeBundle(opts) {
+      const dir = opts.dir || "dist";
+      if (!existsSync(dir + "/index.html")) return;
+      for (const [name, c] of Object.entries(CARDS)) {
+        const set = (html: string, attr: string, key: string, v: string) => {
+          const re = new RegExp(`(<meta ${attr}="${key}" content=")[^"]*(")`);
+          if (!re.test(html)) throw new Error(`cards: no ${key} in index.html`);
+          return html.replace(re, (_, a, b) => a + v.replace(/&/g, "&amp;").replace(/"/g, "&quot;") + b);
+        };
+        let h = readFileSync(dir + "/index.html", "utf8");
+        h = set(h, "property", "og:url", c.url);
+        for (const [k, v] of [["title", c.title], ["description", c.desc], ["image", c.img], ["image:alt", c.alt]]) {
+          h = set(h, "property", "og:" + k, v);
+          h = set(h, "name", "twitter:" + k, v);
+        }
+        h = set(h, "name", "description", c.desc);
+        writeFileSync(`${dir}/${name}.html`, h);
+      }
+    },
+  };
+}
+
 // The shop's server (api/*.ts, Vercel functions in production) under `vite` and `vite preview`, so the
 // probes can order end to end. Always the dev database branch (SHOP_DATABASE_URL_DEV in .env), never
 // the real orders. Only SHOP_*, STRIPE_* and BANKR_LLM_* (api/explain.ts) come from .env.
@@ -104,7 +136,7 @@ function shopApi(): Plugin {
 const ISOLATE = { "Cross-Origin-Opener-Policy": "same-origin", "Cross-Origin-Embedder-Policy": "require-corp" };
 
 export default defineConfig({
-  plugins: [firmware(), loaderManifest(), shopApi()],
+  plugins: [firmware(), loaderManifest(), cards(), shopApi()],
   // shopprobe with no database account: an in-memory Postgres in Neon's place (tools/neonlite.mjs).
   ...(process.env.SHOP_DATABASE_URL_DEV === "pglite" ? { resolve: { alias: { "@neondatabase/serverless": new URL("./tools/neonlite.mjs", import.meta.url).pathname } } } : {}),
   // emu.html (the virtual wedgie's test page) is served by `vite` in dev; it is built only for

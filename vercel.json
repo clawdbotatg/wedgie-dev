@@ -268,7 +268,7 @@
     },
     {
       "source": "/claim",
-      "destination": "/index.html"
+      "destination": "/claim.html"
     },
     {
       "source": "/signin",
