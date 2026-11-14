@@ -7,7 +7,7 @@ import * as W from "../serial/wedgies";
 import { esc } from "../ui/device";
 import { pressModal } from "../ui/askmodal";
 
-const BOT = "wedgiechatbot";
+const BOT = "wedgiegatebot";
 
 export function telegram(main: HTMLElement) {
   const t = new URLSearchParams(location.search).get("t");

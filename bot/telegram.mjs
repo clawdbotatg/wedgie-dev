@@ -1,4 +1,4 @@
-// @wedgiechatbot: the door to the wedgie Telegram group. Runs on clawd's Mac under launchd
+// @wedgiegatebot: the door to the wedgie Telegram group. Runs on clawd's Mac under launchd
 // (bot/com.wedgie.telegram-bot.plist), like the $CLAWD bouncer (~/clawd/token-gated-chat).
 //   A DM: replies with a wedgie.dev/telegram link that names that account (signed, an hour). The page has
 //   the wedgie's chip sign; /api/telegram checks it and sends a one-person invite.

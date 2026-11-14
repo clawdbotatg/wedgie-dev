@@ -48,7 +48,7 @@ export async function POST(req: Request) {
   let body: any;
   try { body = await req.json(); } catch { return oops("Bad request."); }
   const id = await who(body?.t);
-  if (!id) return oops("Link expired. Message @wedgiechatbot for a new one.", 401);
+  if (!id) return oops("Link expired. Message @wedgiegatebot for a new one.", 401);
   let chip;
   try { chip = await checkProof(body?.proof, TEXT, body.t); } catch (e: any) { return oops(`Didn't check out: ${e?.message || e}`); }
   const sql = await db();

@@ -1,5 +1,5 @@
 // tellShop: a note to the shop (Austin) by Telegram AND email, so a frozen bot never hides an order (11-03: Telegram
-// froze @wedgieshippingbot). Never the buyer's address or email in the text.
+// froze @wedgieshippingbot; now @wedgieordersbot). Never the buyer's address or email in the text.
 // Env: TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID (Telegram), SHOP_MAIL_USER + SHOP_MAIL_PASS (Gmail), SHOP_NOTIFY_EMAIL
 // (where it goes; default SHOP_MAIL_USER). SHOP_MAIL_FILE: probes, mail appended there instead of sent.
 import nodemailer from "nodemailer";
