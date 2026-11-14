@@ -270,6 +270,8 @@ for (const [what, t, pages, clear, keys] of cases) {
   const before = all.length;
   const cb = clear && hi?.safe_clear ? await Clear.bundle(hi.safe_clear, t.chainId, t) : null;
   if (clear && !cb && !t.sim) { check(!hi?.safe_clear, `${what}: no bundle for it (an app without clear signing: skipped)`); continue; }
+  const fold = t.sim === "live-fold";   // a lying computer: the first signed line hidden in the second's token field
+  if (fold) t.sim = "live";             // (the signature still passes; safe_sim must show no simulation: audit 11-13)
   if (t.sim === "live") {   // as /safe does: the wedgie's nonce, then a clear-sim server (SIM_URL) simulates it
     const n = h.req({ id: ++id, type: "safe_nonce" }, 5000);
     const go = () => fetch(process.env.SIM_URL || "https://sim.wedgie.dev", { method: "POST", body: JSON.stringify({ chain: t.chainId,
@@ -277,11 +279,17 @@ for (const [what, t, pages, clear, keys] of cases) {
     const r = await go().catch(go);     // once more: a kept-alive connection can close during a long case
     console.log(`     ${what}: nonce ${n?.nonce?.slice(0, 8)}…, sim ${r.ok || r.error} ${(r.changes || []).map((c) => c.amount + " " + c.symbol).join(", ")}`);
     t.sim = r;
+    if (fold) {
+      const [x, y] = r.changes || [];
+      check(!!y, `${what}: the server signed two lines to fold`);
+      if (y) t.sim = { ...r, changes: [{ ...y, token: [x.token, x.symbol, x.decimals, x.amount, x.usd].join(",") + "\n" + y.token }] };
+    }
   }
   const { got, secs } = ask(t, "A", undefined, cb, shots && join(shots, what.replace(/[^a-z0-9]+/gi, "-").slice(0, 60)), keys);
   const out = all.slice(before);
   if (!got || process.env.DUMP) console.log("     it said:", JSON.stringify(out.slice(-1500)));
   const r = ram(what);
+  if (t.sim) check(fold === /simulation: /.test(out), `${what}: the simulation is ${fold ? "left off the screen" : "used"}`);
   // a yes reaches the chip step: no chip here, so the app answers its error (anything but a crash)
   const chipStep = got?.type === "safe_sig" || /trustm|ATECC608/.test(got?.error || "");
   check(chipStep && !crash(out), `${what}: ${pages} page(s), A through them, ${secs} s: answered ${got ? got.type + (got.error ? " (" + got.error.slice(0, 200) + ")" : "") : "nothing"} · ${r?.ram} B free`);

@@ -1,0 +1,20 @@
+[
+ {
+  "to": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+  "data": "0xd0e30db0",
+  "value": "1000000000000000",
+  "chainId": 1,
+  "safe": "0xd8da6bf26964af9d7eed9e03e53415d37aa96045",
+  "name": "wrap 0.001 ETH, a live clear-sim answer",
+  "sim": "live"
+ },
+ {
+  "to": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+  "data": "0xd0e30db0",
+  "value": "1000000000000000",
+  "chainId": 1,
+  "safe": "0xd8da6bf26964af9d7eed9e03e53415d37aa96045",
+  "name": "wrap 0.001 ETH, the answer's ETH line hidden in WETH's token field",
+  "sim": "live-fold"
+ }
+]
