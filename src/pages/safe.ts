@@ -36,7 +36,7 @@ import * as Sim from "clear-signing-safe-kit";
 import { addressQr } from "../safe/qr";
 import * as Hist from "../safe/history";
 
-const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
+const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 const short = (a: string) => a.slice(0, 6) + "…" + a.slice(-4);
 const Z = "0x" + "0".repeat(40);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -1836,7 +1836,7 @@ export function safe(main: HTMLElement) {
       .filter((a) => a.balance > 0n && !(a.usd !== null && a.usd < 0.01));
     box.hidden = !(safeAddr && info && sub === "home" && (assets || assetsErr) && list.length);
     if (box.hidden) return;
-    const row = (a: Asset) => `<li><button class="sx-asset" type="button" data-tok="${a.token || ""}"${can() ? "" : " disabled"}>${assetInner(a)}</button></li>`;
+    const row = (a: Asset) => `<li><button class="sx-asset" type="button" data-tok="${esc(a.token || "")}"${can() ? "" : " disabled"}>${assetInner(a)}</button></li>`;
     const priced = list.filter((a) => a.token === null || a.price !== null), other = list.filter((a) => a.token !== null && a.price === null);
     const open = !!document.querySelector("#s-other[open]");
     box.innerHTML = `<h3>Assets</h3><ul class="sx-assets">${priced.map(row).join("")}</ul>
@@ -1877,8 +1877,9 @@ export function safe(main: HTMLElement) {
     for (const t of activity || []) {
       if (rows.length >= 15) break;
       const when = t.executionDate ? ago(t.executionDate) : "";
-      const link = t.transactionHash || t.txHash ? `${scan}/tx/${t.transactionHash || t.txHash}` : "";
+      const hash = String(t.transactionHash || t.txHash || ""), link = /^0x[0-9a-fA-F]{64}$/.test(hash) ? `${scan}/tx/${hash}` : "";     // Safe's service says it: a real hash, or no link
       if (t.txType === "MULTISIG_TRANSACTION") {
+        try { Object.assign(t, txOf(t)); } catch { continue; }     // Safe's service says it: whole bytes, real addresses, plain numbers, or no row
         const s = describe(t, { ...ctx(), past: true }, t.dataDecoded?.method), failed = t.isSuccessful === false;
         const calls = t.to ? callsOf(t, s) : [];
         const lines = intent(s, calls, chain, safeAddr!, CHAINS[chain].usdc, paintActivity);
@@ -2103,7 +2104,7 @@ export function safe(main: HTMLElement) {
     }
     const sel = $("n-tok") as HTMLSelectElement, keep = sendToken !== null ? sendToken : sel.value;
     sendToken = null;
-    sel.innerHTML = sendList().map((a) => `<option value="${a.token || ""}"${(a.token || "") === keep ? " selected" : ""}>${esc(a.symbol)}</option>`).join("");
+    sel.innerHTML = sendList().map((a) => `<option value="${esc(a.token || "")}"${(a.token || "") === keep ? " selected" : ""}>${esc(a.symbol)}</option>`).join("");
     paintTok();
     $("n-btns").innerHTML = `${isOwner(account) ? `<button class="btn${wedgieOwns() ? "" : " btn-green sx-end"}" id="n-wallet"${dis()}>Sign with wallet</button>` : ""}${wedgieOwns() ? `<button class="btn btn-green sx-end" id="n-wedgie"${dis()}>Sign with wedgie</button>` : ""}`;   // primary on the right
     $("n-wedgie")?.addEventListener("click", () => job(() => newTx("wedgie")));

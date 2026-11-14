@@ -82,7 +82,7 @@ export function describe(t: { to: string; value: string | bigint; data?: string 
   const d = (t.data || "0x").slice(2).toLowerCase(), v = BigInt(t.value || 0), to = E.checksum(t.to), self = eq(to, ctx.safe);
   const s = d.slice(0, 8);
   if (!d) {
-    if (self && !v) return { title: `Cancel${t.nonce !== undefined ? ` #${t.nonce}` : ""}`, kind: "cancel" };
+    if (self && !v) return { title: `Cancel${t.nonce !== undefined ? ` #${String(t.nonce).replace(/\D/g, "")}` : ""}`, kind: "cancel" };
     return { title: `Send ${amount(v, null, ctx)} to ${ctx.addr(to)}`, kind: "send" };
   }
   if (+(t.operation || 0) === 1 && s === S.multiSend && MULTISENDS.includes(to.toLowerCase())) {

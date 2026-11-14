@@ -34,7 +34,7 @@ export async function readAssets(chain: number, safe: string, native: { symbol: 
   try {
     const r = await rpc("alchemy_getTokenBalances", [safe, "erc20"]);
     const found = (r?.tokenBalances || []).map((b: any) => ({ token: String(b.contractAddress), balance: BigInt(b.tokenBalance || "0x0") }))
-      .filter((b: any) => b.balance > 0n && b.token.toLowerCase() !== TWIN[chain]).slice(0, 40);
+      .filter((b: any) => /^0x[0-9a-fA-F]{40}$/.test(b.token) && b.balance > 0n && b.token.toLowerCase() !== TWIN[chain]).slice(0, 40);
     held = [...held.filter((h) => !found.some((f: any) => f.token.toLowerCase() === h.token.toLowerCase())), ...found];
   } catch {}
   const metas = await Promise.all(held.map((h) => tokenMeta(chain, h.token, rpc)));

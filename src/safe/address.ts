@@ -37,6 +37,11 @@ async function tries<T>(f: () => Promise<T>): Promise<T> {
 const names = new Map<string, Promise<string | null>>();
 const known = new Map<string, { name: string; avatar?: string }>();   // what's resolved: painted straight in
 const key = (a: string, chain?: number) => `${chain || 1}:${a.toLowerCase()}`;
+/** A picture this page made itself: a data: URL of plain base64 with a known image type, or a blob: URL. The type in
+ *  a data: URL is the server's Content-Type: one with a quote in it would end the src attribute it's written into
+ *  (audit 11-13). Anything else is not used and not kept. */
+export const okPic = (s: unknown): s is string => typeof s === "string" && (/^data:image\/(png|jpeg|gif|webp|avif|svg\+xml);base64,[A-Za-z0-9+/]*={0,2}$/.test(s) || /^blob:https?:\/\/[A-Za-z0-9.:\-\/]+$/.test(s));
+for (const n of Object.keys(seen.p)) if (!okPic(seen.p[n]?.src)) delete seen.p[n];     // kept before the check was here
 for (const [k, x] of Object.entries(seen.n)) if (x.name) known.set(k, { name: x.name, avatar: seen.p[x.name]?.src });
 /** The address's primary ENS name (on `chain` first, then Ethereum's), checked forward by the resolver, or null. */
 export function ensName(a: string, chain?: number): Promise<string | null> {
@@ -97,7 +102,10 @@ export function ensAvatar(name: string): Promise<string | null> {
         if (!r.ok || !(r.headers.get("content-type") || "").startsWith("image/")) continue;
         const blob = await r.blob();
         if (blob.size > PIC_MAX) return URL.createObjectURL(blob);
-        const src = await new Promise<string>((ok, no) => { const f = new FileReader(); f.onload = () => ok(f.result as string); f.onerror = no; f.readAsDataURL(blob); });
+        const kind = /^image\/(png|jpeg|gif|webp|avif|svg\+xml)\b/.exec(blob.type)?.[0];      // the type alone, no parameters
+        if (!kind) continue;
+        const src = await new Promise<string>((ok, no) => { const f = new FileReader(); f.onload = () => ok(f.result as string); f.onerror = no; f.readAsDataURL(new Blob([blob], { type: kind })); });
+        if (!okPic(src)) continue;
         seen.p[name] = { src, at: Date.now() }; save();
         return src;
       } catch {}
@@ -108,7 +116,8 @@ export function ensAvatar(name: string): Promise<string | null> {
   return avatars.get(name)!;
 }
 
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
+const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+const pic = (k: { avatar?: string } | undefined, cs: string) => esc(okPic(k?.avatar) ? k!.avatar! : blo(cs as `0x${string}`));
 const shortA = (a: string) => a.slice(0, 6) + "…" + a.slice(-4);
 const COPY = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>`;
 const CHECK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12.75 11.25 15 15 9.75"/><circle cx="12" cy="12" r="9"/></svg>`;
@@ -119,7 +128,7 @@ export function address(a: string, o: { link?: string; size?: "sm" | "lg"; long?
   if (!E.isAddress(a)) return `<span class="addr bad">${esc(a)}</span>`;
   const cs = E.checksum(a), k = known.get(key(cs, o.chain)), shown = o.long ? `<b>${cs.slice(0, 6)}</b>${cs.slice(6, -4)}<b>${cs.slice(-4)}</b>` : shortA(cs);
   const txt = o.link ? `<a href="${esc(o.link)}/address/${cs}" target="_blank" rel="noopener">${shown}</a>` : shown;
-  return `<span class="addr${o.size ? " addr-" + o.size : ""}" data-addr="${cs}"${o.chain ? ` data-chain="${o.chain}"` : ""}><img class="addr-av" src="${k?.avatar || blo(cs as `0x${string}`)}" alt="">`
+  return `<span class="addr${o.size ? " addr-" + o.size : ""}" data-addr="${cs}"${o.chain ? ` data-chain="${o.chain}"` : ""}><img class="addr-av" src="${pic(k, cs)}" alt="">`
     + `<span class="addr-txt"><b class="addr-ens"${k ? "" : " hidden"}>${esc(k?.name || "")}</b>`
     + `<span class="addr-row"><span class="addr-hex" title="${cs}">${txt}</span><button class="addr-copy" type="button" data-copy="${cs}" aria-label="Copy address">${COPY}</button></span></span></span>`;
 }
@@ -127,7 +136,7 @@ export function address(a: string, o: { link?: string; size?: "sm" | "lg"; long?
 /** Just the round picture (the ENS avatar, else the blockie): owners stacked on a button. */
 export function face(a: string, chain?: number) {
   const cs = E.checksum(a), k = known.get(key(cs, chain));
-  return `<img class="addr-av" data-face="${cs}"${chain ? ` data-chain="${chain}"` : ""} src="${k?.avatar || blo(cs as `0x${string}`)}" alt="">`;
+  return `<img class="addr-av" data-face="${cs}"${chain ? ` data-chain="${chain}"` : ""} src="${pic(k, cs)}" alt="">`;
 }
 
 /** An address input: 0x… or an ENS name. Its avatar on the right, the ENS name (or the address a name means) on the left. */
