@@ -4,7 +4,8 @@
   - the WEDGIE drive (firmware/drive.bin) carries exactly tools/drive_SKILL.md, and that copy is of this firmware
     (a new VERSION: python3 tools/drive.py --refresh);
   - every guide skill.md's index names is in public/, has frontmatter, and is in tools/skilldoc.py's PARTS;
-  - every wedgie.py command and every USB request the slot answers is in usb.md.
+  - every wedgie.py command and every USB request the slot answers is in usb.md;
+  - wedgie.dev/clear's screens are from the Safe Signer and clear-signing data on the shelf (tools/clear_gallery.py).
     python3 tools/test_docs.py"""
 import re, struct, sys
 from pathlib import Path
@@ -59,6 +60,11 @@ handler = slot[slot.index("def _handle"):slot.index("\ndef ", slot.index("def _h
 types = set(re.findall(r't == "(\w+)"', handler)) | {x for g in re.findall(r"t in \(([^)]*)\)", handler) for x in re.findall(r'"(\w+)"', g)}
 missing = sorted(t for t in types - INTERNAL if '"type":"%s"' % t not in usb)
 check(not missing, "every USB request the slot answers is in usb.md (%s)%s" % (" ".join(sorted(types - INTERNAL)), ": missing " + " ".join(missing) if missing else ""))
+
+import clear_gallery          # wedgie.dev/clear: its screens are from the shelf's Safe Signer and data (docs/CLEAR-GALLERY.md)
+why = clear_gallery.stale(usage=False)
+check(not why, "wedgie.dev/clear is made from the Safe Signer and data on the shelf%s"
+      % (": %s. Redo it: python3 tools/clear_gallery.py refresh <dir> (hours, in the background)" % why if why else ""))
 
 print("all ok" if not bad else "%d FAILED" % bad)
 sys.exit(1 if bad else 0)

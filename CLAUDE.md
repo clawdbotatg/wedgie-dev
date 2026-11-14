@@ -6,7 +6,7 @@ push, then in the background `node tools/loadprobe.mjs` (site: every page on a p
 background tab) or `node tools/sign.mjs --gate-only` (firmware/apps). A FAIL means it's live: patch it now.
 
 **Clear signing:** read `../clear-descriptors/MAP.md` first (all the repos, the marks). A call no one can read gets a descriptor, never new code.
-**wedgie.dev/clear goes stale** with every Safe Signer release and every new clear-signing data tag: redo it (`docs/CLEAR-GALLERY.md`, hours in the background) as part of that release.
+**wedgie.dev/clear goes stale** with every Safe Signer release and every new clear-signing data tag: the gate fails (`test_docs`) until you redo it: `python3 -u tools/clear_gallery.py refresh ~/.wedgie-clear` in the background (hours), then commit `public/clear/screens` and push. `docs/CLEAR-GALLERY.md`.
 
 ## Docs that must stay true
 

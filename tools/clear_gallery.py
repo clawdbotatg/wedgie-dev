@@ -16,12 +16,45 @@
 #       mainnet use a function over the last 7 days, the top 10,000 contracts, from Kaan's dashboard
 #       (erc7730.sourcify.dev): {"window", "tx": {"1:<address>:<selector>": txs}, "sig": {...: "name(types)"},
 #       "name": {"<address>": contract name}, "who": {"<address>": "users" | ...}}
-import glob, json, os, re, shutil, subprocess, sys
+#   python3 tools/clear_gallery.py refresh <dir> [--jobs 8] [--usage-only]
+#       all of it for what's on the shelf now, in one go: the registry at the shelf's commit, wedgie-safe at the
+#       shelf's commit, usage, run, verdicts (tools/test_clear.py, needs uv), publish. <dir> is kept between runs
+#       (hours the first time for a Safe Signer or data; a rerun does what's missing). --usage-only: fresh usage on
+#       the screens <dir> already has (minutes). Then commit public/clear/screens and push. docs/CLEAR-GALLERY.md
+#   python3 tools/clear_gallery.py stale
+#       is public/clear/screens made from the shelf's Safe Signer and data, and its usage under 10 days old? Exit 1
+#       if not. tools/test_docs.py asks the same, so the gate does.
+import glob, json, os, re, shutil, subprocess, sys, time
 from concurrent.futures import ThreadPoolExecutor
 
 here = os.path.dirname(os.path.abspath(__file__))
 root = os.path.join(here, "..")
 PART = 40           # transactions a virtual chip (one boot, ~35 s)
+
+
+def shelf():
+    """What a wedgie gets today: {"app": Safe Signer's version, "data": its clear-signing data, "registry": the
+    registry commit that data was made from, "sha": wedgie-safe's commit}."""
+    d = os.path.join(root, "community", "clawdbotatg", "wedgie-safe")
+    roots = open(os.path.join(d, "safe_roots.py")).read()
+    repo = next(r for r in json.load(open(os.path.join(root, "community.json")))["repos"] if r["repo"] == "clawdbotatg/wedgie-safe")
+    return {"app": repo["version"]["safe"],
+            "data": re.search(r'TAG = "(\w+)"', roots).group(1), "registry": re.search(r"Registry (\w+)", roots).group(1), "sha": repo["sha"]}
+
+
+def stale(usage=True):
+    """Why public/clear/screens isn't what the shelf shows, or "" (docs/CLEAR-GALLERY.md)."""
+    f = os.path.join(root, "public", "clear", "screens", "meta.json")
+    if not os.path.exists(f):
+        return "public/clear/screens has no meta.json"
+    m, s = json.load(open(f)), shelf()
+    for k, what in (("app", "Safe Signer"), ("data", "clear-signing data")):
+        if m.get(k) != s[k]:
+            return "wedgie.dev/clear's screens are from %s %s, the shelf has %s" % (what, m.get(k), s[k])
+    days = (time.time() - time.mktime(time.strptime(m["usage"]["to"], "%Y-%m-%d"))) / 86400 if m.get("usage") else 99
+    if usage and days > 10:
+        return "wedgie.dev/clear's mainnet use is %d days old (refresh --usage-only)" % days
+    return ""
 
 
 def rlp(b, i=0):
@@ -80,6 +113,10 @@ def run(reg, work, jobs, only, usage):
     os.makedirs(os.path.join(work, "shots"), exist_ok=True)
     os.makedirs(os.path.join(work, "log"), exist_ok=True)
     txs = collect(reg, only)
+    mf, s = os.path.join(work, "meta.json"), shelf()
+    if os.path.exists(mf) and json.load(open(mf)) != s:
+        sys.exit("%s has another Safe Signer's or data's screens (%s): use a new work dir" % (work, json.load(open(mf))))
+    json.dump(s, open(mf, "w"))
     json.dump(txs, open(os.path.join(work, "txs.json"), "w"))
     done = results(work)
     todo = [t for t in txs if t["id"] not in done]
@@ -211,12 +248,56 @@ def publish(work, verdicts, usage):
     json.dump(out, open(os.path.join(dst, "..", "all.json"), "w"), separators=(",", ":"))
     if u.get("sig"):
         json.dump({"window": u["window"], "calls": missing(u)}, open(os.path.join(dst, "..", "missing.json"), "w"), separators=(",", ":"))
+    made = json.load(open(os.path.join(work, "meta.json")))       # what the screens were made with (run wrote it)
+    w = u.get("window") or {}
+    json.dump({"app": made["app"], "data": made["data"], "registry": made["registry"], "date": time.strftime("%Y-%m-%d"),
+               "usage": {"from": w["fromIso"][:10], "to": w["toIso"][:10]} if w else None},
+              open(os.path.join(dst, "..", "meta.json"), "w"))
     n = sum(len(s["cases"]) for s in out)
     by = {}
     for s in out:
         for c in s["cases"]:
             by[c["chip"]] = by.get(c["chip"], 0) + 1
     print("%d files, %d transactions, %d screens: %s" % (len(out), n, sum(len(c["pages"]) for s in out for c in s["cases"]), by))
+
+
+def refresh(base, jobs, usage_only):
+    s = shelf()
+    sh = lambda *c, **k: subprocess.run(c, check=True, **k)
+    os.makedirs(base, exist_ok=True)
+    reg, app = os.path.join(base, "registry"), os.path.join(base, "wedgie-safe")
+    for d, url, at in ((reg, "https://github.com/ethereum/clear-signing-erc7730-registry", s["registry"]),
+                       (app, "https://github.com/clawdbotatg/wedgie-safe", s["sha"])):
+        if not os.path.isdir(d):
+            sh("git", "clone", "-q", url, d)
+        if subprocess.run(["git", "-C", d, "cat-file", "-e", at + "^{commit}"], capture_output=True).returncode:
+            sh("git", "-C", d, "fetch", "-q", "origin")
+        sh("git", "-C", d, "checkout", "-q", "--detach", at)
+    key = "%s-%s" % (s["app"], s["data"])
+    work, verdicts, use = os.path.join(base, "work-" + key), os.path.join(base, "verdicts-%s.json" % key), os.path.join(base, "usage.json")
+    if usage_only and not (os.path.exists(os.path.join(work, "txs.json")) and os.path.exists(verdicts)):
+        sys.exit("no screens for Safe Signer %s, data %s in %s yet: run without --usage-only" % (s["app"], s["data"], base))
+    usage(use)
+    if not usage_only:
+        run(reg, work, jobs, None, use)
+        left = len(json.load(open(os.path.join(work, "txs.json")))) - len(results(work))
+        if left:
+            sys.exit("%d transactions got no answer: run it again (it does only those)" % left)
+        r = subprocess.run(["uv", "run", "-q", "-p", "3.13", "--with", "clearsig", "--with", "eth-account", "--with", "pycryptodome",
+                            "--with", "cryptography", "python3", os.path.join(here, "test_clear.py"), reg, app],
+                           env={**os.environ, "RESULTS": verdicts, "DUMP": os.path.join(base, "why-%s.json" % key)}, capture_output=True, text=True)
+        print("\n".join(r.stdout.splitlines()[-4:]))
+        if r.returncode:
+            sys.exit("tools/test_clear.py didn't end all ok: look before publishing (its DUMP: %s)" % os.path.join(base, "why-%s.json" % key))
+    old = os.path.join(root, "public", "clear", "screens", "all.json")
+    before = {(s_["file"], c["name"]): (c["says"], c["chip"], len(c["pages"])) for s_ in json.load(open(old)) for c in s_["cases"]} if os.path.exists(old) else {}
+    publish(work, verdicts, use)
+    after = {(s_["file"], c["name"]): (c["says"], c["chip"], len(c["pages"])) for s_ in json.load(open(old)) for c in s_["cases"]}
+    moved = [(k, before[k], v) for k, v in after.items() if k in before and before[k] != v]
+    print("%d new, %d gone, %d with another verdict or page count:" % (len(set(after) - set(before)), len(set(before) - set(after)), len(moved)))
+    for k, a, b in moved[:40]:
+        print("  %s: %s -> %s  (%s)" % (k[1][:60], a, b, k[0]))
+    print("Now: git add -A public/clear/screens, commit (Safe Signer %s, data %s), push, node tools/loadprobe.mjs https://wedgie.dev" % (s["app"], s["data"]))
 
 
 if __name__ == "__main__":
@@ -226,6 +307,11 @@ if __name__ == "__main__":
         run(a[1], a[2], int(opt("--jobs", 12)), opt("--only"), opt("--usage"))
     elif a and a[0] == "usage":
         usage(a[1])
+    elif a and a[0] == "refresh":
+        refresh(a[1], int(opt("--jobs", 8)), "--usage-only" in a)
+    elif a and a[0] == "stale":
+        why = stale()
+        sys.exit(why + ": python3 tools/clear_gallery.py refresh <dir> (docs/CLEAR-GALLERY.md)" if why else print("wedgie.dev/clear is made from what's on the shelf: %s" % shelf()))
     elif a and a[0] == "publish":
         publish(a[1], a[2] if len(a) > 2 else None, a[3] if len(a) > 3 else None)
     else:

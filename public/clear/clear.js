@@ -70,7 +70,7 @@ function card(c, where) {
 }
 
 const get = (f) => fetch(f).then((r) => (r.ok ? r.json() : []), () => []);
-Promise.all([get("/clear/screens/index.json"), get("/clear/screens/all.json"), get("/clear/screens/missing.json")]).then(([hand, all, miss]) => {
+Promise.all([get("/clear/screens/index.json"), get("/clear/screens/all.json"), get("/clear/screens/missing.json"), get("/clear/screens/meta.json")]).then(([hand, all, miss, made]) => {
   const root = document.getElementById("sections");
   // one list of sections: by hand first, then the registry's
   const secs = [
@@ -110,7 +110,8 @@ Promise.all([get("/clear/screens/index.json"), get("/clear/screens/all.json"), g
     const count = {};
     let total = 0, screens = 0;
     for (const s of secs) for (const c of s.cases) { const v = verdict(c); count[v] = (count[v] || 0) + 1; if (c.pages.length) { total++; screens += c.pages.length; } }
-    root.append(el("p", "sum", `${num(total)} transactions, ${num(screens)} screens, ${Object.keys(by).length} dapps.`));
+    root.append(el("p", "sum", `${num(total)} transactions, ${num(screens)} screens, ${Object.keys(by).length} dapps.`
+      + (made.app ? ` Safe Signer ${made.app}, data ${made.data}, ${made.date}.` : "")));
     const tabs = el("div", "tabs");
     for (const k of Object.keys(VERDICTS)) if (count[k]) { const a = el("a", "badge " + VERDICTS[k][1], `${num(count[k])} ${VERDICTS[k][0]}`); a.href = `/clear/?show=${k}`; a.title = VERDICTS[k][2]; tabs.append(a); }
     if (miss.calls && miss.calls.length) { const a = el("a", "badge bad", `${miss.calls.length} busy calls with no descriptor`); a.href = "/clear/?show=missing"; tabs.append(a); }
