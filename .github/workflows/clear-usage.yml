@@ -1,0 +1,22 @@
+# wedgie.dev/clear's "mainnet txs last week": fresh every Monday (docs/CLEAR-GALLERY.md). No chips: only the numbers,
+# the order of dapps and the "no descriptor" list. The screens themselves are redone by hand after a Safe Signer or
+# data release (tools/clear_gallery.py refresh).
+name: clear usage
+on:
+  schedule:
+    - cron: "17 14 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  usage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 tools/clear_gallery.py weekly
+      - run: |
+          git config user.name clawdbotatg
+          git config user.email clawd@buidlguidl.com
+          git add public/clear/screens/all.json public/clear/screens/missing.json public/clear/screens/meta.json
+          git diff --cached --quiet || git commit -m "wedgie.dev/clear: mainnet use, $(python3 -c "import json;u=json.load(open('public/clear/screens/meta.json'))['usage'];print(u['from'],'to',u['to'])")"
+          git push

@@ -5,14 +5,15 @@ the Safe Signer and the data that are on the shelf now. Nothing redoes them by i
 the list below, redoing /clear is part of the job.**
 
 Status 2026-11-14: redone on **Safe Signer 68**, data `e649676a`. The stamp, the check and the one command are
-built (below). The timer, redo-only-what-changed and stable ids are not.
+built, and the usage numbers refresh by themselves every Monday (`.github/workflows/clear-usage.yml` runs `weekly`
+and pushes). Redo-only-what-changed and stable ids are not built.
 
 ## The short version
 
 ```
 python3 tools/clear_gallery.py stale                      # is /clear behind the shelf? (exit 1 = yes)
 python3 -u tools/clear_gallery.py refresh ~/.wedgie-clear   # redo it: hours the first time for a release, in the background
-python3 tools/clear_gallery.py refresh ~/.wedgie-clear --usage-only    # weekly: fresh mainnet use, minutes, no chips
+python3 tools/clear_gallery.py weekly                     # fresh mainnet use only: a minute, no chips
 ```
 
 `refresh` gets the registry and wedgie-safe at the shelf's commits into that folder, runs every transaction, gets
@@ -80,7 +81,7 @@ ln -s <path to clear-descriptors checkout>                  ../clear-descriptors
 6. **Ship:** `git add -A public/clear/screens`, commit (say which Safe Signer and data tag), push to main, then
    `node tools/loadprobe.mjs https://wedgie.dev`. Look at wedgie.dev/clear once.
 
-Usage only (the weekly case): steps 2 and 5 with the **old** work dir and verdicts, then 6. No chips.
+Usage only: `python3 tools/clear_gallery.py weekly`, then 6. No chips, no work dir. The Monday Action does this.
 
 ### Things that bit us
 
@@ -99,15 +100,13 @@ Usage only (the weekly case): steps 2 and 5 with the **old** work dir and verdic
 The goal: /clear can't quietly fall behind, and catching up is one command.
 
 Built (11-13): the stamp (`meta.json`), the check (`clear_gallery.py stale`, in `tools/test_docs.py` and so the
-gate), the one command (`refresh`).
+gate), the one command (`refresh`), the weekly usage timer (a GitHub Action; `stale` also complains when usage is
+over 10 days old, which means the Action broke).
 
 Not built:
 
-1. **On a timer.**
-   - Weekly: `refresh --usage-only`, commit, push. A scheduled agent, no chips, a small commit. `stale` (not the
-     gate) also complains when the usage is over 10 days old.
-   - After every Safe Signer or data release: the session that released starts `refresh` in the background right
-     after the gate, and ships it when it ends. The gate's FAIL is the reminder.
+1. **After a release, by itself.** Today the session that released starts `refresh` in the background right
+   after the gate, and ships it when it ends. The gate's FAIL is the reminder. (The weekly usage timer is built.)
 2. **Redo only what changed.** Keep, per transaction, a hash of (the app's files, its bundle, the transaction).
    Same hash = keep the screens. New data then reruns only the calls it touched (minutes). A new app still
    reruns everything (hours): its drawing code can change any screen.

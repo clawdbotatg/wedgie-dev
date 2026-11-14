@@ -21,6 +21,9 @@
 #       shelf's commit, usage, run, verdicts (tools/test_clear.py, needs uv), publish. <dir> is kept between runs
 #       (hours the first time for a Safe Signer or data; a rerun does what's missing). --usage-only: fresh usage on
 #       the screens <dir> already has (minutes). Then commit public/clear/screens and push. docs/CLEAR-GALLERY.md
+#   python3 tools/clear_gallery.py weekly
+#       only fresh mainnet use, on the screens already published (same as refresh --usage-only; needs nothing else).
+#       .github/workflows/clear-usage.yml runs it every Monday and pushes.
 #   python3 tools/clear_gallery.py stale
 #       is public/clear/screens made from the shelf's Safe Signer and data, and its usage under 10 days old? Exit 1
 #       if not. tools/test_docs.py asks the same, so the gate does.
@@ -261,7 +264,36 @@ def publish(work, verdicts, usage):
     print("%d files, %d transactions, %d screens: %s" % (len(out), n, sum(len(c["pages"]) for s in out for c in s["cases"]), by))
 
 
+def weekly():
+    """Fresh mainnet use on the screens already published: no chips, no work dir (the weekly job,
+    .github/workflows/clear-usage.yml). Rewrites all.json's use and order, missing.json, meta.json's usage."""
+    import tempfile
+    d = os.path.join(root, "public", "clear", "screens")
+    f = os.path.join(tempfile.mkdtemp(), "usage.json")
+    usage(f)
+    u = json.load(open(f))
+    if len(u["tx"]) < 5000:                     # a broken answer must not wipe the numbers
+        sys.exit("only %d functions from erc7730.sourcify.dev: nothing changed" % len(u["tx"]))
+    out = json.load(open(os.path.join(d, "all.json")))
+    for s in out:
+        seen = {}
+        for c in s["cases"]:
+            c["use"] = u["tx"].get("1:%s:%s" % (c["to"], c["sel"]), 0) if c["chainId"] == 1 else 0
+            seen[(c["to"], c["sel"])] = c["use"]
+        s["cases"].sort(key=lambda c: -c["use"])
+        s["use"] = sum(seen.values())
+    out.sort(key=lambda s: (-s["use"], s["dapp"], s["title"]))
+    json.dump(out, open(os.path.join(d, "all.json"), "w"), separators=(",", ":"))
+    json.dump({"window": u["window"], "calls": missing(u)}, open(os.path.join(d, "missing.json"), "w"), separators=(",", ":"))
+    m = json.load(open(os.path.join(d, "meta.json")))
+    m["usage"] = {"from": u["window"]["fromIso"][:10], "to": u["window"]["toIso"][:10]}
+    json.dump(m, open(os.path.join(d, "meta.json"), "w"))
+    print("mainnet use %s to %s on %d transactions" % (m["usage"]["from"], m["usage"]["to"], sum(len(s["cases"]) for s in out)))
+
+
 def refresh(base, jobs, usage_only):
+    if usage_only:
+        return weekly()
     s = shelf()
     sh = lambda *c, **k: subprocess.run(c, check=True, **k)
     os.makedirs(base, exist_ok=True)
@@ -275,10 +307,8 @@ def refresh(base, jobs, usage_only):
         sh("git", "-C", d, "checkout", "-q", "--detach", at)
     key = "%s-%s" % (s["app"], s["data"])
     work, verdicts, use = os.path.join(base, "work-" + key), os.path.join(base, "verdicts-%s.json" % key), os.path.join(base, "usage.json")
-    if usage_only and not (os.path.exists(os.path.join(work, "txs.json")) and os.path.exists(verdicts)):
-        sys.exit("no screens for Safe Signer %s, data %s in %s yet: run without --usage-only" % (s["app"], s["data"], base))
     usage(use)
-    if not usage_only:
+    if True:
         run(reg, work, jobs, None, use)
         left = len(json.load(open(os.path.join(work, "txs.json")))) - len(results(work))
         if left:
@@ -307,6 +337,8 @@ if __name__ == "__main__":
         run(a[1], a[2], int(opt("--jobs", 12)), opt("--only"), opt("--usage"))
     elif a and a[0] == "usage":
         usage(a[1])
+    elif a and a[0] == "weekly":
+        weekly()
     elif a and a[0] == "refresh":
         refresh(a[1], int(opt("--jobs", 8)), "--usage-only" in a)
     elif a and a[0] == "stale":
