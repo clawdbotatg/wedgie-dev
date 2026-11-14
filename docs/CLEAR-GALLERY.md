@@ -4,7 +4,7 @@ wedgie.dev/clear says "this is how a wedgie shows every transaction". That's onl
 the Safe Signer and the data that are on the shelf now. Nothing redoes them by itself. **If you ship something in
 the list below, redoing /clear is part of the job.**
 
-Status 2026-11-13: redone on **Safe Signer 67**, data `e649676a`. The stamp, the check and the one command are
+Status 2026-11-14: redone on **Safe Signer 68**, data `e649676a`. The stamp, the check and the one command are
 built (below). The timer, redo-only-what-changed and stable ids are not.
 
 ## The short version
