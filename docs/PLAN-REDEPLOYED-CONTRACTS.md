@@ -1,6 +1,6 @@
 # Plan: descriptors for contracts that keep moving
 
-Status 2026-11-13: not built. Written so we can build it later. Austin: "let's pretend 0x is never going to play
+Status 2026-11-14: step 1 of the build order is done, the robot is not built. Written so we can build it later. Austin: "let's pretend 0x is never going to play
 nice with clear signing. What kind of a system could we create that does it every time it needs to be done?"
 
 ## The problem
@@ -95,8 +95,10 @@ roots built into Safe Signer, so new data means a new signed app. That's true fo
 
 ## Build order
 
-1. The Settler descriptor by hand: `execute` on today's three addresses, per chain. Proves the fields and the
-   screens. (A day.)
+1. **Done 11-14.** The Settler descriptor by hand: `execute` on today's feature-2 Settler on 9 chains
+   (clear-descriptors `registry/0x/calldata-Settler.json`, registry PR #3228). Safe Signer 70 reads two levels of
+   nested calls, so a Safe batch (approve + swap) shows "Receive at least". It goes stale at 0x's next redeploy:
+   until the robot exists, rerun `Deployer.ownerOf(2)` per chain and add the new address by hand.
 2. The robot for 0x Settler only: steps 1-6 above, PRs opened but checked by us before merge. (A day.)
 3. The config file, so a second family is a few lines. Candidates: any contract the miss list
    (`clear-descriptors/tools/misses.py`) or wedgie.dev/clear's "no descriptor" list shows moving.
