@@ -278,6 +278,53 @@ tk[3] = "USDC"
 its = R.items(tx, bytes(wire.dumps({8: [tk], 13: [wire.loads(d)]})))[3]
 check(its[0][2] == "token?", "a token renamed by the host is ignored: %r" % (its[0][1],))
 
+# ---- a call inside a call is held to the rules of one outside (audit 11-13) ------------------------------
+def word(x):
+    return (bytes.fromhex(x[2:]) if isinstance(x, str) else x.to_bytes(32, "big")).rjust(32, b"\0")
+
+
+SAFE_A, SAFE_B, THIEF = "0x" + "a1" * 20, "0x" + "b2" * 20, "0x" + "66" * 20
+USDC1, MC3 = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", "0xca11bde05977b3631167028862be2a173976ca11"
+
+
+def page(to, data, value=0):
+    t = {"chainId": 1, "safe": SAFE_A, "to": to, "value": value, "data": data, "operation": 0}
+    return R.read(t, bundle(1, bytes.fromhex(to[2:]), data))
+
+
+def red(pg, text):
+    return isinstance(pg, tuple) and any(l[0] == text and l[1] == "RED" for l in pg[1])
+
+
+def agg3(calls):
+    """Multicall3 aggregate3((address target, bool allowFailure, bytes callData)[])."""
+    heads, tails, off = b"", b"", 32 * len(calls)
+    for target, cd in calls:
+        t = word(target) + word(0) + word(96) + word(len(cd)) + cd + bytes(-len(cd) % 32)
+        heads += word(off)
+        tails += t
+        off += len(t)
+    return bytes.fromhex("82ad56cb") + word(32) + word(len(calls)) + heads + tails
+
+
+approve = bytes.fromhex("095ea7b3") + word(THIEF) + word(2 ** 256 - 1)
+pg = page(USDC1, approve)
+check(red(pg, THIEF) and red(pg, "Unlimited USDC"), "approve(thief, all) on its own: the spender and Unlimited are red")
+pg = page(MC3, agg3([(USDC1, approve)]))
+check(red(pg, THIEF) and red(pg, "Unlimited USDC"), "the same approval inside a Multicall3 batch: red too (%s)" % (
+    pg if isinstance(pg, str) else [l[:2] for l in pg[1] if l[0] in (THIEF, "Unlimited USDC")],))
+pg = page(USDC1, bytes.fromhex("095ea7b3") + word(THIEF) + word(2 ** 255))
+check(red(pg, "Unlimited USDC"), "approve of 2^255: Unlimited, red (%s)" % (pg if isinstance(pg, str) else [l[0] for l in pg[1]][:6],))
+hash_ = bytes.fromhex("d4d9bdcd") + bytes(range(32))
+pg = page(SAFE_B, hash_)
+check(red(pg, R.BLIND_SAYS) if hasattr(R, "BLIND_SAYS") else False, "approveHash on another Safe: a red line says it can't be read (%s)" % (
+    pg if isinstance(pg, str) else [l[:2] for l in pg[1]],))
+pg = page(MC3, agg3([(SAFE_B, hash_)]))
+check(red(pg, R.BLIND_SAYS) if hasattr(R, "BLIND_SAYS") else False, "approveHash inside a Multicall3 batch: the same red line")
+pg = page(MC3, agg3([(USDC1, bytes.fromhex("a9059cbb") + word(THIEF) + word(5_000_000) + b"\x01\x02\x03")]))
+check(isinstance(pg, tuple) and any(l[0] == "+3 bytes at the end" for l in pg[1]), "bytes after a call inside's arguments are said (%s)" % (
+    pg if isinstance(pg, str) else [l[0] for l in pg[1]],))
+
 if os.environ.get("RESULTS"):
     json.dump(per, open(os.environ["RESULTS"], "w"))
 if os.environ.get("DUMP"):
