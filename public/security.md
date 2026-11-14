@@ -92,6 +92,7 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md
 | 0.3.57 | Yes is grey until the check ends; installs end in a hard reset |
 | 0.3.64 | Release signatures checked on the Trust M (0.2 s, was 2.4 s); pure Python only without one, or if it says no |
 | 0.3.66 | Apps in their own list, named by its hash in the signed one (no size limit) |
+| 0.3.80 | `net.ask` with a url or an Ethereum call (fetched over the wedgie's own TLS): the computer could put its own answer in place of the fetched one before the app took it. Now its answers count only for asks it was sent. A TLS connection that failed a check is never used again (a retry on it skipped the failed check). The drive's command buffer holds a whole USB packet |
 | 0.3.79 | Only apps that say they use the secure chip can open it: signed into each app's line, read from its code (a red cartridge on wedgie.dev). After a computer had full control, the wedgie asks on its screen instead |
 | 0.3.78 | Its own TLS refuses a site that sends no signature (a computer could pose as any site); locked: no hash of a save, and `/saves/.` can't be deleted |
 

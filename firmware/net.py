@@ -23,7 +23,8 @@
 # key): the computer or wedgie.dev could change those.
 # Each waits for its answer (up to ms) and raises net.Error if none comes: draw your loading screen first.
 # Not waiting (chain calls): rid = net.ask({...}); then net.answer(rid) each tick (None until it's in). A url
-# ask does the whole fetch before it returns.
+# ask does the whole fetch before it returns. A "net" line from the computer counts only for an ask it was sent and
+# hasn't answered (0.3.80): never for one the wedgie fetched itself (before, its line could replace that answer).
 # Wire (public/usb.md): a site: {"type": "tcp", "rid": 7, "host": ...}, then {"type": "tcp", "rid": 7, "d": <base64>}
 # both ways, {..., "end": true} or {..., "error": "..."} to close. A chain call: {"type": "net", "rid": 7, "chain":
 # 1, "method": ..., "params": [...]}; the answer {"type": "net", "rid": 7, "data": ...} or {..., "error": "..."}.
@@ -74,7 +75,7 @@ def ask(req):
         return _rid
     req["type"], req["rid"] = "net", _rid
     _out[_rid] = []
-    while len(_out) > 4:            # asks nobody waits for any more
+    while len(_out) > 4:            # asks nobody waits for any more (a late answer to one is dropped)
         del _out[min(_out)]
     _send(_rid, req)
     return _rid
@@ -103,8 +104,8 @@ def got(m):
         return ready()
     if not (isinstance(rid, int) and 0 < rid <= _rid):
         return
-    _out.pop(rid, None)             # a host has it
     if m.get("type") == "tcp":
+        _out.pop(rid, None)         # a host has it
         q = _tcp.get(rid)
         if q is not None:
             if m.get("d"):
@@ -115,6 +116,10 @@ def got(m):
             elif m.get("end"):
                 q.append(None)
         return
+    o = _out.get(rid)               # an answer only to an ask the computer was sent and hasn't answered (0.3.80):
+    if not o or o[0].get("type") != "net":      # never to one the wedgie fetched itself (ask with a url, chain 1):
+        return                      # the computer could put its own data in place of the site's (audit 11-13)
+    del _out[rid]
     _got[rid] = m
     while len(_got) > 4:            # answers nobody took
         del _got[min(_got)]

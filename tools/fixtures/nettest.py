@@ -19,7 +19,9 @@ SITES = (
     ("price", None),                                     # an rm comes mid-fetch: it stops the fetch (0.3.73+)
     ("keep", None),                                      # keep (0.3.74+): Coinbase, left open
     ("keep", None),                                      # the same site again: no handshake (BuidlGuidl's node hangs
-)                                                        # up in ~5 s: a virtual wedgie is slower than that)
+                                                         # up in ~5 s: a virtual wedgie is slower than that)
+    ("ask", None),                                       # net.ask with a url, taken a second later: the computer sends
+)                                                        # its own "net" answer for that rid in between (0.3.80, netchip)
 
 
 def run():
@@ -28,8 +30,17 @@ def run():
         gc.collect()
         f0, t = gc.mem_free(), time.ticks_ms()
         try:
-            v = (net.price() if url == "price" else net.chain(1, "eth_blockNumber") if url == "block"
-                 else net.get(SITES[0][0], SITES[0][1], keep=True) if url == "keep" else net.get(url, pick))
+            if url == "ask":
+                rid = net.ask({"url": SITES[3][0], "pick": SITES[3][1]})
+                for _ in range(50):     # an app's ticks: USB lines are read between the ask and the answer
+                    serve = net._serve()
+                    if serve:
+                        serve()
+                    time.sleep_ms(20)
+                v = net.answer(rid)
+            else:
+                v = (net.price() if url == "price" else net.chain(1, "eth_blockNumber") if url == "block"
+                     else net.get(SITES[0][0], SITES[0][1], keep=True) if url == "keep" else net.get(url, pick))
             if isinstance(v, str) and len(v) > 200:
                 v = "%d chars" % len(v)
             W.send({"type": "nettest", "url": url, "v": v, "ms": time.ticks_diff(time.ticks_ms(), t)})

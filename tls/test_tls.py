@@ -369,6 +369,19 @@ def main():
         check(False, "a bad CertificateVerify was taken")
     except tls.Error as e:
         check(True, "a bad CertificateVerify -> %s" % e)
+    # a forged leaf (signed by nobody we know) with the real intermediate: the first get fails on the leaf's
+    # signature. A second get on the same connection must fail too: the failed check was dropped, the checks left
+    # (the real intermediate, the forger's own CertificateVerify) passed, and it read the forger's answer (audit 11-13)
+    fk2 = p256()
+    forged = Site(fk2, [cert("leaf", fk2, "Test CA", p256(), ca=False, san=[HOST], ku="sig"), inter], close=False, keep=2)
+    p = Pipe(forged.port)
+    conn, tries = tls.Conn(HOST, p.send, p.recv, chip=Soft()), []
+    for _ in range(2):
+        try:
+            tries.append(("ok", conn.get("/", keep=True)))
+        except tls.Error as e:
+            tries.append(("error", str(e)))
+    check(tries[0][0] == "error" and tries[1][0] == "error", "a forged leaf, then get() again on the same connection -> %s" % (tries,))
     th = Thief([c, inter])      # the site's public certificates, no key, no CertificateVerify
     try:
         got = tls.Conn(HOST, th.send, th.recv, chip=Soft()).get("/")

@@ -67,6 +67,7 @@ function tcp(v) {
 }
 
 const t0 = Date.now();
+let askRid = null, fakes = 0;     // the last step's connection; the "net" answers this computer made up for its ask
 let done = false, lost = 0, hereAt = null, chipAsked = false, chipSaid = null, rmAt = null, rmMs = null;     // hereAt: chip ms the late computer shows up
 while (!done && Date.now() - t0 < 600_000) {
   chip.run(20);
@@ -84,6 +85,10 @@ while (!done && Date.now() - t0 < 600_000) {
     else if (v.type === "tcp" && chip.ms < hereAt) lost++;
     else if (v.type === "tcp") {
       tcp(v);
+      // the last step (net.ask with a url): this computer answers the ask itself, as the fetch starts and again once
+      // the wedgie has the site's answer. The ask's rid is the one before its connection's. Its data must not win.
+      if (results.length === 12 && typeof v.host === "string") askRid = v.rid;
+      if (askRid !== null && v.rid === askRid && (typeof v.host === "string" || v.end)) for (let i = 0; i < 3; i++) { fakes++; write({ type: "net", rid: askRid - 1, data: "FAKE" }); }
       // the page's chip check mid-fetch (on the second site): busy, never a reset under the fetch (0.3.71+)
       if (!chipAsked && results.length === 1 && typeof v.d === "string") { chipAsked = true; write({ id: 99, type: "chip" }); }
       // an install (here an rm) mid-fetch on the last site: the fetch stops and it's answered at once (0.3.73+;
@@ -100,7 +105,7 @@ while (!done && Date.now() - t0 < 600_000) {
 check(done, "the app got through every site");
 check(chipSaid?.busy === 1, `a chip check mid-fetch says busy: ${JSON.stringify(chipSaid)?.slice(0, 80)}`);
 check(lost >= 2, `a late computer: ${lost} lines went nowhere, then net.ready sent them again`);
-const [cb, cg, gh, kr, mp, ex, flip, px, blk, cut, kp, kb] = results;
+const [cb, cg, gh, kr, mp, ex, flip, px, blk, cut, kp, kb, sw] = results;
 check(cb && /^\d+\.\d+$/.test(cb.v), `Coinbase: ${cb?.v ?? cb?.error} (${cb?.ms} ms)`);
 check(cg && typeof cg.v?.usd === "number", `CoinGecko (P-384 root): ${JSON.stringify(cg?.v ?? cg?.error)} (${cg?.ms} ms)`);
 check(gh && typeof gh.v === "string" && gh.v.length > 3, `GitHub, text: ${gh?.v ?? gh?.error} (${gh?.ms} ms)`);
@@ -113,5 +118,6 @@ check(blk && /^0x[0-9a-f]+$/.test(blk.v || ""), `net.chain(1) (BuidlGuidl's node
 check(cut && /stopped/.test(cut.error || ""), `an rm mid-fetch stops it: ${cut?.v ?? cut?.error}`);
 check(rmMs !== null && rmMs < 3000, `and is answered in ${rmMs} ms of chip time`);
 check(kp && kb && /^\d+\.\d+$/.test(kb.v || "") && kb.ms < kp.ms / 2, `keep: the second request to the same site skips the handshake: ${kp?.ms} ms, then ${kb?.ms} ms (${kb?.v ?? kb?.error})`);
+check(sw && typeof sw.v === "number" && fakes === 6, `net.ask with a url, the computer sent ${fakes} "net" answers of its own for it: the app got the site's (${JSON.stringify(sw?.v ?? sw?.error)})`);
 console.log(failed ? `${failed} FAILED` : "all passed");
 process.exit(failed ? 1 : 0);

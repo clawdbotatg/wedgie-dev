@@ -73,7 +73,7 @@ class Drive(usbdev.Interface):
         # tools/bootprobe.mjs plays the Mac's reads (tools/rp2040/chip.mjs mscHost) and failed the same
         # way. So: buffers made here, bound methods made once (each self.method access makes a new
         # object), header fields read byte by byte.
-        self.cbw = bytearray(31)
+        self.cbw = bytearray(64)            # a whole packet: a computer can send 64 bytes where 31 are due (audit 11-13)
         self.csw = bytearray(13)
         self.csw[0], self.csw[1], self.csw[2], self.csw[3] = 0x55, 0x53, 0x42, 0x53       # "USBS"
         self.cmd = bytearray(16)

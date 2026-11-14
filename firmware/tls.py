@@ -437,6 +437,7 @@ class Conn:
         self.rd = self.wr = None
         self.checks = []                    # signatures to check (_checks) before reading the answer
         self.dead = False                   # the site closed it: no more requests on it (keep)
+        self.bad = False                    # a get failed on it: no more requests on it either
         _sure(self._handshake)
 
     def _read(self, mv):
@@ -672,7 +673,12 @@ class Conn:
         return self.chip.verify(kind, d, int.from_bytes(sig[a[0][2]:a[0][3]], "big"), int.from_bytes(sig[a[1][2]:a[1][3]], "big"), pub)
 
     def get(self, path, headers=b"", most=8192, body=None, keep=False):
-        return _sure(self._get, path, headers, most, body, keep)
+        if self.bad:                        # a get on it failed (a signature, a cut answer): never used again. A second
+            raise Error("closed")           # get ran only the checks left, and read a forger's answer (0.3.80)
+        self.bad = True
+        r = _sure(self._get, path, headers, most, body, keep)
+        self.bad = False
+        return r
 
     def _get(self, path, headers, most, body, keep):
         """GET path over this connection (POST `body`, JSON bytes, if given); the answer's body (bytes, up to

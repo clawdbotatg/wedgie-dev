@@ -15,14 +15,14 @@ or an ATECC608) **wedged** between the boards on I2C. It runs MicroPython plus t
 into one app, and asks on its own screen before anything that matters. Games, tools, and a hardware signer for a
 Safe multisig. Everything is MIT. Home: https://wedgie.dev
 
-**The current firmware is 0.3.79.** If a wedgie's `hello` says older, update it first: everything here assumes
+**The current firmware is 0.3.80.** If a wedgie's `hello` says older, update it first: everything here assumes
 current firmware.
 
 ```yaml
 name: wedgie
 site: https://wedgie.dev
 skill_index: https://wedgie.dev/skill.md          # this file
-firmware: 0.3.79
+firmware: 0.3.80
 license: MIT (hardware design, case, firmware, site, art)
 source: https://github.com/clawdbotatg/wedgie-dev
 made_by: Austin Griffith and Gus Griffith, with @ClawdBotATG; sold by BuidlGuidl DAO LLC
@@ -222,7 +222,7 @@ https://instantwallet.io. Details: safe.md.
 
 # Talk to a wedgie over USB
 
-Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.79**; if `hello`
+Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.80**; if `hello`
 says older, run `wedgie.py update` first.
 
 ## Talk to it directly
@@ -347,7 +347,7 @@ from answering. Hold **Y**: no WEDGIE drive this time (debugging only).
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.79","fw":"wedgie-0.3.79","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.80","fw":"wedgie-0.3.80","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":3,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -881,6 +881,13 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md
 - **Safe Signer's key is locked, not exclusive:** nothing can replace it, but any code on the wedgie can sign with it.
 - **Physical access:** whoever holds the wedgie can hold BOOTSEL, flash any firmware, and sign with its key. **A
   lost wedgie is a lost key:** remove it as an owner of your Safe.
+- **The chip's wires are not encrypted (known, not fixed).** The chip and the Pico talk over two plain I2C
+  wires, and the same wires go to the spare STEMMA port. Something plugged into that port, or soldered to the
+  wires, can answer as the chip or change bytes on the way. It could: swap the hash being signed (the screen
+  shows one transaction, the signature is for another); supply the random bytes the wedgie's TLS uses (then the
+  computer can read or change what `net.get` fetches); say yes to a firmware or app list that isn't signed. The
+  firmware doesn't check the chip's answers itself: that costs about 2.4 s each time. **Build your own wedgie,
+  and keep the STEMMA port empty unless you know what's on it.**
 - **A dead chip is a lost key:** keep a second owner or recovery on every Safe.
 - **Apps decide** whether a USB press counts inside their own screens; the firmware's own questions take only real
   presses.
@@ -929,6 +936,7 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md
 | 0.3.57 | Yes is grey until the check ends; installs end in a hard reset |
 | 0.3.64 | Release signatures checked on the Trust M (0.2 s, was 2.4 s); pure Python only without one, or if it says no |
 | 0.3.66 | Apps in their own list, named by its hash in the signed one (no size limit) |
+| 0.3.80 | `net.ask` with a url or an Ethereum call (fetched over the wedgie's own TLS): the computer could put its own answer in place of the fetched one before the app took it. Now its answers count only for asks it was sent. A TLS connection that failed a check is never used again (a retry on it skipped the failed check). The drive's command buffer holds a whole USB packet |
 | 0.3.79 | Only apps that say they use the secure chip can open it: signed into each app's line, read from its code (a red cartridge on wedgie.dev). After a computer had full control, the wedgie asks on its screen instead |
 | 0.3.78 | Its own TLS refuses a site that sends no signature (a computer could pose as any site); locked: no hash of a save, and `/saves/.` can't be deleted |
 
