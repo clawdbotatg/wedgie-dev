@@ -1,0 +1,34 @@
+{
+ "tag": "de508f1f",
+ "registry": "3bebbd05cbc2d2d2bf9c41a8edbf5e5cc88e4eb4",
+ "issued": 1794677949,
+ "roots": {
+  "a": "d2ab0acbff302dd8e8056544ca77a9e4103938d8ac0d10f3bd73e0cc80a5ae98",
+  "b": "42d932454792a2986e331e1aad922bdce9f8d41189840dff076a15e266fac599"
+ },
+ "audited": 1778,
+ "notAudited": 6999,
+ "tokens": 2468,
+ "auditors": [
+  "Cyfrin"
+ ],
+ "clearMax": 10000,
+ "chains": [
+  1,
+  10,
+  56,
+  100,
+  137,
+  146,
+  999,
+  4663,
+  5042,
+  8453,
+  9745,
+  42161,
+  42220,
+  43114,
+  84532,
+  11155111
+ ]
+}
