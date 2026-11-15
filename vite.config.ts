@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv, type Plugin, type Connect } from "vite";
 import { readFileSync, statSync, existsSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 // @ts-ignore plain JS build helper
 import { buildFirmware } from "./tools/fw.mjs";
 
@@ -24,6 +25,17 @@ function firmware(): Plugin {
     server.watcher.add("firmware");
     server.watcher.on("change", (f) => { if (f.includes("/firmware/")) buildFirmware(); });
   } };
+}
+
+// The built page's script policy (audit 11-13): only this site's files, WebAssembly (the virtual wedgie) and the
+// inline scripts that are in the HTML right now, each by its hash. Script that got in through a string the page
+// drew (an XSS) doesn't run, and no inline handler does. A <meta>, not a header: the loader's script changes with
+// every build. vercel.json's header still says who may frame the site. tools/loadprobe.mjs fails on a violation.
+function csp(html: string) {
+  const hashes = [...html.matchAll(/<script>([^]*?)<\/script>/g)].map((m) => `'sha256-${createHash("sha256").update(m[1]).digest("base64")}'`);
+  const policy = `script-src 'self' 'wasm-unsafe-eval' ${hashes.join(" ")}; object-src 'none'; base-uri 'self'`;
+  if (!html.includes('<meta charset="utf-8">')) throw new Error("csp: no <meta charset> in index.html");
+  return html.replace('<meta charset="utf-8">', `<meta charset="utf-8">\n<meta http-equiv="Content-Security-Policy" content="${policy}">`);
 }
 
 function loaderManifest(): Plugin {
@@ -59,7 +71,8 @@ function loaderManifest(): Plugin {
             }
           }
         }
-        return html.replace("__MANIFEST__", JSON.stringify(files));
+        html = html.replace("__MANIFEST__", JSON.stringify(files));
+        return ctx.bundle ? csp(html) : html;    // the dev server adds its own inline scripts
       },
     },
   };

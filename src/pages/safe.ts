@@ -38,6 +38,12 @@ import * as Sim from "clear-signing-safe-kit";
 import { addressQr } from "../safe/qr";
 import * as Hist from "../safe/history";
 
+// a token logo that doesn't load: its letter instead. A listener, not an inline onerror: the page's script policy
+// (vite.config.ts csp) runs no inline handlers. Capture: error events don't bubble.
+if (typeof document !== "undefined") document.addEventListener("error", (e) => {
+  const i = e.target as HTMLElement | null;
+  if (i instanceof HTMLImageElement && i.classList.contains("sx-tok-img")) i.replaceWith(Object.assign(document.createElement("span"), { className: "sx-tok", textContent: i.dataset.sym || "" }));
+}, true);
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 const short = (a: string) => a.slice(0, 6) + "…" + a.slice(-4);
 const Z = "0x" + "0".repeat(40);
@@ -260,7 +266,7 @@ const route = (chain: number, a: string) => `/safe/${CHAINS[chain].key}:${a}`;
 export function savedSafes(): { addr: string; chain: number; href: string; usd: number | null }[] {
   try {
     const l = JSON.parse(localStorage.getItem("wedgie.safe.last") || "null"), full = JSON.parse(localStorage.getItem("wedgie.safe.usd") || "{}");
-    return (Array.isArray(l?.rows) ? l.rows : []).filter((r: any) => CHAINS[r.chain] && r.info && !r.gone).map((r: any) => {
+    return (Array.isArray(l?.rows) ? l.rows : []).filter((r: any) => CHAINS[r.chain] && r.info && !r.gone && E.isAddress(r.addr)).map((r: any) => {
       const f = full[`${r.chain}:${r.addr.toLowerCase()}`], px = l.px?.[r.chain];
       const usd = CHAINS[r.chain].test ? null : f && f.b === String(r.info.balance) && f.u === String(r.info.usdc) ? f.usd
         : px ? Number(r.info.balance) / 1e18 * px + Number(r.info.usdc || 0) / 1e6 : null;
@@ -592,7 +598,7 @@ export function safe(main: HTMLElement) {
       : new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: s > 3e7 ? "numeric" : undefined });
   };
   const tokenBadge = (sym: string, logo?: string | null) => {
-    if (logo) return `<img class="sx-tok sx-tok-img" src="${esc(logo)}" alt="" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'sx-tok',textContent:${esc(JSON.stringify(sym.slice(0, 1).toUpperCase()))}}))">`;
+    if (logo) return `<img class="sx-tok sx-tok-img" src="${esc(logo)}" alt="" referrerpolicy="no-referrer" data-sym="${esc(sym.slice(0, 1).toUpperCase())}">`;
     let h = 0; for (const ch of sym) h = (h * 31 + ch.charCodeAt(0)) % 360;
     return `<span class="sx-tok" style="--h:${h}">${esc(sym.slice(0, 1).toUpperCase())}</span>`;
   };

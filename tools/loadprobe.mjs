@@ -31,6 +31,8 @@ const bad = [];
 await Promise.all(PAGES.map(async (path) => {
   const p = await ctx.newPage();
   p.on("pageerror", (e) => bad.push(`${path}: ${e.message}`));
+  // the page's script policy (vite.config.ts csp) refused something: a script the site needs, or an inline handler
+  p.on("console", (m) => { if (/Content Security Policy/.test(m.text())) bad.push(`${path}: ${m.text().slice(0, 300)}`); });
   await p.goto(base + path, { waitUntil: "domcontentloaded" }).catch((e) => bad.push(`${path}: ${e.message}`));
   await p.waitForTimeout(2500);
   if ((await p.innerText("body").catch(() => "")).includes("did not load")) bad.push(`${path}: "Something did not load"`);

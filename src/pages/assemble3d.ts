@@ -7,6 +7,7 @@ import { STEPS as KIT_STEPS, NO_3D, stepsFor } from "./assemble";
 import { wires } from "./cablecolors";
 import { cableBox, mountCableBox } from "./cablebox";
 import type { Playground } from "../ui/playground3d";
+const q = () => location.search.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);   // into an href: never markup
 
 const IMG = "/img/assemble/";
 // The manual's steps that have a 3D animation (step numbers stay the manual's).
@@ -38,7 +39,7 @@ export function assemble3d(main: HTMLElement) {
       <ol class="pg-list" id="pg-list">
         ${IDS.map((i) => `<li><button type="button" data-i="${i}"><b>${i + 1}</b>${STEPS[i].t}</button></li>`).join("")}
       </ol>
-      <p class="fine pg-back"><a href="/assemble${location.search}">The step-by-step page with photos</a> · <a href="/assemble.pdf" download>Print (PDF)</a></p>
+      <p class="fine pg-back"><a href="/assemble${q()}">The step-by-step page with photos</a> · <a href="/assemble.pdf" download>Print (PDF)</a></p>
     </aside>
     <dialog class="asm-big"><img alt=""><button type="button" class="btn">Close</button></dialog>
   </section>`;
@@ -136,6 +137,6 @@ export function assemble3d(main: HTMLElement) {
     tick();
   }).catch((err) => {
     console.error("3D playground:", err);
-    stage.innerHTML = `<p class="pg-fail">3D didn't load here. <a href="/assemble${location.search}">The step-by-step page</a> has every step with photos.</p>`;
+    stage.innerHTML = `<p class="pg-fail">3D didn't load here. <a href="/assemble${q()}">The step-by-step page</a> has every step with photos.</p>`;
   });
 }

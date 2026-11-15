@@ -4,6 +4,7 @@
 import "./assemble.css";
 import { KIT, hex, label, wires, isKit } from "./cablecolors";
 import { cableBox, mountCableBox } from "./cablebox";
+const q = () => location.search.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);   // into an href: never markup
 
 type Step = { t: string; p: string; d?: string; ph: string[]; art?: string; tip?: string; warn?: string; end?: string };
 
@@ -201,7 +202,7 @@ export function assemble(main: HTMLElement) {
     list.innerHTML = stepsFor(w).map((s, i) => `
       <li class="card asm-step" id="step-${i + 1}">
         <div class="asm-copy">
-          <div class="asm-head"><span class="num">${i + 1}</span><h3>${s.t}</h3>${NO_3D.includes(RAW[i].t) ? "" : `<a class="asm-3d" href="/assemble/3d${location.search}#${i + 1}">See it in 3D →</a>`}</div>
+          <div class="asm-head"><span class="num">${i + 1}</span><h3>${s.t}</h3>${NO_3D.includes(RAW[i].t) ? "" : `<a class="asm-3d" href="/assemble/3d${q()}#${i + 1}">See it in 3D →</a>`}</div>
           <p>${s.p}</p>
           ${s.art ? `<div class="asm-art recess">${s.art}</div>` : ""}
           ${s.tip ? `<p class="note">${s.tip}</p>` : ""}
