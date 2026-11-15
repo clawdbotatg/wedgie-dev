@@ -15,8 +15,9 @@ from time import ticks_ms, ticks_diff
 
 SETTLE = 700
 MAX = 16384             # bytes: a bigger file is skipped
-seen = set()            # small: one tuple per file dropped this power-up
-todo = []               # (cluster, size) of files waiting to be read
+seen = set()            # small: one tuple per dropped file still in the top folder (64 entries at most)
+todo = []               # (cluster, size) of files waiting to be read, QUEUE at most
+QUEUE = 16
 cur = None              # [cluster, offset in it, bytes left, first cluster] of the file being read
 _geo = None
 _buf = None
@@ -34,10 +35,11 @@ scans = 0
 
 
 def _geometry(dr):
-    """(fat0, root0, root sectors, data0, sectors per cluster), from the boot sector."""
+    """(fat0, root0, root sectors, data0, sectors per cluster), from the image's own boot sector: never one the
+    computer wrote (0.3.82: a root folder of 65535 entries kept every scan busy for good)."""
     global _geo
     if _geo is None:
-        b = dr.sector(0, _buf)
+        b = dr.img.read(0, _buf)
         spc, res, nfats, nroot, _, _, fsz = struct.unpack_from("<BHBHHBH", b, 13)
         root0 = res + nfats * fsz
         _geo = (res, root0, nroot * 32 // 512, root0 + nroot * 32 // 512, spc)
@@ -56,13 +58,18 @@ def _next(dr, clus):
 
 
 def _scan(dr):
-    """Queue every new host-written file in the top folder."""
+    """Queue every new host-written file in the top folder. seen keeps only files still in the folder, and todo
+    holds QUEUE at most (0.3.82: a computer rewriting the folder with new times grew both until the RAM ran out);
+    a file that found no room is taken at a later scan."""
+    global seen
     fat0, root0, nroot, data0, spc = _geometry(dr)
+    here, done = set(), False
     for s in range(root0, root0 + nroot):
         b = dr.sector(s, _buf)
         for o in range(0, 512, 32):
             if b[o] == 0:
-                return
+                done = True
+                break
             attr = b[o + 11]
             if b[o] == 0xE5 or attr == 0x0F or attr & 0x18:   # deleted, long name, label or folder
                 continue
@@ -70,9 +77,16 @@ def _scan(dr):
             if clus < 2 or not 0 < size <= MAX or data0 + (clus - 2) * spc not in dr.over:
                 continue                                    # empty, too big, or the image's own
             key = (bytes(b[o:o + 11]), clus, size, bytes(b[o + 22:o + 26]))
-            if key not in seen:
-                seen.add(key)
+            if key in seen:
+                here.add(key)
+            elif len(todo) < QUEUE:
+                here.add(key)
                 todo.append((clus, size))
+            else:
+                dr.wrote = dr.wrote or ticks_ms()   # no room now: scan again once these are read
+        if done:
+            break
+    seen = here
 
 
 def _free(dr, clus):

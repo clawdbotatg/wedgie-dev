@@ -321,5 +321,24 @@ for i in range(3 * W._CAP):
         print("  request", i, "write status", st, "read", got and len(got[0]), "RAM sectors", sorted(d.over))
         break
 check("%d big requests, never deleted, fit (RAM sectors at the end: %d)" % (3 * W._CAP, len(d.over)), ok)
+# ---- a computer that writes the drive to break the wedgie (audit 11-13) ---------------------------------
+geo = inbox._geometry(d)
+boot = bytearray(IMG[:512])
+struct.pack_into("<H", boot, 17, 0xFFFF)                # a root folder of 65535 entries
+write(0, bytes(boot))
+inbox._geo = None
+check("the folder's place and size come from the image, never a boot sector the computer wrote (%r)" % (inbox._geometry(d),),
+      inbox._geometry(d) == geo)
+lines()
+clus = 900                                              # one data sector, kept, and 16 names for it, new times each write
+write(geo[3] + clus - 2, b'{"type":"ping","id":"again"}\n' + b"\n" * 483)
+most_seen = most_todo = 0
+for i in range(40):
+    root = b"".join(b"F%07dTXT" % k + b"\x20" + bytes(10) + struct.pack("<HHHI", i, k, clus, 29) for k in range(16))
+    write(geo[1], root)
+    inbox._scan(d)
+    most_seen, most_todo = max(most_seen, len(inbox.seen)), max(most_todo, len(inbox.todo))
+check("the folder rewritten 40 times with new times: at most %d files remembered, %d waiting" % (most_seen, most_todo),
+      most_seen <= 64 and most_todo <= inbox.QUEUE)
 img.unlink()
 sys.exit(1 if fails else 0)

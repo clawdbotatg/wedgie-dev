@@ -233,6 +233,9 @@ failed = W.failed
 
 def _handle(m):
     mid, t = m.get("id"), m.get("type")
+    if _q and t in ("rm", "open", "job", "stop", "home", "reboot", "phone"):   # a question is up: not over it (_asking)
+        W.send({"id": mid, "type": "error", "error": "busy: a question is on its screen"})
+        return
     if t == "hello":
         W.send(W.hello(mid, running=app["mod"] if app and state in ("running", "entry") else None))
     elif t == "chip":
@@ -501,7 +504,15 @@ def let_in(job="", full=False):
         print("wedgie: it said no. Unplug it and plug it back in to ask again.")   # ask till they give in)
         return False
     global _paused
+    if _q:                              # another question is up: not asked, and not a no
+        return False
     ok = _asking(lambda: __import__("hatch").ask())
+    if not ok and not ui.said_no:       # nobody answered. The third time counts as a no (0.3.82: a computer could ask
+        n = W.flag(W.NO_1) + 2 * W.flag(W.NO_2) + 1     # again for good, waiting for a green press meant for the app).
+        W.flag(W.NO_1, n & 1)                           # Counted in flags: the restart after each keeps them
+        W.flag(W.NO_2, n & 2)
+        if n >= 3:
+            W.flag(W.SAID_NO, True)
     if not ok and ui.said_no:
         W.flag(W.SAID_NO, True)
     if ok:
@@ -525,14 +536,20 @@ def _drop():
         L._on_show = L._on_keys = _interrupt
 
 
+_q = False          # a question is on the screen (_asking): nothing else that asks is taken (handle answers "busy")
+
+
 def _asking(fn):
-    """Run a question (and a job) with the app's ticks paused."""
-    global _paused
-    _paused = True
+    """Run a question (and a job) with the app's ticks paused. One at a time (0.3.82): a second question drawn over
+    the first took its yes from the same press as the first's, whose words were no longer on the screen."""
+    global _paused, _q
+    if _q:
+        return False
+    _paused = _q = True
     try:
         return fn()
     finally:
-        _paused = False
+        _paused = _q = False
 
 
 def _restart():

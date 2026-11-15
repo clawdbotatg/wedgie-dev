@@ -4,6 +4,7 @@
 //   signed, doesn't say so                                -> OSError "secure chip: not for this app"
 //   put on before 0.3.79 (no word): safe/secret/welcome   -> let through; any other -> refused
 //   a computer had full control (the "modified" mark)     -> the wedgie asks; green lets it through, red doesn't
+//   a second question sent while that one is up (0.3.82)  -> busy: never drawn over it
 // and wedgie.rand() works in every one (the firmware's own use). No Trust M on this chip: "let through" is any
 // other error (the bus doesn't answer).
 //   node tools/chipaskprobe.mjs
@@ -31,7 +32,7 @@ const REFUSED = /ZAP chip: secure chip: not for this app/, ASKED = /ZAP chip/;
 let failed = 0;
 const check = (ok, what) => { console.log(`${ok ? "ok  " : "FAIL"} ${what}`); if (!ok) failed++; };
 
-function run(mod, record, { modified = false, key = null } = {}) {
+function run(mod, record, { modified = false, key = null, under = null } = {}) {
   const F = firmware();
   const i = F.carts.findIndex((c) => c.mod === mod);
   if (i >= 0) F.carts.splice(i, 1);                       // our app under a shelf app's name
@@ -44,6 +45,7 @@ function run(mod, record, { modified = false, key = null } = {}) {
   if (key) {
     waited = !h.until((b) => ASKED.test(b), 12000, 20);    // nothing until a button: the question is up
     const p = h.chip.mcu.gpio[KEYS[key]];
+    if (under) { h.chip.run(1000); h.chip.write(JSON.stringify(under) + "\n"); }     // the computer asks its own question now
     h.chip.run(1500); p.setInputValue(false); h.chip.run(200); p.setInputValue(true);
   }
   h.until((b) => /ZAP rand/.test(b), 30000, 20);
@@ -64,6 +66,11 @@ r = run("zap", { chipuse: false }, { modified: true, key: "A" });
 check(r.waited && through(r.out) && rand(r.out), "full control was given: it asks, green lets it through");
 r = run("zap", { chipuse: true }, { modified: true, key: "Y" });
 check(r.waited && REFUSED.test(r.out) && rand(r.out), "full control was given: it asks, red refuses");
+// one question at a time (0.3.82): the computer's own question, sent while the chip question is up, isn't drawn
+// over it (one press of green answered both: the chip's yes went to words no longer on the screen)
+r = run("zap", { chipuse: false }, { modified: true, key: "A", under: { id: 7, type: "rm", path: "/saves/zap/x" } });
+const seven = r.out.split("\n").find((l) => /"id": 7[,}]/.test(l)) || "";
+check(/busy: a question is on its screen/.test(seven) && through(r.out), `a delete asked for under the chip question: busy, and green answers the chip question alone (${seven.trim().slice(0, 90)})`);
 if (failed) console.log(r.out.slice(-600));
 console.log(failed ? `${failed} FAILED` : "all checks passed");
 process.exit(failed ? 1 : 0);

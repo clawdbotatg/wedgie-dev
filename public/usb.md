@@ -5,7 +5,7 @@ description: Talk to a plugged-in wedgie over USB - find its port, hello, wedgie
 
 # Talk to a wedgie over USB
 
-Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.81**; if `hello`
+Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.82**; if `hello`
 says older, run `wedgie.py update` first.
 
 ## Talk to it directly
@@ -97,8 +97,7 @@ wedgie's own screen answered by a **real press** (a `press` request can't answer
   0.3.54+: a signed list older than the last one it installed is refused (`@serial`), even of the same version.
   0.3.55+: signed by one of two new keys, which can't be copied (a Mac's Secure Enclave, a YubiKey); lists
   signed by the old key are refused. A wedgie on 0.3.54 or older can't take a 0.3.55+ list: update it at
-  wedgie.dev/test (it reflashes), or with `wedgie.py update` (asks FULL CONTROL: only firmware that old does;
-  0.3.55+ gets the checked "Update firmware?" question).
+  wedgie.dev/test (it reflashes), or with `wedgie.py update` (FULL CONTROL; 0.3.55+ gets the checked question).
   0.3.56+: the wedgie checks the signature while its question is up: a grey dot pulses, then turns into a
   green check (signed by wedgie.dev) or a red warning sign (not signed: a yes changes nothing). No check
   mark means it wasn't checked yet; it always is after the yes, before anything is written. 0.3.57+: yes is
@@ -107,6 +106,8 @@ wedgie's own screen answered by a **real press** (a `press` request can't answer
   Older firmware sees no apps in a 0.3.66+ list: update its firmware first, then install apps.
 - **A no to FULL CONTROL holds until it's unplugged** (0.3.54+): every `open` after it is `refused` without
   asking, so a computer can't ask until the person gives in. A question takes no press in its first 0.6 s.
+  0.3.82+: FULL CONTROL left unanswered three times is a no too. One question at a time: `rm`, `open`, `job`,
+  `stop`, `reboot`, `phone` sent while one is up get `error` "busy: a question is on its screen".
 - **A no restarts the wedgie.** The question is drawn straight over the app's screen without saving it
   (saving the screen ran wedgies out of memory), so after a no it starts again from the top.
   Expect a `refused` answer, then its `ready` line.
@@ -132,7 +133,7 @@ from answering. Hold **Y**: no WEDGIE drive this time (debugging only).
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.81","fw":"wedgie-0.3.81","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.82","fw":"wedgie-0.3.82","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":3,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n

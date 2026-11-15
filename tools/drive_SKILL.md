@@ -15,14 +15,14 @@ or an ATECC608) **wedged** between the boards on I2C. It runs MicroPython plus t
 into one app, and asks on its own screen before anything that matters. Games, tools, and a hardware signer for a
 Safe multisig. Everything is MIT. Home: https://wedgie.dev
 
-**The current firmware is 0.3.81.** If a wedgie's `hello` says older, update it first: everything here assumes
+**The current firmware is 0.3.82.** If a wedgie's `hello` says older, update it first: everything here assumes
 current firmware.
 
 ```yaml
 name: wedgie
 site: https://wedgie.dev
 skill_index: https://wedgie.dev/skill.md          # this file
-firmware: 0.3.81
+firmware: 0.3.82
 license: MIT (hardware design, case, firmware, site, art)
 source: https://github.com/clawdbotatg/wedgie-dev
 made_by: Austin Griffith and Gus Griffith, with @ClawdBotATG; sold by BuidlGuidl DAO LLC
@@ -222,7 +222,7 @@ https://instantwallet.io. Details: safe.md.
 
 # Talk to a wedgie over USB
 
-Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.81**; if `hello`
+Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.82**; if `hello`
 says older, run `wedgie.py update` first.
 
 ## Talk to it directly
@@ -281,6 +281,7 @@ One file: `curl -O https://wedgie.dev/wedgie.py`, then `python3 wedgie.py <comma
     python3 wedgie.py run app.py           run a file once (streams output; Ctrl-C stops)               A
     python3 wedgie.py uninstall            take its app off ("no software")                             A
     python3 wedgie.py update               install or update the firmware (its app and saves stay)      A
+    python3 wedgie.py update --dev         the same from a build of your own (not signed): FULL CONTROL   A
     python3 wedgie.py ls                   every file, saves included                                   A
     python3 wedgie.py saves [backup f.json | restore f.json]                                           A
     python3 wedgie.py debug                a report: firmware, files, free space and RAM, error.log     A
@@ -313,7 +314,7 @@ wedgie's own screen answered by a **real press** (a `press` request can't answer
   0.3.54+: a signed list older than the last one it installed is refused (`@serial`), even of the same version.
   0.3.55+: signed by one of two new keys, which can't be copied (a Mac's Secure Enclave, a YubiKey); lists
   signed by the old key are refused. A wedgie on 0.3.54 or older can't take a 0.3.55+ list: update it at
-  wedgie.dev/test (it reflashes), or with `wedgie.py update` (asks FULL CONTROL).
+  wedgie.dev/test (it reflashes), or with `wedgie.py update` (FULL CONTROL; 0.3.55+ gets the checked question).
   0.3.56+: the wedgie checks the signature while its question is up: a grey dot pulses, then turns into a
   green check (signed by wedgie.dev) or a red warning sign (not signed: a yes changes nothing). No check
   mark means it wasn't checked yet; it always is after the yes, before anything is written. 0.3.57+: yes is
@@ -322,6 +323,8 @@ wedgie's own screen answered by a **real press** (a `press` request can't answer
   Older firmware sees no apps in a 0.3.66+ list: update its firmware first, then install apps.
 - **A no to FULL CONTROL holds until it's unplugged** (0.3.54+): every `open` after it is `refused` without
   asking, so a computer can't ask until the person gives in. A question takes no press in its first 0.6 s.
+  0.3.82+: FULL CONTROL left unanswered three times is a no too. One question at a time: `rm`, `open`, `job`,
+  `stop`, `reboot`, `phone` sent while one is up get `error` "busy: a question is on its screen".
 - **A no restarts the wedgie.** The question is drawn straight over the app's screen without saving it
   (saving the screen ran wedgies out of memory), so after a no it starts again from the top.
   Expect a `refused` answer, then its `ready` line.
@@ -347,7 +350,7 @@ from answering. Hold **Y**: no WEDGIE drive this time (debugging only).
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.81","fw":"wedgie-0.3.81","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.82","fw":"wedgie-0.3.82","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":3,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -867,6 +870,7 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md
 | A computer can't wear you down | A **no** to FULL CONTROL holds until unplugged: every later ask is refused without asking |
 | Firmware and shelf apps are wedgie.dev's | Signed lists, checked on the wedgie **while the question is up**: a green check (signed) or a red warning (a yes changes nothing). Yes stays grey until the check ends |
 | An old release can't be replayed | A signed list older than the last one it installed is refused (`@serial`) |
+| Update and Install never ask for FULL CONTROL | They send only the checked question. No answer is an error, never Ctrl-C. (`wedgie.py update --dev`, a build of your own, does ask it) |
 | A job does one thing | "Update firmware" writes only firmware; "Install X" writes only X and removes only the app it replaces (the question names it); anything more is refused |
 | Release keys can't be copied | Two keys, either signs: one in a Mac's Secure Enclave (Touch ID), one on a YubiKey (PIN + touch). No key file exists |
 | Keys never leave the chip | Made inside the Trust M / ATECC608. Not to the computer, not to wedgie.dev |
@@ -936,6 +940,7 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md
 | 0.3.57 | Yes is grey until the check ends; installs end in a hard reset |
 | 0.3.64 | Release signatures checked on the Trust M (0.2 s, was 2.4 s); pure Python only without one, or if it says no |
 | 0.3.66 | Apps in their own list, named by its hash in the signed one (no size limit) |
+| 0.3.82 | A computer's own "clean" list can't take the red border off. One question at a time (one press answered two). FULL CONTROL left unanswered three times is a no. Writing the drive can't hang it or fill its RAM |
 | 0.3.80 | `net.ask` with a url or an Ethereum call (fetched over the wedgie's own TLS): the computer could put its own answer in place of the fetched one before the app took it. Now its answers count only for asks it was sent. A TLS connection that failed a check is never used again (a retry on it skipped the failed check). The drive's command buffer holds a whole USB packet |
 | 0.3.79 | Only apps that say they use the secure chip can open it: signed into each app's line, read from its code (a red cartridge on wedgie.dev). After a computer had full control, the wedgie asks on its screen instead |
 | 0.3.78 | Its own TLS refuses a site that sends no signature (a computer could pose as any site); locked: no hash of a save, and `/saves/.` can't be deleted |

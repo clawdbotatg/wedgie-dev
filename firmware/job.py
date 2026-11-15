@@ -216,8 +216,9 @@ def check(m, sig=True, tick=None):
             required.update(may_write)  # the whole app, as signed
         after = json.loads(m["apps"]) if m.get("apps") is not None else ([now] if now else [])
         s = after and signed.get(after[0].get("mod"))
-        if not after or s:              # all the core and the app it runs after this, as signed: it clears the mark
-            m["clean"] = core + list(s and s.get("files") or ())
+        m.pop("clean", None)            # never the computer's own list (0.3.82: with an app nobody signed running, its
+        if not after or s:              # "clean": ["boot.py"] took the red border off). All the core and the app it
+            m["clean"] = core + list(s and s.get("files") or ())    # runs after this, as signed: it clears the mark
         for n in m.get("write") or []:
             if n not in may_write:
                 raise ValueError("%s isn't part of this job" % n)

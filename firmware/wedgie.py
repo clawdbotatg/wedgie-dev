@@ -3,7 +3,7 @@
 # interrupted; from the REPL they are plain calls:  import wedgie; wedgie.shot(); wedgie.press("A")
 import sys, os, json, machine
 
-VERSION = "0.3.81"
+VERSION = "0.3.82"
 
 # The lock. main.py turns Ctrl-C off before anything else and never ends by itself, so a computer
 # can only send the slot's JSON lines: it can't stop the app, reach the REPL, or make the secure chip
@@ -103,6 +103,7 @@ def is_open():
 # Flags in watchdog scratch3: they live through a soft reset and machine.reset(), and power-up clears them.
 WAS_OPEN = 1        # a computer was let in and main.py hasn't run since. MicroPython skips main.py (the lock) when
                     # a soft reset comes from the raw REPL, so boot.py hard resets instead (audit 10-18)
+NO_1, NO_2 = 4, 8   # how many FULL CONTROL questions nobody answered since it was plugged in (0-3, slot.let_in)
 SAID_NO = 2         # the person said no to FULL CONTROL: no more asking until it's unplugged (slot.let_in)
 
 
@@ -364,6 +365,8 @@ def chip_verify(digest, r, s, x, y):
                 _rng = _find_rng()
             if _rng[0] != "trustm":
                 return False
+            if sys.modules["trustm"].busy[0]:   # a chip command is under way (an app's, cut into by the USB timer): its
+                return False                    # answer would be read as this check's yes (0.3.82). The slow check instead
             return _rng[1].verify(digest, r, s, x, y)
         except Exception:
             _rng = None

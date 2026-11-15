@@ -44,8 +44,8 @@ def ctrl_c():
     """A Ctrl-C came in while sealed. True after a yes: the caller stops the app as Ctrl-C would. A no
     restarts it, locked."""
     import slot
-    if not W.SEALED or W.is_open() or time.ticks_diff(time.ticks_ms(), slot._started) < AFTER:
-        return False
+    if not W.SEALED or W.is_open() or slot._q or time.ticks_diff(time.ticks_ms(), slot._started) < AFTER:
+        return False                        # (_q: another question is up: a Ctrl-C under it does nothing)
     print("wedgie: locked. Press the green button on its red screen to give this computer full control.")
     if slot.let_in("", True):
         return True

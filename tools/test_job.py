@@ -396,6 +396,19 @@ check("done" in types_(out) and "modified" in f, "an install, a .py over a signe
 out, f = run({"job": "Install Buttons", "write": ["keytest.py"], "delete": ["hello.py"], "apps": json.dumps(buttons)},
              puts("keytest.py", kt) + [{"type": "commit"}], flash=M)
 check("done" in types_(out) and "modified" not in f, "a signed install, all as signed: the border goes")
+# the computer's own "clean" list is never used (audit 11-13: a signed update with "clean": ["boot.py"] took the
+# border off while a changed app stayed: only that one file had to be as signed)
+out, f = run({"job": "Update firmware", "write": ["slot.mpy"], "delete": [], "apps": json.dumps([{"mod": "hello"}]), "clean": ["boot.py"]}, upd(),
+             flash=dict(M, **{"hello.py": b"print('changed')\n"}))
+check("done" in types_(out) and "modified" in f, "a changed app and the computer's own clean list: the border stays")
+out, f = run({"job": "Install Buttons", "write": ["keytest.py"], "delete": ["hello.py"], "apps": json.dumps(buttons), "clean": ["boot.py"]},
+             puts("keytest.py", kt) + [{"type": "commit"}], flash=dict(M, **{"ui.py": b"x = 1\n"}))
+check("done" in types_(out) and "modified" in f, "an install over a changed core file, with its own clean list: the border stays")
+EVIL = dict(M, **{"evil.py": b"def run():\n    pass\n", "apps.json": json.dumps([{"mod": "evil", "name": "Evil"}]).encode()})
+out, f = run({"job": "Update firmware", "write": ["slot.mpy"], "delete": []}, upd(), flash=EVIL)
+check("done" in types_(out) and "modified" in f and "evil.py" in f, "an app nobody signed runs, a signed update: the border stays")
+out, f = run({"job": "Update firmware", "write": ["slot.mpy"], "delete": [], "clean": ["boot.py"]}, upd(), flash=EVIL)
+check("done" not in types_(out) or "modified" in f, "the same with the computer's own clean list: the border stays (%s, border %s)" % (types_(out), "modified" in f))
 out, f = run({"job": "Uninstall the app", "write": [], "delete": ["modified"], "apps": "[]"}, [{"type": "commit"}],
              flash=dict(M, **{"ui.py": b"x = 1\n"}))
 check("done" not in types_(out) and "modified" in f, "a job can't delete the border's file")

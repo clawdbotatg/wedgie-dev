@@ -23,7 +23,7 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md
 | A computer can't wear you down | A **no** to FULL CONTROL holds until unplugged: every later ask is refused without asking |
 | Firmware and shelf apps are wedgie.dev's | Signed lists, checked on the wedgie **while the question is up**: a green check (signed) or a red warning (a yes changes nothing). Yes stays grey until the check ends |
 | An old release can't be replayed | A signed list older than the last one it installed is refused (`@serial`) |
-| Update and Install never ask for FULL CONTROL | wedgie.dev, `wedgie.py use` and `wedgie.py update` only send the checked question (`update --dev`, for a build of your own, asks FULL CONTROL). A wedgie that doesn't answer gets an error, never Ctrl-C (a locked wedgie answers Ctrl-C with the red question) |
+| Update and Install never ask for FULL CONTROL | They send only the checked question. No answer is an error, never Ctrl-C. (`wedgie.py update --dev`, a build of your own, does ask it) |
 | A job does one thing | "Update firmware" writes only firmware; "Install X" writes only X and removes only the app it replaces (the question names it); anything more is refused |
 | Release keys can't be copied | Two keys, either signs: one in a Mac's Secure Enclave (Touch ID), one on a YubiKey (PIN + touch). No key file exists |
 | Keys never leave the chip | Made inside the Trust M / ATECC608. Not to the computer, not to wedgie.dev |
@@ -93,6 +93,7 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md
 | 0.3.57 | Yes is grey until the check ends; installs end in a hard reset |
 | 0.3.64 | Release signatures checked on the Trust M (0.2 s, was 2.4 s); pure Python only without one, or if it says no |
 | 0.3.66 | Apps in their own list, named by its hash in the signed one (no size limit) |
+| 0.3.82 | A computer's own "clean" list can't take the red border off. One question at a time (one press answered two). FULL CONTROL left unanswered three times is a no. Writing the drive can't hang it or fill its RAM |
 | 0.3.80 | `net.ask` with a url or an Ethereum call (fetched over the wedgie's own TLS): the computer could put its own answer in place of the fetched one before the app took it. Now its answers count only for asks it was sent. A TLS connection that failed a check is never used again (a retry on it skipped the failed check). The drive's command buffer holds a whole USB packet |
 | 0.3.79 | Only apps that say they use the secure chip can open it: signed into each app's line, read from its code (a red cartridge on wedgie.dev). After a computer had full control, the wedgie asks on its screen instead |
 | 0.3.78 | Its own TLS refuses a site that sends no signature (a computer could pose as any site); locked: no hash of a save, and `/saves/.` can't be deleted |
