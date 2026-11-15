@@ -183,6 +183,8 @@ def ok_diff(label, got, want):
         return True                         # the same amount under the wedgie's own ticker (USDT for USDT0, WMATIC for WPOL)
     if want.isdigit() and got.startswith("Unlimited ") and int(want) >> 200:
         return True
+    if got.startswith("Unlimited ") and len(want.split(" ")[0].replace(".", "")) >= 77:
+        return True                         # 2^255 and up is "Unlimited" whatever the descriptor says (safe-70, audit 11-13)
     if want.isdigit() and " " in got and digits(got) and digits(want).startswith(digits(got)):
         return True                         # a token it knows and the test doesn't, cut short: "8262.522497 WCT"
     g, w = got.split(" ", 1), want.split(" ", 1)          # an amount cut short: "0.0009026 WETH" for 0.000902656..
