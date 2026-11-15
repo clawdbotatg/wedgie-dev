@@ -96,6 +96,7 @@ function wedgie(app, old = false) {
   return w;
 }
 
+const DEEP = new Set(["grove"]);    // apps whose own calls leave too little stack for the question's check
 /** One checked job the way install.ts sends it (0.3.10+). true, or what went wrong. */
 function job(w, title, write, del, apps, where) {
   const h = w.req({ type: "hello" });
@@ -113,7 +114,10 @@ function job(w, title, write, del, apps, where) {
     w.h.chip.write(JSON.stringify({ type: "rel", sig: relSig }) + "\n");
     if (!w.h.until((b) => /slot: signed \S+ \d+/.test(b), 60000, 20)) return `no check while the question was up: ${JSON.stringify(w.h.out.slice(-300))}`;
     const m = w.all.match(/slot: signed (\S+) (\d+)/);
-    if (!m || m[1] !== "True") return `its check said ${m ? m[1] : "?"} (${m?.[2]} B free)`;
+    // "None … deep": no stack left under this app for pure-Python P-256 (no Trust M here). No mark on the question;
+    // the job's own check after the yes must then pass (0.3.81: it said False, "not signed", beside Crystal Grove)
+    const deep = /slot: signed None \d+ deep/.test(w.all) && DEEP.has(where.split(" ")[0]);
+    if (!m || (m[1] !== "True" && !deep)) return `its check said ${m ? m[1] : "?"} (${m?.[2]} B free)`;
     if (+m[2] < leastFree) { leastFree = +m[2]; leastWhere = where + ", after the check on the question"; }
   } else w.h.chip.run(1600);        // the question is up, past its 0.6 s with no answer (ui.SETTLE)
   w.press("A");
@@ -177,6 +181,9 @@ for (const [a, b] of pairs) {
   check(r === true && !BAD.test(w.all), `install ${b.mod} while ${a.mod} runs (${r0} B free before): ${r === true ? "done, restarted into it" : r} ${BAD.test(w.all) ? "| " + bad(w) : ""}(${Math.round((Date.now() - t0) / 1000)} s)`);
   if (args.includes("--no-update")) continue;
   w = wedgie(a.mod, true);  // the same app on an older core: every core .py differs
+  // an app made after 0.3.13 may not fit beside a core that compiles itself (Jiro-ikusu: MemoryError at its start).
+  // That isn't the update's: only what's said from here on counts, and the app must start on the new core.
+  const at = w.all.length, pre = BAD.test(w.all);
   const want = compiled.length;
   r = job(w, "Update firmware", F.core, [], null, `${a.mod}, firmware update`);
   if (r === true && w.sent !== want) r = `sent ${w.sent} files, not ${want}`;
@@ -189,7 +196,8 @@ for (const [a, b] of pairs) {
     if (off.length) r = `after the update these aren't the new ones: ${off.join(" ")}`;
     else if (left.length) r = `the old .py is still there (it would run instead): ${left.join(" ")}`;
   }
-  check(r === true && !BAD.test(w.all), `firmware update (${want} core files sent, booted on them) while ${a.mod} runs: ${r === true ? "done, " + w.put : r} ${BAD.test(w.all) ? "| " + bad(w) : ""}`);
+  const after = w.all.slice(at);
+  check(r === true && !BAD.test(after), `firmware update (${want} core files sent, booted on them) while ${a.mod} runs: ${r === true ? "done, " + w.put : r} ${pre ? "(it couldn't start on the old core) " : ""}${BAD.test(after) ? "| " + bad(w) : ""}`);
 }
 // The question's check, the other ways it goes (0.3.56+): a list signed by another key gets the warning sign,
 // and a yes then changes nothing; while it checks a yes does nothing (yes is grey) and a no answers at once.

@@ -3,7 +3,7 @@
 # interrupted; from the REPL they are plain calls:  import wedgie; wedgie.shot(); wedgie.press("A")
 import sys, os, json, machine
 
-VERSION = "0.3.80"
+VERSION = "0.3.81"
 
 # The lock. main.py turns Ctrl-C off before anything else and never ends by itself, so a computer
 # can only send the slot's JSON lines: it can't stop the app, reach the REPL, or make the secure chip
@@ -40,8 +40,9 @@ def release_ok(text, sig, tick=None, digest=None):
             return True
         import p256
         return p256.verify(x, y, d, r, s, tick)
-    except MemoryError:                     # not "unsigned": it couldn't tell (slot._sig: no mark; a job: its error)
-        raise
+    except (MemoryError, RuntimeError):     # not "unsigned": it couldn't tell (slot._sig: no mark; a job: its error).
+        raise                               # RuntimeError: no stack left for p256 under a deep app (0.3.81: Crystal
+                                            # Grove on a wedgie with no Trust M; its question said "not signed")
     except Exception:
         return False
     finally:

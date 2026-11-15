@@ -390,6 +390,7 @@ def _sig(mid, m, v):
             print("slot: signed None %d low" % gc.mem_free())
             return None
         import sys
+        deep = ""
         try:
             import listcheck            # its own file, loaded only now: slot.py stays beside every app
             ok = listcheck.run(mid, app, v, tick, _poll)
@@ -397,11 +398,14 @@ def _sig(mid, m, v):
             ok = None
         except MemoryError:
             ok = None
+        except RuntimeError:            # no stack left under this app for p256 (0.3.81): it couldn't tell, so no
+            ok = None                   # mark; job.py checks after the yes, off the app's stack
+            deep = " deep"
         except ValueError:
             ok = False
         sys.modules.pop("listcheck", None)
         gc.collect()
-        print("slot: signed %s %d" % (ok, gc.mem_free()))    # tools/chipprobe.mjs reads it
+        print("slot: signed %s %d%s" % (ok, gc.mem_free(), deep))    # tools/chipprobe.mjs reads it
         return ok
     return check
 
