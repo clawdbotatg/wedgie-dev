@@ -2220,10 +2220,12 @@ export function safe(main: HTMLElement) {
   async function pairWith(uri: string) {
     const m = await wcStart();
     say("Connecting to the app.");
-    await m.pair(uri.trim(), safeAddr, chain);
+    const d = await m.pair(uri.trim(), safeAddr, chain);
     try { localStorage.setItem(WC_ON, "1"); } catch {}
     closeSheet();
-    say(`Connected. What the app asks for shows up here.`);
+    let host = "";
+    try { host = new URL(d.url).host; } catch {}
+    say(`Connected to ${d.name}${host ? ` (${host})` : ""}. What it asks for shows up here.`);
   }
   function paintWc() {
     const box = $("s-wc");

@@ -28,7 +28,9 @@ export type Session = { topic: string; dapp: Dapp; chainId: number; safe: string
 type Kit = Awaited<ReturnType<typeof WalletKit.init>>;
 let kit: Promise<Kit> | null = null;
 // the Safe a pasted link connects, and how that ends: the app confirmed the session, or it didn't
-let want: { safe: string; chainId: number; done: (e?: Error) => void } | null = null;
+// (topic: the pasted link's own pairing. Only a proposal from it is answered: an app paired on an earlier visit
+// keeps its pairing and could get a proposal in first, audit 11-13.)
+let want: { safe: string; chainId: number; topic: string; done: (e?: Error, d?: Dapp) => void } | null = null;
 let hooks: { onAsk: (a: Ask) => void; onChange: () => void; onError: (m: string) => void;
   receipt: (chainId: number, hash: string) => Promise<any> } | null = null;
 
@@ -57,22 +59,35 @@ export function start(h: NonNullable<typeof hooks>) {
 }
 
 /** Connect an app: its wc: link, for this Safe. Resolves only once the app has confirmed the session. */
-export async function pair(uri: string, safe: string, chainId: number) {
-  if (!/^wc:/.test(uri.trim())) throw new Error("That isn't a WalletConnect link (it starts with wc:).");
+export async function pair(uri: string, safe: string, chainId: number): Promise<Dapp> {
+  const topic = /^wc:([0-9a-f]{64})@2\?/i.exec(uri.trim())?.[1].toLowerCase();
+  if (!topic) throw new Error("That isn't a WalletConnect link (it starts with wc:).");
   const k = await kit!;
-  const ended = new Promise<void>((ok, no) => { want = { safe, chainId, done: (e) => (e ? no(e) : ok()) }; });
+  const ended = new Promise<Dapp>((ok, no) => { want = { safe, chainId, topic, done: (e, d) => (e ? no(e) : ok(d!)) }; });
+  ended.catch(() => {});
   const slow = setTimeout(() => want?.done(new Error("The app never asked to connect. Copy a fresh link from it and paste that.")), 30_000);
   try {
     await k.pair({ uri: uri.trim() });
-    await ended;
+    return await ended;
   } finally { clearTimeout(slow); want = null; }
 }
 
+/** For tools/test_wcpair.mjs: a stand-in kit, and the proposal handler. */
+export function _useKit(k: any) { kit = Promise.resolve(k); }
+export const _onProposal = (k: any, p: any) => onProposal(k, p);
+
 async function onProposal(k: Kit, p: WalletKitTypes.SessionProposal) {
   const w = want;
+  // not the link just pasted (none was, or this comes from another pairing): refused, and the pasted one still waits
+  if (!w || String(p.params.pairingTopic || "").toLowerCase() !== w.topic) { await k.rejectSession({ id: p.id, reason: getSdkError("USER_REJECTED") }); return; }
   want = null;
-  if (!w) { await k.rejectSession({ id: p.id, reason: getSdkError("USER_REJECTED") }); return; }
-  try { await approve(k, p, w); w.done(); } catch (e: any) { w.done(e); }
+  const m = p.params.proposer.metadata, v = p.verifyContext?.verified;
+  const dapp: Dapp = { name: String(m?.name || "An app").slice(0, 40), url: String(m?.url || ""), icon: m?.icons?.[0] };
+  if (v?.isScam || v?.validation === "INVALID") {      // WalletConnect's own check of the page that made the link
+    await k.rejectSession({ id: p.id, reason: getSdkError("USER_REJECTED") }).catch(() => {});
+    return w.done(new Error(v.isScam ? `WalletConnect lists ${v.origin || "that site"} as a scam. Not connected.` : `That link says it is ${dapp.url || dapp.name}, but it was made at ${v.origin || "another site"}. Not connected.`));
+  }
+  try { await approve(k, p, w); w.done(undefined, dapp); } catch (e: any) { w.done(e); }
 }
 
 async function approve(k: Kit, p: WalletKitTypes.SessionProposal, w: { safe: string; chainId: number }) {
