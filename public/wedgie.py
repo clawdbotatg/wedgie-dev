@@ -16,6 +16,7 @@
                                               (several apps in it: install . snake)
   python3 wedgie.py install app.py [--name N] make one file the app it runs
   python3 wedgie.py update                    install/update the wedgie firmware (only changed files; its app and saves stay)
+  python3 wedgie.py update --dev              the same from a build of your own (not signed): asks FULL CONTROL
   python3 wedgie.py ls                        files on it, saves included
   python3 wedgie.py saves [backup f.json | restore f.json]    its saves (/saves/<game>/), out to a file and back
   python3 wedgie.py unlock                    full control (mpremote, Ctrl-C, its chip) until it restarts; asks on its screen, in red
@@ -186,6 +187,27 @@ class Wedgie:
             sys.exit("nobody pressed A on the wedgie")
         if v.get("type") != "open":
             sys.exit("the wedgie said no (Y on its screen)" if v.get("type") == "refused" else "the wedgie said %s" % v)
+
+    def hello_late(self):
+        """Its hello, waiting out a busy app (one in the middle of a fetch answers seconds late). None: no answer."""
+        for t in (1.5, 4, 4):
+            h = self.hello(t)
+            if h:
+                return h
+        return None
+
+    def repl_open(self):
+        """Is its REPL open to this computer already (bare MicroPython)? Asked with Ctrl-A alone: never Ctrl-C,
+        which a locked wedgie answers with its FULL CONTROL question. A wedgie running its app says nothing."""
+        self.s.reset_input_buffer()
+        self.buf = b""
+        self.s.write(b"\x01")
+        try:
+            self._read_until(b"raw REPL; CTRL-B to exit\r\n>", 0.9)
+            return True
+        except (TimeoutError, RuntimeError):
+            self.s.write(b"\r\n")       # end the bad line, so its next one reads
+            return False
 
     def enter(self):
         """Stop what it runs (Ctrl-C) and go to the raw REPL. No soft reset: wedgie firmware 0.1.1+ re-adds
@@ -526,18 +548,17 @@ FREE_PY = """def _free():
 _free()"""
 
 
-def checked(wg, m):
+NO_ANSWER = "the wedgie didn't answer (its app is busy, or it's stuck). Unplug it, plug it in, try again"
+
+
+def checked(wg, m, h=None):
     """A wedgie that installs signed files itself (0.3.0+, hello says jobs): no REPL needed. Returns
-    `have` like look() does (hashes, apps), or None for older firmware or an unsigned manifest."""
-    h = None
-    for t in (1.5, 4, 4):               # an app in the middle of a fetch answers late
-        h = wg.hello(t)
-        if h:
-            break
+    `have` like look() does (hashes, apps), or None for older firmware (its hello says so)."""
+    h = h or wg.hello_late()
     # No answer isn't "old firmware" (audit 11-13): full control's Ctrl-C makes a locked wedgie ask its red
     # FULL CONTROL question. Only a hello that says it's older goes that way.
     if not h:
-        sys.exit("the wedgie didn't answer (its app is busy, or it has no wedgie firmware: wedgie.py update). Unplug it, plug it in, try again")
+        sys.exit(NO_ANSWER)
     if not h.get("jobs"):
         return None
     # before 0.3.12 a job could run out of memory on a real board (it ran on the app's heap, and read each
@@ -545,13 +566,20 @@ def checked(wg, m):
     if tuple(int(x) for x in (h.get("version") or "0").split(".")[:3] if x.isdigit()) < (0, 3, 12):
         return None
     if not m.get("signed"):
-        sys.exit("this firmware isn't signed yet. Your wedgie stays as it is")
+        sys.exit("this firmware isn't signed yet. Your wedgie stays as it is (a build of your own: wedgie.py update --dev)")
     # 0.3.54 and older trust only the release key 0.3.55 dropped: nothing signed now goes on them
     if tuple(int(x) for x in (h.get("version") or "0").split(".")[:3] if x.isdigit()) < (0, 3, 55):
         raise RuntimeError("this wedgie's firmware is too old to update here. Install it at https://wedgie.dev/reset")
     names = sorted(with_twins(set(m["core"]) | {n for c in m["carts"] for n in c["files"]}))
     v = wg.request({"type": "sums", "names": names}, 30)
     return {"hashes": v["sums"], "apps": v.get("apps") or [], "files": [n for n, s in v["sums"].items() if s]}
+
+
+def update_writes(m, have):
+    """What a checked firmware update sends: the core files that differ, and any whose old .py is still beside
+    its .mpy (the job takes that off). Its app stays as it is (install.ts installCore, 0.3.53+)."""
+    sha = {f["name"]: f["sha256"] for f in m["files"]}
+    return [n for n in m["core"] if have["hashes"].get(n) != sha[n] or have["hashes"].get(twin(n) or "")]
 
 
 def job(wg, title, write, delete, apps):
@@ -849,6 +877,7 @@ def main():
     ap.add_argument("--port")
     ap.add_argument("--id")
     ap.add_argument("--name")
+    ap.add_argument("--dev", action="store_true", help="update: a build of your own, over FULL CONTROL")
     args = ap.parse_args()
     c = args.cmd
     if c == "list":
@@ -971,6 +1000,21 @@ def main():
             print("its app is uninstalled; it shows \"no software\"")
         elif c == "update":
             m = manifest()
+            # 0.3.55+ updates through its checked question, like wedgie.dev (audit 11-13: this always took
+            # FULL CONTROL, so a yes to red became routine). Full control is left for --dev (a build of your
+            # own), firmware that says it's older (it can't take today's signed list), and a bare board.
+            h = None if args.dev else wg.hello_late()
+            if not args.dev and not h and not wg.repl_open():
+                sys.exit(NO_ANSWER)
+            have = checked(wg, m, h) if h else None
+            if have:
+                write = update_writes(m, have)
+                if not write:
+                    print("wedgie %s: already up to date" % m["version"])
+                    return
+                job(wg, "Update firmware", write, [], None)
+                print("wedgie %s: %d files updated (checked install; its app and saves stay)" % (m["version"], len(write)))
+                return
             take_over(wg, "Update firmware to " + m["version"])
             have = look(wg, m)
             names = [f["name"] for f in m["files"]]

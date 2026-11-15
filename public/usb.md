@@ -64,6 +64,7 @@ One file: `curl -O https://wedgie.dev/wedgie.py`, then `python3 wedgie.py <comma
     python3 wedgie.py run app.py           run a file once (streams output; Ctrl-C stops)               A
     python3 wedgie.py uninstall            take its app off ("no software")                             A
     python3 wedgie.py update               install or update the firmware (its app and saves stay)      A
+    python3 wedgie.py update --dev         the same from a build of your own (not signed): FULL CONTROL   A
     python3 wedgie.py ls                   every file, saves included                                   A
     python3 wedgie.py saves [backup f.json | restore f.json]                                           A
     python3 wedgie.py debug                a report: firmware, files, free space and RAM, error.log     A
@@ -96,7 +97,8 @@ wedgie's own screen answered by a **real press** (a `press` request can't answer
   0.3.54+: a signed list older than the last one it installed is refused (`@serial`), even of the same version.
   0.3.55+: signed by one of two new keys, which can't be copied (a Mac's Secure Enclave, a YubiKey); lists
   signed by the old key are refused. A wedgie on 0.3.54 or older can't take a 0.3.55+ list: update it at
-  wedgie.dev/test (it reflashes), or with `wedgie.py update` (asks FULL CONTROL).
+  wedgie.dev/test (it reflashes), or with `wedgie.py update` (asks FULL CONTROL: only firmware that old does;
+  0.3.55+ gets the checked "Update firmware?" question).
   0.3.56+: the wedgie checks the signature while its question is up: a grey dot pulses, then turns into a
   green check (signed by wedgie.dev) or a red warning sign (not signed: a yes changes nothing). No check
   mark means it wasn't checked yet; it always is after the yes, before anything is written. 0.3.57+: yes is

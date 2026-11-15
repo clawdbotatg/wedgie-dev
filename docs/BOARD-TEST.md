@@ -25,7 +25,8 @@ Use a test wedgie, not the one with your wallet on it. Each step: press A on the
    Watch for "memory allocation failed" and note the lowest free RAM it prints.
 7. **Entry app (Demo):** `python3 tools/boardprobe.py --site http://localhost:4173 --port /dev/ttyACM0 demo hello`
    (Hello goes on over a running Demo: the hard-reset backstop). It must finish.
-8. A firmware update while Battery runs: `WEDGIE_SITE=http://localhost:4173 python3 public/wedgie.py update`.
+8. A firmware update while Battery runs: `WEDGIE_SITE=http://localhost:4173 python3 public/wedgie.py update --dev`
+   (`--dev`: a preview build isn't signed, so it goes over full access; a signed one needs no flag).
 
 ## The escape hatch
 
