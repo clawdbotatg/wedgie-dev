@@ -47,4 +47,23 @@ npm run build      # dist/, what Vercel serves
 
 Deploy: Vercel, framework "Other", build `npm run build`, output `dist` (see `vercel.json`).
 
+## Run it yourself (no wedgie.dev)
+
+A clone is the whole thing: the site, the firmware, MicroPython (`public/mp/`) and the apps on the shelf
+(`community/`). No `.env` needed.
+
+- **The site:** `npm install`, `npm run dev`, open http://localhost:5173 in Chrome or Edge. Its pages set up,
+  update and fill a wedgie from your clone's `firmware/`, not from wedgie.dev.
+- **The terminal:** `WEDGIE_SITE=http://localhost:5173 python3 public/wedgie.py update` (any command).
+- **No hardware:** `node tools/emu.mjs`, or `/virtual` on your local site (`docs/EMU.md`).
+- **Your own firmware:** change `firmware/` and it is no longer signed by us, so a wedgie won't take it as an
+  update. Put it on at `/reset` on your local site: hold BOOTSEL while plugging in, Find it, Reset it. That
+  wipes its apps and saves; the chip and its keys aren't touched.
+- **Your own releases:** put your two public keys in `RELEASE_KEYS` in `firmware/wedgie.py`, put that firmware
+  on once at `/reset`, and from then on your wedgie takes updates you sign. `tools/sign.mjs` signs with a Mac's
+  Secure Enclave (`tools/sekey.swift`) or a YubiKey (`tools/yksign.py`).
+
+What still needs the internet or keys of your own: the shop (`/order`), the Safe pages, and an app's internet
+through the page (it goes through relay.wedgie.dev; `wedgie.py net` goes straight to the site).
+
 MIT — everything, including the art in `art/`.

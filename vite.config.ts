@@ -18,7 +18,9 @@ const HERO_CHUNKS = /^assets\/(wedgie3d|demo)-[^/]+\.js$/;
 const FONT_UP_FRONT = /(latin-wght-normal|dm-mono-latin-500-normal|silkscreen-latin-400-normal)[^/]*\.woff2$/;
 
 function firmware(): Plugin {
-  return { name: "wedgie-firmware", buildStart() { buildFirmware(); }, configureServer(server) {
+  // In config(), not buildStart: vite lists public/ once, before buildStart. On a fresh clone public/fw
+  // didn't exist yet, so the first `npm run dev` answered /fw/manifest.json with the home page.
+  return { name: "wedgie-firmware", config() { buildFirmware(); }, configureServer(server) {
     server.watcher.add("firmware");
     server.watcher.on("change", (f) => { if (f.includes("/firmware/")) buildFirmware(); });
   } };
