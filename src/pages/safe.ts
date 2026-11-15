@@ -26,6 +26,7 @@ import * as Drive from "../serial/drive";
 import type { Repl } from "../serial/repl";
 import * as E from "../safe/eth";
 import { ownSigs } from "../safe/signer";
+import { realSafe } from "../safe/real";
 import { address, addressInput, addressOf, face, watch } from "../safe/address";
 import { describe, type Ctx, type Said } from "../safe/describe";
 import { explain, callsOf, intent, mark, markOf } from "../safe/explain";
@@ -247,7 +248,8 @@ async function send(chain: number, to: string, data: string, say: (s: string, pc
   throw new Error("Still not in a block: " + hash);
 }
 
-type Info = { owners: string[]; threshold: number; nonce: number; balance: bigint; usdc: bigint | null };
+/** real: one of Safe's own contracts (safe/real.ts); false: something else that answers like one; null: couldn't tell. */
+type Info = { owners: string[]; threshold: number; nonce: number; balance: bigint; usdc: bigint | null; real: boolean | null };
 type Row = { chain: number; addr: string; wedgie: boolean; wallet: boolean; info?: Info | null; err?: string; gone?: boolean };
 const KEYS = Object.fromEntries(IDS.map((id) => [CHAINS[id].key, id]));
 const route = (chain: number, a: string) => `/safe/${CHAINS[chain].key}:${a}`;
@@ -280,11 +282,14 @@ async function readSafe(c: number, a: string): Promise<Info> {
     { to: a, allowFailure: true, data: E.selector("getThreshold()") }, { to: a, allowFailure: true, data: E.selector("nonce()") },
     { to: E.MULTICALL3, allowFailure: true, data: E.call("getEthBalance(address)", [E.aword(a)]) },
     ...(u ? [{ to: u, allowFailure: true, data: E.call("balanceOf(address)", [E.aword(a)]) }] : [])];
-  const [owners, th, n, bal, usdc] = E.unaggregate(await view(c, E.MULTICALL3, E.aggregate3(calls)));
+  const [res, code, slot] = await Promise.all([view(c, E.MULTICALL3, E.aggregate3(calls)),
+    rpc(c, "eth_getCode", [a, "latest"]).catch(() => null), rpc(c, "eth_getStorageAt", [a, "0x0", "latest"]).catch(() => null)]);
+  const [owners, th, n, bal, usdc] = E.unaggregate(res);
   // no code there: every call "works" and says nothing; not a Safe: getOwners fails
   if (!owners.ok || owners.data.length < 130 || !th.ok || !n.ok) throw Object.assign(new Error(`There's no Safe at ${short(a)} on ${CHAINS[c].name}.`), { gone: true });
   return { owners: E.addrs(owners.data), threshold: Number(BigInt(th.data)), nonce: Number(BigInt(n.data)), balance: BigInt(bal.data),
-    usdc: usdc?.ok && usdc.data.length > 2 ? BigInt(usdc.data) : null };
+    usdc: usdc?.ok && usdc.data.length > 2 ? BigInt(usdc.data) : null,
+    real: typeof code === "string" && typeof slot === "string" ? realSafe(code, slot) : null };
 }
 
 // ---- what a Safe has besides owners: modules (each can move money without the owners) and guards ----
@@ -822,7 +827,7 @@ export function safe(main: HTMLElement) {
       }
       paintAll();
       const news = (onWedgie || []).some((k) => !rows.some((r) => `${r.chain}:${r.addr.toLowerCase()}` === k.toLowerCase()));
-      if (safeAddr) { checkDeployed(); if (info && wedgieOwns()) remember(chain, safeAddr); }
+      if (safeAddr) { checkDeployed(); if (info && info.real && wedgieOwns()) remember(chain, safeAddr); }
       else if (!listing && (news || Date.now() - lastFind > 60_000)) findSafes();
       keyTries = 0;
     } catch (e) {
@@ -958,8 +963,8 @@ export function safe(main: HTMLElement) {
       await Promise.all(list.slice(i, i + 4).map(async (r) => { try { r.info = await readSafe(r.chain, r.addr); } catch (e: any) { r.info = null; r.err = msgOf(e); r.gone = !!e?.gone; } read++; tick(); }));
     for (const r of list) {          // the chain is the truth: who really is an owner now
       if (!r.info) continue;
-      r.wedgie = r.info.owners.some(mine);
-      if (r.wedgie) remember(r.chain, r.addr);   // seen once, listed in this browser even when Safe's API isn't answering
+      r.wedgie = r.info.owners.some(mine) && r.info.real !== false;     // a contract that only answers like a Safe isn't the wedgie's
+      if (r.wedgie && r.info.real) remember(r.chain, r.addr);   // seen once, listed in this browser even when Safe's API isn't answering
       r.wallet = !!account && r.info.owners.some((o) => eqA(o, account));
       if (r.wedgie || r.wallet) tellOurs(r.chain, r.addr);
     }
@@ -1163,6 +1168,7 @@ export function safe(main: HTMLElement) {
         <button class="sx-act" id="a-receive"><span>↓</span>Receive</button>
         ${can() ? `<button class="sx-act" id="a-connect"${dis()}><span>⇄</span>Connect app</button>` : ""}</div>`;
     }
+    if (i && i.real === false) h += `<p class="sx-warn">This page doesn't know this contract as one of Safe's. It may only answer like one. Sign only if you know what it is.</p>`;
     box.innerHTML = h;
     box.classList.toggle("sx-hero-set", sub === "settings");   // Settings: a lighter gray, so it reads as a level down
     paintSpin();
@@ -1255,7 +1261,8 @@ export function safe(main: HTMLElement) {
       if (c !== chain || a !== safeAddr) return;
       info = i; stale = false;
       tellOurs(c, a);
-      if (signer) { if (wedgieOwns()) { remember(c, a); tellWedgie(c, a); } else forget(c, a); }
+      // only one of Safe's own contracts is kept or written to the wedgie's list (a link to a fake naming the wedgie did both)
+      if (signer) { if (wedgieOwns() && i.real) { remember(c, a); tellWedgie(c, a); } else if (!wedgieOwns() || i.real === false) forget(c, a); }
       if (!quiet) say("");
       paintAll();             // the Safe from the chain now; its queue, tokens and history as the sources answer
       if (!quiet) checkCopies(c, a);
