@@ -173,6 +173,20 @@ export async function expireOld(sql: Awaited<ReturnType<typeof db>>) {
     and created < now() - ${`${QUOTE / 1000} seconds`}::interval`;
   for (const o of cards as Order[]) await endCard(sql, o).catch(() => {});   // Stripe down: tried again next time
 }
+/**
+ * This site's address, for links in mail and Stripe's way back. Never just the request's own host (audit 11-13): any
+ * name that reaches this project works, old *.vercel.app deployments and emu.wedgie.dev too, so a link in a real
+ * mail (it carries the order's token) could point at another origin. wedgie.dev, or this computer in development.
+ */
+export const SITE = "https://wedgie.dev";
+export function siteOf(req: Request): string {
+  try {
+    const u = new URL(req.url);
+    if (u.origin === SITE || ["localhost", "127.0.0.1"].includes(u.hostname)) return u.origin;
+  } catch {}
+  return SITE;
+}
+
 /** A card order's quote ran out: paid after all, or its Stripe checkout is ended and the order expired. If Stripe
  * won't end it, the order stays 'new' (still holding its box, stockLeft CARD_HOLD) and is tried again later. */
 export async function endCard(sql: Awaited<ReturnType<typeof db>>, o: Pick<Order, "id" | "stripe_session">): Promise<"paid" | "expired" | "new"> {

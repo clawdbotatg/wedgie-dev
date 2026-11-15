@@ -41,7 +41,7 @@ ok(!JSON.stringify(row).toLowerCase().includes("buyer@example.com") && row.email
 await sql`update orders set status = 'paid', paid_at = now() where id = ${o.id}`;
 await call(order.POST, { id: o.id, token: o.token });
 await call(order.POST, { id: o.id, token: o.token });
-const paid = mails().filter((m) => /paid/.test(m.subject));
+const paid = mails().filter((m) => /paid/.test(m.subject) && m.to === EMAIL);     // the buyer's (the shop gets its own "paid" note too: _tell.ts)
 ok(paid.length === 1 && paid[0].to === EMAIL && paid[0].text.includes(`/order/${o.id}#${o.token}`), "one paid mail, with the order's link");
 
 // 3

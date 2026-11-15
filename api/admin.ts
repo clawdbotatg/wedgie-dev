@@ -19,7 +19,7 @@
 // holds their price (older empty ones settle when their buyer opens the order page), and deletes what's done with: shipped or canceled orders and
 // unpaid or expired ones with nothing sent, 30 days on (a shipped box that never shows as delivered: 60 days, its
 // sealed address with it). GET ?stock=1: just the stock counts, {left: {wedgie, kit}}.
-import { db, env, json, oops, same, settleDeposit, stockLeft, STOCK_ROW, endCard, type Order, crossSite } from "./_shop.js";
+import { db, env, json, oops, same, settleDeposit, stockLeft, STOCK_ROW, endCard, type Order, crossSite, siteOf } from "./_shop.js";
 import type { Item } from "../src/shop/catalog.js";
 import { unlock, shippedMail, mailPaid, sendAlerts } from "./_mail.js";
 
@@ -32,7 +32,7 @@ export async function GET(req: Request) {
   if (!allowed(req)) return oops("no", 401);
   const sql = await db();
   const q = new URL(req.url).searchParams;
-  if (env("SHOP_MAIL_KEY")) await sendAlerts(sql, new URL(req.url).origin).catch(() => {});   // omen's timer: alerts go out even on a quiet site
+  if (env("SHOP_MAIL_KEY")) await sendAlerts(sql, siteOf(req)).catch(() => {});   // omen's timer: alerts go out even on a quiet site
   if (q.get("funnel")) {
     const days = Math.max(1, Math.min(365, Number(q.get("days")) || 30));
     const counts = await sql`select day::text, k, n from counts where day > current_date - ${days}::int order by day, k`;
@@ -62,7 +62,7 @@ export async function GET(req: Request) {
     and (created > now() - interval '3 days' or got > 0)`) as Order[];
   await Promise.all(open.map(async (o) => {
     const r = await settleDeposit(sql, o).catch(() => null);
-    if (r?.paid) await mailPaid(sql, o.id, new URL(req.url).origin).catch(() => {});
+    if (r?.paid) await mailPaid(sql, o.id, siteOf(req)).catch(() => {});
   }));
   const orders = await sql`select id, cart, cents, pay, chain, sealed, paid_at, created, boxed_at, tracking from orders where status = 'paid' order by paid_at`;
   return json({ orders, left: await stockLeft(sql) });
@@ -118,7 +118,7 @@ export async function POST(req: Request) {
   const [o] = r.length ? r : await sql`select email_enc from orders where id = ${b.id} and status = 'shipped' and tracking = ${tracking} and email_enc is not null`;
   if (!o) return oops("No paid, unshipped order with that id.", 404);
   if (!o.email_enc) return json({ ok: true, mailed: false, noEmail: true });
-  try { await shippedMail(await unlock(o.email_enc), b.id, tracking, new URL(req.url).origin); }
+  try { await shippedMail(await unlock(o.email_enc), b.id, tracking, siteOf(req)); }
   catch { return json({ ok: true, mailed: false }); }
   await sql`update orders set email_enc = null where id = ${b.id} and status = 'shipped'`;
   return json({ ok: true, mailed: true });

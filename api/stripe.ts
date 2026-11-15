@@ -2,7 +2,7 @@
 // directly, so a missed webhook only delays the "paid" until the buyer looks.)
 // Stripe dashboard -> Developers -> Webhooks: https://wedgie.dev/api/stripe, events
 // checkout.session.completed and checkout.session.async_payment_succeeded; its secret is STRIPE_WEBHOOK_SECRET.
-import { db, env, hmac, same, json, oops, markPaid } from "./_shop.js";
+import { db, env, hmac, same, json, oops, markPaid, siteOf } from "./_shop.js";
 import { mailPaid } from "./_mail.js";
 
 export async function POST(req: Request) {
@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     && s?.payment_status === "paid" && s?.metadata?.order) {
     const sql = await db();
     await markPaid(sql, s.metadata.order, s.id);
-    await mailPaid(sql, s.metadata.order, new URL(req.url).origin);
+    await mailPaid(sql, s.metadata.order, siteOf(req));
   }
   return json({ ok: true });
 }
