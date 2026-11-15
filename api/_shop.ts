@@ -179,6 +179,9 @@ export async function endCard(sql: Awaited<ReturnType<typeof db>>, o: Pick<Order
   if (o.stripe_session) {
     const s = await session(o.stripe_session);
     if (s.payment_status === "paid") { await markPaid(sql, o.id, s.id); return "paid"; }
+    // finished at Stripe, the money not in yet (a slow payment method): it can still land on this session, so the
+    // order stays as it is (audit 11-13: renew forgot the session and the payment matched no order). A week at most.
+    if (s.status === "complete" && Date.now() / 1000 - Number((s as any).created || 0) < 7 * 86400) return "new";
     if (s.status === "open") {
       const done = await stripe(`checkout/sessions/${s.id}/expire`, {}).then(() => true, () => false);
       if (!done) {

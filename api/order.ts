@@ -186,7 +186,11 @@ async function status(sql: Awaited<ReturnType<typeof db>>, b: any, origin: strin
 /** An expired order quoted again: today's price, a fresh 10 minutes, the same cart and sealed address. */
 async function renew(sql: Awaited<ReturnType<typeof db>>, o: Order, origin: string, ip: string): Promise<string | { o: Order; url?: string }> {
   if (!o.sealed) return "That order can't be renewed: start over.";
-  if (o.pay === "card" && (await endCard(sql, o)) === "paid") return { o: { ...o, status: "paid" } };   // its old checkout: paid after all, or ended
+  // its old checkout: paid after all, ended, or still live (Stripe wouldn't end it, or its money is on the way):
+  // then no new one, or the old one could be paid with no order pointing at it
+  const old = o.pay === "card" ? await endCard(sql, o) : "expired";
+  if (old === "paid") return { o: { ...o, status: "paid" } };
+  if (old === "new") return "Its last checkout is still open. Try again in a few minutes.";
   await expireOld(sql);
   const many = await tooMany(sql, ip);
   if (many) return many;
