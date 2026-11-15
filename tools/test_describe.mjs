@@ -88,6 +88,22 @@ for (const calls of [[send], [send, drain], five]) {
   ok(back.length === calls.length && back.every((c, i) => c.operation === 0 && c.to.toLowerCase() === calls[i].to.toLowerCase() && c.value === calls[i].value && c.data === calls[i].data), `9 the page's own batch of ${calls.length} opens back up`, back);
 }
 
+// A call the Safe makes to itself changes the Safe (audit 11-13, PAGE-7): the ones the page had no words for read as a
+// calm "Call 0x…". Safe 1.5's module guard, an old Safe's changeMasterCopy (its whole code), and any other.
+{
+  const self = (sig, args) => say({ to: SAFE, value: "0", data: E.call(sig, args), operation: 0 });
+  let x = self("setModuleGuard(address)", [E.aword(EVIL)]);
+  ok(x.kind === "danger" && /module guard/i.test(x.title) && x.title.includes(EVIL), "a self-call to setModuleGuard: danger, named", x);
+  x = self("changeMasterCopy(address)", [E.aword(EVIL)]);
+  ok(x.kind === "danger" && /code/i.test(x.title) && x.title.includes(EVIL), "a self-call to changeMasterCopy: danger, named", x);
+  x = self("somethingNew(uint256)", [E.word(1)]);
+  ok(x.kind === "danger" && /can't read/.test(x.title), "any other call to the Safe itself: danger, can't read", x);
+  x = say({ to: SAFE, value: "0", data: "0x", operation: 0 });
+  ok(x.kind !== "danger", "an empty call to itself (a reject) stays calm", x);
+  x = self("addOwnerWithThreshold(address,uint256)", [E.aword(BOB), E.word(2)]);
+  ok(x.kind === "owners", "adding an owner still reads as before", x);
+}
+
 await vs.close();
 console.log(bad ? bad + " FAILED" : "all ok");
 process.exit(bad ? 1 : 0);

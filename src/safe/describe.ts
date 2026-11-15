@@ -25,7 +25,7 @@ const S = {
   addOwner: sel("addOwnerWithThreshold(address,uint256)"), removeOwner: sel("removeOwner(address,address,uint256)"),
   swapOwner: sel("swapOwner(address,address,address)"), threshold: sel("changeThreshold(uint256)"), multiSend: sel("multiSend(bytes)"),
   enableModule: sel("enableModule(address)"), disableModule: sel("disableModule(address,address)"), setGuard: sel("setGuard(address)"),
-  setFallback: sel("setFallbackHandler(address)"),
+  setFallback: sel("setFallbackHandler(address)"), setModuleGuard: sel("setModuleGuard(address)"), changeMasterCopy: sel("changeMasterCopy(address)"),
 };
 const MAX = 2n ** 256n - 1n;
 const eq = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
@@ -48,7 +48,8 @@ const dollars = (n: number) => n.toLocaleString("en-US", { style: "currency", cu
  * A DELEGATECALL anywhere else runs that contract's code as the Safe, whatever its data looks like (audit 11-13). */
 export const MULTISENDS = ["0x9641d764fc13c8b624c04430c7356c1c7c8102e2", "0x38869bf66a61cf6bdb996a6ae40d5853fd43b526",
   "0x40a2accbd92bca938b02010e17a5b8929b49130d", "0xa1dabef33b3b82c7814b6d82a79e50f4ac44102b",
-  "0xa238cbeb142c10ef7ad8442c6d1f9e89e07e7761", "0x998739bfdaadde7c933b942a68053933098f9eda"];
+  "0xa238cbeb142c10ef7ad8442c6d1f9e89e07e7761", "0x998739bfdaadde7c933b942a68053933098f9eda",
+  "0x218543288004cd07832472d464648173c77d7eb7", "0xa83c336b20401af773b6219ba5027174338d1836"];     // Safe 1.5.0's (the wedgie reads them since Safe Signer 65)
 
 /** The calls in a multiSend(bytes) calldata: operation, to, value, data each. Throws on anything that isn't a batch
  * written the one way they're always written: MultiSend follows the offset word, so calls read from a fixed place
@@ -103,6 +104,10 @@ export function describe(t: { to: string; value: string | bigint; data?: string 
     if (s === S.disableModule) return { title: `Remove module ${ctx.addr(wAddr(d, 1))}`, kind: "owners" };
     if (s === S.setGuard) return { title: `Set a guard ${ctx.addr(wAddr(d, 0))}: it can block every transaction`, kind: "danger" };
     if (s === S.setFallback) return { title: `Change the fallback handler to ${ctx.addr(wAddr(d, 0))}`, kind: "danger" };
+    if (s === S.setModuleGuard) return { title: `Set a module guard ${ctx.addr(wAddr(d, 0))}: it can block what modules do (recovery, limits)`, kind: "danger" };
+    if (s === S.changeMasterCopy) return { title: `Replace the Safe's own code with ${ctx.addr(wAddr(d, 0))}: it can do anything`, kind: "danger" };
+    // any other call the Safe makes to itself changes the Safe: never a calm "Call 0x…" (audit 11-13)
+    return { title: `${method ? `${esc(method)}: a` : "A"} change to the Safe itself the page can't read`, kind: "danger" };
   }
   if (s === S.transfer && d.length >= 136) return { title: `Send ${amount(wNum(d, 1), to, ctx)} to ${ctx.addr(wAddr(d, 0))}${extra}`, kind: "send" };
   if (s === S.transferFrom && d.length >= 200) return { title: `Move ${amount(wNum(d, 2), to, ctx)} from ${ctx.addr(wAddr(d, 0))} to ${ctx.addr(wAddr(d, 1))}${extra}`, kind: "send" };
