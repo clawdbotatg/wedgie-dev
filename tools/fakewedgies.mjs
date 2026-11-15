@@ -127,6 +127,7 @@ export function fakeWedgies(specs) {
       answer("");
     }
     async function onJson(msg) {
+      if (st.mute) return;       // _st.mute: its app stopped reading USB (a busy or a bad app): nothing answers
       if (!wedgie()) return push(">>> " + JSON.stringify(msg) + "\r\n{'x': 1}\r\n>>> ");
       const id = msg.id, v = version();
       const ok = () => push(JSON.stringify({ id, type: "ok" }) + "\r\n");
@@ -273,6 +274,7 @@ export function fakeWedgies(specs) {
           const ch = String.fromCharCode(b);
           if (ch === "\x03" && sealed() && !st.open && !raw) { line = ""; st.sealedBytes = (st.sealedBytes || 0) + 1; continue; }
           if (ch === "\x03") { raw = false; line = ""; st.interrupts++; st.stopped = true; continue; }
+          if (ch === "\x01" && sealed() && !st.open && !raw) continue;     // locked: no REPL behind it, a plain byte like Ctrl-C
           if (ch === "\x01") { raw = true; code = ""; push("raw REPL; CTRL-B to exit\r\n>"); continue; }
           if (ch === "\x02") { raw = false; continue; }
           if (!raw) {

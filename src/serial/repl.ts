@@ -227,6 +227,16 @@ export class Repl {
     await this.waitFor(RAW_PROMPT, 25000); // boot.py may bring WiFi up
   }
 
+  /** Is its REPL open to this computer already (bare MicroPython, a board left in the REPL)? Asked with Ctrl-A
+   *  alone: never Ctrl-C, which a locked wedgie answers with its FULL CONTROL question. A wedgie running its
+   *  app takes the byte as a bad line and says nothing. */
+  async replOpen(ms = 900) {
+    this.buf = "";
+    await this.write("\x01");
+    try { await this.waitFor(RAW_PROMPT, ms); return true; }
+    catch { await this.write("\r\n").catch(() => {}); return false; }     // end the bad line, so its next one reads
+  }
+
   /** Run code. Resolves with its stdout when it finishes; @tag lines stream to onLine as they print. */
   async exec(code: string, ms = 30000): Promise<string> {
     this.buf = "";

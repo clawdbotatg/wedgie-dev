@@ -266,6 +266,7 @@ export const APP_LIST = "0.3.66";
 export const UPDATE_FIRST = "Update the firmware first.";
 export const NEW_KEYS = "0.3.55";
 export const OLD_KEY = "This wedgie's firmware is too old to update here. Install it at wedgie.dev/reset";
+export const NO_ANSWER = "the wedgie didn't answer. Unplug it, plug it in, try again";
 export const NOT_SIGNED = "this firmware isn't signed yet. Your wedgie stays as it is";
 /** Its hello, waiting out a busy app: an app in the middle of a fetch (ETH Price's TLS: seconds of Trust M
  *  math) answers late, and a 0.7 s hello read that as old firmware and asked FULL CONTROL (Austin 10-26). */
@@ -281,6 +282,10 @@ async function helloOf(r: Repl) {
 async function checkedOnly(r: Repl, m: Manifest) {
   const h = await helloOf(r);
   if (h?.version && cmpVersion(h.version, "0.3.12") >= 0) throw new Error(m.signed ? "the wedgie didn't take it. Unplug it, plug it in, try again" : NOT_SIGNED);
+  // No answer isn't "old firmware" (audit 11-13): an app that keeps quiet got Ctrl-C next, and a locked wedgie
+  // answers that with FULL CONTROL, right after its person clicked Update. Only a board whose REPL is open
+  // already (bare MicroPython: nothing to lock) goes on without a hello.
+  if (!h && !(await r.replOpen())) throw new Error(NO_ANSWER);
 }
 const appList = new WeakMap<Repl, boolean>();
 const uidOf = new WeakMap<Repl, string>();     // its board ID, to find it again if a job's restart drops the port

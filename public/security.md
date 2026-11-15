@@ -23,6 +23,7 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md
 | A computer can't wear you down | A **no** to FULL CONTROL holds until unplugged: every later ask is refused without asking |
 | Firmware and shelf apps are wedgie.dev's | Signed lists, checked on the wedgie **while the question is up**: a green check (signed) or a red warning (a yes changes nothing). Yes stays grey until the check ends |
 | An old release can't be replayed | A signed list older than the last one it installed is refused (`@serial`) |
+| Update and Install never ask for FULL CONTROL | wedgie.dev and `wedgie.py use` only send the checked question. A wedgie that doesn't answer gets an error, never Ctrl-C (a locked wedgie answers Ctrl-C with the red question) |
 | A job does one thing | "Update firmware" writes only firmware; "Install X" writes only X and removes only the app it replaces (the question names it); anything more is refused |
 | Release keys can't be copied | Two keys, either signs: one in a Mac's Secure Enclave (Touch ID), one on a YubiKey (PIN + touch). No key file exists |
 | Keys never leave the chip | Made inside the Trust M / ATECC608. Not to the computer, not to wedgie.dev |

@@ -529,13 +529,23 @@ _free()"""
 def checked(wg, m):
     """A wedgie that installs signed files itself (0.3.0+, hello says jobs): no REPL needed. Returns
     `have` like look() does (hashes, apps), or None for older firmware or an unsigned manifest."""
-    h = wg.hello(1.5) or {}
-    if not h.get("jobs") or not m.get("signed"):
+    h = None
+    for t in (1.5, 4, 4):               # an app in the middle of a fetch answers late
+        h = wg.hello(t)
+        if h:
+            break
+    # No answer isn't "old firmware" (audit 11-13): full control's Ctrl-C makes a locked wedgie ask its red
+    # FULL CONTROL question. Only a hello that says it's older goes that way.
+    if not h:
+        sys.exit("the wedgie didn't answer (its app is busy, or it has no wedgie firmware: wedgie.py update). Unplug it, plug it in, try again")
+    if not h.get("jobs"):
         return None
     # before 0.3.12 a job could run out of memory on a real board (it ran on the app's heap, and read each
     # USB line a char at a time): those take full access once, then install on a clean heap (install.ts)
     if tuple(int(x) for x in (h.get("version") or "0").split(".")[:3] if x.isdigit()) < (0, 3, 12):
         return None
+    if not m.get("signed"):
+        sys.exit("this firmware isn't signed yet. Your wedgie stays as it is")
     # 0.3.54 and older trust only the release key 0.3.55 dropped: nothing signed now goes on them
     if tuple(int(x) for x in (h.get("version") or "0").split(".")[:3] if x.isdigit()) < (0, 3, 55):
         raise RuntimeError("this wedgie's firmware is too old to update here. Install it at https://wedgie.dev/reset")
