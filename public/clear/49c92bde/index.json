@@ -1,0 +1,34 @@
+{
+ "tag": "49c92bde",
+ "registry": "3bebbd05cbc2d2d2bf9c41a8edbf5e5cc88e4eb4",
+ "issued": 1794755728,
+ "roots": {
+  "a": "51bb7bc81c8395e1416853cf224a056623bcea759a4fd48d42b0869d525fd037",
+  "b": "5180bf082f9155f6814f88804d931f45141e3a10c12516f4d6d406a8dde6fd0f"
+ },
+ "audited": 1789,
+ "notAudited": 6999,
+ "tokens": 2474,
+ "auditors": [
+  "Cyfrin"
+ ],
+ "clearMax": 10000,
+ "chains": [
+  1,
+  10,
+  56,
+  100,
+  137,
+  146,
+  999,
+  4663,
+  5042,
+  8453,
+  9745,
+  42161,
+  42220,
+  43114,
+  84532,
+  11155111
+ ]
+}
