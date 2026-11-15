@@ -25,6 +25,7 @@ import * as W from "../serial/wedgies";
 import * as Drive from "../serial/drive";
 import type { Repl } from "../serial/repl";
 import * as E from "../safe/eth";
+import { ownSigs } from "../safe/signer";
 import { address, addressInput, addressOf, face, watch } from "../safe/address";
 import { describe, type Ctx, type Said } from "../safe/describe";
 import { explain, callsOf, intent, mark, markOf } from "../safe/explain";
@@ -1643,6 +1644,9 @@ export function safe(main: HTMLElement) {
       if (!E.isAddress(t.to)) throw 0;
     } catch { return say("That link is broken: ask for it again.", true); }
     const h = E.safeTxHash(c, a, t), data = E.safeTxData(c, a, t);
+    // each signature counts for the owner it is really from, once: the label beside it in the link proves nothing
+    // (one signature listed under three owners read "3 of 3 · Ready" for a tx that reverts)
+    sigs = ownSigs(h, sigs);
     say("Checking the link's signatures.");
     // true: the Safe took it; false: it reverted (not an owner's); null: no answer (the chain can't be read now)
     const ok = await Promise.all(sigs.map((s) => within(view(c, a, E.call("checkNSignatures(bytes32,bytes,bytes,uint256)",
