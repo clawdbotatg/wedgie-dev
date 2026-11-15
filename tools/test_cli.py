@@ -65,7 +65,8 @@ check(got is None, "firmware with no jobs: full control (%r)" % (got,))
 import hashlib, json, shutil, tempfile  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-FW = os.path.join(HERE, "..", "public", "fw")
+FW = os.path.join(HERE, "..", "firmware")
+REL = os.path.join(HERE, "..", "release")       # the signed list, as committed (public/fw is a build's copy)
 sys.path.insert(0, os.path.join(HERE, "..", "firmware"))
 machine = types.ModuleType("machine")
 machine.unique_id = lambda: b"\x01" * 8
@@ -77,10 +78,11 @@ sys.modules["micropython"] = types.ModuleType("micropython")
 import wedgie as W  # noqa: E402
 import job          # noqa: E402
 
-man = json.load(open(os.path.join(FW, "manifest.json")))
-rel = open(os.path.join(FW, "release.txt")).read()
-al = open(os.path.join(FW, "apps.txt")).read() if "\n@apps  " in rel else ""
-other = man["carts"][0]["files"][0]         # an app's file: never part of a firmware update
+rel = open(os.path.join(REL, "firmware.txt")).read()
+al = open(os.path.join(REL, "apps.txt")).read() if "\n@apps  " in rel else ""
+listed = [l.split("  ", 1) for l in rel.split("\n")[2:] if l and not l.startswith("@")]
+man = {"version": rel.split("\n")[1][8:], "core": [n for _, n in listed], "files": [{"name": n, "sha256": h} for h, n in listed], "carts": []}
+other = next(l.split("  ", 1)[1] for l in al.split("\n") if l and not l.startswith("@"))      # an app's file: never part of a firmware update
 stale = [n for n in man["core"] if n != "main.py"][:2]
 d, old = tempfile.mkdtemp(), os.getcwd()
 os.chdir(d)
