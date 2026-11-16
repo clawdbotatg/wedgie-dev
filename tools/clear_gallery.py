@@ -112,6 +112,88 @@ def collect(reg, only):
     return txs
 
 
+def rig():
+    """What draws a screen besides the app and its data: the firmware, the virtual chip, the page's bundle picker."""
+    r = subprocess.run(["git", "-C", root, "rev-parse", "HEAD:firmware", "HEAD:tools/rp2040", "HEAD:tools/safechip.mjs",
+                        "HEAD:src/safe/clear.ts", "HEAD:package-lock.json"], capture_output=True, text=True, check=True)
+    return "".join(x[:8] for x in r.stdout.split())
+
+
+def said(hexes):
+    """{id: a hash of what a bundle says}: each structure without its last item (its place in the release's
+    Merkle tree, which is new with every release). None: no bundle."""
+    import hashlib
+    sys.path.insert(0, os.path.join(root, "wire"))
+    import wire
+    out = {}
+    for i, h in hexes.items():
+        if h is None:
+            out[i] = None
+            continue
+        b = wire.loads(bytes.fromhex(h))
+        out[i] = hashlib.sha256(bytes(wire.dumps([[x[:-1] for x in b[k]] for k in sorted(b)]))).hexdigest()
+    return out
+
+
+def reuse(base, work, reg, app):
+    """Before a run: take from an earlier run every transaction a wedgie would show the same way now. Same app code
+    (all but its version and its data's roots), same firmware and chip, and the bundle /safe sends says the same.
+    The rest is left for run()."""
+    s, now = shelf(), rig()
+    if os.path.exists(os.path.join(work, "txs.json")):          # started already: run() goes on with it
+        return
+    best = None
+    for old in glob.glob(os.path.join(base, "work-*")):
+        try:
+            m, r = json.load(open(os.path.join(old, "meta.json"))), open(os.path.join(old, "rig.txt")).read()
+            otxs = json.load(open(os.path.join(old, "txs.json")))
+        except OSError:
+            continue
+        if os.path.abspath(old) == os.path.abspath(work) or r != now or len(results(old)) < len(otxs):
+            continue
+        if not os.path.isdir(os.path.join(root, "public", "clear", m["data"])) or not os.path.isdir(os.path.join(old, "shots")):
+            continue
+        d = subprocess.run(["git", "-C", app, "diff", "-I", "^FW *=", m["sha"], s["sha"], "--", "*.py", ":!safe_roots.py"],
+                           capture_output=True, text=True)
+        if d.returncode or d.stdout.strip():                    # the app's code changed: every screen may have
+            continue
+        if best is None or os.path.getmtime(old) > os.path.getmtime(best[0]):
+            best = (old, m, otxs)
+    if not best:
+        return print("no earlier run with this app code, firmware and chip: every transaction runs")
+    old, m, otxs = best
+    txs = collect(reg, None)
+    key = lambda t: (t["chainId"], t["to"], t["value"], t["data"], t["safe"])
+    was = {key(t): t["id"] for t in otxs}
+    both = [t for t in txs if key(t) in was]
+    f = os.path.join(base, "bundles.json")
+    json.dump(both, open(f, "w"))
+    subprocess.run(["node", os.path.join(here, "clear_bundles.mjs"), f, f, m["data"], s["data"]], check=True, cwd=root)
+    b = json.load(open(f))
+    a, b = said(b[m["data"]]), said(b[s["data"]])
+    lines = {}
+    for lf in glob.glob(os.path.join(old, "log", "*.txt")):
+        for line in open(lf, errors="replace"):
+            x = re.match(r"(ok  |FAIL) (t\d{5}): (.*)", line)
+            if x:
+                lines[x.group(2)] = (x.group(1), x.group(3).strip())
+    os.makedirs(os.path.join(work, "shots"), exist_ok=True)
+    os.makedirs(os.path.join(work, "log"), exist_ok=True)
+    n = 0
+    with open(os.path.join(work, "log", "reused.txt"), "w") as log:
+        for t in both:
+            o = was[key(t)]
+            if a[t["id"]] != b[t["id"]] or o not in lines:
+                continue
+            k = 1
+            while os.path.exists(os.path.join(old, "shots", "%s-%d.png" % (o, k))):
+                shutil.copy(os.path.join(old, "shots", "%s-%d.png" % (o, k)), os.path.join(work, "shots", "%s-%d.png" % (t["id"], k)))
+                k += 1
+            log.write("%s %s: %s\n" % (lines[o][0], t["id"], lines[o][1]))
+            n += 1
+    print("%d of %d transactions read the same as on Safe Signer %s, data %s: taken from that run" % (n, len(txs), m["app"], m["data"]))
+
+
 def run(reg, work, jobs, only, usage):
     os.makedirs(os.path.join(work, "shots"), exist_ok=True)
     os.makedirs(os.path.join(work, "log"), exist_ok=True)
@@ -120,6 +202,10 @@ def run(reg, work, jobs, only, usage):
     if os.path.exists(mf) and json.load(open(mf)) != s:
         sys.exit("%s has another Safe Signer's or data's screens (%s): use a new work dir" % (work, json.load(open(mf))))
     json.dump(s, open(mf, "w"))
+    rf = os.path.join(work, "rig.txt")
+    if os.path.exists(rf) and open(rf).read() != rig():
+        sys.exit("%s was made with another firmware or chip: use a new work dir" % work)
+    open(rf, "w").write(rig())
     json.dump(txs, open(os.path.join(work, "txs.json"), "w"))
     done = results(work)
     todo = [t for t in txs if t["id"] not in done]
@@ -184,6 +270,12 @@ def missing(u):
 def is_page(f):
     """A page to sign: the dark header on top, the red "no" bar at the bottom. Not the "Reading" splash, not the
     Safe tx hash bar drawn over a page. safechip's PNGs: RGB, 240 x 240, no filter."""
+    raw = pixels(f)
+    at = lambda x, y: tuple(raw[y * 721 + 1 + x * 3:y * 721 + 4 + x * 3])
+    return at(120, 2) == (24, 24, 24) and at(20, 232) == (224, 48, 40)
+
+
+def pixels(f):
     import zlib, struct
     b, i, idat = open(f, "rb").read(), 8, b""
     while i < len(b):
@@ -191,9 +283,14 @@ def is_page(f):
         if t == b"IDAT":
             idat += b[i + 8:i + 8 + n]
         i += 12 + n
-    raw = zlib.decompress(idat)
-    at = lambda x, y: tuple(raw[y * 721 + 1 + x * 3:y * 721 + 4 + x * 3])
-    return at(120, 2) == (24, 24, 24) and at(20, 232) == (224, 48, 40)
+    return zlib.decompress(idat)
+
+
+def whole(shots):
+    """Without a page caught while its bottom bar was still being drawn: the next shot is the same page, done.
+    (It made a 2-page call 3 pages on one run and 2 on the next, 11-15.)"""
+    top = [pixels(x)[:200 * 721] for x in shots]
+    return [x for k, x in enumerate(shots) if k + 1 == len(shots) or top[k] != top[k + 1]]
 
 
 def results(work):
@@ -226,7 +323,7 @@ def publish(work, verdicts, usage):
             shots.append(os.path.join(work, "shots", "%s-%d.png" % (t["id"], n)))
             n += 1
         pages = []
-        for src in [x for x in shots if is_page(x)] or shots[1:]:     # none looks like a page: all but the first
+        for src in whole([x for x in shots if is_page(x)]) or shots[1:]:     # none looks like a page: all but the first
             f = "%s-%d.png" % (t["id"][1:], len(pages) + 1)
             shutil.copy(src, os.path.join(dst, f))
             pages.append(f)
@@ -309,6 +406,7 @@ def refresh(base, jobs, usage_only):
     work, verdicts, use = os.path.join(base, "work-" + key), os.path.join(base, "verdicts-%s.json" % key), os.path.join(base, "usage.json")
     usage(use)
     if True:
+        reuse(base, work, reg, app)
         run(reg, work, jobs, None, use)
         left = len(json.load(open(os.path.join(work, "txs.json")))) - len(results(work))
         if left:

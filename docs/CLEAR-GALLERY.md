@@ -6,13 +6,13 @@ the list below, redoing /clear is part of the job.**
 
 Status 2026-11-15: redone on **Safe Signer 73**, data `b21a5a1f`. The stamp, the check and the one command are
 built, and the usage numbers refresh by themselves every Monday (`.github/workflows/clear-usage.yml` runs `weekly`
-and pushes). Redo-only-what-changed and stable ids are not built.
+and pushes). A data-only release redoes only what changed (minutes). Stable ids are not built.
 
 ## The short version
 
 ```
 python3 tools/clear_gallery.py stale                      # is /clear behind the shelf? (exit 1 = yes)
-python3 -u tools/clear_gallery.py refresh ~/.wedgie-clear   # redo it: hours the first time for a release, in the background
+python3 -u tools/clear_gallery.py refresh ~/.wedgie-clear   # redo it, in the background: minutes for new data, hours for new app code
 python3 tools/clear_gallery.py weekly                     # fresh mainnet use only: a minute, no chips
 ```
 
@@ -103,14 +103,18 @@ Built (11-13): the stamp (`meta.json`), the check (`clear_gallery.py stale`, in 
 gate), the one command (`refresh`), the weekly usage timer (a GitHub Action; `stale` also complains when usage is
 over 10 days old, which means the Action broke).
 
+Built (11-15): **redo only what changed** (`reuse` in `clear_gallery.py`). `refresh` first takes from an earlier
+run in the same folder every transaction that reads the same now: same app code (all but its version and its
+data's roots), same firmware and chip (`rig.txt`), and the bundle /safe sends says the same (`tools/clear_bundles.mjs`;
+the Merkle proofs, new with every release, don't count). Only the rest runs. New app code or firmware still reruns
+everything. So keep the folder (`~/.wedgie-clear`): without the last run's `shots/` it is hours again.
+Also 11-15: a page caught half-drawn is dropped at publish (it made a 2-page call 3 pages on one run, 2 on the next).
+
 Not built:
 
 1. **After a release, by itself.** Today the session that released starts `refresh` in the background right
    after the gate, and ships it when it ends. The gate's FAIL is the reminder. (The weekly usage timer is built.)
-2. **Redo only what changed.** Keep, per transaction, a hash of (the app's files, its bundle, the transaction).
-   Same hash = keep the screens. New data then reruns only the calls it touched (minutes). A new app still
-   reruns everything (hours): its drawing code can change any screen.
-3. **Stable ids.** Name a transaction's screens by a hash of (test file, description), not its place in the
+2. **Stable ids.** Name a transaction's screens by a hash of (test file, description), not its place in the
    list. Then links to one transaction survive a new registry commit, and `--only` runs can be published.
 
 ## Not part of this
