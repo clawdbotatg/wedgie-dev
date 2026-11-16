@@ -4,7 +4,7 @@ wedgie.dev/clear says "this is how a wedgie shows every transaction". That's onl
 the Safe Signer and the data that are on the shelf now. Nothing redoes them by itself. **If you ship something in
 the list below, redoing /clear is part of the job.**
 
-Status 2026-11-15: redone on **Safe Signer 73**, data `b21a5a1f`. The stamp, the check and the one command are
+Status 2026-11-15: redone on **Safe Signer 74**, data `3c7d3bba`. The stamp, the check and the one command are
 built, and the usage numbers refresh by themselves every Monday (`.github/workflows/clear-usage.yml` runs `weekly`
 and pushes). A data-only release redoes only what changed (minutes). Stable ids are not built.
 
