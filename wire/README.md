@@ -114,7 +114,8 @@ LI.FI has none: its `_receiver` is just who gets paid, and should be the Safe. W
 5. **`amount` has no threshold** in the wire format; ERC-7730 v2's `amount` does.
 6. **Unknown enum values:** the wire spec says the field MUST fail; two registry tests expect the raw number.
 7. **No names to show:** no source for NFT collection names or address names, so "#1001 of 0x.." and addresses.
-8. **Audit coverage is thin:** 760 of 6,736 descriptor deployments on our chains are attested (Cyfrin only; 11 of
+8. **Audit coverage is thin:** 1,813 of 8,812 descriptor functions in the data are audited (11-15, data `3c7d3bba`;
+   today's count: `public/clear/<tag>/index.json`. Cyfrin only; 11 of
    its attestations were dropped for re-review, Aave v3 among them).
 
 ## What it does
@@ -134,7 +135,8 @@ descriptors into wire-format messages, signed with a public test key (secp256k1,
 python3 wire/from7730.py <registry>/registry <out dir>     # one .cbor per (chain, contract, selector)
 ```
 
-Registry 7ced22e (2026-10-19): 8,774 messages from 543 files, the biggest 1,144 bytes. 3 files skipped (see
+Counted once, on registry 7ced22e (2026-10-19), and not kept up (today's: `public/clear/<tag>/index.json`,
+`docs/CLEAR-GALLERY.md`): 8,774 messages from 543 files, the biggest 1,144 bytes. 3 files skipped (see
 below). Its 1,543 test transactions all find their message, the signature checks, every value reads out of
 the real calldata in place, and the labels a wallet must show are all there in order. Not yet checked:
 that the values are the right ones. That comes with step 2, against the registry's expected screens.
