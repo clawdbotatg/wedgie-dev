@@ -45,7 +45,7 @@ def stuck(e):
         if a.value() == 0 and drew:
             try:            # the escape hatch's red question (hatch.py). If it can't draw, no: BOOTSEL is the way back
                 if not ui.ask(d, "FULL CONTROL?", ["This computer could run any code and make the chip sign anything: send your money.",
-                                                   "Didn't ask? Press {r}"], yes="full control", no="no", scary=True):
+                                                   "Didn't ask? Press {r}"], yes="hold 3 seconds", no="no", scary=True, hold=3000):
                     return False
             except Exception:
                 return False

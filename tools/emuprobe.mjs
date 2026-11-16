@@ -187,7 +187,7 @@ try {
   await page.evaluate(() => window.vw.exec("import wedgie\nwedgie.SEALED = True\nwedgie._open = False"));
   const yes = page.evaluate(() => new Promise((res) => { const off = window.vw.onOutput((l) => { if (/"id": ?62/.test(l)) { off(); res(l); } }); window.vw.write(JSON.stringify({ id: 62, type: "open", for: "Install Buttons" }) + "\n"); setTimeout(() => { off(); res(""); }, 12000); }));
   await page.waitForTimeout(1500);
-  await page.evaluate(() => window.vw.press("A", 150));
+  await page.evaluate(() => window.vw.press("A", 3400));
   const yl = await yes;
   await page.waitForTimeout(500);
   await page.locator(".vw").screenshot({ path: `${out}/emu-let-in.png` });
@@ -206,7 +206,11 @@ try {
   await page.waitForTimeout(1500);
   await page.locator(".vw").screenshot({ path: `${out}/emu-full.png` });
   const red = await px(3, 120);
-  await page.evaluate(() => window.vw.press("A", 150));
+  await page.evaluate(() => window.vw.press("A", 150));      // 0.3.85: a tap is not a yes, green must stay down 3 s
+  await page.waitForTimeout(900);
+  const tap = await px(3, 120), tapOpen = await Promise.race([full.then(() => "answered"), new Promise((r) => setTimeout(() => r("waiting"), 50))]);
+  check(near(tap, [227, 49, 44]) && tapOpen === "waiting", `full control: a tap of green is not a yes (${tap}, ${tapOpen})`);
+  await page.evaluate(() => window.vw.press("A", 3400));
   const fy = await full;
   await page.waitForTimeout(500);
   await page.locator(".vw").screenshot({ path: `${out}/emu-full-yes.png` });
@@ -223,13 +227,13 @@ try {
   await cc(true);
   await page.evaluate(() => window.vw.write("\r\x03\x03"));
   await page.waitForTimeout(1200);
-  const early = await px(3, 120);
+  const early = await px(20, 96);      // inside the screen: the edge is red anyway after full control (the border)
   await cc(false);
   await page.evaluate(() => window.vw.write("\r\x03\x03"));
   await page.waitForTimeout(1500);
-  const ccRed = await px(3, 120);
+  const ccRed = await px(20, 96);
   await page.locator(".vw").screenshot({ path: `${out}/emu-ctrlc.png` });
-  await page.evaluate(() => window.vw.press("A", 150));
+  await page.evaluate(() => window.vw.press("A", 3400));
   await page.waitForTimeout(800);
   const cco = await page.evaluate(() => window.vw.exec("import wedgie, slot, micropython\nprint('open:', wedgie.is_open(), 'kbd:', slot._kbd)\nslot._kbd = False\nslot.step = _step\nwedgie._open = False\nwedgie.SEALED = False\nmicropython.kbd_intr(3)"));
   check(!near(early, [227, 49, 44]), `Ctrl-C right after the slot starts asks nothing (${early})`);

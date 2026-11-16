@@ -129,7 +129,7 @@ export async function takeOver(r: Repl, ask = askHint, job = "", title = doing(j
 export const doing = (job: string) => job.replace(/ to \S+$/, "")
   .replace(/^(Update|Install|Uninstall|Save|Run)\b/, (v) => ({ Update: "Updating", Install: "Installing", Uninstall: "Uninstalling", Save: "Saving", Run: "Running" } as Record<string, string>)[v]) || "This computer has it";
 
-export const ASK_TEXT = "Press the green button on the wedgie to let this computer in";
+export const ASK_TEXT = "Hold the green button on the wedgie for 3 seconds to let this computer in";
 /** Where a page shows ASK_TEXT while the wedgie waits for its person ("" when they answered). */
 export let askHint: (s: string) => void = () => {};
 /** The last question's time: site = ms from the click to the request going out (what the site did

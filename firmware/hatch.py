@@ -1,5 +1,5 @@
 # The escape hatch: a computer gets the whole wedgie (the REPL, every file, the secure chip) only after
-# its person sees this red question and presses the green button. Asked by {"type": "open", "full": true} (wedgie.py
+# its person sees this red question and holds the green button for 3 seconds (0.3.85: a tap is not a yes). Asked by {"type": "open", "full": true} (wedgie.py
 # unlock) and by a Ctrl-C while sealed (main.py turns Ctrl-C off, so it arrives as a plain byte: slot.serve,
 # usbwallet.pump). A yes stops the app and drops to the REPL (slot.let_in), under a screen that says the
 # computer has full access, until a restart or an unplug. Only a real press answers (ui.ask). Loaded only
@@ -18,7 +18,7 @@ def ask():
     ok = ui.ask(slot.d, "FULL CONTROL?",
                 ["This computer could run any code and make the chip sign anything: send your money.",
                  "Didn't ask? Press {r}"],
-                yes="full control", no="no", ms=slot.ASK_MS, scary=True)
+                yes="hold 3 seconds", no="no", ms=slot.ASK_MS, scary=True, hold=3000)
     W.asked_ms = time.ticks_diff(ui.drawn, slot._rx)
     if ok:
         shown(slot.d)
@@ -46,7 +46,7 @@ def ctrl_c():
     import slot
     if not W.SEALED or W.is_open() or slot._q or time.ticks_diff(time.ticks_ms(), slot._started) < AFTER:
         return False                        # (_q: another question is up: a Ctrl-C under it does nothing)
-    print("wedgie: locked. Press the green button on its red screen to give this computer full control.")
+    print("wedgie: locked. Hold the green button 3 seconds on its red screen to give this computer full control.")
     if slot.let_in("", True):
         return True
     slot._restart()

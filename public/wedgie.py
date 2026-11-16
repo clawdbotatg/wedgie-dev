@@ -901,7 +901,7 @@ def main():
             if not h.get("sealed") or h.get("open"):
                 print("it's open already: Ctrl-C works (mpremote too)")
             else:
-                sys.stderr.write("press the green button on the wedgie (the red screen) to give this computer full control\n")
+                sys.stderr.write("hold the green button on the wedgie for 3 seconds (the red screen) to give this computer full control\n")
                 try:
                     v = wg.request({"type": "open", "full": True}, 65)
                 except TimeoutError:

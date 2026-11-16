@@ -54,7 +54,7 @@ def _mark(d, x, y, s):
     d.show_rect(x, y, 8, 8)
 
 
-def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None, scary=False, big=None, sig=None):
+def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None, scary=False, big=None, sig=None, hold=0):
     k = keys or L.Keys(physical=True)
     k.pressed()
     bg, fg = (INK, WHITE) if scary else (WHITE, INK)
@@ -66,7 +66,7 @@ def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None, scary=Fa
         at = (8 * len(big[:11]) + 2, y)
         y += 10
     _lines(d, lines, y, fg, cols=11)
-    no, yes = no[:5], yes[:5]
+    no, yes = no[:5], "hold" if hold else yes[:5]
 
     def ready():                            # yes shows once a signed job's check is done (ui.wait)
         d.fill_rect(124 - 8 * len(yes), 0, 8 * len(yes) + 4, 12, fg)
@@ -77,7 +77,7 @@ def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None, scary=Fa
     d.text(no, 128 - 8 * len(no), 56, fg)
     d.show()
     ui.drawn = time.ticks_ms()
-    return ui.wait(k, ms, sig, at and (lambda s: _mark(d, at[0], at[1], s)), sig and ready)
+    return ui.wait(k, ms, sig, at and (lambda s: _mark(d, at[0], at[1], s)), sig and ready, hold)
 
 
 def busy(d, title, what=""):

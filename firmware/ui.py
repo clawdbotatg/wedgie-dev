@@ -162,9 +162,10 @@ def mark(d, x, y, s):
     d.show_rect(x, y - 1, 16, 15)
 
 
-def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None, scary=False, big=None, sig=None):
+def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None, scary=False, big=None, sig=None, hold=0):
     """A yes/no question: green yes, red no, no answer in `ms` is a no. Only real presses count (a press
-    sent over USB can't answer). True for yes. scary: white on red, for a yes that hands over
+    sent over USB can't answer). True for yes. hold: ms the green button must stay down for a yes (full
+    control: 3 s, a white line grows across the yes bar; a tap or a bump is not a yes). scary: white on red, for a yes that hands over
     everything (full control: slot.let_in). big: what it's about, drawn huge under a one-line question
     (scale 3, a word a line, or scale 2 for long words): an update's version, an app's name.
     sig(tick): a signed job's check (slot._sig), run once the question is up, a dot pulsing after big
@@ -174,7 +175,7 @@ def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None, scary=Fa
     sig there's never a check: it means only "this wedgie checked the signature" (Austin, 10-19)."""
     if d.width < 240:
         import small
-        return small.ask(d, question, lines, yes, no, ms, keys, scary, big, sig)
+        return small.ask(d, question, lines, yes, no, ms, keys, scary, big, sig, hold)
     k = keys or L.Keys(physical=True)
     k.pressed()                             # a key already down doesn't count
     bg, fg = (RED, WHITE) if scary else (WHITE, INK)
@@ -214,7 +215,8 @@ def ask(d, question, lines=(), yes="yes", no="no", ms=60000, keys=None, scary=Fa
     d.show()
     global drawn
     drawn = time.ticks_ms()
-    return wait(k, ms, sig, at and (lambda s: mark(d, at[0], at[1], s)), sig and (lambda: _yes(d, yes)))
+    return wait(k, ms, sig, at and (lambda s: mark(d, at[0], at[1], s)), sig and (lambda: _yes(d, yes)),
+                hold, hold and (lambda e: _held(d, yes, e * 240 // hold)))
 
 
 def _yes(d, yes):
@@ -223,15 +225,25 @@ def _yes(d, yes):
     d.show_rect(0, 184, 240, 26)
 
 
+def _held(d, yes, w):
+    """The yes bar while green is held: a white line w px across its top (0: let go, the bar as it was)."""
+    if w:
+        d.fill_rect(0, 184, w, 4, WHITE)
+        d.show_rect(0, 184, 240, 4)
+    else:
+        _yes(d, yes)
+
+
 class _Answered(BaseException):     # a press during the check: not an Exception, so release_ok can't eat it
     pass
 
 
-def wait(k, ms, sig=None, show=None, ready=None):
+def wait(k, ms, sig=None, show=None, ready=None, hold=0, fill=None):
     """The answer to a question just drawn: A True, Y False, nothing in ms False. Presses in its first SETTLE
     ms are dropped (audit 10-18: a computer could pop a question under a finger already pressing A).
     sig, show: ask's check, and what draws its mark (show(s), s as ui.mark). signed: what it found. While
-    the check runs only Y answers (an A is dropped); ready() then redraws yes as live."""
+    the check runs only Y answers (an A is dropped); ready() then redraws yes as live. hold: A answers only
+    after staying down that many ms (the pin itself: Keys.held); fill(ms held) draws how far, fill(0) a let-go."""
     global said_no, signed
     said_no = False
     signed = None
@@ -258,11 +270,23 @@ def wait(k, ms, sig=None, show=None, ready=None):
             return False
         show and show(signed)
         ready and ready()                   # an A during the check was dropped by tick (k.pressed)
-    while time.ticks_diff(time.ticks_ms(), t0) < ms:
+    dn = None                               # when A went down (hold)
+    while time.ticks_diff(time.ticks_ms(), t0) < ms or dn is not None:
         for key in k.pressed():
             if key in ("A", "Y") and time.ticks_diff(time.ticks_ms(), t0) >= SETTLE:
                 said_no = key == "Y"
-                return key == "A"
+                if key == "Y" or not hold:
+                    return key == "A"
+                dn = time.ticks_ms()
+        if dn is not None:
+            e = time.ticks_diff(time.ticks_ms(), dn)
+            if not k.held("A"):
+                dn = None
+                fill and fill(0)
+            elif e >= hold:
+                return True
+            elif fill:
+                fill(e)
         time.sleep_ms(20)
     return False
 

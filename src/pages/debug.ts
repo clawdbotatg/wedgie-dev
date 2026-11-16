@@ -11,7 +11,7 @@ export function debug(main: HTMLElement) {
   main.innerHTML = `
   <section class="test-page">
     <h1>Debug a wedgie</h1>
-    <p id="g-text">Plug in the wedgie. The report needs you to press its green button: that gives this computer full access, for this one report.</p>
+    <p id="g-text">Plug in the wedgie. The report needs you to hold its green button for 3 seconds: that gives this computer full access, for this one report.</p>
     <div id="g-list"></div>
     <div class="test-actions" id="g-actions"></div>
     <pre class="recess" id="g-out" hidden></pre>
@@ -29,7 +29,7 @@ export function debug(main: HTMLElement) {
 
   async function run(w: W.Wedgie) {
     busy = true; paint();
-    $("g-text").innerHTML = "<b>Press the green button on the wedgie.</b> It asks: Debug and read logs?";
+    $("g-text").innerHTML = "<b>Hold the green button on the wedgie for 3 seconds.</b> Its screen is red: FULL CONTROL?";
     let got: any = null, err = "";
     try {
       const code = await fetch("/device/debug.py", { cache: "no-cache" }).then((r) => r.text());
