@@ -30,13 +30,13 @@ df608681fbe81de3d918c0d12f11455031ba08658865a5765369764d5d93847e  jiro_levels.bi
 @app  {"mod":"keypad","name":"Keypad","entry":"run","files":["keypad.py"]}
 0cf9561df639b610056d896dbf503f37d4df3c1ef59eab58dfd3118913be23aa  keypad.py
 @app  {"mod":"safe","name":"Safe Signer","entry":"run","usb":true,"chipuse":true,"files":["safe.mpy","safe_read.mpy","safe_7730.mpy","safe_8362.mpy","safe_book.mpy","safe_wire.mpy","safe_roots.py","safe_keccak.py","safe_addr.py","safe_blockie.py","safe_key.py","safe_msg.mpy","safe_sim.mpy","safe_icons.py","safe_icons.bin"]}
-78d5bc60acfc72908aef6ae0f1b53e481edca3d60bf5bd33a65693ce738e03d6  safe.mpy
+2a69ae621a9cab04ce78c258d3a1aaafa6c08031e8b8c909d43388a4e8d8f533  safe.mpy
 56d88613054a0a644bb5b5f865b5a73c0b877f05165dd89d121408106233fd41  safe_read.mpy
 24f956cc9d8b734ee8ab4d751eeca4115a6a2c9ca0e528ee33e03d68521adee9  safe_7730.mpy
 343ee1ecbe6837968a2fba670f5e824f8985b7927c78e44508c79b40d84d2920  safe_8362.mpy
 fe80b1e39dd3a8e51bdd9a55163cbdddee6266bc8daad2c7c30b63aac7a0cddb  safe_book.mpy
 2e73a686ae655c00868cad672afce79dc02b996eec7c7fda410ab8474825542b  safe_wire.mpy
-ca0dbaada2f6ec9f8057c39f26ffe0b475b385a0b640af55a33267f5a1175db9  safe_roots.py
+0d0688271e3a01599f26cb971b6c3a564644baea58a6e9793ec37a898fe58fd8  safe_roots.py
 f5465cbfa72b6ea201d7993d09d0c4c163cf40fa1313f7938204bc32c12c94f5  safe_keccak.py
 ebb05bac073a564d54741c5ff029132e66ca2001260c080fb9c171481901304e  safe_addr.py
 44e2ec64f5e7c9acd8c50a293ffa16d19f45deaf2201d88bc7dc4c3a5996bb1e  safe_blockie.py
