@@ -27,6 +27,7 @@ import type { Repl } from "../serial/repl";
 import * as E from "../safe/eth";
 import { ownSigs } from "../safe/signer";
 import { realSafe } from "../safe/real";
+import { knownModule, modulePage } from "../safe/modules";
 import { address, addressInput, addressOf, face, watch } from "../safe/address";
 import { describe, type Ctx, type Said } from "../safe/describe";
 import { explain, callsOf, intent, mark, markOf } from "../safe/explain";
@@ -307,7 +308,7 @@ type Limit = { sym: string; dec: number; max: bigint; left: bigint; days: number
 type Addon = { addr: string; kind: "recovery" | "limit" | "roles" | "allowance" | "delay" | "4337" | "other"; name: string;
   guardians?: string[]; need?: number; days?: number; running?: { owners: string[]; at: number; approvals: number };
   members?: string[]; limits?: Limit[]; who?: { addr: string; limits: Limit[] }[]; wait?: number };
-type Addons = { mods: Addon[]; guards: string[] };
+type Addons = { mods: Addon[]; guards: string[]; more?: boolean };
 const RECOVERY_DAYS: Record<string, number> = { "0x088f6cfd8bb1ddb1bb069ccb3fc1a98927d233f2": 7,
   "0x9bacd92f4687db306d7ded5d4513a51ea05df25b": 14, "0x6aa9a8ad0582db61a97a6e30eba22ba143d1e960": 60 };
 // where each is deployed (verified on Sourcify; clear-descriptors registry/candide)
@@ -363,10 +364,22 @@ async function addApprovals(c: number, safe: string, owners: string[], q: any[])
 }
 async function readAddons(c: number, safe: string): Promise<Addons> {
   const many = async (calls: { to: string; data: string }[]) => calls.length ? E.unaggregate(await view(c, E.MULTICALL3, E.aggregate3(calls.map((x) => ({ ...x, allowFailure: true }))))) : [];
-  const [mods, ...gs] = await many([{ to: safe, data: E.call("getModulesPaginated(address,uint256)", [E.aword(E.SENTINEL), E.word(20)]) },
-    ...GUARD_SLOTS.map((s) => ({ to: safe, data: E.call("getStorageAt(uint256,uint256)", [E.word(s), E.word(1)]) }))]);
+  const gs = await many(GUARD_SLOTS.map((s) => ({ to: safe, data: E.call("getStorageAt(uint256,uint256)", [E.word(s), E.word(1)]) })));
   const guards = gs.filter((g) => g.ok && g.data.length >= 194 && wd(g.data, 2) !== 0n).map((g) => wAddr(g.data, 2));
-  const list = mods.ok && mods.data.length >= 194 ? arrAt(mods.data, 0) : [];
+  // every module, not the newest 20 (one bad module behind 20 decoys was never shown); a page that can't be read is
+  // an error, never "none"
+  const list: string[] = [];
+  let more = false;
+  for (let at = E.SENTINEL, n = 0; ; n++) {
+    const pg = modulePage(await view(c, safe, E.call("getModulesPaginated(address,uint256)", [E.aword(at), E.word(50)])));
+    if (!pg) throw new Error("modules unread");
+    list.push(...pg.mods.map((m) => E.checksum(m)));
+    if (!pg.mods.length || BigInt(pg.next) <= 1n) break;
+    if (n >= 3) { more = true; break; }      // 200 read: say there are more
+    at = pg.next;
+  }
+  // a calm name only by address (or a Zodiac clone of a known mastercopy): anything can answer getGuardians()
+  const what = await Promise.all(list.map(async (m) => knownModule(m) || knownModule(m, await rpc(c, "eth_getCode", [m, "latest"]).catch(() => ""))));
   const probes = (m: string) => [E.selector("NAME()"), E.selector("SUPPORTED_ENTRYPOINT()"), E.call("getGuardians(address)", [E.aword(safe)]),
     E.call("threshold(address)", [E.aword(safe)]), E.call("getRecoveryRequest(address)", [E.aword(safe)]), E.selector("avatar()"),
     E.selector("txCooldown()"), E.call("getModulesPaginated(address,uint256)", [E.aword(E.SENTINEL), E.word(20)]),
@@ -377,17 +390,17 @@ async function readAddons(c: number, safe: string): Promise<Addons> {
   const out: Addon[] = [];
   for (const [k, m] of list.entries()) {
     const [name, ep, gd, th, req, av, cool, mem, au, ae, del] = got.slice(k * 11, k * 11 + 11), ok = (x: { ok: boolean; data: string }, n = 66) => x.ok && x.data.length >= n;
-    const nm = ok(name, 194) ? str(name.data) : "";
-    if (ok(gd, 130) && ok(th) && ok(req, 386)) {
+    const nm = ok(name, 194) ? str(name.data) : "", is = what[k];
+    if (is === "recovery" && ok(gd, 130) && ok(th) && ok(req, 386)) {
       const r = req.data, t = Number(wd(r, 0)) / 32, at = Number(wd(r, t + 2)) * 1000;
       out.push({ addr: m, kind: "recovery", name: nm || "Social recovery", guardians: arrAt(gd.data, 0), need: Number(wd(th.data, 0)),
         days: RECOVERY_DAYS[m.toLowerCase()], running: at ? { owners: arrAt(r, t + 3, t), at, approvals: Number(wd(r, t)) } : undefined });
-    } else if (ok(ep) && wd(ep.data, 0) >> 160n === 0n && wd(ep.data, 0)) out.push({ addr: m, kind: "4337", name: nm || "4337 module" });
-    else if (/allowance module/i.test(nm) && ok(del, 194)) out.push({ addr: m, kind: "allowance", name: nm, members: arrAt(del.data, 0) });
-    else if (ok(av) && ok(au, 322)) {
+    } else if (is === "4337" && ok(ep) && wd(ep.data, 0) >> 160n === 0n && wd(ep.data, 0)) out.push({ addr: m, kind: "4337", name: nm || "4337 module" });
+    else if (is === "allowance" && ok(del, 194)) out.push({ addr: m, kind: "allowance", name: nm, members: arrAt(del.data, 0) });
+    else if (is === "roles" && ok(av) && ok(au, 322)) {
       const limits = [usdc && rolesLimit(au.data, "USDC", 6), rolesLimit(ae.data, nat(c), 18)].filter((x): x is Limit => !!x);
       out.push({ addr: m, kind: limits.length ? "limit" : "roles", name: "Zodiac Roles", limits, members: ok(mem, 194) ? arrAt(mem.data, 0) : [] });
-    } else if (ok(av) && ok(cool)) out.push({ addr: m, kind: "delay", name: "Zodiac Delay", wait: Number(wd(cool.data, 0)) });
+    } else if (is === "delay" && ok(av) && ok(cool)) out.push({ addr: m, kind: "delay", name: "Zodiac Delay", wait: Number(wd(cool.data, 0)) });
     else out.push({ addr: m, kind: "other", name: nm });
   }
   // Safe's own spending limit: each delegate's tokens, then each token's allowance [amount, spent, reset minutes, …]
@@ -404,7 +417,7 @@ async function readAddons(c: number, safe: string): Promise<Addons> {
       a.who.find((w) => w.addr === d)!.limits.push({ sym: meta?.symbol || short(t), dec: meta?.decimals ?? 18, max: amt, left: due ? amt : amt > spent ? amt - spent : 0n, days: reset / 1440 });
     }
   }
-  return { mods: out, guards };
+  return { mods: out, guards, more };
 }
 
 export function safe(main: HTMLElement) {
@@ -467,6 +480,7 @@ export function safe(main: HTMLElement) {
   let sub: "home" | "settings" = "home";
   let assets: Asset[] | null = null;              // what the open Safe holds (null: not read yet)
   let activity: any[] | null = null, activityErr = "";
+  let addonsErr = false;                          // the read failed: say so, never "none"
   let addons: Addons | null = null;               // its modules and guards (null: not read yet)
   let ownerSafes: Record<string, OwnerSafe> = {};  // owners that are Safes (lowercase address)
   const ethPx: Record<number, number | null> = {};   // the native coin's dollar price per chain, for the list's totals
@@ -701,7 +715,7 @@ export function safe(main: HTMLElement) {
       const was = chain, sameAddr = eqA(m[2], safeAddr);    // another chain of this Safe: keep what's known of the others
       chain = KEYS[m[1]]; safeAddr = E.checksum(m[2]); info = null; queue = []; recipe = null;
       if (sameAddr) copies[was] = true; else { copies = seenOn(m[2]); worths = {}; looked = false; }
-      assets = null; assetsErr = false; activity = null; activityErr = ""; addons = null; ownerSafes = {};
+      assets = null; assetsErr = false; activity = null; activityErr = ""; addons = null; addonsErr = false; ownerSafes = {};
       $("s-new").innerHTML = ""; $("s-owner").innerHTML = ""; $("s-guard").innerHTML = ""; $("s-wc").innerHTML = "";
       stale = false; loadView(chain, safeAddr);
       paintAll();
@@ -1203,7 +1217,7 @@ export function safe(main: HTMLElement) {
       if (m.kind === "roles") return addonRow("Zodiac Roles", `${plural(m.members!.length, "key")} can act within set rules`, m.addr, full);
       if (m.kind === "delay") return addonRow("Delay", `A module's transaction waits ${waits(m.wait!)}`, m.addr, full);
       if (m.kind === "4337") return addonRow("4337", "Owners sign, any bundler sends", m.addr, full);
-      return addonRow(esc(m.name) || "Unknown module", `<span class="sx-warn">Can move money without the owners</span>`, m.addr, full);
+      return addonRow("Unknown module", `<span class="sx-warn">Can move money without the owners</span>${m.name ? `<div class="fine">Calls itself “${esc(m.name)}”</div>` : ""}`, m.addr, full);
     }).join("");
   }
   function paintAddons() {
@@ -1211,7 +1225,8 @@ export function safe(main: HTMLElement) {
     box.hidden = !(safeAddr && info && sub === "settings");
     if (box.hidden) return;
     const a = addons, rows = a ? addonRows(a.mods, true) + a.guards.map((g) => addonRow("Guard", "Checks every transaction", g, true)).join("") : "";
-    box.innerHTML = `<h3>Add-ons</h3>${!a ? `<p class="fine">Checking.</p>` : rows ? `<ul class="sx-rows">${rows}</ul>` : `<p class="fine">None: a plain Safe.</p>`}`;
+    box.innerHTML = `<h3>Add-ons</h3>${addonsErr ? `<p class="sx-warn">Couldn't read this Safe's add-ons. It may have modules that can move money.</p>` : !a ? `<p class="fine">Checking.</p>`
+      : rows ? `<ul class="sx-rows">${rows}</ul>${a.more ? `<p class="sx-warn">More than 200 modules: not all are shown.</p>` : ""}` : `<p class="fine">None: a plain Safe.</p>`}`;
   }
 
   // ---- Settings: owners and threshold ----
@@ -1274,7 +1289,7 @@ export function safe(main: HTMLElement) {
       if (!quiet) checkCopies(c, a);
       loadAssets(c, a, i).catch(() => { if (c === chain && a === safeAddr) { assetsErr = true; paintSpin(); } });
       loadActivity(c, a, { bg, fresh });
-      readAddons(c, a).then((x) => { if (c === chain && a === safeAddr) { addons = x; paintSafe(); paintAddons(); paintGuard(); } }, () => {});
+      readAddons(c, a).then((x) => { if (c === chain && a === safeAddr) { addons = x; addonsErr = false; paintSafe(); paintAddons(); paintGuard(); } }, () => { if (c === chain && a === safeAddr && !addons) { addonsErr = true; paintAddons(); } });
       readOwnerSafes(c, i.owners).then((x) => { if (c === chain && a === safeAddr) { ownerSafes = x; paintAll(); } }, () => {});
       const q = await readQueue(c, a, i.nonce, { bg, fresh });
       await addApprovals(c, a, i.owners, q).catch(() => {});
