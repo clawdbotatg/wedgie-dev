@@ -12,6 +12,7 @@ import { ITEMS, MAX_EACH, MAX_BOXES, SHIPS, ABROAD_NOTE, STATES, COUNTRIES, PAY_
 import { addressQr } from "../safe/qr";
 import { WHY, STAR, wire } from "../shop/why";
 import { seal, SEAL_KEY } from "../shop/seal";
+import { askedHere, notJoined } from "../shop/signin";
 import { transferData } from "../safe/eth";
 import { count, errKey } from "../shop/count";
 import { STEPS, sprite } from "../shop/steps";
@@ -58,7 +59,10 @@ export function order(main: HTMLElement) {
 
 // ---- signed in (api/login.ts): a session good till `until`, and the last email used here (fills the box in) ----
 const SESSION = "wedgie-session", LAST = "wedgie-email";
-export const session = (): { token: string; until: number } | null => {
+const ASKED = "wedgie-asked";      // {email, at}: the sign-in link this browser asked for (shop/signin.ts)
+const asked = () => { try { return JSON.parse(localStorage.getItem(ASKED) || "null"); } catch { return null; } };
+/** ok: this browser's orders may join the signed-in email (it asked for the link, or its person clicked Add). */
+export const session = (): { token: string; until: number; ok?: boolean } | null => {
   try { const v = JSON.parse(localStorage.getItem(SESSION) || "null"); return v?.until > Date.now() ? v : null; } catch { return null; }
 };
 const lastEmail = () => { try { return localStorage.getItem(LAST) || ""; } catch { return ""; } };
@@ -76,7 +80,8 @@ function signIn(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
     login({ link }).then((r) => {
       keep(r.orders);
       localStorage.setItem(LAST, r.email);
-      localStorage.setItem(SESSION, JSON.stringify({ token: r.session, until: r.until }));
+      localStorage.setItem(SESSION, JSON.stringify({ token: r.session, until: r.until, ok: askedHere(asked(), r.email, Date.now()) }));
+      localStorage.removeItem(ASKED);
       location.replace("/orders");
     }, (e) => { say(msgOf(e), true); ask(); });
     return;
@@ -99,6 +104,7 @@ function signIn(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
       try {
         await login({ email: e });
         localStorage.setItem(LAST, e);
+        localStorage.setItem(ASKED, JSON.stringify({ email: e, at: Date.now() }));
         say("");
         sent(e);
       } catch (err) { say(msgOf(err), true); go.disabled = false; }
@@ -122,19 +128,36 @@ function signIn(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
 const STATUS: Record<string, string> = { new: "Not paid", expired: "Time ran out", paid: "Paid", shipped: "Shipped", canceled: "Canceled" };
 async function list(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
   const s = session();
+  let loose = 0;        // orders here that aren't on the signed-in email, and nobody said they should be
   if (s) {
-    const claim = Object.entries(mem()).map(([id, o]) => ({ id, token: o.token }));
-    try { const r = await login({ session: s.token, claim }); keep(r.orders); localStorage.setItem(LAST, r.email); }
+    // this browser's orders join the email only if it asked for the link, or after a click (a link someone sent
+    // you signed you in as them and took your orders: shop/signin.ts)
+    const claim = s.ok === true ? Object.entries(mem()).map(([id, o]) => ({ id, token: o.token })) : [];
+    try {
+      const r = await login({ session: s.token, claim });
+      if (s.ok !== true) loose = notJoined(Object.keys(mem()), r.orders).length;
+      keep(r.orders); localStorage.setItem(LAST, r.email);
+    }
     catch (e) { if (/Signed out/.test(msgOf(e))) { localStorage.removeItem(SESSION); return location.reload(); } say(msgOf(e), true); }
   }
   const yours = Object.entries(mem()).sort((a, b) => (b[1].at || 0) - (a[1].at || 0));
   if (!s && !yours.length) return location.replace("/signin");
   box.innerHTML = (s && lastEmail() ? `<p class="fine orders-who">Signed in as <b>${esc(lastEmail())}</b></p>` : "")
+    + (s && loose ? `<div class="safe-box recess" id="o-join"><p>${loose === 1 ? "An order" : `${loose} orders`} on this device ${loose === 1 ? "isn't" : "aren't"} on <b>${esc(lastEmail())}</b>.</p>
+      <p><button class="btn btn-green" id="o-add">Add to ${esc(lastEmail())}</button> <button class="btn btn-sm" id="o-notme">Not my email</button></p></div>` : "")
     + (yours.length ? "" : `<div class="safe-box recess"><p>No orders yet.</p><p><a class="btn btn-green" href="/order">Order a wedgie</a></p></div>`)
     + yours.map(([i]) => `<a class="safe-box recess orders-row" href="/order/${esc(i)}" data-id="${esc(i)}">
     <span><b>Order ${esc(i)}</b><br><span class="fine o-what">&nbsp;</span></span><b class="o-st"></b></a>`).join("")
     + (s ? `<p><button class="btn btn-sm btn-red" id="o-out">Sign out</button></p>`
       : `<div class="safe-box recess"><p>Sign in to see orders from other devices.</p><p><a class="btn btn-green" href="/signin">Sign in</a></p></div>`);
+  const add = box.querySelector<HTMLButtonElement>("#o-add"), notme = box.querySelector<HTMLButtonElement>("#o-notme");
+  if (add) add.onclick = () => { localStorage.setItem(SESSION, JSON.stringify({ ...s!, ok: true })); location.reload(); };
+  if (notme) notme.onclick = async () => {        // out of that email; this device keeps its own orders
+    notme.disabled = true;
+    await login({ signout: s!.token }).catch(() => {});
+    localStorage.removeItem(SESSION);
+    location.reload();
+  };
   const out = box.querySelector<HTMLButtonElement>("#o-out");
   if (out) out.onclick = async () => {
     out.disabled = true;
