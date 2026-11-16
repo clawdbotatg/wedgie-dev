@@ -92,8 +92,9 @@ https://wedgie.dev/virtual.md
 ```
 
 - `mod`: the Python module name, 2-20 of `a-z 0-9 _`, starting with a letter. Must not be a firmware
-  module (`lcd`, `ui`, `save`, `slot`, `wedgie`, `loader`, `optiga`, ...) or an app already on
-  wedgie.dev. It's also the app's save folder.
+  module (`lcd`, `ui`, `save`, `slot`, `wedgie`, `loader`, `optiga`, ...), a MicroPython module (`json`,
+  `os`, `time`, `hashlib`, `machine`, ...: a file with that name would be imported in its place) or an app
+  already on wedgie.dev. It's also the app's save folder.
 - `files`: paths in the folder. On the wedgie **every file lands in the flash's root under its own
   name**, so every file name is `<mod>.py` or starts with `<mod>_` (`snake_levels.json`), lowercase
   `a-z 0-9 _`, ending `.py .mpy .bin .json .txt`. `<mod>.py` (or `.mpy`) is required: it's what gets

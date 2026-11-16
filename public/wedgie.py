@@ -458,6 +458,9 @@ def others(m, have, keep):
     return sorted(every - need - {n for n, h in have["hashes"].items() if not h})
 
 
+RESERVED = set("_asyncio _boot _boot_fat _onewire _rp2 _thread array asyncio binascii builtins cmath collections cryptolib deflate dht ds18x20 errno framebuf gc hashlib heapq io json machine math micropython neopixel onewire os platform random re rp2 select struct sys time uasyncio uctypes vfs bluetooth network socket ssl zlib webrepl websocket lwip ntptime requests urequests ujson uos utime uhashlib ubinascii ustruct uselect usys uio ure urandom ucollections uerrno uarray uheapq uplatform uzlib saves apps log serial modified error lib main boot".split())
+
+
 def folder_app(path, pick, m):
     """The app in a folder's wedgie.json (the rules: wedgie.dev/code.md): (entry for apps.json, {name: bytes})."""
     try:
@@ -469,6 +472,8 @@ def folder_app(path, pick, m):
     if not a:
         sys.exit("which app? wedgie.py install %s <mod>   (%s)" % (path, ", ".join(str(x.get("mod")) for x in apps)))
     mod, core = a.get("mod", ""), set(m["core"])
+    if mod in RESERVED:     # as src/apps/appjson.mjs: /json.py would be imported in place of MicroPython's json
+        sys.exit("wedgie.json: mod %r is a MicroPython module or a name the wedgie keeps; pick another name" % mod)
     files = {}
     for p in a.get("files", []):
         n = os.path.basename(p)

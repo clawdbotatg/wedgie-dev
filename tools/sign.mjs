@@ -41,6 +41,10 @@ else if (spawnSync("git", ["merge-base", "--is-ancestor", "origin/main", "HEAD"]
   console.error("not signed: origin/main has commits this tree doesn't (another session pushed or signed). `git rebase origin/main`, then sign");
   process.exit(1);
 }
+// Before the Touch ID (seconds): every .mpy is built from the .py beside it and matches it (tools/mpy.py --check;
+// releaseText refuses one with no source, and a file with a MicroPython module's name). The rest of the gate is after.
+const mpy = spawnSync("uv", ["run", "-q", "--with", "mpy-cross==1.29.0.post2", "python3", join(root, "tools/mpy.py"), "--check"], { cwd: root, encoding: "utf8" });
+if (mpy.status !== 0) { console.error(`not signed: ${(mpy.stderr || mpy.stdout || "tools/mpy.py --check failed").trim()}`); process.exit(1); }
 const text = releaseText(signedSerial() + 1);     // one more every signing: wedgies refuse a lower one (job.py)
 const k = yk ? 1 : 0;
 const run = yk ? spawnSync("uv", ["run", "-q", "--with", "yubikey-manager", "python3", join(root, "tools/yksign.py")], { input: text, encoding: "utf8", stdio: ["pipe", "pipe", "inherit"] })

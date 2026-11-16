@@ -141,6 +141,11 @@ def keep(m):
     return out
 
 
+# Module names this build has (help("modules")) and the old u-names: no job writes a file with one (0.3.84; audit
+# 11-13). wedgie.dev's tools refuse such an app (src/apps/appjson.mjs RESERVED); the wedgie doesn't count on them.
+SHADOW = ("_asyncio _boot _boot_fat _onewire _rp2 _thread array asyncio binascii builtins cmath collections cryptolib deflate dht ds18x20 errno framebuf gc hashlib heapq io json machine math micropython neopixel onewire os platform random re rp2 select struct sys time uasyncio uctypes vfs ssl socket zlib network ujson uos utime uhashlib ubinascii ustruct uselect usys uio").split()
+
+
 def check(m, sig=True, tick=None):
     """The job against its signed list: (version, {name: sha}, required names) or raises ValueError. sig=False skips the
     signature (0.2 s on a Trust M, else pure-Python P-256: 2.4 s on an RP2040), which run() checks after the yes.
@@ -222,6 +227,8 @@ def check(m, sig=True, tick=None):
         for n in m.get("write") or []:
             if n not in may_write:
                 raise ValueError("%s isn't part of this job" % n)
+            if n.split(".")[0] in SHADOW:       # /json.py is imported before MicroPython's json, by everything
+                raise ValueError("%s has a built-in module's name" % n)
         for n in m.get("delete") or []:
             if n not in may_delete:
                 raise ValueError("%s isn't part of this job" % n)

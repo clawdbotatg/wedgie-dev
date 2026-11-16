@@ -348,6 +348,22 @@ finally:
     names.remove("keytest.mpy")
     del APPS["keytest.mpy"]
 
+# A signed app can't put a file on with a built-in module's name (audit 11-13): MicroPython imports /json.py before
+# its own json, for everything, the signature check too. The tools refuse such an app; the wedgie doesn't count on them.
+for stem in ("json", "hashlib", "os", "machine", "time"):
+    n = stem + ".py"
+    APPS[n] = b"MINE = 1\n"
+    names.append(n)
+    carts[1]["files"].append(n)
+    try:
+        out, f = run({"job": "Install Buttons", "write": ["keytest.py", n], "apps": json.dumps(buttons)},
+                     puts("keytest.py", kt) + puts(n, APPS[n]) + [{"type": "commit"}])
+        check("done" not in types_(out) and n not in f and "built-in" in str(out), "a signed app with %s: refused (%s)" % (n, str(out[-1:])[:90]))
+    finally:
+        carts[1]["files"].remove(n)
+        names.remove(n)
+        del APPS[n]
+
 # A second authentic list cannot replace the list that approved an upload, including legacy jobs.
 rel, sig = release()
 second = {"type": "release", "release": rel, "sig": sig}

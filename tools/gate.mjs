@@ -52,7 +52,7 @@ const read = (n) => before ? git("show", `${before}:release/${n}`) : disk(n);
 const was = byApp(read("apps.txt")), now = byApp(appsText());
 const coreSame = !process.argv.includes("--all") && read("firmware.txt") && core(read("firmware.txt")) === core(releaseText(0));
 const changed = Object.keys(now).filter((m) => now[m] !== was[m]);
-const want = (name) => !coreSame || ["test_job", "test_cli", "test_netswap", "test_chipcheck", "test_memory", "test_style", "test_docs", "mpy --check"].includes(name)
+const want = (name) => !coreSame || ["test_job", "test_cli", "test_netswap", "test_chipcheck", "test_release", "test_memory", "test_style", "test_docs", "mpy --check"].includes(name)
   || (/^(safechip|test_safekey)/.test(name) && changed.includes("safe"))
   || (/^chip: /.test(name) && changed.some((m) => m === "buttons" || m === "hello"))
   || changed.some((m) => name === `fresh plug-in: ${m}`);
@@ -61,6 +61,7 @@ const all = [
   ["test_cli", ["python3", "tools/test_cli.py"]],
   ["test_netswap", ["python3", "tools/test_netswap.py"]],
   ["test_chipcheck", ["node", "tools/test_chipcheck.mjs"]],
+  ["test_release", ["node", "tools/test_release.mjs"]],
   ["test_memory", ["python3", "tools/test_memory.py"]],
   ["test_style", ["python3", "tools/test_style.py"]],
   ["test_docs", ["python3", "tools/test_docs.py"]],

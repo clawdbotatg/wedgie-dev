@@ -13,7 +13,7 @@ import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { checkAppJson, parseRepo, usesChip } from "../src/apps/appjson.mjs";
+import { checkAppJson, parseRepo, usesChip, RESERVED } from "../src/apps/appjson.mjs";
 
 export const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 /** The files wedgie.dev publishes from firmware/ (tools/fw.mjs uses this too). A .py with a compiled
@@ -45,14 +45,26 @@ export function appsText() {
   const src = join(root, "firmware");
   const carts = JSON.parse(readFileSync(join(src, "carts.json"), "utf8"));
   const apps = carts.map((c) => ({ app: c, files: c.files.map((name) => ({ name, buf: readFileSync(join(src, name)) })) }));
-  apps.push(...shelf(firmwareNames(), carts.map((c) => c.mod)));
+  apps.push(...shelf(firmwareNames(), carts.map((c) => c.mod)));   // checkAppJson compares stems: slot.py is slot.mpy's
   return apps.sort((a, b) => (a.app.mod < b.app.mod ? -1 : 1))
     .map(({ app, files }) => appLines([app]) + files.map((f) => `${sha(f.buf)}  ${f.name}\n`).join("")).join("");
+}
+
+/** What must never be signed (audit 11-13), or throws: a compiled file with no source beside it (nobody can read a
+ *  .mpy in review), and a firmware file with a MicroPython module's name (it would be imported in its place). */
+export function checkFirmware(src = join(root, "firmware")) {
+  const bad = [];
+  for (const n of readdirSync(src)) {
+    if (n.endsWith(".mpy") && !existsSync(join(src, n.replace(/\.mpy$/, ".py")))) bad.push(`${n}: no ${n.replace(/\.mpy$/, ".py")} beside it`);
+    if (/\.(py|mpy)$/.test(n) && RESERVED.has(n.replace(/\.(py|mpy)$/, "")) && !["boot.py", "main.py"].includes(n)) bad.push(`${n}: a MicroPython module's name`);
+  }
+  if (bad.length) throw new Error(`firmware/ can't be signed:\n  ${bad.join("\n  ")}`);
 }
 
 /** The core: published firmware files no firmware cart claims. */
 export function firmwareNames() {
   const src = join(root, "firmware");
+  checkFirmware(src);
   const claimed = new Set(JSON.parse(readFileSync(join(src, "carts.json"), "utf8")).flatMap((c) => c.files));
   return readdirSync(src).filter((n) => published(n, join(src, n)) && !claimed.has(n));
 }

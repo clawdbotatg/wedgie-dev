@@ -46,6 +46,12 @@ export const CHAIN_HOST = "mainnet.rpc.buidlguidl.com";
 export const DEFAULT_ICON = ["............", ".kkkkkkkkkk.", ".k........k.", ".k.k....k.k.", ".k........k.", ".k........k.",
   ".k.k....k.k.", ".k..kkkk..k.", ".k........k.", ".kkkkkkkkkk.", "............", "............"];
 
+// Names no app may take: a file with one in the flash's root is imported in place of MicroPython's own module, by
+// everything, the firmware's signature check too (audit 11-13; tried on the RP2040 build: a /machine.py stopped the
+// boot). The build's modules (help("modules"), MicroPython 1.29 for the Pico), ones other builds have and the old
+// u-names, and the wedgie's own folders and files. firmware/job.py refuses them too (SHADOW).
+export const RESERVED = new Set("_asyncio _boot _boot_fat _onewire _rp2 _thread array asyncio binascii builtins cmath collections cryptolib deflate dht ds18x20 errno framebuf gc hashlib heapq io json machine math micropython neopixel onewire os platform random re rp2 select struct sys time uasyncio uctypes vfs bluetooth network socket ssl zlib webrepl websocket lwip ntptime requests urequests ujson uos utime uhashlib ubinascii ustruct uselect usys uio ure urandom ucollections uerrno uarray uheapq uplatform uzlib saves apps log serial modified error lib main boot".split(" "));
+
 /**
  * Check a parsed wedgie.json. core: the firmware's file names (manifest.core); taken: app mods that
  * already exist (the catalog). Returns { apps, errors }: apps are carts without v/size (the caller adds
@@ -66,6 +72,7 @@ export function checkAppJson(j, core = [], taken = []) {
     if (!a || typeof a !== "object") return bad("not an object");
     if (typeof a.mod !== "string" || !MOD.test(a.mod)) return bad("mod: 2-20 of a-z 0-9 _, starting with a letter (it's the Python module name)");
     if (coreMods.has(a.mod)) return bad(`mod "${a.mod}" is a firmware module; pick another name`);
+    if (RESERVED.has(a.mod)) return bad(`mod "${a.mod}" is a MicroPython module or a name the wedgie keeps; pick another name`);
     if (taken.includes(a.mod)) return bad(`mod "${a.mod}" is taken by an app on wedgie.dev; pick another name`);
     if (seen.has(a.mod)) return bad("mod used twice in this repo");
     seen.add(a.mod);
@@ -79,7 +86,8 @@ export function checkAppJson(j, core = [], taken = []) {
       if (!FILE.test(n)) { bad(`files: "${n}": lowercase a-z 0-9 _, ending .py .mpy .bin .json or .txt`); continue; }
       const stem = n.replace(/\.[a-z]+$/, "");
       if (stem !== a.mod && !stem.startsWith(a.mod + "_")) { bad(`files: "${n}" must be named ${a.mod}.py or start with ${a.mod}_ (every file lands in the flash's root)`); continue; }
-      if (coreFiles.has(n)) { bad(`files: "${n}" is a firmware file`); continue; }
+      if (coreFiles.has(n) || (/\.(py|mpy)$/.test(n) && coreMods.has(stem))) { bad(`files: "${n}" is a firmware file`); continue; }
+      if (/\.(py|mpy)$/.test(n) && RESERVED.has(stem)) { bad(`files: "${n}" has a MicroPython module's name`); continue; }
       if (names.includes(n)) { bad(`files: "${n}" twice`); continue; }
       names.push(n);
     }

@@ -70,6 +70,12 @@ def main():
                     bad.append(mod + ".mpy")
             else:
                 print("%s.mpy %d bytes (from %d)" % (mod, os.path.getsize(dst), os.path.getsize(os.path.join(FW, mod + ".py"))))
+    # every .mpy in firmware/ is one of those: built here from the .py beside it. Any other is bytes nobody can read
+    # in review, and it would be signed and sent as core (audit 11-13: a hashlib.mpy with no source).
+    known = set(names())
+    orphans = sorted(n for n in os.listdir(FW) if n.endswith(".mpy") and (n[:-4] not in known or not os.path.exists(os.path.join(FW, n[:-4] + ".py"))))
+    if orphans:
+        sys.exit("no source for: %s. A .mpy in firmware/ must be built from a .py beside it" % " ".join(orphans))
     if bad:
         sys.exit("out of date: %s. Run: uv run --with mpy-cross==1.29.0.post2 python3 tools/mpy.py" % " ".join(bad))
     if check:

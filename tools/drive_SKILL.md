@@ -15,14 +15,14 @@ or an ATECC608) **wedged** between the boards on I2C. It runs MicroPython plus t
 into one app, and asks on its own screen before anything that matters. Games, tools, and a hardware signer for a
 Safe multisig. Everything is MIT. Home: https://wedgie.dev
 
-**The current firmware is 0.3.83.** If a wedgie's `hello` says older, update it first: everything here assumes
+**The current firmware is 0.3.84.** If a wedgie's `hello` says older, update it first: everything here assumes
 current firmware.
 
 ```yaml
 name: wedgie
 site: https://wedgie.dev
 skill_index: https://wedgie.dev/skill.md          # this file
-firmware: 0.3.83
+firmware: 0.3.84
 license: MIT (hardware design, case, firmware, site, art)
 source: https://github.com/clawdbotatg/wedgie-dev
 made_by: Austin Griffith and Gus Griffith, with @ClawdBotATG; sold by BuidlGuidl DAO LLC
@@ -222,7 +222,7 @@ https://instantwallet.io. Details: safe.md.
 
 # Talk to a wedgie over USB
 
-Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.83**; if `hello`
+Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.84**; if `hello`
 says older, run `wedgie.py update` first.
 
 ## Talk to it directly
@@ -350,7 +350,7 @@ from answering. Hold **Y**: no WEDGIE drive this time (debugging only).
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.83","fw":"wedgie-0.3.83","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.84","fw":"wedgie-0.3.84","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":3,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -946,6 +946,7 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md
 | 0.3.66 | Apps in their own list, named by its hash in the signed one (no size limit) |
 | 0.3.82 | A computer's own "clean" list can't take the red border off. One question at a time (one press answered two). FULL CONTROL left unanswered three times is a no. Writing the drive can't hang it or fill its RAM |
 | 0.3.83 | The chip check can't be a recording: the page sends random bytes and the Trust M signs them with its own. Before, the wedgie picked every byte it signed, so one answer from any real wedgie passed forever |
+| 0.3.84 | No job writes a file with a built-in module's name (`json.py`, `os.py`...): MicroPython would import it in place of its own, the signature check included. wedgie.dev refuses such an app, and never signs compiled code with no source beside it |
 | 0.3.80 | `net.ask` with a url or an Ethereum call (fetched over the wedgie's own TLS): the computer could put its own answer in place of the fetched one before the app took it. Now its answers count only for asks it was sent. A TLS connection that failed a check is never used again (a retry on it skipped the failed check). The drive's command buffer holds a whole USB packet |
 | 0.3.79 | Only apps that say they use the secure chip can open it: signed into each app's line, read from its code (a red cartridge on wedgie.dev). After a computer had full control, the wedgie asks on its screen instead |
 | 0.3.78 | Its own TLS refuses a site that sends no signature (a computer could pose as any site); locked: no hash of a save, and `/saves/.` can't be deleted |
@@ -1193,8 +1194,9 @@ https://wedgie.dev/virtual.md
 ```
 
 - `mod`: the Python module name, 2-20 of `a-z 0-9 _`, starting with a letter. Must not be a firmware
-  module (`lcd`, `ui`, `save`, `slot`, `wedgie`, `loader`, `optiga`, ...) or an app already on
-  wedgie.dev. It's also the app's save folder.
+  module (`lcd`, `ui`, `save`, `slot`, `wedgie`, `loader`, `optiga`, ...), a MicroPython module (`json`,
+  `os`, `time`, `hashlib`, `machine`, ...: a file with that name would be imported in its place) or an app
+  already on wedgie.dev. It's also the app's save folder.
 - `files`: paths in the folder. On the wedgie **every file lands in the flash's root under its own
   name**, so every file name is `<mod>.py` or starts with `<mod>_` (`snake_levels.json`), lowercase
   `a-z 0-9 _`, ending `.py .mpy .bin .json .txt`. `<mod>.py` (or `.mpy`) is required: it's what gets

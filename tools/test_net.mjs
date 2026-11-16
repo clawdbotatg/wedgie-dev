@@ -25,6 +25,13 @@ eq(a.netAllows(["chain"], "https://mainnet.rpc.buidlguidl.com/"), true, "chain r
 eq(a.netAllows(["chain"], "https://x.mainnet.rpc.buidlguidl.com/"), false, "only that host");
 eq(a.netAllows(["buidlguidl.com"], "https://mainnet.rpc.buidlguidl.com/"), true, "a listed site still works");
 eq(a.checkAppJson({ apps: [{ mod: "zz", name: "Z", files: ["zz.py"], net: ["https://x.com"] }] }).errors.length, 1, "bad net");
+// an app can't take a built-in module's name (audit 11-13: /json.py is imported before MicroPython's own json),
+// nor a core module's, whatever its ending (slot.mpy is the core's: an app's slot_x.py is fine, its slot.py isn't)
+for (const mod of ["json", "hashlib", "os", "time", "machine", "struct", "asyncio", "saves", "lib"])
+  eq(a.checkAppJson({ apps: [{ mod, name: "Z", files: [mod + ".py"] }] }).errors.length > 0, true, `mod ${mod}: refused`);
+eq(a.checkAppJson({ apps: [{ mod: "tl", name: "Z", files: ["tl.py", "tl_s.py"] }] }, ["tl_s.mpy", "slot.mpy"]).errors.length > 0, true, "a .py twin of a core .mpy: refused");
+eq(a.checkAppJson({ apps: [{ mod: "slot", name: "Z", files: ["slot.py"] }] }, ["slot.mpy"]).errors.length > 0, true, "a core module's name as mod: refused");
+eq(a.checkAppJson({ apps: [{ mod: "jsonx", name: "Z", files: ["jsonx.py", "jsonx_os.py"] }] }, ["slot.mpy"]).errors.length, 0, "jsonx, jsonx_os.py: fine");
 eq(a.checkAppJson({ apps: [{ mod: "zz", name: "Z", files: ["zz.py"], net: ["x.com", "chain"] }] }).apps[0].net, ["x.com", "chain"], "good net");
 const post = (b) => m.POST(new Request("https://wedgie.dev/api/net", { method: "POST", body: JSON.stringify(b) })).then((r) => r.json());
 eq(await post({ url: "https://api.coinbase.com/v2/prices/ETH-USD/spot", pick: "data.base" }), { data: "ETH" }, "live coinbase");

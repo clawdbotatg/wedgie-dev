@@ -13,3 +13,4 @@ export function usesChip(files: { name: string; buf: Uint8Array }[]): boolean;
 export function parseRepo(s: string): { owner: string; repo: string; ref?: string } | null;
 export function cmpVersion(a: string, b: string): number;
 export function netAllows(net: string[] | undefined, url: string): boolean;
+export const RESERVED: Set<string>;
