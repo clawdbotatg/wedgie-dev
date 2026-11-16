@@ -8,6 +8,11 @@ import { RPI_VID } from "./wedgies";
 export const BOOT_PIDS: Record<number, "RP2040" | "RP2350"> = { 0x0003: "RP2040", 0x000f: "RP2350" };
 const FAMILY = { RP2040: 0xe48bff56, RP2350: 0xe48bff59 };
 // The plain builds boot on any board; a board found to have the Pico W's WiFi chip gets the W build.
+// Each MicroPython build's sha256 (the first 40 hex), also in public/security.md to check by hand (audit 11-13,
+// INST-10): a file swapped on the server is refused. tools/test_uf2.mjs keeps them true.
+export const UF2_SHA: Record<string, string> = {
+  "/mp/RPI_PICO.uf2": "e1160e602e277d85920adb5fe741435edccba9ba", "/mp/RPI_PICO_W.uf2": "f918c0a082c6daf53e27998b7f990ba5f065db2e",
+  "/mp/RPI_PICO2.uf2": "6bfc5d110f293870f60150468dfeec8aec5323b5", "/mp/RPI_PICO2_W.uf2": "c49c7ed93eb7eeaaa78436b17bd4329e5d4ccbae" };
 const UF2 = { RP2040: ["/mp/RPI_PICO.uf2", "/mp/RPI_PICO_W.uf2"], RP2350: ["/mp/RPI_PICO2.uf2", "/mp/RPI_PICO2_W.uf2"] };
 const MAGIC = 0x431fd10b;
 const FLASH = 0x10000000, FLASH_END = 0x11000000, SECTOR = 4096, BLOCK = 0x10000;
@@ -43,7 +48,9 @@ export function sectors(uf2: ArrayBuffer, family: number) {
 /** Wipe a BOOTSEL Pico, put MicroPython on it and reboot it. It comes back as a serial port. */
 export async function flashMicroPython(dev: USBDevice, onProgress: (p: number) => void, wifi = false) {
   const chip = BOOT_PIDS[dev.productId];
-  const uf2 = await (await fetch(UF2[chip][wifi ? 1 : 0])).arrayBuffer();
+  const url = UF2[chip][wifi ? 1 : 0], uf2 = await (await fetch(url)).arrayBuffer();
+  const sha = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", uf2)), (b) => b.toString(16).padStart(2, "0")).join("");
+  if (!sha.startsWith(UF2_SHA[url])) throw new Error("the MicroPython file isn't the one wedgie.dev ships. Nothing was written. Report it.");
   const secs = [...sectors(uf2, FAMILY[chip])].sort((a, b) => a[0] - b[0]);
   if (!secs.length) throw new Error("the MicroPython file has nothing for " + chip);
   const wipeFrom = Math.ceil((secs[secs.length - 1][0] + SECTOR) / BLOCK) * BLOCK, wipeTo = FLASH + BUILD_FLASH[chip];

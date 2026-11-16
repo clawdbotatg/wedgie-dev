@@ -56,10 +56,11 @@ def run(mid, app, v, tick, poll):
 
 def unsigned(d):
     """After a yes on a list no release key signed (the question's warning sign, or job.check after the yes):
-    nothing changed, and the screen says where to put it on anyway (Austin, 10-28: a wedgie that only restarted
-    read as a crash). Here, not in slot.py: that one stays loaded beside every app."""
+    nothing changed, and the screen says so (Austin, 10-28: a wedgie that only restarted read as a crash). It no
+    longer says where to put it on anyway (audit 11-13, INST-10): a hacked site would serve a bad list and the
+    wedgie would send its person to /reset, the one way on with no signature check. Here, not in slot.py: that one stays loaded beside every app."""
     import lcd, ui
-    ui.page(d, "Not signed", [("Nothing changed.", ui.INK), ("To install anyway:", ui.INK), ("wedgie.dev/reset", ui.RED)], show=False)
+    ui.page(d, "Not signed", [("Nothing changed.", ui.INK), ("Don't install it.", ui.RED)], show=False)
     if d.width >= 240:
         ui.warn(d, 112, 52)
     d.show()

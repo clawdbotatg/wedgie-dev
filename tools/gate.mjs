@@ -61,6 +61,7 @@ const all = [
   ["test_cli", ["python3", "tools/test_cli.py"]],
   ["test_netswap", ["python3", "tools/test_netswap.py"]],
   ["test_chipcheck", ["node", "tools/test_chipcheck.mjs"]],
+  ["test_uf2", ["node", "tools/test_uf2.mjs"]],
   ["test_release", ["node", "tools/test_release.mjs"]],
   ["test_memory", ["python3", "tools/test_memory.py"]],
   ["test_style", ["python3", "tools/test_style.py"]],
