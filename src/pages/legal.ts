@@ -73,7 +73,7 @@ const PRIVACY = `
 <p>A bug report sends what you see before you press Send, including a plugged-in wedgie's log. We keep it 90 days.</p>
 
 <h2>Cookies</h2>
-<p>No ads, no trackers. Your browser stores your sign-in and your order links on your own computer. We count how many people reach each step of checkout, per day: just numbers, nothing about you. To stop abuse we keep a one-way hash of your IP address for a day (with a chat message, for its 7 days); never the address itself.</p>
+<p>No ads, no cookies. We count page visits with Plausible: no cookies, nothing that follows you to other sites, and never your order or Safe address. Your browser stores your sign-in and your order links on your own computer. We count how many people reach each step of checkout, per day: just numbers, nothing about you. To stop abuse we keep a one-way hash of your IP address for a day (with a chat message, for its 7 days); never the address itself.</p>
 
 <h2>Chat</h2>
 <p>Messages sent with /secret are sealed on the wedgie: our server can't read them. It deletes each one after 7 days.</p>

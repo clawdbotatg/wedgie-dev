@@ -11,6 +11,19 @@
   else if (h === "emu.wedgie.dev" && p !== "/code") location.replace("https://wedgie.dev" + location.pathname + rest);
 })();
 </script>
+<!-- Plausible: counts visits, no cookies. Served through wedgie.dev (vercel.json /p/*). Order ids, Safe
+     addresses and query strings never leave: the path is cut down to its route first. -->
+<script async src="/p/s.js"></script>
+<script>
+window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
+plausible.init({ endpoint: "/p/e", transformRequest: function (r) {
+  var u = new URL(r.u), q = new URLSearchParams();
+  u.searchParams.forEach(function (v, k) { if (/^(utm_\w+|ref)$/.test(k)) q.set(k, v); });
+  var p = u.pathname.replace(/^\/(order|safe|connect)\/[^/]+/, "/$1/:id").replace(/^(\/safe\/:id)\/[^/]+/, "$1/:sub");
+  r.u = u.origin + p + (q.toString() ? "?" + q : "");
+  return r;
+} });
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>wedgie.dev</title>
 <meta name="description" content="Give yourself a wedgie: a pocket computer from three off-the-shelf parts. Order one, build one, plug it in and put software on it. MIT everything.">

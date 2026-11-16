@@ -187,6 +187,14 @@
   ],
   "rewrites": [
     {
+      "source": "/p/s.js",
+      "destination": "https://plausible.io/js/pa-GRI3_psuxHr0QWIn2Harg.js"
+    },
+    {
+      "source": "/p/e",
+      "destination": "https://plausible.io/api/event"
+    },
+    {
       "source": "/favicon.ico",
       "destination": "/img/favicon.png"
     },
