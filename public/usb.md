@@ -5,7 +5,7 @@ description: Talk to a plugged-in wedgie over USB - find its port, hello, wedgie
 
 # Talk to a wedgie over USB
 
-Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.82**; if `hello`
+Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.83**; if `hello`
 says older, run `wedgie.py update` first.
 
 ## Talk to it directly
@@ -133,7 +133,7 @@ from answering. Hold **Y**: no WEDGIE drive this time (debugging only).
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.82","fw":"wedgie-0.3.82","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.83","fw":"wedgie-0.3.83","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":3,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -141,6 +141,9 @@ from answering. Hold **Y**: no WEDGIE drive this time (debugging only).
     {"id":3,"type":"press","key":"A","ms":80} -> {"type":"ok"}   (0.3.54+: only after a yes, as shot)
     {"id":4,"type":"chip"}               -> proof the chip works: an ATECC608 hashes random bytes, a Trust M
                                             signs them with its factory key (check it yourself).
+                                            0.3.83+: send "nonce" (64 hex you made up); a Trust M then signs
+                                            sha256("wedgie-chip-v1" + nonce + its "msg") and says "v":1, so
+                                            the answer can't be a recording
                                             0.3.53+: {"busy":1} while its app is using the chip: ask again
     {"id":5,"type":"ls","path":"/saves"} -> {"type":"ls","files":[[path, bytes], ...],"free":N}  (folders end in /)
     {"id":6,"type":"get","path":"/saves/x/best.json"} -> {"type":"file","i":0,"n":N,"size":S,"data":"<base64>"} x n

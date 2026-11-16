@@ -103,6 +103,34 @@ while (!done && Date.now() - t0 < 600_000) {
   }
 }
 check(done, "the app got through every site");
+// the chip check with the page's nonce (0.3.83+): the Trust M signs "wedgie-chip-v1" + nonce + its own bytes, so an
+// answer can't be a recording. Checked against the key in its certificate (a virtual chip: not Infineon's).
+{
+  const { X509Certificate, verify, randomBytes } = await import("node:crypto");
+  const { trustmCert } = await import("../src/serial/chipcheck.ts");
+  const askChip = async (nonce) => {
+    const id = 90 + Math.floor(Math.random() * 5), at = out.length;
+    write({ id, type: "chip", ...(nonce ? { nonce } : {}) });
+    for (let i = 0; i < 1500; i++) {
+      chip.run(20);
+      const m = out.slice(at).match(new RegExp(`\\{[^\\n]*"id": ${id}[,}][^\\n]*\\n`));
+      if (m) return JSON.parse(m[0]);
+    }
+    return null;
+  };
+  const good = (d, nonce) => {
+    if (!d?.cert || !d.r) return false;
+    const key = new X509Certificate(Buffer.from(trustmCert(d))).publicKey, msg = Buffer.from(d.msg, "hex");
+    const signed = nonce ? Buffer.concat([Buffer.from("wedgie-chip-v1"), Buffer.from(nonce, "hex"), msg]) : msg;
+    return verify("sha256", signed, { key, dsaEncoding: "ieee-p1363" }, Buffer.from(d.r + d.s, "hex"));
+  };
+  const n1 = randomBytes(32).toString("hex"), n2 = randomBytes(32).toString("hex");
+  const a = await askChip(n1);
+  check(a?.v === 1 && good(a, n1), `chip check with a nonce: "v": ${a?.v}, signed over the nonce and its own bytes${a?.error ? " (" + a.error + ")" : ""}`);
+  check(a && !good(a, n2) && !good(a, null), "that answer doesn't pass for another nonce, or for none (a recording)");
+  const b = await askChip(null);
+  check(b && b.v === undefined && good(b, null), "no nonce asked: the old answer, as before");
+}
 check(chipSaid?.busy === 1, `a chip check mid-fetch says busy: ${JSON.stringify(chipSaid)?.slice(0, 80)}`);
 check(lost >= 2, `a late computer: ${lost} lines went nowhere, then net.ready sent them again`);
 const [cb, cg, gh, kr, mp, ex, flip, px, blk, cut, kp, kb, sw] = results;

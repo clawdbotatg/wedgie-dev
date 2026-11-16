@@ -239,7 +239,7 @@ def _handle(m):
     if t == "hello":
         W.send(W.hello(mid, running=app["mod"] if app and state in ("running", "entry") else None))
     elif t == "chip":
-        W.send(dict(W.chip(), id=mid))
+        W.send(dict(W.chip(m.get("nonce")), id=mid))
     elif t == "ping":
         W.send({"id": mid, "type": "pong"})
     elif W.SEALED and not W.is_open() and (t in ("press", "shot") or t == "sums" and (   # locked: a computer neither sees

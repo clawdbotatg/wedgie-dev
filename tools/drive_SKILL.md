@@ -15,14 +15,14 @@ or an ATECC608) **wedged** between the boards on I2C. It runs MicroPython plus t
 into one app, and asks on its own screen before anything that matters. Games, tools, and a hardware signer for a
 Safe multisig. Everything is MIT. Home: https://wedgie.dev
 
-**The current firmware is 0.3.82.** If a wedgie's `hello` says older, update it first: everything here assumes
+**The current firmware is 0.3.83.** If a wedgie's `hello` says older, update it first: everything here assumes
 current firmware.
 
 ```yaml
 name: wedgie
 site: https://wedgie.dev
 skill_index: https://wedgie.dev/skill.md          # this file
-firmware: 0.3.82
+firmware: 0.3.83
 license: MIT (hardware design, case, firmware, site, art)
 source: https://github.com/clawdbotatg/wedgie-dev
 made_by: Austin Griffith and Gus Griffith, with @ClawdBotATG; sold by BuidlGuidl DAO LLC
@@ -222,7 +222,7 @@ https://instantwallet.io. Details: safe.md.
 
 # Talk to a wedgie over USB
 
-Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.82**; if `hello`
+Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.83**; if `hello`
 says older, run `wedgie.py update` first.
 
 ## Talk to it directly
@@ -350,7 +350,7 @@ from answering. Hold **Y**: no WEDGIE drive this time (debugging only).
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.82","fw":"wedgie-0.3.82","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.83","fw":"wedgie-0.3.83","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":3,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -358,6 +358,9 @@ from answering. Hold **Y**: no WEDGIE drive this time (debugging only).
     {"id":3,"type":"press","key":"A","ms":80} -> {"type":"ok"}   (0.3.54+: only after a yes, as shot)
     {"id":4,"type":"chip"}               -> proof the chip works: an ATECC608 hashes random bytes, a Trust M
                                             signs them with its factory key (check it yourself).
+                                            0.3.83+: send "nonce" (64 hex you made up); a Trust M then signs
+                                            sha256("wedgie-chip-v1" + nonce + its "msg") and says "v":1, so
+                                            the answer can't be a recording
                                             0.3.53+: {"busy":1} while its app is using the chip: ask again
     {"id":5,"type":"ls","path":"/saves"} -> {"type":"ls","files":[[path, bytes], ...],"free":N}  (folders end in /)
     {"id":6,"type":"get","path":"/saves/x/best.json"} -> {"type":"file","i":0,"n":N,"size":S,"data":"<base64>"} x n
@@ -919,8 +922,9 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md
 
 ## Checks you can run
 
-- **Is the chip real?** `{"type":"chip"}`: a Trust M signs random bytes with its factory key; its certificate
-  chains to Infineon.
+- **Is the chip real?** `{"type":"chip","nonce":"<64 hex you made up>"}`: a Trust M signs your bytes with its
+  own (0.3.83+, `"v":1`) with its factory key; its certificate chains to Infineon. It proves a real Trust M is
+  there and answering now, not where a key lives. An ATECC608 can't be proven real.
 - **Is my Safe key mine?** Safe Signer's first screen must say **No key** (safe.md).
 - **Is the firmware right?** Update at https://wedgie.dev/connect; the question shows the version and a green check.
 - **What happened?** `get /log.txt` (no yes needed): power-ons, app starts, crashes, installs. No keys in it.
@@ -941,6 +945,7 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md
 | 0.3.64 | Release signatures checked on the Trust M (0.2 s, was 2.4 s); pure Python only without one, or if it says no |
 | 0.3.66 | Apps in their own list, named by its hash in the signed one (no size limit) |
 | 0.3.82 | A computer's own "clean" list can't take the red border off. One question at a time (one press answered two). FULL CONTROL left unanswered three times is a no. Writing the drive can't hang it or fill its RAM |
+| 0.3.83 | The chip check can't be a recording: the page sends random bytes and the Trust M signs them with its own. Before, the wedgie picked every byte it signed, so one answer from any real wedgie passed forever |
 | 0.3.80 | `net.ask` with a url or an Ethereum call (fetched over the wedgie's own TLS): the computer could put its own answer in place of the fetched one before the app took it. Now its answers count only for asks it was sent. A TLS connection that failed a check is never used again (a retry on it skipped the failed check). The drive's command buffer holds a whole USB packet |
 | 0.3.79 | Only apps that say they use the secure chip can open it: signed into each app's line, read from its code (a red cartridge on wedgie.dev). After a computer had full control, the wedgie asks on its screen instead |
 | 0.3.78 | Its own TLS refuses a site that sends no signature (a computer could pose as any site); locked: no hash of a save, and `/saves/.` can't be deleted |

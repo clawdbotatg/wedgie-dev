@@ -3,7 +3,7 @@
 # interrupted; from the REPL they are plain calls:  import wedgie; wedgie.shot(); wedgie.press("A")
 import sys, os, json, machine
 
-VERSION = "0.3.82"
+VERSION = "0.3.83"
 
 # The lock. main.py turns Ctrl-C off before anything else and never ends by itself, so a computer
 # can only send the slot's JSON lines: it can't stop the app, reach the REPL, or make the secure chip
@@ -251,13 +251,15 @@ def hello(mid=None, **extra):
 
 
 @_own
-def chip():
+def chip(nonce=None):
     """Prove the secure chip works, without stopping anything: the host sends nothing but this
     request and checks the answer itself (wedgie.dev: src/serial/chipcheck.ts).
       ATECC608: SHA-256 of 100 random bytes computed on the chip, and two Random reads.
       Trust M: two Random reads, its Infineon device certificate, and its factory key's signature
       over random bytes (the host checks the signature against the certificate and the certificate
-      against Infineon's roots).
+      against Infineon's roots). nonce (0.3.83+): 64 hex the host made up. The key then signs
+      sha256("wedgie-chip-v1" + nonce + its own 100 bytes) and the answer says "v": 1: an answer recorded from
+      another wedgie can't be played back, and the chip never signs bytes the host chose alone.
     Also the I2C lines (the breakout's pull-ups hold them high), so "no chip" can say why.
     An app in the middle of a chip command: {"busy": 1}, nothing touched (this resets a Trust M, and
     an app's command caught in that waited 10 s); the host asks again."""
@@ -307,7 +309,13 @@ def chip():
                 d["type_"] = "OPTIGA Trust M"
                 d["random"] = [hx(s.random(32)), hx(s.random(32))]
                 d["cert"] = hx(s.get_all(0xE0E0))
-                r, sg = s.sign(0xE0F0, hashlib.sha256(msg).digest())
+                try:
+                    nb = binascii.unhexlify(nonce) if isinstance(nonce, str) and len(nonce) == 64 else None
+                except ValueError:
+                    nb = None
+                if nb:
+                    d["v"] = 1
+                r, sg = s.sign(0xE0F0, hashlib.sha256(b"wedgie-chip-v1" + nb + msg if nb else msg).digest())
                 d.update(r="%064x" % r, s="%064x" % sg)
     except Exception as e:
         d["error"] = str(e) or type(e).__name__

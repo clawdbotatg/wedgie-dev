@@ -79,11 +79,22 @@ export async function trustmSigned(der: Uint8Array | Cert, msg: Uint8Array, rs: 
   return { sigOk, chain, path };
 }
 
-export type ChipCheck = { pass: boolean; detail: string; facts: [string, string][] };
+/** pass: the chip works. proven: and it is a real Trust M answering now (it signed bytes this page just made up,
+ *  and its certificate traces to Infineon). A working chip that isn't proven says why in detail. */
+export type ChipCheck = { pass: boolean; proven?: boolean; detail: string; facts: [string, string][] };
 
-export async function checkChip(d: any, base = ""): Promise<ChipCheck> {
+/** 32 random bytes (hex) to send with {"type": "chip", "nonce": ...}: the chip signs them with its own, so an
+ *  answer recorded from another wedgie can't be played back (audit 11-13: the wedgie picked every byte it signed). */
+export const chipNonce = () => hex(crypto.getRandomValues(new Uint8Array(32)));
+const PREFIX = new TextEncoder().encode("wedgie-chip-v1");
+/** Firmware that signs the page's nonce (wedgie.chip): an answer without it from one of these is refused. */
+const NONCE_FW = [0, 3, 83];
+const hasNonce = (v?: string) => { const a = (v || "").split(".").map(Number); for (let i = 0; i < 3; i++) if ((a[i] || 0) !== NONCE_FW[i]) return (a[i] || 0) > NONCE_FW[i]; return true; };
+
+/** nonce: what the page sent with the request (chipNonce); fw: the wedgie's firmware version, from its hello. */
+export async function checkChip(d: any, base = "", nonce?: string, fw?: string): Promise<ChipCheck> {
   if (d.error) return { pass: false, detail: `Chip didn't finish: ${d.error}`, facts: [["Chip test", d.error]] };
-  const msg = hexb(d.msg);
+  let msg = hexb(d.msg);
   if (d.kind === "atecc") {
     const want = new Uint8Array(await crypto.subtle.digest("SHA-256", msg));
     const ok = same(hexb(d.sha), want);
@@ -94,15 +105,21 @@ export async function checkChip(d: any, base = ""): Promise<ChipCheck> {
       ["Chip random", fixed ? "fixed pattern: config not locked yet, as shipped (left unlocked)" : `${r1.slice(0, 16)}… ${r2.slice(0, 16)}…`],
     ];
     const rndOk = fixed || (r1 !== r2 && !/^(00)+$|^(ff)+$/.test(r1));
-    return { pass: ok && rndOk, detail: ok ? "ATECC608: hashed on the chip ✓" : "ATECC608 hashed wrong", facts };
+    facts.push(["Real chip?", "can't be proven: an ATECC608 has no certificate to check"]);
+    return { pass: ok && rndOk, proven: false, detail: ok ? "ATECC608: works (can't be proven real)" : "ATECC608 hashed wrong", facts };
   }
   const dev = cert(trustmCert(d));
   const facts: [string, string][] = [["Trust M certificate", dev.cn || "?"]];
+  // 0.3.83+ ("v": 1): it signed "wedgie-chip-v1" + our nonce + its own bytes. Checked with the nonce we sent, never one
+  // from the answer. Older firmware signed only its own bytes: that answer could be a recording.
+  const fresh = !!nonce && d.v === 1;
+  if (nonce && !fresh && hasNonce(fw)) return { pass: false, proven: false, detail: "Trust M didn't sign this page's bytes", facts: [...facts, ["Trust M signature", "not over the bytes this page sent: it could be a recording"]] };
+  if (fresh) msg = Uint8Array.from([...PREFIX, ...hexb(nonce!), ...msg]);
   const { sigOk, chain, path } = await trustmSigned(dev, msg, d.r + d.s, base);
-  facts.push(["Trust M signature", sigOk ? "valid: its factory key signed our random bytes" : "INVALID"]);
+  facts.push(["Trust M signature", !sigOk ? "INVALID" : fresh ? "valid: its factory key signed bytes this page just made up" : "valid, but only over its own bytes (old firmware): it could be a recording"]);
   facts.push(["Trust M chain", chain || path]);
   const [r1, r2] = d.random as string[];
   facts.push(["Trust M random", `${r1.slice(0, 16)}… ${r2.slice(0, 16)}…`]);
   const pass = sigOk && !chain && r1 !== r2;
-  return { pass, detail: pass ? "Trust M: signed, traces to Infineon ✓" : !sigOk ? "Trust M signature didn't verify" : chain ? `Trust M: ${chain}` : "Trust M random repeated", facts };
+  return { pass, proven: pass && fresh, detail: pass ? (fresh ? "Trust M: signed, traces to Infineon ✓" : "Trust M: signed, traces to Infineon (update it to rule out a recording)") : !sigOk ? "Trust M signature didn't verify" : chain ? `Trust M: ${chain}` : "Trust M random repeated", facts };
 }

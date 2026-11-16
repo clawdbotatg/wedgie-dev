@@ -7,7 +7,7 @@
 // MicroPython board is stopped, asked for its unique ID in the raw REPL, and soft-reset back into
 // whatever it was running.
 import { Repl } from "./repl";
-import { checkChip, type ChipCheck } from "./chipcheck";
+import { checkChip, chipNonce, type ChipCheck } from "./chipcheck";
 import * as V from "../chip/port";
 
 export const RPI_VID = 0x2e8a;
@@ -230,11 +230,13 @@ async function prove(w: Wedgie, r: Repl, wait = true) {
     // Not while it's being found (wait false): until it's ready nobody carries its app's net, so a fetch it's
     // waiting on keeps the chip busy (10-27: ETH Price said No internet for a minute). Busy then: proofLater.
     w.proofLater = false;
+    // a new nonce with every ask: the Trust M signs it (0.3.83+), so the answer is this chip's, now (chipcheck.ts)
+    let nonce = "";
     const ask = async () => {
-      let d = await r.request({ type: "chip" }, 15000);
+      let d = await r.request({ type: "chip", nonce: (nonce = chipNonce()) }, 15000);
       for (let i = 0; d.busy && wait && i < 240; i++) {
         await new Promise((res) => setTimeout(res, 500));
-        d = await r.request({ type: "chip" }, 15000);
+        d = await r.request({ type: "chip", nonce: (nonce = chipNonce()) }, 15000);
       }
       return d;
     };
@@ -254,7 +256,7 @@ async function prove(w: Wedgie, r: Repl, wait = true) {
         "No chip: the I2C lines have no power, so it isn't connected" };
       return;
     }
-    w.proof = { state: "done", ...(await checkChip(d)) };
+    w.proof = { state: "done", ...(await checkChip(d, "", nonce, w.version)) };
   } catch (e: any) {
     w.proof = { state: "unknown", pass: false, facts: [], detail: `Couldn't check the chip: ${e?.message || e}` };
   }
