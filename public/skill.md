@@ -78,7 +78,7 @@ newest is always here).
 1. Plug it in with a USB **data** cable. The screen lights up (no light: turn the cable around, or try another).
    A **WEDGIE** drive appears.
 2. Open **Open wedgie** on the drive (Mac), **Open wedgie (Windows)**, or go to https://wedgie.dev/connect in Chrome
-   or Edge. Linux, once: `curl -fsSL https://wedgie.dev/bench-linux.sh | sudo sh` (udev rules), else "Access denied".
+   or Edge. Linux, once: `curl -fsSL https://wedgie.dev/linux.sh | sudo sh` (udev rules), else "Access denied".
 3. Click **Allow wedgie connection** (top right) and pick it.
 4. **Update the firmware** if the page says so. Always. Press green on the wedgie.
 5. Pick an app from the shelf. The wedgie asks **Install ...?** on its screen: press green.

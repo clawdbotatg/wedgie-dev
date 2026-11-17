@@ -60,7 +60,7 @@ export function setupCard(el: HTMLElement, opts: { reset?: boolean } = {}) {
     for (const x of items) el.querySelector<HTMLElement>(`[data-id="${x.id}"]`)!.onclick = () => void x.go();
   };
   const set = (j: Partial<Job>) => { job = { ...(job || { stage: "boot", text: "", detail: "", p: null, since: Date.now(), wifi: false }), ...j }; paint(); };
-  const fail = (e: any, what: string) => set({ stage: "fail", text: "Set up failed", detail: `${what}: ${e?.message || e}. Unplug it, hold BOOTSEL, plug it back in, and try again.`, p: null, pick: undefined });
+  const fail = (e: any, what: string) => set({ stage: "fail", text: "Set up failed", detail: `${what}: ${e?.message || e}. Unplug it, hold BOOTSEL, plug it back in, and try again.${W.isLinux() && /access denied|unable to claim|failed to open/i.test(e?.message || "") ? " " + W.LINUX_FIX : ""}`, p: null, pick: undefined });
 
   async function look() {
     if (!alive) return;

@@ -64,6 +64,10 @@ export function arm() {
 }
 const whenArmed = (fn: () => void) => (armedNow ? fn() : onArm.push(fn));
 const isMac = () => /Mac/.test(navigator.platform || navigator.userAgent);
+// Linux lets nobody open a Pico until the udev rules are in (public/linux.sh); Chrome then fails the same way
+// as for a port another program holds, so on Linux the error names both.
+export const isLinux = () => /Linux/.test(navigator.platform || "") && !/Android|CrOS/.test(navigator.userAgent);
+export const LINUX_FIX = "First time on Linux? Run this once, then unplug it and plug it back in: curl -fsSL https://wedgie.dev/linux.sh | sudo sh";
 export const wedgies = () => list.filter((w) => w.state !== "gone");
 export function onChange(fn: Listener) { listeners.add(fn); return () => listeners.delete(fn); }
 const emit = () => listeners.forEach((fn) => fn());
@@ -149,7 +153,7 @@ async function identify(w: Wedgie) {
     if ((w.state as string) === "gone") return;   // set by the disconnect listener while talk() ran
     w.state = "error";
     w.error = e?.message || String(e);
-    if (/failed to open|busy|access denied|already open/i.test(w.error || "")) w.error = "Another tab has your wedgie. Close other wedgie.dev tabs (or mpremote, Thonny), then try again.";
+    if (/failed to open|busy|access denied|already open/i.test(w.error || "")) w.error = "Another tab has your wedgie. Close other wedgie.dev tabs (or mpremote, Thonny), then try again." + (isLinux() ? " " + LINUX_FIX : "");
   }
   emit();
 }

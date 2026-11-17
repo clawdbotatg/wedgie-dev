@@ -25,7 +25,8 @@ export function reset(main: HTMLElement) {
     <details class="fine">
       <summary>Finds it but can't write? (Linux, Windows)</summary>
       <p><b>Linux:</b> run this once, restart Chrome, then hold the button and plug it in again.</p>
-      <pre class="recess test-cmd">curl -fsSL https://wedgie.dev/bench-linux.sh | sudo sh</pre>
+      <pre class="recess test-cmd">curl -fsSL https://wedgie.dev/linux.sh | sudo sh</pre>
+      <p>Chromium from snap (Ubuntu's own)? Also run <span class="mono">sudo snap connect chromium:raw-usb</span>.</p>
       <p><b>Windows:</b> get <a href="https://zadig.akeo.ie" target="_blank" rel="noopener">Zadig</a>. Options → List All Devices. Pick <b>RP2 Boot (Interface 1)</b>, choose <b>WinUSB</b>, Install. Then hold the button and plug it in again.</p>
     </details>
   </section>`;
