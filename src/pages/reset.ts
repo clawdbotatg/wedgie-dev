@@ -22,15 +22,19 @@ export function reset(main: HTMLElement) {
     <div class="test-actions" id="r-actions"></div>
     <div id="r-setup"></div>
     <p class="fine">Its apps and saves get wiped. Nothing shows up? Try another cable (some only charge) and hold the button again.</p>
-    <details class="fine">
-      <summary>Finds it but can't write? (Linux, Windows)</summary>
+    <div class="test-actions reset-help">
+      <h3>Finds it but can't write?</h3>
+      <button class="btn" id="r-help" aria-expanded="false" aria-controls="r-help-body">Linux / Windows users</button>
+    </div>
+    <div class="test-setup card" id="r-help-body" hidden>
       <p><b>Linux:</b> run this once, restart Chrome, then hold the button and plug it in again.</p>
       <pre class="recess test-cmd">curl -fsSL https://wedgie.dev/linux.sh | sudo sh</pre>
       <p>Chromium from snap (Ubuntu's own)? Also run <span class="mono">sudo snap connect chromium:raw-usb</span>.</p>
       <p><b>Windows:</b> get <a href="https://zadig.akeo.ie" target="_blank" rel="noopener">Zadig</a>. Options → List All Devices. Pick <b>RP2 Boot (Interface 1)</b>, choose <b>WinUSB</b>, Install. Then hold the button and plug it in again.</p>
-    </details>
+    </div>
   </section>`;
   const $ = (id: string) => document.getElementById(id)!;
+  $("r-help").onclick = () => { const b = $("r-help-body"); b.hidden = !b.hidden; $("r-help").setAttribute("aria-expanded", String(!b.hidden)); };
   import("../ui/bootsel3d").then((m) => m.mountBootsel3D($("r-3d"), { install: true })).catch(() => {});
   if (!W.supported() || !usbSupported()) {
     $("r-actions").innerHTML = `<p class="fine">Can't see USB here. Open wedgie.dev/reset in Chrome or Edge on a computer.</p>`;
