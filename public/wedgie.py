@@ -875,7 +875,24 @@ def cmd_list(args):
         print(line)
 
 
+class Plain:
+    """What this prints, with control characters taken out (audit 11-13, INST-11): names, errors, file names and
+    a run's output come from the wedgie, and an ESC sequence in them could rewrite your terminal or hide words
+    from you, or from an AI reading it. Newlines, tabs and \\r stay (\\r only redraws a progress line)."""
+    BAD = re.compile("\x1b\\[[0-?]*[ -/]*[@-~]|\x1b\\][^\x07\x1b]*(\x07|\x1b\\\\)?|\x9b[0-?]*[ -/]*[@-~]|[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")
+
+    def __init__(self, out):
+        self.out = out
+
+    def write(self, s):
+        return self.out.write(self.BAD.sub("", s) if isinstance(s, str) else s)
+
+    def __getattr__(self, k):
+        return getattr(self.out, k)
+
+
 def main():
+    sys.stdout, sys.stderr = Plain(sys.stdout), Plain(sys.stderr)
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("cmd")
     ap.add_argument("rest", nargs="*")

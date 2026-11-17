@@ -123,5 +123,12 @@ finally:
 src = open(os.path.join(HERE, "..", "public", "wedgie.py")).read()
 up = src[src.index('elif c == "update":'):src.index('elif c == "debug":')]
 check(up.index("repl_open()") < up.index("take_over(") and "args.dev" in up, "update asks for an open REPL (Ctrl-A) before it ever takes over; --dev is the way to full control")
+# what it prints from a wedgie has no control characters (audit 11-13, INST-11): an ESC sequence in a name or an
+# error could rewrite the terminal or hide words from whoever reads it
+import io  # noqa: E402
+_b = io.StringIO()
+cli.Plain(_b).write("ok\x1b[2J\x1b]0;evil\x07 name\tx\n\x9b31mred\x1b[0m\x00 done")
+check(_b.getvalue() == "ok name\tx\nred done", "printed device text loses its escape sequences (%r)" % _b.getvalue())
+check("sys.stdout, sys.stderr = Plain(sys.stdout), Plain(sys.stderr)" in src, "every print goes through it")
 print("\n%s" % ("ALL OK" if not bad else "%d FAILED" % bad))
 sys.exit(1 if bad else 0)
