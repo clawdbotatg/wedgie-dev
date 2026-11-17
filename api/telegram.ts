@@ -14,7 +14,8 @@ const TEXT = "Join Telegram";
 let ready: Promise<unknown> | null = null;
 async function db() {
   const sql = neon(env("SHOP_DATABASE_URL"));
-  ready ||= sql`create table if not exists tg_members (chip text primary key, tg_id bigint not null, at timestamptz not null default now())`;
+  ready ||= sql`create table if not exists tg_members (chip text primary key, tg_id bigint not null, at timestamptz not null default now())`
+    .then(() => sql`alter table tg_members add column if not exists link text, add column if not exists link_until timestamptz`);
   await ready;
   return sql;
 }
@@ -53,10 +54,14 @@ export async function POST(req: Request) {
   try { chip = await checkProof(body?.proof, TEXT, body.t); } catch (e: any) { return oops(`Didn't check out: ${e?.message || e}`); }
   const sql = await db();
   await sql`insert into tg_members (chip, tg_id) values (${chip}, ${id}) on conflict (chip) do nothing`;
-  const [row] = await sql`select tg_id from tg_members where chip = ${chip}`;
+  const [row] = await sql`select tg_id, link, link_until > now() as fresh from tg_members where chip = ${chip}`;
   if (String(row.tg_id) !== id) return oops("This wedgie already let in another account.", 409);
+  // one invite per wedgie at a time (audit 11-13, SHOP-16): the same proof, posted again within its hour, made a
+  // new invite each time. The bot also removes anyone who joins without a proven wedgie (bot/telegram.mjs)
+  if (row.link && row.fresh) return json({ link: row.link });
   const link = (await tg("createChatInviteLink", { chat_id: env("TELEGRAM_GATE_CHAT"), member_limit: 1,
     expire_date: Math.floor(Date.now() / 1000) + 3600, name: `wedgie ${id}` })).invite_link;
+  await sql`update tg_members set link = ${link}, link_until = now() + interval '1 hour' where chip = ${chip}`;
   await tg("sendMessage", { chat_id: id, text: `You're in: ${link}` }).catch(() => {});
   return json({ link });
 }
