@@ -1,6 +1,6 @@
 // /api/order
 //   GET                                       what's open: card, usdc; extra = cents over list price right now;
-//                                             left = {wedgie, kit} in stock (_shop.ts stockLeft); sends the price alerts once it's back down
+//                                             left = {wedgie, kit} in stock (_shop.ts stockLeft)
 //   GET ?wallet=0x…                           + cv: claims (api/_cv.ts): open, cost; this wallet's balance (null: never
 //                                             staked) and claimed (its order id, or null)
 //   POST {cart, sealed, email, pay, chain?}   a new order -> {id, token, url?} (url: Stripe Checkout); email: _mail.ts
@@ -11,7 +11,7 @@
 // The token is the buyer's: only its hash is kept. See _shop.ts for what is and isn't stored.
 import { PAY_CHAINS, cartOk, cartLines, type Cart } from "../src/shop/catalog.js";
 import { depositOf } from "../src/shop/deposits.js";
-import { EMAIL, emailHash, lock, tokenOf, mailPaid, sendAlerts } from "./_mail.js";
+import { EMAIL, emailHash, lock, tokenOf, mailPaid } from "./_mail.js";
 import { cvOpen, cvCost, cvBalance, cvSigned, cvSpend, cvClaimed, cvAlarm, fmtCv } from "./_cv.js";
 import { db, env, json, oops, randomHex, sha256, same, publicView, checkout, session, markPaid, endCard, usdcPaid, usdcFind, settleDeposit, extraNow, expireOld, late, rpc, ipOf, tooMany, stockLeft, short, oversold, type Order, crossSite, siteOf } from "./_shop.js";
 
@@ -20,7 +20,6 @@ const open = () => ({ card: !!env("STRIPE_SECRET_KEY"), usdc: !!env("SHOP_PAY_TO
 export async function GET(req: Request) {
   const sql = env("SHOP_DATABASE_URL") ? await db() : null;
   const extra = sql ? await extraNow(sql).catch(() => -1) : 0;
-  if (sql && extra === 0 && env("SHOP_MAIL_KEY")) await sendAlerts(sql, siteOf(req), 0).catch(() => {});
   const l = sql ? await stockLeft(sql).catch(() => null) : null;
   const left = { wedgie: Math.max(0, l?.wedgie || 0), kit: Math.max(0, l?.kit || 0) };
   return json({ ...open(), extra: Math.max(0, extra), left, cv: await cvView(sql, new URL(req.url).searchParams.get("wallet")) });

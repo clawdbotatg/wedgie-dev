@@ -74,6 +74,7 @@ export async function db() {
       email_hash text primary key, email_enc text not null, ip text, created timestamptz not null default now())`;
     await sql`alter table alerts add column if not exists sent int not null default 0`;   // mails sent so far (2 at most)
     await sql`alter table alerts add column if not exists sent_at timestamptz`;
+    await sql`create table if not exists mail_day (day date not null, k text not null, n int not null, primary key (day, k))`;   // _mail.ts mailToday: mails sent per kind per day, all senders
     await sql`create table if not exists cv_claims (   -- api/_cv.ts: a wallet that claimed its wedgie with CV; kept for good (one per wallet)
       wallet text primary key, order_id text not null, created timestamptz not null default now(), burned_at timestamptz)`;
   })().catch((e) => { ready = null; throw e; });

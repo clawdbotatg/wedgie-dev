@@ -86,20 +86,30 @@ ok((await call(alert.POST, { email: "nope" })).status === 400, "alert: a bad ema
 ok((await call(alert.POST, { email: "Watcher@Example.com" })).ok, "alert: asked");
 const [al] = await sql`select * from alerts`;
 ok(al && !JSON.stringify(al).toLowerCase().includes("watcher@"), "alert: only a hash and a locked copy");
-await get();
+const tick = () => admin.GET(new Request("https://wedgie.dev/api/admin", { headers: { authorization: "Bearer " + "t".repeat(40) } }));   // omen's timer
+await tick();
 ok(!mails().some((m) => m.to === "Watcher@Example.com"), "alert: no mail while the surge is on");
 await sql`update orders set created = created - interval '3 days', paid_at = paid_at - interval '3 days'`;
 ok((await get()).extra === 0, "the surge is gone");
+ok(!mails().some((m) => m.to === "Watcher@Example.com"), "alert: a page view sends no mail");
+await sql`insert into mail_day (day, k, n) values (current_date, 'alert', 100)`;
+await tick();
+ok(!mails().some((m) => m.to === "Watcher@Example.com") && (await sql`select sent from alerts`)[0]?.sent === 0, "alert: none past the day's cap, kept for later");
+await sql`delete from mail_day`;
+await tick();
 const am = mails().filter((m) => m.to === "Watcher@Example.com");
 ok(am.length === 1 && /\$67 again/.test(am[0].subject) && am[0].text.includes("https://wedgie.dev/order"), "alert: one mail, with a link to order");
-await get();
+await tick();
 ok(mails().filter((m) => m.to === "Watcher@Example.com").length === 1, "alert: not again right away");
 await sql`update alerts set sent_at = sent_at - interval '15 days'`;
-await get();
+await tick();
 const am2 = mails().filter((m) => m.to === "Watcher@Example.com");
 ok(am2.length === 2 && /last price email/.test(am2[1].text) && !(await sql`select * from alerts`).length, "alert: a 2nd mail 2 weeks on, then deleted");
-await get();
+await tick();
 ok(mails().filter((m) => m.to === "Watcher@Example.com").length === 2, "alert: never a 3rd");
+await sql`insert into mail_day (day, k, n) values (current_date, 'signin', 300)`;
+ok((await call(login.POST, { email: "late@example.com" })).status === 429 && !mails().some((m) => m.to === "late@example.com"), "sign in: none past the day's cap");
+await sql`delete from mail_day`;
 ok((await call(alert.POST, { email: "watcher@example.com" })).status === 400, "alert: refused while it's already $67");
 
 // 6: the real pages under vite, in a browser

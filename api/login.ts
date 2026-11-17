@@ -6,10 +6,10 @@
 //                      the paid/shipped mails if it hasn't shipped)
 //   POST {signout}     the session ends
 // orders: [{id, token, at}]; the tokens (_mail.ts tokenOf) open each order's page. One link a minute, 5 an hour,
-// per email, and IP_HOUR an hour per IP (a script with a list of addresses would burn the inbox's daily quota). Only
+// per email, and IP_HOUR an hour per IP, and MAIL_DAY.signin a day for everyone (a script with a list of addresses would burn the inbox's daily quota). Only
 // hashes are stored (the IP's: _shop.ts ipOf, gone with its link after a day).
 import { db, json, oops, same, env, sha256, randomHex, ipOf, crossSite, siteOf } from "./_shop.js";
-import { EMAIL, emailHash, tokenOf, signinMail, lock, unlock } from "./_mail.js";
+import { EMAIL, emailHash, tokenOf, signinMail, lock, unlock, mailToday } from "./_mail.js";
 
 const SESSION_DAYS = 30, IP_HOUR = 5;
 type Sql = Awaited<ReturnType<typeof db>>;
@@ -37,6 +37,7 @@ async function ask(sql: Sql, email: string, origin: string, ip: string) {
   if (r.hour >= 5) return oops("Too many tries. Wait an hour.", 429);
   const [n] = await sql`select count(*)::int as n from links where ip = ${ip} and created > now() - interval '1 hour'`;
   if (n.n >= IP_HOUR) return oops("Too many tries. Wait an hour.", 429);
+  if (!(await mailToday(sql, "signin"))) return oops("Too many sign-ins today. Try tomorrow, or email wedgie@buidlguidl.com.", 429);
   const token = randomHex(16);
   await sql`insert into links (token_hash, email_hash, email_enc, ip) values (${await sha256(token)}, ${h}, ${await lock(email.trim())}, ${ip})`;
   try { await signinMail(email.trim(), `${origin}/signin#${token}`); } catch { return oops("Couldn't send the email. Try again soon.", 503); }

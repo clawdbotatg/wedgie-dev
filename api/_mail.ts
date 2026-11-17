@@ -45,6 +45,15 @@ ${lines.map((l) => `<p style="margin:0 0 16px">${esc(l).replace(/\n/g, "<br>")}<
   await smtp.sendMail({ from: `wedgie <${env("SHOP_MAIL_USER")}>`, to, subject, text, html });
 }
 
+/** One more mail of this kind today, if under its cap (MAIL_DAY): one count for the whole site, not per IP or email,
+ * so a script with many IPs and addresses can't burn the inbox's daily quota and stop the paid and shipped mails. */
+export const MAIL_DAY = { signin: 300, alert: 100 } as const;
+export async function mailToday(sql: Awaited<ReturnType<typeof db>>, k: keyof typeof MAIL_DAY) {
+  const [r] = await sql`insert into mail_day (day, k, n) values (current_date, ${k}, 1)
+    on conflict (day, k) do update set n = mail_day.n + 1 returning n`;
+  return r.n <= MAIL_DAY[k];
+}
+
 const items = (lines: Line[] | null) => (lines || []).map((l) => `${l.qty} × ${nameOf(l.item)}`).join(", ");
 const usd = (c: number) => "$" + (c / 100).toFixed(c % 100 ? 2 : 0);
 const link = async (origin: string, id: string) => `${origin}/order/${id}#${await tokenOf(id)}`;
@@ -80,18 +89,20 @@ async function pingPaid(sql: Awaited<ReturnType<typeof db>>, id: string) {
 }
 
 /** Price alerts (api/alert.ts): once the surge is gone, each one gets a mail; ALERT_AGAIN later, the next time it's
- * back to list, one more, and it's deleted. 50 a call (Gmail's daily cap); a failed send goes back for next time.
- * Runs on GET /api/order (every shop page view) and omen's admin GETs. */
+ * back to list, one more, and it's deleted. 20 a call, MAIL_DAY.alert a day; a failed send goes back for next time.
+ * Runs only on omen's admin GETs (a timer): a page view never sends mail. */
 const ALERT_AGAIN = "14 days";
 export async function sendAlerts(sql: Awaited<ReturnType<typeof db>>, origin: string, extra?: number) {
   const [any] = await sql`select 1 from alerts where sent = 0 or sent_at < now() - ${ALERT_AGAIN}::interval limit 1`;
   if (!any || (extra ?? (await extraNow(sql))) > 0) return;
   const rows = await sql`update alerts set sent = sent + 1, sent_at = now()
-    where email_hash in (select email_hash from alerts where sent = 0 or sent_at < now() - ${ALERT_AGAIN}::interval order by created limit 50) returning *`;
+    where email_hash in (select email_hash from alerts where sent = 0 or sent_at < now() - ${ALERT_AGAIN}::interval order by created limit 20) returning *`;
   const list = usd(ITEMS.wedgie.cents);
+  let full = false;
   for (const r of rows) {
     const last = r.sent >= 2;
     try {
+      if (full || !(await mailToday(sql, "alert"))) { full = true; throw new Error("today's cap"); }
       await send(await unlock(r.email_enc), `wedgie is ${list} again`,
         [`The price is back to ${list}.`, `Each sale adds ${usd(BUMP)}, so it may not last.`,
           last ? "That's the last price email from us." : `You asked for this on wedgie.dev. One more in a couple of weeks, the next time it's ${list}, then that's it.`],

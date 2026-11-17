@@ -8,7 +8,7 @@
 import { db as shopDb, json, oops, env, ipOf, crossSite } from "./_shop.js";
 import { send } from "./_mail.js";
 
-const REPORT_DAYS = 90, PER_HOUR = 6, MAIL_PER_DAY = 50, KEEP_PER_DAY = 1000, MAX = 60_000, NOTE_MAX = 4000;
+const REPORT_DAYS = 90, PER_HOUR = 6, MAIL_PER_DAY = 50, KEEP_PER_DAY = 100, MAX = 60_000, NOTE_MAX = 4000;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 let ready: Promise<unknown> | null = null;
