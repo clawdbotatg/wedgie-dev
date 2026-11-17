@@ -15,6 +15,8 @@ Everything wedgie.py and the website do is JSON lines over the wedgie's USB seri
 1. **Find its port.** macOS: `/dev/cu.usbmodem*`. Linux: `/dev/ttyACM*` (or `/dev/serial/by-id/*wedgie*`).
    Windows: a `COM` port (USB vendor 0x2e8a, product name "wedgie"). Several boards: ask each for hello
    and match its `uid`. Just plugged in? Wait 2 s: the port drops once while the WEDGIE drive appears.
+   Linux, "Access denied" or "Permission denied": add the udev rules once,
+   `curl -fsSL https://wedgie.dev/bench-linux.sh | sudo sh`.
 2. **Only one program can hold the port.** "Busy" or "Resource busy": find who has it with
    `lsof /dev/cu.usbmodem*` (macOS/Linux). Usually it's a wedgie.dev tab in Chrome (ask your person to
    close it) or mpremote.

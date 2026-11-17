@@ -163,7 +163,8 @@ wires straight out of the sockets. Reassemble in reverse, then check it on its p
 
 1. **Is it on USB?** `python3 wedgie.py list` or https://wedgie.dev/connect. Nothing: another cable (charge-only
    cables are common), another port, or turn the cable around (some only work one way). A drive called RPI-RP2 /
-   RP2350 instead: it's in BOOTSEL (no MicroPython, or BOOTSEL was held): First boot.
+   RP2350 instead: it's in BOOTSEL (no MicroPython, or BOOTSEL was held): First boot. Linux, the page says
+   "Access denied": the udev rules (usb.md).
 2. **Does hello answer?** No: read its screen. "wedgie broke: <error>": B tries again, A asks for full control so
    a computer can fix it (`wedgie.py debug` shows `error.log`). Black screen: the Pico isn't fully seated, or
    there's no firmware (bare MicroPython shows nothing): /reset. An app that crashes at start: **hold both grey
