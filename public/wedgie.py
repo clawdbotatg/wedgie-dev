@@ -1031,11 +1031,14 @@ def main():
             have = checked(wg, m, h) if h else None
             if have:
                 write = update_writes(m, have)
-                if not write:
+                # the red border (full control since its files were last as signed): only a signed job takes it off
+                marked = bool((wg.request({"type": "sums", "exists": ["modified"]}, 10).get("sums") or {}).get("modified"))
+                if not write and not marked:
                     print("wedgie %s: already up to date" % m["version"])
                     return
                 job(wg, "Update firmware", write, [], None)
-                print("wedgie %s: %d files updated (checked install; its app and saves stay)" % (m["version"], len(write)))
+                print("wedgie %s: %d files updated (checked install; its app and saves stay)" % (m["version"], len(write))
+                      + ("; the red border is gone" if marked else ""))
                 return
             take_over(wg, "Update firmware to " + m["version"])
             have = look(wg, m)
