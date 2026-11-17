@@ -5,7 +5,7 @@ description: Talk to a plugged-in wedgie over USB - find its port, hello, wedgie
 
 # Talk to a wedgie over USB
 
-Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.86**; if `hello`
+Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.87**; if `hello`
 says older, run `wedgie.py update` first.
 
 ## Talk to it directly
@@ -82,7 +82,7 @@ wedgie's own screen answered by a **real press** (a `press` request can't answer
 
 - **One job** (`{"type":"open","for":"Update firmware"}`; wedgie.py and the site send it for you): the
   same red **FULL CONTROL?** question as below (0.3.27+: a computer's own title never goes on a calm
-  screen that gives it the REPL); green (A) held 3 seconds says yes (0.3.86+; a press before that), red (Y) or a minute with no answer says no. Allow 65 s for the reply.
+  screen that gives it the REPL); green (A) held 3 seconds says yes (0.3.87+; a press before that), red (Y) or a minute with no answer says no. Allow 65 s for the reply.
   After a yes, hello says `"open": true` and Ctrl-C (0x03) works as usual until its app starts again.
 - **Full control** (`{"type":"open","full":true}`, `wedgie.py unlock`, or just pressing Ctrl-C, e.g.
   mpremote's): a white-on-red **FULL CONTROL?** question. After a yes the app stops and the screen says
@@ -133,7 +133,7 @@ from answering. Hold **Y**: no WEDGIE drive this time (debugging only).
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.86","fw":"wedgie-0.3.86","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.87","fw":"wedgie-0.3.87","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":3,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n

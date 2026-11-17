@@ -15,14 +15,14 @@ or an ATECC608) **wedged** between the boards on I2C. It runs MicroPython plus t
 into one app, and asks on its own screen before anything that matters. Games, tools, and a hardware signer for a
 Safe multisig. Everything is MIT. Home: https://wedgie.dev
 
-**The current firmware is 0.3.86.** If a wedgie's `hello` says older, update it first: everything here assumes
+**The current firmware is 0.3.87.** If a wedgie's `hello` says older, update it first: everything here assumes
 current firmware.
 
 ```yaml
 name: wedgie
 site: https://wedgie.dev
 skill_index: https://wedgie.dev/skill.md          # this file
-firmware: 0.3.86
+firmware: 0.3.87
 license: MIT (hardware design, case, firmware, site, art)
 source: https://github.com/clawdbotatg/wedgie-dev
 made_by: Austin Griffith and Gus Griffith, with @ClawdBotATG; sold by BuidlGuidl DAO LLC
@@ -222,7 +222,7 @@ https://instantwallet.io. Details: safe.md.
 
 # Talk to a wedgie over USB
 
-Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.86**; if `hello`
+Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.87**; if `hello`
 says older, run `wedgie.py update` first.
 
 ## Talk to it directly
@@ -299,7 +299,7 @@ wedgie's own screen answered by a **real press** (a `press` request can't answer
 
 - **One job** (`{"type":"open","for":"Update firmware"}`; wedgie.py and the site send it for you): the
   same red **FULL CONTROL?** question as below (0.3.27+: a computer's own title never goes on a calm
-  screen that gives it the REPL); green (A) held 3 seconds says yes (0.3.86+; a press before that), red (Y) or a minute with no answer says no. Allow 65 s for the reply.
+  screen that gives it the REPL); green (A) held 3 seconds says yes (0.3.87+; a press before that), red (Y) or a minute with no answer says no. Allow 65 s for the reply.
   After a yes, hello says `"open": true` and Ctrl-C (0x03) works as usual until its app starts again.
 - **Full control** (`{"type":"open","full":true}`, `wedgie.py unlock`, or just pressing Ctrl-C, e.g.
   mpremote's): a white-on-red **FULL CONTROL?** question. After a yes the app stops and the screen says
@@ -350,7 +350,7 @@ from answering. Hold **Y**: no WEDGIE drive this time (debugging only).
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.86","fw":"wedgie-0.3.86","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.87","fw":"wedgie-0.3.87","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":3,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -944,6 +944,7 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md
 | 0.3.57 | Yes is grey until the check ends; installs end in a hard reset |
 | 0.3.64 | Release signatures checked on the Trust M (0.2 s, was 2.4 s); pure Python only without one, or if it says no |
 | 0.3.66 | Apps in their own list, named by its hash in the signed one (no size limit) |
+| 0.3.87 | The WEDGIE drive's README sends AIs to https://wedgie.dev/skill.md, not the copy on the drive. `wedgie.py` prints no control characters from the wedgie |
 | 0.3.86 | "Not signed" no longer points to wedgie.dev/reset. /reset checks each MicroPython file's hash before writing it (sha256 starts: Pico e1160e602e27, Pico W f918c0a082c6, Pico 2 6bfc5d110f29, Pico 2 W c49c7ed93eb7) |
 | 0.3.85 | FULL CONTROL needs the green button held for 3 seconds, and the screen says so: a tap or a bump is not a yes |
 | 0.3.82 | A computer's own "clean" list can't take the red border off. One question at a time (one press answered two). FULL CONTROL left unanswered three times is a no. Writing the drive can't hang it or fill its RAM |

@@ -33,8 +33,8 @@ readme = b"""This is a wedgie.
 
 Double-click "Open wedgie", or go to https://wedgie.dev/connect in Chrome or Edge.
 
-Using an AI (Claude, Codex, ...)? Point it at SKILL.md on this drive: everything about a wedgie, and how
-to talk to it over USB.
+Using an AI (Claude, Codex, ...)? Point it at https://wedgie.dev/skill.md: everything about a wedgie, and
+how to talk to it over USB. SKILL.md here is a copy for when you're offline; if they differ, wedgie.dev wins.
 """
 
 
