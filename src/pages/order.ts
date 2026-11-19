@@ -8,7 +8,7 @@
 // quotes it again at today's price.
 // An order's token (its proof you made it) stays in this browser and in the link we show; the server keeps
 // only its hash. api/order.ts is the other side.
-import { ITEMS, MAX_EACH, MAX_BOXES, SHIPS, ABROAD_NOTE, STATES, COUNTRIES, PAY_CHAINS, SHOP_ENS, cartLines, cartCents, nameOf, type Cart, type Item, type ShipTo } from "../shop/catalog";
+import { ITEMS, ITEM_KEYS, boxes, noAbroad, MAX_EACH, MAX_BOXES, SHIPS, ABROAD_NOTE, STATES, COUNTRIES, PAY_CHAINS, SHOP_ENS, cartLines, cartCents, nameOf, type Cart, type Item, type ShipTo } from "../shop/catalog";
 import { addressQr } from "../safe/qr";
 import { WHY, STAR, wire } from "../shop/why";
 import { seal, SEAL_KEY } from "../shop/seal";
@@ -227,8 +227,9 @@ function shipForm(box: HTMLElement, say: (s: string, bad?: boolean) => void, onW
 // ---- a new order ----
 function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
   const q = new URLSearchParams(location.search);
-  const cart: Cart = { wedgie: 0, kit: 0 };
-  if (q.get("item") === "kit") cart.kit = 1; else cart.wedgie = 1;
+  const cart: Cart = { wedgie: 0, kit: 0, atomic: 0, atomickit: 0 };
+  const want = q.get("item") as Item;      // /order?item=kit | atomic | atomickit
+  cart[ITEM_KEYS.includes(want) ? want : "wedgie"] = 1;
   count("view");
   box.innerHTML = `
     <div class="safe-box recess" id="o-cart">
@@ -271,7 +272,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
   box.querySelectorAll<HTMLElement>(".order-line").forEach((l) => l.querySelectorAll<HTMLButtonElement>("button").forEach((b) => (b.onclick = () => {
     const k = l.dataset.item as Item, d = Number(b.dataset.d);
     if (d > 0 && left != null && cart[k] >= left[k]) return say(left[k] ? `Only ${left[k]} in stock.` : "Sold out.", true);
-    if (d > 0 && cart.wedgie + cart.kit >= MAX_BOXES) return say(`Up to ${MAX_BOXES} per order.`, true);
+    if (d > 0 && boxes(cart) >= MAX_BOXES) return say(`Up to ${MAX_BOXES} per order.`, true);
     cart[k] = Math.max(0, Math.min(MAX_EACH, cart[k] + d));
     count("cart");
     say("");
@@ -284,21 +285,23 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
   const openEl = box.querySelector<HTMLElement>("#o-open")!;
   let shop: { card: boolean; usdc: boolean } = { card: false, usdc: false };
   api().then((r) => {
-    left = { wedgie: r.left?.wedgie || 0, kit: r.left?.kit || 0 };
-    for (const k of Object.keys(cart) as Item[]) if (k in left) cart[k] = Math.min(cart[k], left[k]);   // sold out: not in the cart
-    if (!cart.wedgie && !cart.kit) { if (left.wedgie) cart.wedgie = 1; else if (left.kit) cart.kit = 1; }
-    shop = SEAL_KEY && (left.wedgie || left.kit) ? r : { card: false, usdc: false }; extra = r.extra || 0;
+    const l = left = Object.fromEntries(ITEM_KEYS.map((k) => [k, r.left?.[k] || 0])) as Record<Item, number>;
+    for (const k of ITEM_KEYS) cart[k] = Math.min(cart[k], l[k]);   // sold out: not in the cart
+    const first = ITEM_KEYS.find((k) => l[k]);                      // what they came for is gone: the first kind there is
+    if (!boxes(cart) && first) cart[first] = 1;
+    shop = SEAL_KEY && first ? r : { card: false, usdc: false }; extra = r.extra || 0;
     paint();
     box.querySelectorAll<HTMLOptionElement>("#o-chain option").forEach((o) => { if (!r.chains?.includes(Number(o.value))) o.remove(); });   // only chains the server can read
   }, () => {}).finally(() => {
     card.disabled = !shop.card; crypto.disabled = !shop.usdc;
-    openEl.textContent = shop.card || shop.usdc ? "" : left && !left.wedgie && !left.kit ? "Sold out." : "Checkout opens soon.";
+    openEl.textContent = shop.card || shop.usdc ? "" : left && !boxes(left) ? "Sold out." : "Checkout opens soon.";
     openEl.hidden = !openEl.textContent;
   });
 
   const shipTo = (): ShipTo | null => {
     const s = addrOf();
     if (s && !cartCents(cart, extra)) { say("Pick at least one.", true); return null; }
+    if (s && noAbroad(cart)) { say(noAbroad(cart), true); return null; }
     return s;
   };
   const go = async (pay: "card" | "usdc", b: HTMLButtonElement) => {
@@ -343,7 +346,7 @@ async function clawdOf(w: string): Promise<{ held: bigint; staked: bigint } | nu
   try { const [held, staked] = await Promise.all([call(CLAWD, "0x70a08231"), call(STAKING, "0x9bfd8d61")]); return { held, staked }; } catch { return null; }
 }
 function claim(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
-  const cart: Cart = { wedgie: 1, kit: 0 };
+  const cart: Cart = { wedgie: 1, kit: 0, atomic: 0, atomickit: 0 };
   box.innerHTML = `
     <div class="safe-ids claim-ids" id="c-ids" hidden>
       <div class="safe-id safe-id-wallet" id="c-wallet"></div>

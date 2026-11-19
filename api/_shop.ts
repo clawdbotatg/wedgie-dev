@@ -9,7 +9,8 @@
 // Env: SHOP_DATABASE_URL, STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET (card), SHOP_PAY_TO (USDC),
 // CV_* (claims, api/_cv.ts), SHOP_ADMIN_TOKEN (omen's orders.py), SHOP_STATS_TOKEN (api/stats.ts, counts only), SHOP_RPC_<chainId> (an Alchemy URL: never a public RPC).
 import { neon } from "@neondatabase/serverless";
-import { ITEMS, nameOf, PAY_CHAINS, QUOTE, cartLines, extraAt, type Cart, type Item, type Line } from "../src/shop/catalog.js";
+import { ITEMS, ITEM_KEYS, MANY, boxes, nameOf, PAY_CHAINS, QUOTE, cartLines, extraAt, type Cart, type Item, type Line } from "../src/shop/catalog.js";
+export { boxes };
 
 declare const process: { env: Record<string, string | undefined> };
 export const env = (k: string) => process.env[k] || "";
@@ -121,22 +122,22 @@ export async function extraNow(sql: Awaited<ReturnType<typeof db>>) {
   const rows = await sql`select coalesce(paid_at, created) as at, cart from orders
     where pay <> 'cv' and ((status in ('paid', 'shipped') and paid_at > now() - interval '60 days')
     or (status = 'new' and created > now() - ${`${QUOTE / 1000} seconds`}::interval))`;
-  return extraAt(rows.map((r: any) => ({ at: Date.parse(r.at), n: (r.cart.wedgie || 0) + (r.cart.kit || 0) })), Date.now());
+  return extraAt(rows.map((r: any) => ({ at: Date.parse(r.at), n: boxes(r.cart) })), Date.now());
 }
 
-/** How many of each are left to sell: wedgies and kits each have their own count. The shipping computer sets
- * them (orders.py stock [wedgie|kit] N, admin.ts; stock row 1 = wedgies, 2 = kits); each one paid since then, or
+/** How many of each are left to sell: each kind has its own count. The shipping computer sets
+ * them (orders.py stock [wedgie|kit|atomic|atomickit] N, admin.ts; STOCK_ROW); each one paid since then, or
  * held by an open quote, takes one; a canceled order gives its boxes back, and so does an expired quote. A card
  * quote holds its box till its Stripe checkout can't be paid any more (CARD_HOLD), even if ending it early failed.
  * Unpaid money never holds a box: a dust send can't lock the stock. Never set: 0, sold out. Can go below 0 when
  * two orders race (order.ts raced backs one out) or when a quote paid in full only after it expired lands on a
  * sold-out shop: orders.py list then says oversold (Austin, 10-15: OK). */
 export const CARD_HOLD = 31 * 60_000;   // checkout()'s expires_at, plus a minute
-export const STOCK_ROW: Record<Item, number> = { wedgie: 1, kit: 2 };
+export const STOCK_ROW: Record<Item, number> = { wedgie: 1, kit: 2, atomic: 3, atomickit: 4 };
 export type Left = Record<Item, number>;
 export async function stockLeft(sql: Awaited<ReturnType<typeof db>>): Promise<Left> {
-  const left = { wedgie: 0, kit: 0 };
-  for (const k of Object.keys(STOCK_ROW) as Item[]) {
+  const left: Left = { wedgie: 0, kit: 0, atomic: 0, atomickit: 0 };
+  for (const k of ITEM_KEYS) {
     const [s] = await sql`select n, set_at from stock where id = ${STOCK_ROW[k]}`;
     if (!s) continue;
     const [r] = await sql`select coalesce(sum(coalesce((cart->>${k})::int, 0)), 0)::int as used from orders
@@ -147,11 +148,10 @@ export async function stockLeft(sql: Awaited<ReturnType<typeof db>>): Promise<Le
   }
   return left;
 }
-export const boxes = (c: Cart) => (c.wedgie || 0) + (c.kit || 0);
 /** Why this cart can't be had ("Only 2 kits left.", "Wedgies are sold out."), or "" if it can. */
 export const short = (c: Partial<Cart>, left: Left) => {
   for (const k of Object.keys(STOCK_ROW) as Item[]) {
-    const n = Math.max(0, left[k]), many = k === "kit" ? "kits" : "wedgies";
+    const n = Math.max(0, left[k]), many = MANY[k];
     if ((c[k] || 0) > n) return n ? `Only ${n} ${n === 1 ? ITEMS[k].name : many} left.` : `${many[0].toUpperCase() + many.slice(1)} are sold out.`;
   }
   return "";

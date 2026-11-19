@@ -1,18 +1,33 @@
 // What the shop sells. Read by the order page and by the server (api/), so a price lives in one place.
 // Prices are US dollars in cents, US shipping included (Ground Advantage is ~$6). Outside the US: a flat ABROAD
 // per order (USPS international is $16-30; wedgie-shipping README). The buyer pays any import tax.
+export const ATOMIC = 1000;   // what the battery, its board and the red base add (Austin, 11-19)
 export const ITEMS = {
   wedgie: { name: "wedgie", what: "Assembled: pico, screen, chip, and case, plus a USB cable (USB-C and USB-A). Plug it in and go.", cents: 6700 },
   kit: { name: "wedgie kit", what: "Every part and the case, a USB cable (USB-C and USB-A), and assembly instructions. You need a wire stripper, electrical tape, tweezers, and a stiff wire or pin.", cents: 5700 },
+  // The atomic wedgie (wedgie.dev/atomic): a battery inside, the red base, a RESET button. ATOMIC more than the plain one.
+  atomic: { name: "atomic wedgie", what: "Assembled, with a battery inside: runs with no cable. Red base, RESET button, plus a USB cable (USB-C and USB-A) to charge it. US only for now.", cents: 6700 + ATOMIC },
+  atomickit: { name: "atomic wedgie kit", what: "Every part, the battery and the red case, a USB cable (USB-C and USB-A), and assembly instructions. You need a wire stripper, electrical tape, tweezers, and a stiff wire or pin. US only for now.", cents: 5700 + ATOMIC },
 } as const;
 export type Item = keyof typeof ITEMS;
+export const ITEM_KEYS = Object.keys(ITEMS) as Item[];
+/** "wedgies", "kits": for "Only 2 kits left." and the stock line. */
+export const MANY: Record<Item, string> = { wedgie: "wedgies", kit: "kits", atomic: "atomic wedgies", atomickit: "atomic wedgie kits" };
+/** Boxes in a cart, all kinds together. A cart from before a kind existed has no count for it: 0. */
+export const boxes = (c: Partial<Record<Item, number>>) => ITEM_KEYS.reduce((t, k) => t + (c[k] || 0), 0);
 export type Cart = Record<Item, number> & { abroad?: boolean };   // abroad: ships outside the US (only that bit, never the country)
-export const MAX_EACH = 3, MAX_BOXES = 3;   // per order, wedgies and kits together (one person can't hold all the stock)
+export const MAX_EACH = 3, MAX_BOXES = 3;   // per order, every kind together (one person can't hold all the stock)
 export const ABROAD = 2000;
 export const SHIPS = "Ships within a week.";
+// A battery inside can go abroad, but the label must carry hazmat codes the label script doesn't send yet
+// (wedgie-shipping label.py; USPS Pub 52, Packaging Instruction 9E), and some countries refuse batteries. Until then: US only.
+export const US_ONLY: Item[] = ["atomic", "atomickit"];
+export const US_ONLY_NOTE = "Atomic wedgies ship in the US only for now (there's a battery inside).";
+/** Why this cart can't go abroad, or "". */
+export const noAbroad = (c: Partial<Cart>) => (c.abroad && US_ONLY.some((k) => (c[k] || 0) > 0) ? US_ONLY_NOTE : "");
 export const ABROAD_NOTE = "Outside the US: $20 shipping. You pay any import tax when it arrives.";
 
-// The price follows demand: each box sold adds BUMP to the next one (wedgies and kits together). That extra
+// The price follows demand: each box sold adds BUMP to the next one (every kind together: an atomic sale raises a plain wedgie too). That extra
 // melts away evenly, all of it 24 hours after the last sale, so a quiet day is back at $67. Whole cents,
 // rounded down. Open quotes count too (at their making), so six orders cost what one order of six does; a quote
 // that runs out unpaid stops counting. `extra` comes from api/.
@@ -29,7 +44,7 @@ export const nameOf = (i: Line["item"]) => i === "ship" ? "Shipping outside the 
 export function cartLines(c: Cart, extra: number): Line[] {
   const lines: Line[] = [];
   let x = extra;
-  for (const k of Object.keys(ITEMS) as Item[]) for (let i = 0; i < c[k]; i++, x += BUMP) {
+  for (const k of ITEM_KEYS) for (let i = 0; i < (c[k] || 0); i++, x += BUMP) {
     const cents = ITEMS[k].cents + x, last = lines[lines.length - 1];
     if (last?.item === k && last.cents === cents) last.qty++; else lines.push({ item: k, qty: 1, cents });
   }
@@ -40,7 +55,7 @@ export const cartCents = (c: Cart, extra: number) => cartLines(c, extra).reduce(
 export function cartOk(c: unknown): c is Cart {
   const o = c as Record<string, unknown>;
   if (!o || typeof o !== "object") return false;
-  const ns = (Object.keys(ITEMS) as Item[]).map((k) => o[k]);
+  const ns = ITEM_KEYS.map((k) => o[k] ?? 0);   // a page loaded before a kind existed doesn't send it
   if (o.abroad !== undefined && typeof o.abroad !== "boolean") return false;
   return ns.every((n) => Number.isInteger(n) && (n as number) >= 0 && (n as number) <= MAX_EACH) && ns.some((n) => (n as number) > 0)
     && ns.reduce((t: number, n) => t + (n as number), 0) <= MAX_BOXES;

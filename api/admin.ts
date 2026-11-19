@@ -10,7 +10,7 @@
 //                                wiped (mailed: false = it failed; the same POST again retries it)
 //   POST {id, cancel: true}      canceled (refund by hand), wiped the same way; new, paid or expired
 //   GET ?funnel=1                the checkout counts (api/count.ts) and orders by pay and status, last `days` (30); every canceled order
-//   POST {stock: n, item?}       n left to sell from now on (_shop.ts stockLeft); item wedgie or kit, none = both; 0 = sold out
+//   POST {stock: n, item?}       n left to sell from now on (_shop.ts stockLeft); item wedgie, kit, atomic or atomickit, none = all; 0 = sold out
 //   GET ?moving=1                shipped orders not delivered yet, 60 days back: {id, tracking, shipped_at, moving_at} (orders.py track)
 //   POST {id, step, at}          step "moving" or "delivered" (the buyer's order page shows it), at = when USPS said so.
 //                                Only the step and its time: never a place. Delivered wipes the sealed address
@@ -18,7 +18,7 @@
 // Each GET also marks paid the USDC orders made in the last 3 days, or with something sent, whose deposit address now
 // holds their price (older empty ones settle when their buyer opens the order page), and deletes what's done with: shipped or canceled orders and
 // unpaid or expired ones with nothing sent, 30 days on (a shipped box that never shows as delivered: 60 days, its
-// sealed address with it). GET ?stock=1: just the stock counts, {left: {wedgie, kit}}.
+// sealed address with it). GET ?stock=1: just the stock counts, {left: {wedgie, kit, atomic, atomickit}}.
 import { db, env, json, oops, same, settleDeposit, stockLeft, STOCK_ROW, endCard, type Order, crossSite, siteOf } from "./_shop.js";
 import type { Item } from "../src/shop/catalog.js";
 import { unlock, shippedMail, mailPaid, sendAlerts } from "./_mail.js";
@@ -55,8 +55,8 @@ export async function GET(req: Request) {
     or (status in ('new', 'expired') and coalesce(got, 0) = 0 and created < now() - interval '30 days') returning cart, status, paid_at),
     tally as (insert into counts (day, k, n) select current_date, 'shipped_gone', count(*)::int from gone where status = 'shipped'
       having count(*) > 0 on conflict (day, k) do update set n = counts.n + excluded.n)
-    update stock set n = n - coalesce((select sum(coalesce((cart->>(case stock.id when ${STOCK_ROW.wedgie} then 'wedgie' else 'kit' end))::int, 0)) from gone
-      where status = 'shipped' and paid_at >= stock.set_at), 0)::int where id in (${STOCK_ROW.wedgie}, ${STOCK_ROW.kit})`;
+    update stock set n = n - coalesce((select sum(coalesce((cart->>(case stock.id when ${STOCK_ROW.wedgie} then 'wedgie' when ${STOCK_ROW.kit} then 'kit' when ${STOCK_ROW.atomic} then 'atomic' else 'atomickit' end))::int, 0)) from gone
+      where status = 'shipped' and paid_at >= stock.set_at), 0)::int where id in (${STOCK_ROW.wedgie}, ${STOCK_ROW.kit}, ${STOCK_ROW.atomic}, ${STOCK_ROW.atomickit})`;
   // USDC sent to an order's deposit address after its buyer left the page still pays it
   const open = (await sql`select * from orders where pay = 'usdc' and deposit is not null and status in ('new', 'expired')
     and (created > now() - interval '3 days' or got > 0)`) as Order[];
@@ -76,7 +76,7 @@ export async function POST(req: Request) {
   const sql = await db();
   if (b?.stock !== undefined) {
     if (!Number.isInteger(b.stock) || b.stock < 0 || b.stock > 10000) return oops("Stock is a whole number, 0 or more.");
-    if (b.item !== undefined && !(b.item in STOCK_ROW)) return oops("item is wedgie or kit.");
+    if (b.item !== undefined && !(b.item in STOCK_ROW)) return oops("item is wedgie, kit, atomic or atomickit.");
     for (const k of (b.item ? [b.item] : Object.keys(STOCK_ROW)) as Item[])
       await sql`insert into stock (id, n, set_at) values (${STOCK_ROW[k]}, ${b.stock}, now()) on conflict (id) do update set n = excluded.n, set_at = excluded.set_at`;
     return json({ ok: true, left: await stockLeft(sql) });

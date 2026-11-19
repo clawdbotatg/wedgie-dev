@@ -239,6 +239,10 @@
       "destination": "/index.html"
     },
     {
+      "source": "/atomic",
+      "destination": "/index.html"
+    },
+    {
       "source": "/code",
       "destination": "/index.html"
     },

@@ -20,6 +20,8 @@ export type Wedgie3DOptions = {
   side?: number;
   /** Fly in when the page shows: tumbles at you from tiny, overshoots, sticks, wobbles back. */
   intro?: boolean;
+  /** Turned this much more (radians, about x and y), to show its side: the atomic wedgie's red base. */
+  pose?: { x: number; y: number };
 };
 
 export type Wedgie3D = {
@@ -231,6 +233,7 @@ export async function mountWedgie3D(el: HTMLElement, opts: Wedgie3DOptions = {})
     scroll += (sc - scroll) * 0.12;
     tilt.rotation.y = cur.x * 0.12 + scroll * 0.22 * side + Math.sin(t * 0.6 + side) * 0.012;
     tilt.rotation.x = -0.05 + cur.y * 0.08 + scroll * 0.28 + Math.sin(t * 0.45) * 0.01;
+    if (opts.pose) { tilt.rotation.x += opts.pose.x; tilt.rotation.y += opts.pose.y; }
     tilt.rotation.z = 0;
     if (introT < INTRO) {
       if (introStart < 0 && document.documentElement.classList.contains("ready")) introStart = performance.now();

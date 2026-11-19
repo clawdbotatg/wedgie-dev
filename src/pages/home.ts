@@ -3,6 +3,7 @@ import { place3D, pageShown } from "../ui/place3d";
 import { ITEMS, type Item } from "../shop/catalog";
 import { WHY, STAR, wire } from "../shop/why";
 import { blo } from "blo";
+import { atomicArt } from "../ui/atomic";
 
 // The Safe section's drawing: Safe's mark (from safe-global/safe-wallet-monorepo), two made-up owners, a key that turns into a wedgie.
 const SAFE_MARK = `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M21.757 11.998h-2.485c-.742 0-1.343.579-1.343 1.293v3.47c0 .714-.602 1.293-1.344 1.293H6.699c-.743 0-1.344.578-1.344 1.292v2.391c0 .714.601 1.293 1.344 1.293h10.458c.742 0 1.335-.579 1.335-1.293V19.82c0-.714.602-1.22 1.344-1.22h1.92c.743 0 1.344-.58 1.344-1.293v-4.03c0-.714-.601-1.278-1.343-1.278ZM5.355 7.249c0-.714.6-1.293 1.343-1.293h9.88c.743 0 1.344-.579 1.344-1.293v-2.39c0-.714-.601-1.293-1.344-1.293H6.125c-.742 0-1.343.579-1.343 1.293v1.842c0 .714-.602 1.292-1.344 1.292H1.526C.784 5.407.182 5.986.182 6.7v4.034c0 .714.604 1.264 1.346 1.264h2.485c.743 0 1.344-.579 1.344-1.293L5.355 7.25ZM10.472 9.485h2.387c.778 0 1.409.608 1.409 1.356v2.296c0 .748-.632 1.356-1.41 1.356h-2.386c-.778 0-1.409-.608-1.409-1.356v-2.296c0-.749.632-1.356 1.409-1.356Z"/></svg>`;
@@ -63,7 +64,7 @@ export function home(main: HTMLElement): Promise<unknown> {
         <p>A snap-together shell with no screws, designed from scratch and MIT licensed. PETG, 0.16 mm layers, 4 walls, no supports. Print the lid face down, the base floor down, and the caps flange down.</p>
         <p class="note bad"><b>The joystick needs <a href="https://github.com/clawdbotatg/clawd-pico-case/blob/main/stl/current/JOYSTICK-PRINT.md" target="_blank" rel="noopener">special settings</a>.</b> Printed like the rest, it comes out bad.</p>
         <div class="row"><a class="btn btn-sm" href="https://github.com/clawdbotatg/clawd-pico-case/tree/main/stl/current" target="_blank" rel="noopener">The case files →</a></div>
-        <p class="fine">White lid, black base, grey joystick; buttons 2 grey, 1 green, 1 red. <b>Atomic wedgie</b>: its own <a href="https://github.com/clawdbotatg/clawd-pico-case/tree/main/stl/atomic-wedgie" target="_blank" rel="noopener">base and RESET plunger</a>.</p>
+        <p class="fine">White lid, black base, grey joystick; buttons 2 grey, 1 green, 1 red. <b><a href="/atomic">Atomic wedgie</a></b>: its own <a href="https://github.com/clawdbotatg/clawd-pico-case/tree/main/stl/atomic-wedgie" target="_blank" rel="noopener">base and RESET plunger</a>.</p>
         <p class="fine">Source, measurements, and every iteration: <a href="https://github.com/clawdbotatg/clawd-pico-case" target="_blank" rel="noopener">clawd-pico-case</a>. Why it's called a wedgie: <a href="/lore.md" target="_blank">the lore</a>.</p>
       </div>
     </div>
@@ -96,6 +97,18 @@ export function home(main: HTMLElement): Promise<unknown> {
           <li class="o3"><img class="stx-av" src="${blo(OWNERS[2])}" alt=""><div><b>Owner 3</b><span class="stx-mono">${OWNERS[2].slice(0, 6)}…${OWNERS[2].slice(-4)}</span></div><span class="stx-wait">Not needed</span></li>
         </ol>
         <div class="stx-done">Executed</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="atomic" class="sec">
+    <div class="card wide atomic-card">
+      <a href="/atomic" id="atomic-art" aria-label="The atomic wedgie"></a>
+      <div>
+        <span class="kicker">New</span>
+        <h2>Cut the cord.</h2>
+        <p>The atomic wedgie has a battery inside. Sign anywhere, charge it over USB-C. Red base, RESET button, $${ITEMS.atomic.cents / 100}.</p>
+        <div class="row"><a class="btn btn-sm" href="/atomic">Meet the atomic wedgie →</a></div>
       </div>
     </div>
   </section>
@@ -256,6 +269,7 @@ export function home(main: HTMLElement): Promise<unknown> {
   main.querySelector<HTMLButtonElement>("#pop-emu")!.onclick = () => {
     if (!open("/virtual", "wedgie-emu", "popup,width=420,height=640")) location.href = "/virtual";
   };
+  atomicArt(main.querySelector<HTMLElement>("#atomic-art")!, { words: true });
   assembly(main.querySelector<HTMLElement>("#assembly")!);
   safeTx(main.querySelector<HTMLElement>(".stx")!);
   library(main.querySelector<HTMLElement>("#lib")!);
