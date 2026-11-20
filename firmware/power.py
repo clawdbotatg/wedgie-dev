@@ -9,18 +9,16 @@
 # Phone mode (0.3.37): while the WEDGIE drive is writable (a phone's knock: wedgiedrive.py) a phone
 # shows in the corner, until unplug.
 # Ship mode (0.3.88): hold the four front buttons (green, both grey, red) 10 s on battery and it's off till USB
-# comes: buttons can't wake it. USPS Pub 52 349.221: a device with a lithium battery mailed must have "effective
-# means of preventing it from being inadvertently turned on". A flag file (SHIP) keeps it off through a RESET
-# press in the mail; plugging in USB clears it and boots fresh.
+# comes: buttons can't wake it. All of it is in shipmode.py, loaded only then (0.3.90: in here it cost every
+# wedgie 1 KB of heap, and two installs on the virtual chip ran out). Here: the 10 s watch and a look for its flag.
 # Runs in one real Timer (never an app's: slot._RealTimer), every TICK_MS. Integers only: nothing grows.
-import os, sys, time, machine
+import sys, time, machine
 from machine import Pin, ADC
 import lcd as L
 import ui
 
 IDLE_MS = 20000
 SHIP_MS = 10000
-SHIP = "/.ship"                 # ship mode is on (survives a reset; USB clears it)
 TICK_MS = 1000
 BOX = (184, 2, 55, 11)          # x, y, w, h: the corner the battery takes
 # mV read at VSYS -> percent. Below the last: 0. Set from a real atomic wedgie (0.3.89; Austin, 11-20): after
@@ -91,10 +89,12 @@ def start(d, Timer):
             p.irq(_touch, Pin.IRQ_FALLING, hard=True)
         names = list(L.KEYS)
         _four = [_pins[names.index(k)] for k in ("A", "B", "X", "Y")]
-        if _flag():
-            if _vbus.value() == 0:
-                ship(quiet=True)                    # reset in the mail: back off, no screen
-            _flag(False)
+        try:
+            open("/.ship").close()                  # ship mode's flag (shipmode.py): a reset in the mail, or USB came
+            import shipmode
+            shipmode.boot()
+        except OSError:
+            pass
         _touch()
         L._on_frame = corner
         _tick()
@@ -162,55 +162,8 @@ def _ship_check():
         _held = now or 1
     elif time.ticks_diff(now, _held) >= SHIP_MS:
         _held = 0
-        ship()
-
-
-def _flag(on=None):
-    """Ship mode's file: on=None reads it, True writes it, False removes it. Never raises."""
-    try:
-        if on is None:
-            os.stat(SHIP)
-            return True
-        if on:
-            with open(SHIP, "w") as f:
-                f.write("1")
-        else:
-            os.remove(SHIP)
-    except OSError:
-        pass
-    return False
-
-
-def ship(quiet=False):
-    """Ship mode: screen and chip off until USB. No button can wake it; USB boots it fresh (machine.reset).
-    quiet: no screen (a reset while in ship mode)."""
-    d = _d
-    if not quiet:
-        ui.page(d, "Off", (("plug in USB to turn on", ui.MUTED),))
-        t = time.ticks_ms()
-        while _down() and time.ticks_diff(time.ticks_ms(), t) < 15000:
-            time.sleep_ms(10)                       # let go first
-        time.sleep_ms(2000)
-    _flag(True)
-    d.backlight(0)
-    _black(d)
-    d._cmd(0x28)                                    # panel: display off
-    d._cmd(0x10)                                    # panel: sleep in
-    if " W" not in sys.implementation._machine:
-        Pin(25).init(Pin.OUT, value=0)              # a Pico's own LED
-    while _vbus.value() == 0:                       # only USB ends it: a button that wakes the chip sleeps again
-        try:
-            if _gp24:
-                _wake(True, keys=False)
-                machine.lightsleep()                # dormant until GP24 (VBUS)
-            else:
-                machine.lightsleep(1000)            # VBUS on the radio (a Pico W): look each second
-        except Exception:
-            time.sleep_ms(1000)
-    if _gp24:
-        _wake(False)
-    _flag(False)
-    machine.reset()
+        import shipmode
+        shipmode.ship()
 
 
 def corner(d, x0, y0, x1, y1):
