@@ -8,7 +8,7 @@
 # is the app's. The slot starts it on a real board only (slot.run); the emulator has no battery.
 # Phone mode (0.3.37): while the WEDGIE drive is writable (a phone's knock: wedgiedrive.py) a phone
 # shows in the corner, until unplug.
-# Ship mode (0.3.50): hold the four front buttons (green, both grey, red) 10 s on battery and it's off till USB
+# Ship mode (0.3.88): hold the four front buttons (green, both grey, red) 10 s on battery and it's off till USB
 # comes: buttons can't wake it. USPS Pub 52 349.221: a device with a lithium battery mailed must have "effective
 # means of preventing it from being inadvertently turned on". A flag file (SHIP) keeps it off through a RESET
 # press in the mail; plugging in USB clears it and boots fresh.
