@@ -200,7 +200,7 @@
     },
     {
       "source": "/connect",
-      "destination": "/index.html"
+      "destination": "/connect.html"
     },
     {
       "source": "/connect/:id",
@@ -208,11 +208,11 @@
     },
     {
       "source": "/assemble",
-      "destination": "/index.html"
+      "destination": "/assemble.html"
     },
     {
       "source": "/assemble/3d",
-      "destination": "/index.html"
+      "destination": "/assemble-3d.html"
     },
     {
       "source": "/format",
@@ -220,11 +220,11 @@
     },
     {
       "source": "/test",
-      "destination": "/index.html"
+      "destination": "/test.html"
     },
     {
       "source": "/update",
-      "destination": "/index.html"
+      "destination": "/update.html"
     },
     {
       "source": "/prepare",
@@ -232,11 +232,11 @@
     },
     {
       "source": "/reset",
-      "destination": "/index.html"
+      "destination": "/reset.html"
     },
     {
       "source": "/build",
-      "destination": "/index.html"
+      "destination": "/build.html"
     },
     {
       "source": "/atomic",
@@ -252,7 +252,7 @@
     },
     {
       "source": "/safe",
-      "destination": "/index.html"
+      "destination": "/safe.html"
     },
     {
       "source": "/safe/:id",
@@ -264,11 +264,11 @@
     },
     {
       "source": "/secret",
-      "destination": "/index.html"
+      "destination": "/secret.html"
     },
     {
       "source": "/order",
-      "destination": "/index.html"
+      "destination": "/order.html"
     },
     {
       "source": "/order/:id",
@@ -288,19 +288,19 @@
     },
     {
       "source": "/terms",
-      "destination": "/index.html"
+      "destination": "/terms.html"
     },
     {
       "source": "/privacy",
-      "destination": "/index.html"
+      "destination": "/privacy.html"
     },
     {
       "source": "/virtual",
-      "destination": "/index.html"
+      "destination": "/virtual.html"
     },
     {
       "source": "/sandbox",
-      "destination": "/index.html"
+      "destination": "/sandbox.html"
     },
     {
       "source": "/dollar",
@@ -323,6 +323,17 @@
     {
       "source": "/emu",
       "destination": "/virtual",
+      "permanent": true
+    },
+    {
+      "source": "/((?!api/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "wedgie-dev.vercel.app"
+        }
+      ],
+      "destination": "https://wedgie.dev/$1",
       "permanent": true
     }
   ],

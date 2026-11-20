@@ -1,3 +1,4 @@
+import { TITLES } from "./pages/titles";
 import * as Drive from "./serial/drive";
 import "@fontsource-variable/nunito/wght.css";
 import "@fontsource/dm-mono/500.css";
@@ -53,9 +54,6 @@ const onSandbox = path === "/sandbox";       // paste a transaction, see a wedgi
 const onEmu = path === "/virtual" || path === "/emu";   // /emu: its old name
 if (path === "/emu") history.replaceState(null, "", "/virtual" + location.search);
 // Each page its own tab title (the first path part; /order/<id> is an order, /safe/<x> a Safe).
-const TITLES: Record<string, string> = { connect: "Connect", assemble: "Assemble", test: "Test", update: "Update", prepare: "Prepare", reset: "Reset", build: "Build", atomic: "Atomic wedgie",
-  code: "Code", debug: "Debug", safe: "Safe", secret: "Secret chat", order: "Order", orders: "Your orders", signin: "Sign in",
-  terms: "Terms", privacy: "Privacy", sandbox: "Clear signing sandbox", virtual: "Virtual wedgie", emu: "Virtual wedgie", telegram: "Telegram" };
 const title = TITLES[path.split("/")[1] || ""];
 if (title) document.title = `${title} · wedgie.dev`;
 const signedIn = !!session();
@@ -76,6 +74,7 @@ app.innerHTML = `
   <p>Hardware, case, firmware, and this site are MIT licensed. Build it, fork it, sell it.</p>
   ${path === "/order" ? "" : `<p><a class="btn btn-green" id="foot-order" href="/order">Order a wedgie →</a></p>`}
   <p><a class="btn btn-sm" href="https://github.com/clawdbotatg/wedgie-dev" target="_blank" rel="noopener">Code on GitHub →</a></p>
+  <p class="fine">Made by <a href="https://x.com/austingriffith" target="_blank" rel="noopener">Austin Griffith</a> and Gus Griffith.</p>
   <p class="fine">Sold by BuidlGuidl DAO LLC · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="mailto:wedgie@buidlguidl.com">wedgie@buidlguidl.com</a></p>
   <p class="fine"><a href="https://github.com/clawdbotatg/wedgie-dev" target="_blank" rel="noopener">site + firmware</a> ·
   <a href="https://github.com/clawdbotatg/clawd-pico-case" target="_blank" rel="noopener">case</a> ·

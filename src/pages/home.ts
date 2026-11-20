@@ -17,7 +17,7 @@ export function home(main: HTMLElement): Promise<unknown> {
   <section class="hero">
     <div class="hero-copy">
       <h1>Give<br>yourself<br><span class="nowrap">a wedgie.</span></h1>
-      <p class="lede">A pocket computer from three off-the-shelf parts: a Pico, a screen hat, and a secure chip
+      <p class="lede">A pocket computer and DIY hardware wallet from three off-the-shelf parts: a Pico, a screen hat, and a secure chip
       <em>wedged</em> in between. Make it a wallet, a game, or whatever you and your agent dream up.</p>
       <div class="row">
         <a class="btn btn-green" href="#build">Build your own</a>
@@ -75,7 +75,7 @@ export function home(main: HTMLElement): Promise<unknown> {
       <div class="signer-copy">
         <span class="kicker">Safe signer</span>
         <h2>Sign on a Safe.</h2>
-        <p>A wedgie can sign for a Safe multisig with Safe's own audited contracts. The key never leaves the chip, and nothing signs until you press the green button.</p>
+        <p>A wedgie is an open-source hardware signer for Ethereum. It signs for a Safe multisig with Safe's own audited contracts. The key never leaves the chip, and nothing signs until you press the green button.</p>
         <div class="row"><a class="btn btn-sm" href="/safe">Use it with a Safe →</a></div>
       </div>
       <div class="stx" aria-hidden="true">

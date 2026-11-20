@@ -1,6 +1,6 @@
 # wedgie.dev
 
-> A wedgie is an open-source pocket computer and hardware signer: a Raspberry Pi Pico, a Waveshare Pico-LCD-1.3 screen hat, and a secure chip wedged in between, running MicroPython and the wedgie firmware. MIT. Start with skill.md: it indexes every guide.
+> A wedgie is an open-source pocket computer and DIY Ethereum hardware wallet (a hardware signer for a Safe multisig), by Austin Griffith: a Raspberry Pi Pico, a Waveshare Pico-LCD-1.3 screen hat, and a secure chip wedged in between, running MicroPython and the wedgie firmware. MIT. Start with skill.md: it indexes every guide.
 
 ## Guides (each a skill file, markdown)
 

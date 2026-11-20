@@ -1,6 +1,6 @@
 # wedgie.dev
 
-Give yourself a wedgie: a pocket computer from three off-the-shelf parts (a Pico, a Waveshare
+Give yourself a wedgie: an open-source DIY Ethereum hardware wallet and pocket computer, by Austin Griffith. A hardware signer for a Safe multisig, from three off-the-shelf parts (a Pico, a Waveshare
 Pico-LCD-1.3 hat, and a secure chip wedged in between). This repo is the website: order one, build
 one, plug it in and put software on it, hand it to your agent.
 

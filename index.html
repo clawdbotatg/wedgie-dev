@@ -25,8 +25,10 @@ plausible.init({ endpoint: "/p/e", transformRequest: function (r) {
 } });
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>wedgie.dev</title>
-<meta name="description" content="Give yourself a wedgie: a pocket computer from three off-the-shelf parts. Order one, build one, plug it in and put software on it. MIT everything.">
+<title>wedgie: the open-source DIY Ethereum hardware wallet · wedgie.dev</title>
+<meta name="description" content="A wedgie is an open-source DIY Ethereum hardware wallet and signer by Austin Griffith: a Pico, a screen, a secure chip, no soldering. Build one or order one.">
+<meta name="author" content="Austin Griffith">
+<link rel="canonical" href="https://wedgie.dev/">
 <meta name="theme-color" content="#fefefe">
 <link rel="icon" href="/img/favicon.png">
 <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
@@ -44,6 +46,7 @@ plausible.init({ endpoint: "/p/e", transformRequest: function (r) {
 <meta name="twitter:description" content="A pocket computer with a crypto chip. Three off-the-shelf parts. MIT everything.">
 <meta name="twitter:image" content="https://wedgie.dev/img/og.png?v=5">
 <meta name="twitter:image:alt" content="A wedgie: a white 3D-printed pocket computer asking to sign a Safe transaction that sends 250 USDC.">
+<!--ld--><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://wedgie.dev/#org","name":"wedgie.dev","url":"https://wedgie.dev/","logo":"https://wedgie.dev/img/apple-touch-icon.png","email":"wedgie@buidlguidl.com","sameAs":["https://x.com/wedgiedev","https://github.com/clawdbotatg/wedgie-dev"],"founder":{"@id":"https://wedgie.dev/#austin"}},{"@type":"Person","@id":"https://wedgie.dev/#austin","name":"Austin Griffith","sameAs":["https://x.com/austingriffith","https://github.com/austintgriffith"]},{"@type":"WebSite","@id":"https://wedgie.dev/#site","url":"https://wedgie.dev/","name":"wedgie.dev","alternateName":["wedgie","wedgie hardware wallet"],"publisher":{"@id":"https://wedgie.dev/#org"}},{"@type":"Product","@id":"https://wedgie.dev/#wedgie","name":"wedgie","alternateName":["wedgie hardware wallet","wedgie hardware signer"],"category":"Hardware wallet","url":"https://wedgie.dev/","image":"https://wedgie.dev/img/og.png?v=5","description":"An open-source DIY Ethereum hardware wallet and hardware signer: a Raspberry Pi Pico, a Waveshare Pico-LCD-1.3 screen and a secure chip, no soldering. It signs for a Safe multisig; the key never leaves the chip and nothing signs without a press of the green button. Sold assembled or as a kit. MIT.","brand":{"@type":"Brand","name":"wedgie"},"manufacturer":{"@id":"https://wedgie.dev/#org"},"offers":{"@type":"AggregateOffer","priceCurrency":"USD","lowPrice":"%PRICE_KIT%","offerCount":2,"url":"https://wedgie.dev/order"}}]}</script><!--/ld-->
 <style>
 /* The loader. Same picture as the device's boot screen (picowallet firmware/splash.py + loader.py):
    the logo box 96x77 above the plastic bar shell 150x30, 15 px apart, on white. All sizes are
@@ -69,6 +72,8 @@ html, body { margin: 0; background: #fefefe; }
   background: linear-gradient(rgba(255,255,255,.2), rgba(255,255,255,0)); }
 #wl.done .fill { background: linear-gradient(#46cd64, #168c34); }
 #wl .fill.empty { visibility: hidden; }
+/* What a crawler that runs no JavaScript reads. Under the loader; main.ts draws over it. */
+#app > .pre { height: 100vh; overflow: hidden; }
 #wl noscript, #wl .msg { position: absolute; bottom: 24px; font: 15px/1.4 system-ui, sans-serif; color: #6b6e6b; text-align: center; padding: 0 16px; }
 </style>
 </head>
@@ -80,7 +85,28 @@ html, body { margin: 0; background: #fefefe; }
   </div>
   <noscript>wedgie.dev needs JavaScript.</noscript>
 </div>
-<div id="app"></div>
+<div id="app"><!--pre--><div class="pre">
+<h1>wedgie: an open-source DIY Ethereum hardware wallet</h1>
+<p>A wedgie is a pocket computer and hardware wallet you can build yourself, by Austin Griffith and Gus Griffith. Three off-the-shelf parts, no soldering: a Raspberry Pi Pico, a Waveshare Pico-LCD-1.3 screen hat, and a secure chip (Infineon OPTIGA Trust M) wedged in between.</p>
+<h2>A hardware signer for a Safe</h2>
+<p>A wedgie is a hardware signer for Ethereum. It signs for a Safe multisig with Safe's own audited contracts. The key is made inside the secure chip and never leaves it. Nothing signs until you press the green button, and the wedgie's own screen says what the transaction does (clear signing, ERC-7730).</p>
+<h2>Build one or buy one</h2>
+<p>Order the parts anywhere and print the case, or order a wedgie assembled or as a kit. Card or USDC. Hardware, case, firmware and this site are MIT licensed: build it, fork it, sell it.</p>
+<h2>More than a wallet</h2>
+<p>It runs MicroPython. Games, tools and apps install from wedgie.dev, and anyone can write one.</p>
+<ul>
+<li><a href="/order">Order a wedgie hardware wallet</a></li>
+<li><a href="/assemble">Assemble a wedgie: build your own hardware wallet</a></li>
+<li><a href="/safe">Sign a Safe multisig with a wedgie</a></li>
+<li><a href="/virtual">Virtual wedgie: try it in your browser</a></li>
+<li><a href="/sandbox">Clear signing sandbox</a></li>
+<li><a href="/clear">Clear signing on a wedgie</a></li>
+<li><a href="/connect">Connect your wedgie</a></li>
+<li><a href="/security.md">Is a wedgie safe?</a></li>
+<li><a href="/skill.md">skill.md: every guide, for you and your agent</a></li>
+<li><a href="https://github.com/clawdbotatg/wedgie-dev">Source on GitHub</a></li>
+</ul>
+</div><!--/pre--></div>
 <script>
 // Fetch everything the site needs with byte progress, fill the bar grey by bytes, then load the app,
 // turn the bar green, and go. Mirrors firmware/loader.py: fill by each file's share of the
