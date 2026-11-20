@@ -132,7 +132,8 @@ https://wedgie.dev/virtual.md
 - `print()` goes to USB (Output on /code, the terminal for `wedgie.py run`). Don't read stdin: USB is
   the firmware's unless `"usb": true`.
 - On a battery (no USB), the firmware draws the charge in the top-right corner and sleeps after 20 s
-  with no press. The press that wakes it never reaches your app.
+  with no press. The press that wakes it never reaches your app. That's the atomic wedgie (wedgie.dev/atomic):
+  unplugged it has no USB and no internet (`net` fails), so a game that should play there must work offline.
 - A thin red border on every screen means a computer had full control since the files were last as
   signed. That's the firmware's, not a bug in your app.
 

@@ -84,6 +84,9 @@ const CARDS: Record<string, { url: string; title: string; desc: string; img: str
   claim: { url: "https://wedgie.dev/claim", title: "Free wedgie for CLAWD stakers.",
     desc: "Staked CLAWD on larv.ai? Burn CV for a free wedgie, shipped. One per wallet.",
     img: "https://wedgie.dev/img/og-claim.png?v=1", alt: "Clawd, the red diamond in a tuxedo, holding up a wedgie with a pixel heart on its screen, next to the words Free wedgie." },
+  atomic: { url: "https://wedgie.dev/atomic", title: "Atomic wedgie.",
+    desc: "A wedgie with a battery inside. Air-gapped games, anywhere. Plug it in to sign.",
+    img: "https://wedgie.dev/img/og-atomic.png?v=1", alt: "A wedgie on a red base in front of a yellow comic burst, next to the words Atomic wedgie." },
 };
 function cards(): Plugin {
   return {

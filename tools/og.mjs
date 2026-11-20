@@ -1,14 +1,15 @@
 // Renders the social card: tools/og/index.html (the 3D wedgie signing a Safe USDC send) -> public/img/og.png.
 // `cover` renders the X header instead: tools/cover/index.html -> public/img/cover.png (1500x500, at 2x).
 // `claim` renders the /claim card: tools/og/claim/index.html -> public/img/og-claim.png.
-// Run the dev server first (npx vite), then: node tools/og.mjs [cover|claim] [url]
+// `atomic` renders the /atomic card: tools/og/atomic/index.html -> public/img/og-atomic.png.
+// Run the dev server first (npx vite), then: node tools/og.mjs [cover|claim|atomic] [url]
 import { chromium } from "playwright-core";
 import { readdirSync } from "node:fs";
 import { homedir } from "node:os";
 
-const cover = process.argv[2] === "cover", claim = process.argv[2] === "claim";
-const url = process.argv[cover || claim ? 3 : 2] || `http://localhost:5173/tools/${cover ? "cover" : claim ? "og/claim" : "og"}/`;
-const out = `public/img/${cover ? "cover" : claim ? "og-claim" : "og"}.png`;
+const cover = process.argv[2] === "cover", claim = process.argv[2] === "claim", atomic = process.argv[2] === "atomic";
+const url = process.argv[cover || claim || atomic ? 3 : 2] || `http://localhost:5173/tools/${cover ? "cover" : claim ? "og/claim" : atomic ? "og/atomic" : "og"}/`;
+const out = `public/img/${cover ? "cover" : claim ? "og-claim" : atomic ? "og-atomic" : "og"}.png`;
 const cache = homedir() + "/Library/Caches/ms-playwright";
 const shell = readdirSync(cache).filter((d) => d.startsWith("chromium_headless_shell-")).sort().reverse()[0];
 const browser = await chromium.launch({ executablePath: `${cache}/${shell}/${process.platform === "linux" ? "chrome-headless-shell-linux64" : "chrome-headless-shell-mac-arm64"}/chrome-headless-shell`, args: ["--use-angle=metal"] });

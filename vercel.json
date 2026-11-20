@@ -240,7 +240,7 @@
     },
     {
       "source": "/atomic",
-      "destination": "/index.html"
+      "destination": "/atomic.html"
     },
     {
       "source": "/code",

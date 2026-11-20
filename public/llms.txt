@@ -6,9 +6,9 @@
 
 - [skill.md](https://wedgie.dev/skill.md): start here. What a wedgie is, every guide, the apps, every page, Instant Wallet
 - [usb.md](https://wedgie.dev/usb.md): talk to a plugged-in wedgie: wedgie.py, the lock, every USB request
-- [build.md](https://wedgie.dev/build.md): build or fix one: parts, assembly, wiring, pinout, case, troubleshooting
+- [build.md](https://wedgie.dev/build.md): build or fix one: parts, assembly, wiring, pinout, case, troubleshooting; the atomic wedgie (a battery inside: plays unplugged, air-gapped, plug in to sign)
 - [safe.md](https://wedgie.dev/safe.md): a wedgie as a Safe signer, wedgie.dev/safe, clear signing, Instant Wallet
-- [shop.md](https://wedgie.dev/shop.md): buy one: prices, what's in the box, shipping, card or USDC
+- [shop.md](https://wedgie.dev/shop.md): buy one: wedgie, kit, atomic wedgie, atomic kit; prices, what's in the box, shipping, card or USDC
 - [virtual.md](https://wedgie.dev/virtual.md): the virtual wedgie in a browser tab
 - [security.md](https://wedgie.dev/security.md): is it safe, exactly how, known gaps
 - [code.md](https://wedgie.dev/code.md): make apps and games; apps can use the internet (net): sites over the wedgie's own TLS, chain reads through wedgie.dev

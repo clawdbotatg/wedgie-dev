@@ -144,6 +144,32 @@ A snap-together printed shell, no screws, MIT: https://github.com/clawdbotatg/cl
   with a RESET plunger: https://github.com/clawdbotatg/clawd-pico-case/tree/main/stl/atomic-wedgie
 - A hole in the base reaches BOOTSEL. A pry notch on one side opens it.
 
+## The atomic wedgie (a battery inside)
+
+The page: https://wedgie.dev/atomic. It plays unplugged and is air-gapped (no Wi-Fi, no Bluetooth): signing,
+installing and anything online still need the USB cable. Plugged in, it's a wedgie like any other.
+
+| Part | What | Where |
+|---|---|---|
+| Board (where the Pico goes) | **Waveshare RP2040-Plus**, with headers: Pico-shaped, with an MX1.25 battery plug, a charger, USB-C, BOOT and RESET buttons. A plain Pico has no battery plug | https://www.waveshare.com/rp2040-plus.htm |
+| Battery | **601120 LiPo**: 3.7 V, 100 mAh (0.37 Wh), 6 x 11 x 20 mm, 2-pin MX1.25 plug | search "601120 lipo 100mAh 1.25mm" |
+| Base | the atomic base, printed red | https://github.com/clawdbotatg/clawd-pico-case/tree/main/stl/atomic-wedgie |
+| RESET plunger | one, printed black | the same folder |
+| Screen hat, chip, cable, lid, joystick, 4 buttons | the same as every wedgie | Parts, above |
+
+- **Check the battery's polarity before plugging it in:** its red wire must land on the board's **+**. Some
+  batteries come wired backwards, and that can damage the board.
+- **Build it** like any wedgie (the steps above, the RP2040-Plus where the Pico goes), with two more steps:
+  1. First, drop the RESET plunger into its hole from inside the red base, flange up.
+  2. Before the lid goes on, plug the battery into the board. Its wire runs in the channel at the end of the
+     base, away from the USB.
+- **On the battery** (firmware 0.3.28+): the charge shows top right, drawn over the app. After 20 s with no press the
+  screen goes off and the chip sleeps; any button wakes it, and that press goes to nobody. Plugging in USB wakes it too.
+- **Charging:** plug in USB-C. It charges while it works. On USB the charge isn't shown (the board can't read the
+  battery then).
+- **RESET** restarts it. With a battery inside, pulling the cable no longer does.
+- **Set it up** over USB like any wedgie (wedgie.dev/connect). Put a game on it, then unplug.
+
 ## Taking it apart and putting it back
 
 Open at the pry notch, lift the lid (caps may fall out), lift the board stack out. Pull the Pico and the screen
@@ -201,6 +227,6 @@ recovery. A reflash, /reset or /test never erases the chip.
 
 - 3.3 V logic; GPIOs are **not 5 V tolerant**. Power is USB (5 V on VBUS); the 3V3 pin gives a few hundred mA.
 - Screen 240x240, 16-bit panel; the firmware draws in 16 colors (a 29 KB buffer); a full-screen push is ~25 ms.
-- No battery built in. A LiPo on VSYS works: off USB the firmware (0.3.28+) shows the charge top right and sleeps
+- No battery built in, except the atomic wedgie (above). A LiPo on VSYS works: off USB the firmware (0.3.28+) shows the charge top right and sleeps
   after 20 s with no press; any button or USB wakes it, and that press goes to nobody.
 - No real-time clock. WiFi only on W boards (never used by wallet apps).

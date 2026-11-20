@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>atomic wedgie og card</title>
+<!-- The /atomic social card (public/img/og-atomic.png), rendered by `node tools/og.mjs atomic`: the site's own
+     picture of the atomic wedgie (src/ui/atomic.ts) beside its name. 1200x630, dev server only. -->
+<style>
+  html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; background: #f9f8f5; }
+  body { font-family: "Nunito Variable", sans-serif; color: #1a1b1a; position: relative; --ink: #1a1b1a; --card: #fff; --coral: #e3312c; }
+  #art { position: absolute; right: 10px; top: 40px; width: 640px; height: 520px; }
+  #art .atom-dev { width: 520px; }
+  .copy { position: absolute; left: 70px; top: 0; bottom: 26px; width: 520px; display: flex; flex-direction: column; justify-content: center; }
+  h1 { margin: 0; font-size: 118px; line-height: .88; transform: rotate(-3deg); transform-origin: left bottom; -webkit-text-stroke-width: 4px !important; text-shadow: 7px 8px 0 var(--ink) !important; }
+  h1 i { display: block; font-style: inherit; color: var(--coral); }
+  p { margin: 34px 0 0; font-weight: 700; font-size: 29px; line-height: 1.3; color: #6b6e6b; }
+  .tag { margin-top: 28px; align-self: flex-start; display: flex; align-items: center; gap: 14px;
+    background: #fff; border-radius: 14px; padding: 9px 20px 9px 12px; font-weight: 800; font-size: 30px;
+    box-shadow: inset 0 -2px 0 #e7e7e3, 0 3px 10px rgba(0,0,0,.1); }
+  .tag img { width: 56px; height: 43px; }
+  .stripes { position: absolute; left: 0; right: 0; bottom: 0; height: 26px; background: #fff;
+    background-image: linear-gradient(#fff 5px, #22c452 5px 11px, #fff 11px 13px, #a9aaa8 13px 17px, #fff 17px 19px, #e3312c 19px 25px, #fff 25px); }
+</style>
+</head>
+<body>
+  <div id="art"></div>
+  <div class="copy">
+    <h1 class="atom-title"><i>Atomic</i>wedgie.</h1>
+    <p>A battery inside.<br>Air-gapped games, anywhere.</p>
+    <div class="tag"><img src="/img/sticker.webp" alt="">wedgie.dev/atomic</div>
+  </div>
+  <div class="stripes"></div>
+  <script type="module">
+    import "@fontsource-variable/nunito/wght.css";
+    import { atomicArt } from "/src/ui/atomic.ts";
+    atomicArt(document.getElementById("art"), { eager: true }).catch((e) => console.error(e));
+    await document.fonts.load("900 118px 'Nunito Variable'");
+    setTimeout(() => { window.ready = true; }, 6000);     // the wedgie, its screen's picture and the first frames
+  </script>
+</body>
+</html>
