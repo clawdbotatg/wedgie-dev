@@ -1,5 +1,5 @@
 // The atomic wedgie's picture (the front page and /atomic): a 1940s comic burst, electron orbits, and the 3D wedgie
-// on its red base, signing on a Safe with no cable. The burst is drawn here (an SVG), the wedgie is the real one
+// on its red base, playing a game with no cable (it can't sign unplugged: no radio). The burst is drawn here (an SVG), the wedgie is the real one
 // (place3d.ts) with its base reprinted red.
 import "./atomic.css";
 import { place3D } from "./place3d";
@@ -41,8 +41,8 @@ const ART = `<svg class="atom-burst" viewBox="-260 -200 520 400" aria-hidden="tr
 export function atomicArt(el: HTMLElement, opts: { words?: boolean; eager?: boolean } = {}) {
   el.classList.add("atom-art");
   el.innerHTML = `${ART}<div class="atom-dev"></div>${opts.words ? `<div class="atom-words" aria-hidden="true"><b>Atomic</b><b>wedgie!</b></div>` : ""}<span class="atom-pow" aria-hidden="true">No cord!</span>`;
-  // A picture, not a toy (clicks go to the link around it): the Safe Signer's home, then a transaction to sign.
+  // A picture, not a toy (clicks go to the link around it): games, what it does unplugged. Never a signing screen.
   return place3D(el.querySelector<HTMLElement>(".atom-dev")!, { interactive: false, eager: opts.eager, side: -1, pose: { x: -0.42, y: 0.32 },
-    screens: ["/screens/safe-home.png", "/screens/safe-sign.png"], fallback: { kind: "off" } })
+    screens: ["/screens/frog.png", "/screens/bunker.png", "/screens/frog-eat.png", "/screens/bunker-2.png"], fallback: { kind: "off" } })
     .then((w) => { w?.setColor("base", ATOMIC_RED); return w; });
 }
