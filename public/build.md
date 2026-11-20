@@ -152,7 +152,7 @@ installing and anything online still need the USB cable. Plugged in, it's a wedg
 | Part | What | Where |
 |---|---|---|
 | Board (where the Pico goes) | **Waveshare RP2040-Plus**, the one with the **pre-soldered header** (shops sell it bare too; pick the header option): Pico-shaped, with an MX1.25 battery plug, a charger, USB-C, BOOT and RESET buttons. A plain Pico has no battery plug | Waveshare https://www.waveshare.com/rp2040-plus.htm · Amazon https://www.amazon.com/dp/B09LT5KPVX · The Pi Hut https://thepihut.com/products/rp2040-plus · Amazon.ca https://www.amazon.ca/dp/B09NMLRS3T · GRobotronics https://grobotronics.com/waveshare-rp2040-plus.html?sl=en |
-| Battery | **601120 LiPo**: 3.7 V, 100 mAh (0.37 Wh), 6 x 11 x 20 mm, 2-pin MX1.25 plug | Amazon: search "601120 1.25" (https://www.amazon.com/s?k=601120+lipo+1.25), e.g. https://www.amazon.com/dp/B0FT3BBSYB · https://www.amazon.com/dp/B0FRFPH2D9 · https://www.amazon.com/dp/B0GHYLX6DC (2-pack). Get the 1.25 mm plug: many are sold with 2.0 mm |
+| Battery | **601120 LiPo**: 3.7 V, 100 mAh (0.37 Wh), 6 x 11 x 20 mm, 2-pin MX1.25 plug | The one we use: https://www.amazon.com/dp/B0HHW5QJ64. Or search Amazon for "601120 1.25" (https://www.amazon.com/s?k=601120+lipo+1.25), e.g. https://www.amazon.com/dp/B0FT3BBSYB · https://www.amazon.com/dp/B0FRFPH2D9 · https://www.amazon.com/dp/B0GHYLX6DC (2-pack). Get the 1.25 mm plug: many are sold with 2.0 mm |
 | Base | the atomic base, printed red | https://github.com/clawdbotatg/clawd-pico-case/tree/main/stl/atomic-wedgie |
 | RESET plunger | one, printed black | the same folder |
 | Screen hat, chip, cable, lid, joystick, 4 buttons | the same as every wedgie | Parts, above |
