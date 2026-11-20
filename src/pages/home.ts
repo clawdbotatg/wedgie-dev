@@ -107,7 +107,7 @@ export function home(main: HTMLElement): Promise<unknown> {
       <div>
         <span class="kicker">New</span>
         <h2>Cut the cord.</h2>
-        <p>The atomic wedgie has a battery inside. Play its games anywhere; plug it in to sign or go online. Red base, RESET button, $${ITEMS.atomic.cents / 100}.</p>
+        <p>The atomic wedgie has a battery inside. Air-gapped games, anywhere. Plug it in to sign. $${ITEMS.atomic.cents / 100}.</p>
         <div class="row"><a class="btn btn-sm" href="/atomic">Meet the atomic wedgie →</a></div>
       </div>
     </div>

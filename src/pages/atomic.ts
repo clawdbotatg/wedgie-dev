@@ -1,5 +1,5 @@
 // /atomic: the atomic wedgie. What it's for (Austin, 11-19): playing away from the computer. It has no Wi-Fi or
-// Bluetooth, so signing and anything online still need the cable: never say "sign anywhere".
+// Bluetooth, so signing and anything online still need the cable: never say "sign anywhere". The word for it: air-gapped.
 // A wedgie with a battery inside: a Waveshare RP2040-Plus for the Pico, a small LiPo,
 // the red base and a RESET button. What's different, where to get the parts, how to build one, and where to order.
 // The shop's side: src/shop/catalog.ts (atomic, atomickit). The picture: ui/atomic.ts.
@@ -26,7 +26,7 @@ export function atomic(main: HTMLElement): Promise<unknown> {
   <section class="hero atomic-hero">
     <div class="hero-copy">
       <h1 class="atom-title"><i>Atomic</i>wedgie.</h1>
-      <p class="lede">A wedgie with a battery inside. Play its games on the couch, in the car, or in the bunker. Signing and anything online still need the cable.</p>
+      <p class="lede">A wedgie with a battery inside. Air-gapped games, anywhere. Plug it in to sign.</p>
       <div class="row">
         <a class="btn btn-green" href="#build">Build your own</a>
         <a class="btn" href="#get">Get one · ${usd(ITEMS.atomic.cents)}<span class="surge">*</span></a>
@@ -45,7 +45,7 @@ export function atomic(main: HTMLElement): Promise<unknown> {
     </div>
     <div class="atomic-facts">
       <div class="card"><h3>Runs on its own</h3><p>Unplug it and the game keeps going. The charge shows in the top right corner. After 20 seconds with no press the screen goes off; any button wakes it.</p></div>
-      <div class="card"><h3>Plug in to go online</h3><p>It has no Wi-Fi or Bluetooth. Signing, installing apps, and anything online need the USB-C cable, like any wedgie. It charges while it's plugged in.</p></div>
+      <div class="card"><h3>Air-gapped</h3><p>No Wi-Fi, no Bluetooth. Plug in the USB-C cable to sign, install apps, or charge.</p></div>
       <div class="card"><h3>A RESET button</h3><p>It pokes through the red base. Press it to restart the wedgie: with a battery inside, pulling the cable no longer does.</p></div>
     </div>
   </section>

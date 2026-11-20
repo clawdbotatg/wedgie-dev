@@ -6,7 +6,7 @@ export const ITEMS = {
   wedgie: { name: "wedgie", what: "Assembled: pico, screen, chip, and case, plus a USB cable (USB-C and USB-A). Plug it in and go.", cents: 6700 },
   kit: { name: "wedgie kit", what: "Every part and the case, a USB cable (USB-C and USB-A), and assembly instructions. You need a wire stripper, electrical tape, tweezers, and a stiff wire or pin.", cents: 5700 },
   // The atomic wedgie (wedgie.dev/atomic): a battery inside, the red base, a RESET button. ATOMIC more than the plain one.
-  atomic: { name: "atomic wedgie", what: "Assembled, with a battery inside: games play with no cable (signing still needs it). Red base, RESET button, plus a USB cable (USB-C and USB-A) to charge it. US only for now.", cents: 6700 + ATOMIC },
+  atomic: { name: "atomic wedgie", what: "Assembled, with a battery inside: air-gapped games with no cable (plug in to sign). Red base, RESET button, plus a USB cable (USB-C and USB-A) to charge it. US only for now.", cents: 6700 + ATOMIC },
   atomickit: { name: "atomic wedgie kit", what: "Every part, the battery and the red case, a USB cable (USB-C and USB-A), and assembly instructions. You need a wire stripper, electrical tape, tweezers, and a stiff wire or pin. US only for now.", cents: 5700 + ATOMIC },
 } as const;
 export type Item = keyof typeof ITEMS;

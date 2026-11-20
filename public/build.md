@@ -139,7 +139,7 @@ A snap-together printed shell, no screws, MIT: https://github.com/clawdbotatg/cl
   Printed like the rest, it comes out bad.
 - **Colors:** white lid, black base, grey joystick; buttons 2 grey, 1 green (A), 1 red (Y). The buttons carry no
   letters: to people, A is "the green button", Y "the red button", B and X "the grey buttons".
-- **Atomic wedgie** (https://wedgie.dev/atomic): a wedgie with a battery inside, for playing unplugged (no radio: signing and anything online still need the cable). A Waveshare RP2040-Plus where the Pico goes
+- **Atomic wedgie** (https://wedgie.dev/atomic): a wedgie with a battery inside, for air-gapped games unplugged (no radio: plug it in to sign or go online). A Waveshare RP2040-Plus where the Pico goes
   (battery plug, charger, USB-C, RESET button), a 601120 LiPo (3.7 V, 100 mAh, MX1.25 plug), and its own red base
   with a RESET plunger: https://github.com/clawdbotatg/clawd-pico-case/tree/main/stl/atomic-wedgie
 - A hole in the base reaches BOOTSEL. A pry notch on one side opens it.
