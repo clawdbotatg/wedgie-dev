@@ -152,7 +152,7 @@ installing and anything online still need the USB cable. Plugged in, it's a wedg
 | Part | What | Where |
 |---|---|---|
 | Board (where the Pico goes) | **Waveshare RP2040-Plus**, with headers: Pico-shaped, with an MX1.25 battery plug, a charger, USB-C, BOOT and RESET buttons. A plain Pico has no battery plug | https://www.waveshare.com/rp2040-plus.htm |
-| Battery | **601120 LiPo**: 3.7 V, 100 mAh (0.37 Wh), 6 x 11 x 20 mm, 2-pin MX1.25 plug | search "601120 lipo 100mAh 1.25mm" |
+| Battery | **601120 LiPo**: 3.7 V, 100 mAh (0.37 Wh), 6 x 11 x 20 mm, 2-pin MX1.25 plug | Amazon: search "601120 1.25" (https://www.amazon.com/s?k=601120+lipo+1.25) |
 | Base | the atomic base, printed red | https://github.com/clawdbotatg/clawd-pico-case/tree/main/stl/atomic-wedgie |
 | RESET plunger | one, printed black | the same folder |
 | Screen hat, chip, cable, lid, joystick, 4 buttons | the same as every wedgie | Parts, above |
