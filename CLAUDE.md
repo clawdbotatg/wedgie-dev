@@ -19,6 +19,13 @@ background tab) or `node tools/sign.mjs --gate-only` (firmware/apps). A FAIL mea
   Our own descriptors live in clawdbotatg/clear-descriptors (a checkout beside this repo), never here; write them
   there, then PR them to the EF registry.
 
+## The atomic wedgie (wedgie.dev/atomic)
+
+A wedgie with a battery inside: Waveshare RP2040-Plus, a 601120 LiPo, the red base, a RESET plunger. Shop items `atomic`
+and `atomickit` ($10 more, own stock, shared surge, US only: `src/shop/catalog.ts`). The picture: `src/ui/atomic.ts`.
+**Words (Austin, 11-19):** it plays unplugged and it's air-gapped (no Wi-Fi, no Bluetooth). It can't sign unplugged:
+never "sign anywhere", never a signing screen in its picture. "Plug it in to sign."
+
 ## Accounts
 
 X [@wedgiedev](https://x.com/wedgiedev) (log in with Google), Gmail wedgie@buidlguidl.com, ENS wedgie.eth,
