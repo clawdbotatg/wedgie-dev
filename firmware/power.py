@@ -8,13 +8,19 @@
 # is the app's. The slot starts it on a real board only (slot.run); the emulator has no battery.
 # Phone mode (0.3.37): while the WEDGIE drive is writable (a phone's knock: wedgiedrive.py) a phone
 # shows in the corner, until unplug.
+# Ship mode (0.3.50): hold the four front buttons (green, both grey, red) 10 s on battery and it's off till USB
+# comes: buttons can't wake it. USPS Pub 52 349.221: a device with a lithium battery mailed must have "effective
+# means of preventing it from being inadvertently turned on". A flag file (SHIP) keeps it off through a RESET
+# press in the mail; plugging in USB clears it and boots fresh.
 # Runs in one real Timer (never an app's: slot._RealTimer), every TICK_MS. Integers only: nothing grows.
-import sys, time, machine
+import os, sys, time, machine
 from machine import Pin, ADC
 import lcd as L
 import ui
 
 IDLE_MS = 20000
+SHIP_MS = 10000
+SHIP = "/.ship"                 # ship mode is on (survives a reset; USB clears it)
 TICK_MS = 1000
 BOX = (184, 2, 55, 11)          # x, y, w, h: the corner the battery takes
 # LiPo volts (mV at VSYS) -> percent, resting. Below the last: 0.
@@ -30,6 +36,8 @@ _t = None
 _vbus = None
 _adc = None
 _pins = ()
+_four = ()          # the front buttons (A B X Y): all held SHIP_MS = ship mode
+_held = 0           # ticks_ms when all four went down (0: they aren't)
 _gp24 = False       # VBUS is GP24, so it can wake the chip from dormant
 phone = False       # phone mode is on: the corner shows a phone
 
@@ -66,7 +74,7 @@ def _percent(mv):
 
 def start(d, Timer):
     """Watch the power from now on. d: the slot's LCD. Never raises: a board it can't read runs as before."""
-    global _d, _t, _vbus, _adc, _pins, _gp24
+    global _d, _t, _vbus, _adc, _pins, _gp24, _four
     try:
         _d = d
         try:
@@ -78,6 +86,12 @@ def start(d, Timer):
         _pins = [Pin(p, Pin.IN, Pin.PULL_UP) for p in L.KEYS.values()]
         for p in _pins:                             # any press is activity, whatever reads the keys
             p.irq(_touch, Pin.IRQ_FALLING, hard=True)
+        names = list(L.KEYS)
+        _four = [_pins[names.index(k)] for k in ("A", "B", "X", "Y")]
+        if _flag():
+            if _vbus.value() == 0:
+                ship(quiet=True)                    # reset in the mail: back off, no screen
+            _flag(False)
         _touch()
         L._on_frame = corner
         _tick()
@@ -122,8 +136,74 @@ def _tick(_=None):
         return
     if (on_battery != was or pct != before) and not L._on_show:
         _d.show_rect(*BOX)                          # a still screen gets it too (corner() draws it)
+    _ship_check()
     if on_battery and time.ticks_diff(time.ticks_ms(), _last) > IDLE_MS:
         sleep()
+
+
+def _ship_check():
+    global _held
+    if not (on_battery and _four):
+        _held = 0
+        return
+    for p in _four:
+        if p.value():
+            _held = 0
+            return
+    now = time.ticks_ms()
+    if not _held:
+        _held = now or 1
+    elif time.ticks_diff(now, _held) >= SHIP_MS:
+        _held = 0
+        ship()
+
+
+def _flag(on=None):
+    """Ship mode's file: on=None reads it, True writes it, False removes it. Never raises."""
+    try:
+        if on is None:
+            os.stat(SHIP)
+            return True
+        if on:
+            with open(SHIP, "w") as f:
+                f.write("1")
+        else:
+            os.remove(SHIP)
+    except OSError:
+        pass
+    return False
+
+
+def ship(quiet=False):
+    """Ship mode: screen and chip off until USB. No button can wake it; USB boots it fresh (machine.reset).
+    quiet: no screen (a reset while in ship mode)."""
+    d = _d
+    if not quiet:
+        ui.page(d, "Off", (("plug in USB to turn on", ui.MUTED),))
+        t = time.ticks_ms()
+        while _down() and time.ticks_diff(time.ticks_ms(), t) < 15000:
+            time.sleep_ms(10)                       # let go first
+        time.sleep_ms(2000)
+    _flag(True)
+    d.backlight(0)
+    _black(d)
+    d._cmd(0x28)                                    # panel: display off
+    d._cmd(0x10)                                    # panel: sleep in
+    if " W" not in sys.implementation._machine:
+        Pin(25).init(Pin.OUT, value=0)              # a Pico's own LED
+    while _vbus.value() == 0:                       # only USB ends it: a button that wakes the chip sleeps again
+        try:
+            if _gp24:
+                _wake(True, keys=False)
+                machine.lightsleep()                # dormant until GP24 (VBUS)
+            else:
+                machine.lightsleep(1000)            # VBUS on the radio (a Pico W): look each second
+        except Exception:
+            time.sleep_ms(1000)
+    if _gp24:
+        _wake(False)
+    _flag(False)
+    machine.reset()
 
 
 def corner(d, x0, y0, x1, y1):
@@ -152,12 +232,12 @@ def corner(d, x0, y0, x1, y1):
     d.fill_rect(bx + 2, y + 3, 12 * pct // 100 or 1, 5, ui.RED if pct <= 15 else ui.GREEN)
 
 
-def _wake(on):
+def _wake(on, keys=True):
     """Which pins end dormant (RP2040 IO_BANK0 DORMANT_WAKE_INTE0-3; MicroPython has no call for it):
-    any button going low, VBUS (GP24) going high. Edges latched before are cleared first."""
+    any button going low (keys), VBUS (GP24) going high. Edges latched before are cleared first."""
     r = [0, 0, 0, 0]
     if on:
-        for g in L.KEYS.values():
+        for g in (L.KEYS.values() if keys else ()):
             r[g >> 3] |= 4 << (4 * (g & 7))         # EDGE_LOW
         r[3] |= 8 << 0                              # GP24 EDGE_HIGH
     for i in range(4):

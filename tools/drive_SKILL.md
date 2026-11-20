@@ -15,14 +15,14 @@ or an ATECC608) **wedged** between the boards on I2C. It runs MicroPython plus t
 into one app, and asks on its own screen before anything that matters. Games, tools, and a hardware signer for a
 Safe multisig. Everything is MIT. Home: https://wedgie.dev
 
-**The current firmware is 0.3.87.** If a wedgie's `hello` says older, update it first: everything here assumes
+**The current firmware is 0.3.88.** If a wedgie's `hello` says older, update it first: everything here assumes
 current firmware.
 
 ```yaml
 name: wedgie
 site: https://wedgie.dev
 skill_index: https://wedgie.dev/skill.md          # this file
-firmware: 0.3.87
+firmware: 0.3.88
 license: MIT (hardware design, case, firmware, site, art)
 source: https://github.com/clawdbotatg/wedgie-dev
 made_by: Austin Griffith and Gus Griffith, with @ClawdBotATG; sold by BuidlGuidl DAO LLC
@@ -50,7 +50,7 @@ Each (but lore.md) is its own skill file with frontmatter. Fetch it by URL.
 | **usb.md** | https://wedgie.dev/usb.md | a plugged-in wedgie: find its port, `hello`, `wedgie.py`, the lock and the green-button press, every USB request, requests as files on the drive (iPhone) |
 | **build.md** | https://wedgie.dev/build.md | building or fixing one: parts and where to buy, the kit, all 21 assembly steps, which wire goes where, pinout, the case, first boot, troubleshooting in order |
 | **safe.md** | https://wedgie.dev/safe.md | the wedgie as a Safe signer: Safe Signer app, its key, wedgie.dev/safe, clear signing, WalletConnect, and **Instant Wallet** |
-| **shop.md** | https://wedgie.dev/shop.md | buying one: wedgie vs kit, what's in the box, surge pricing, shipping, card or USDC, privacy, tracking, terms |
+| **shop.md** | https://wedgie.dev/shop.md | buying one: wedgie vs kit, the atomic wedgie and its kit, what's in the box, surge pricing, shipping, card or USDC, privacy, tracking, terms |
 | **virtual.md** | https://wedgie.dev/virtual.md | the virtual wedgie at wedgie.dev/virtual: real firmware in a browser tab, no hardware; `window.wedgie` for agents |
 | **security.md** | https://wedgie.dev/security.md | is it safe: the two rules, what each party can and can't do, signed releases, known gaps, history by version |
 | **code.md** | https://wedgie.dev/code.md | making apps and games: `wedgie.json`, the template, fast graphics with measured numbers, screen/button/`ui` API, saves, the emulator, publishing |
@@ -72,17 +72,30 @@ newest is always here).
 | "sign my Safe", "Safe Signer", "my Safe key", "GS021", "use Uniswap with my wedgie" | safe.md |
 | "Instant Wallet", "passkey wallet", "harden my wallet" | safe.md (Instant Wallet) |
 | "buy one", "how much", "where's my order", "pay with USDC" | shop.md |
+| "atomic wedgie", "one with a battery", "does it work unplugged", "can it sign without the cable" | The atomic wedgie below, then build.md (build one) or shop.md (buy one) |
 | "try one without hardware", "test on a wedgie" | virtual.md |
 | "is it safe", "can a computer steal my key", "I lost my wedgie" | security.md |
 | "make an app/game", "make my game faster", "put my game on my wedgie" | code.md |
 | "use the secure chip", "store a secret", "sign with the chip" | trustm.md |
+
+## The atomic wedgie
+
+A wedgie with a battery inside (https://wedgie.dev/atomic). Red base, a RESET button.
+
+- **Unplugged:** the app on it keeps running. Good for air-gapped games. The charge shows top right; the screen
+  sleeps after 20 s with no press and any button wakes it.
+- **Air-gapped:** no Wi-Fi, no Bluetooth. Signing, installing, updating and an app's internet all need the USB
+  cable, like any wedgie. It can't sign unplugged: nothing can reach it.
+- **Plugged in:** it's a wedgie. Everything in these guides works the same. It charges while plugged in.
+- **Parts:** a Waveshare RP2040-Plus where the Pico goes, a 601120 LiPo (3.7 V, 100 mAh), its own red base and
+  RESET plunger. Build one: build.md ("The atomic wedgie"). Buy one or its kit: shop.md.
 
 ## Just got one? Start here
 
 1. Plug it in with a USB **data** cable. The screen lights up (no light: turn the cable around, or try another).
    A **WEDGIE** drive appears.
 2. Open **Open wedgie** on the drive (Mac), **Open wedgie (Windows)**, or go to https://wedgie.dev/connect in Chrome
-   or Edge.
+   or Edge. Linux, once: `curl -fsSL https://wedgie.dev/linux.sh | sudo sh` (udev rules), else "Access denied".
 3. Click **Allow wedgie connection** (top right) and pick it.
 4. **Update the firmware** if the page says so. Always. Press green on the wedgie.
 5. Pick an app from the shelf. The wedgie asks **Install ...?** on its screen: press green.
@@ -145,6 +158,7 @@ key), so those could be changed. How: code.md, "The internet".
 | /secret | Secrets: share your wedgie's link, chat |
 | /virtual | the virtual wedgie (virtual.md); /emu redirects here |
 | /code | make apps: prompt for your AI, an emulator that reruns on save (served from emu.wedgie.dev/code) |
+| /atomic | the atomic wedgie: a battery inside. Its parts, its case, how to build it, order |
 | /assemble, /assemble/3d | the build, step by step with photos, and in 3D |
 | /assemble.pdf, /manual.pdf | printable assembly manual; the owner's manual in every box |
 | /reset | BOOTSEL, wipe, latest MicroPython + firmware + Welcome. Saves go |
@@ -216,13 +230,14 @@ https://instantwallet.io. Details: safe.md.
 | BOOTSEL | the Pico's button for flashing; reached through a hole in the base |
 | Trust M | the Infineon OPTIGA Trust M secure chip |
 | virtual wedgie | the real firmware in a browser tab (virtual.md) |
+| atomic wedgie | a wedgie with a battery inside: plays unplugged, air-gapped; plug it in to sign |
 | Safe Signer | the app that makes a wedgie a Safe owner (safe.md) |
 | wedge | the chip and its wires, pushed in between the boards (lore.md) |
 
 
 # Talk to a wedgie over USB
 
-Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.87**; if `hello`
+Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.88**; if `hello`
 says older, run `wedgie.py update` first.
 
 ## Talk to it directly
@@ -232,6 +247,10 @@ Everything wedgie.py and the website do is JSON lines over the wedgie's USB seri
 1. **Find its port.** macOS: `/dev/cu.usbmodem*`. Linux: `/dev/ttyACM*` (or `/dev/serial/by-id/*wedgie*`).
    Windows: a `COM` port (USB vendor 0x2e8a, product name "wedgie"). Several boards: ask each for hello
    and match its `uid`. Just plugged in? Wait 2 s: the port drops once while the WEDGIE drive appears.
+   Linux, "Access denied", "Permission denied" or "Failed to open": add the udev rules once,
+   `curl -fsSL https://wedgie.dev/linux.sh | sudo sh`, then unplug it and plug it back in. Chromium from
+   snap also needs `sudo snap connect chromium:raw-usb`. Over SSH (nobody logged in at the screen) the rules
+   don't count: `sudo usermod -aG dialout $USER` (Arch: `uucp`), then log in again.
 2. **Only one program can hold the port.** "Busy" or "Resource busy": find who has it with
    `lsof /dev/cu.usbmodem*` (macOS/Linux). Usually it's a wedgie.dev tab in Chrome (ask your person to
    close it) or mpremote.
@@ -350,7 +369,7 @@ from answering. Hold **Y**: no WEDGIE drive this time (debugging only).
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.87","fw":"wedgie-0.3.87","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.88","fw":"wedgie-0.3.88","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":3,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -653,8 +672,36 @@ A snap-together printed shell, no screws, MIT: https://github.com/clawdbotatg/cl
   Printed like the rest, it comes out bad.
 - **Colors:** white lid, black base, grey joystick; buttons 2 grey, 1 green (A), 1 red (Y). The buttons carry no
   letters: to people, A is "the green button", Y "the red button", B and X "the grey buttons".
-- **Atomic wedgie:** a variant with its own base and a RESET plunger, and a LiPo on VSYS.
+- **Atomic wedgie** (https://wedgie.dev/atomic): a wedgie with a battery inside, for air-gapped games unplugged (no radio: plug it in to sign or go online). A Waveshare RP2040-Plus where the Pico goes
+  (battery plug, charger, USB-C, RESET button), a 601120 LiPo (3.7 V, 100 mAh, MX1.25 plug), and its own red base
+  with a RESET plunger: https://github.com/clawdbotatg/clawd-pico-case/tree/main/stl/atomic-wedgie
 - A hole in the base reaches BOOTSEL. A pry notch on one side opens it.
+
+## The atomic wedgie (a battery inside)
+
+The page: https://wedgie.dev/atomic. It plays unplugged and is air-gapped (no Wi-Fi, no Bluetooth): signing,
+installing and anything online still need the USB cable. Plugged in, it's a wedgie like any other.
+
+| Part | What | Where |
+|---|---|---|
+| Board (where the Pico goes) | **Waveshare RP2040-Plus**, the one with the **pre-soldered header** (shops sell it bare too; pick the header option): Pico-shaped, with an MX1.25 battery plug, a charger, USB-C, BOOT and RESET buttons. A plain Pico has no battery plug | Waveshare https://www.waveshare.com/rp2040-plus.htm · Amazon https://www.amazon.com/dp/B09LT5KPVX · The Pi Hut https://thepihut.com/products/rp2040-plus · Amazon.ca https://www.amazon.ca/dp/B09NMLRS3T · GRobotronics https://grobotronics.com/waveshare-rp2040-plus.html?sl=en |
+| Battery | **601120 LiPo**: 3.7 V, 100 mAh (0.37 Wh), 6 x 11 x 20 mm, 2-pin MX1.25 plug | The one we use: https://www.amazon.com/dp/B0HHW5QJ64. Or search Amazon for "601120 1.25" (https://www.amazon.com/s?k=601120+lipo+1.25), e.g. https://www.amazon.com/dp/B0FT3BBSYB · https://www.amazon.com/dp/B0FRFPH2D9 · https://www.amazon.com/dp/B0GHYLX6DC (2-pack). Get the 1.25 mm plug: many are sold with 2.0 mm |
+| Base | the atomic base, printed red | https://github.com/clawdbotatg/clawd-pico-case/tree/main/stl/atomic-wedgie |
+| RESET plunger | one, printed black | the same folder |
+| Screen hat, chip, cable, lid, joystick, 4 buttons | the same as every wedgie | Parts, above |
+
+- **Check the battery's polarity before plugging it in:** its red wire must land on the board's **+**. Some
+  batteries come wired backwards, and that can damage the board.
+- **Build it** like any wedgie (the steps above, the RP2040-Plus where the Pico goes), with two more steps:
+  1. First, drop the RESET plunger into its hole from inside the red base, flange up.
+  2. Before the lid goes on, plug the battery into the board. Its wire runs in the channel at the end of the
+     base, away from the USB.
+- **On the battery** (firmware 0.3.28+): the charge shows top right, drawn over the app. After 20 s with no press the
+  screen goes off and the chip sleeps; any button wakes it, and that press goes to nobody. Plugging in USB wakes it too.
+- **Charging:** plug in USB-C. It charges while it works. On USB the charge isn't shown (the board can't read the
+  battery then).
+- **RESET** restarts it. With a battery inside, pulling the cable no longer does.
+- **Set it up** over USB like any wedgie (wedgie.dev/connect). Put a game on it, then unplug.
 
 ## Taking it apart and putting it back
 
@@ -677,7 +724,8 @@ wires straight out of the sockets. Reassemble in reverse, then check it on its p
 
 1. **Is it on USB?** `python3 wedgie.py list` or https://wedgie.dev/connect. Nothing: another cable (charge-only
    cables are common), another port, or turn the cable around (some only work one way). A drive called RPI-RP2 /
-   RP2350 instead: it's in BOOTSEL (no MicroPython, or BOOTSEL was held): First boot.
+   RP2350 instead: it's in BOOTSEL (no MicroPython, or BOOTSEL was held): First boot. Linux, the page says
+   "Access denied": the udev rules (usb.md).
 2. **Does hello answer?** No: read its screen. "wedgie broke: <error>": B tries again, A asks for full control so
    a computer can fix it (`wedgie.py debug` shows `error.log`). Black screen: the Pico isn't fully seated, or
    there's no firmware (bare MicroPython shows nothing): /reset. An app that crashes at start: **hold both grey
@@ -712,8 +760,11 @@ recovery. A reflash, /reset or /test never erases the chip.
 
 - 3.3 V logic; GPIOs are **not 5 V tolerant**. Power is USB (5 V on VBUS); the 3V3 pin gives a few hundred mA.
 - Screen 240x240, 16-bit panel; the firmware draws in 16 colors (a 29 KB buffer); a full-screen push is ~25 ms.
-- No battery built in. A LiPo on VSYS works: off USB the firmware (0.3.28+) shows the charge top right and sleeps
+- No battery built in, except the atomic wedgie (above). A LiPo on VSYS works: off USB the firmware (0.3.28+) shows the charge top right and sleeps
   after 20 s with no press; any button or USB wakes it, and that press goes to nobody.
+  **Off for the mail** (0.3.88+): on battery, hold the four front buttons 10 s. It says "Off" and stays off
+  (no button wakes it, RESET too) till USB is plugged in, which boots it fresh. A mailed lithium battery needs
+  a device that can't turn on in the box (USPS Pub 52 349.221).
 - No real-time clock. WiFi only on W boards (never used by wallet apps).
 
 
@@ -1032,8 +1083,10 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md. Or build one your
 |---|---|---|
 | **wedgie** | **$67** shipped (US) | Assembled: Pico, screen hat, Trust M secure chip, printed case. Firmware and the Welcome app already on. Comes with a USB cable (USB-C and USB-A). Plug it in and go. |
 | **wedgie kit** | **$57** shipped (US) | Every part and the case, with assembly instructions (also in 3D at wedgie.dev/assemble/3d). Comes with a USB cable (USB-C and USB-A). No soldering. You need a wire stripper, electrical tape, tweezers, and a stiff wire or pin. |
+| **atomic wedgie** | **$77** shipped (US) | A wedgie with a battery inside: air-gapped games with no cable. No Wi-Fi or Bluetooth: plug it in to sign or go online. Charges over USB-C. Red base, RESET button. Assembled, with a USB cable. US only for now. https://wedgie.dev/atomic |
+| **atomic wedgie kit** | **$67** shipped (US) | Every part for an atomic wedgie: the Waveshare RP2040-Plus board, the battery, the red case, the rest, a USB cable, and assembly instructions. US only for now. |
 
-- Order: https://wedgie.dev/order. Up to 3 boxes per order (wedgies and kits together). Stock is shown; "Sold out"
+- Order: https://wedgie.dev/order. Up to 3 boxes per order (every kind together). Stock is shown; "Sold out"
   when it's gone.
 - **Give someone a wedgie:** the same order, with their address as the shipping address.
 - Built by hand by Austin and Gus Griffith. **Ships within a week**, by USPS.
@@ -1057,7 +1110,7 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md. Or build one your
 ## The price moves (surge pricing)
 
 - Each box sold adds **$5** to the next one. The extra melts away evenly: a full day with no sales and it's back
-  to $67 (kit $57). Open quotes count while they last. It's a VRGDA-style rule: sell faster than two people can
+  to $67 (kit $57, atomic $77, atomic kit $67). Every kind shares it: any sale raises them all. Open quotes count while they last. It's a VRGDA-style rule: sell faster than two people can
   build and the price climbs.
 - During a surge, the price box (the green `*` or the green surge amount) has a red **Email alert**: one email the
   next time it's back to list, then the address is deleted.
@@ -1237,7 +1290,8 @@ https://wedgie.dev/virtual.md
 - `print()` goes to USB (Output on /code, the terminal for `wedgie.py run`). Don't read stdin: USB is
   the firmware's unless `"usb": true`.
 - On a battery (no USB), the firmware draws the charge in the top-right corner and sleeps after 20 s
-  with no press. The press that wakes it never reaches your app.
+  with no press. The press that wakes it never reaches your app. That's the atomic wedgie (wedgie.dev/atomic):
+  unplugged it has no USB and no internet (`net` fails), so a game that should play there must work offline.
 - A thin red border on every screen means a computer had full control since the files were last as
   signed. That's the firmware's, not a bug in your app.
 
