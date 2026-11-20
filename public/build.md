@@ -201,6 +201,6 @@ recovery. A reflash, /reset or /test never erases the chip.
 - No battery built in. A LiPo on VSYS works: off USB the firmware (0.3.28+) shows the charge top right and sleeps
   after 20 s with no press; any button or USB wakes it, and that press goes to nobody.
   **Off for the mail** (0.3.88+): on battery, hold the four front buttons 10 s. It says "Off" and stays off
-  (no button wakes it, RESET too) till USB is plugged in, which boots it fresh. A mailed lithium battery needs
+  (no button wakes it; RESET restarts the chip, which goes straight back off with the screen dark, 0.3.91+) till USB is plugged in, which boots it fresh. A mailed lithium battery needs
   a device that can't turn on in the box (USPS Pub 52 349.221).
 - No real-time clock. WiFi only on W boards (never used by wallet apps).

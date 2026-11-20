@@ -190,9 +190,12 @@ for (const [a, b] of pairs) {
   if (r === true) {                 // booted on the new core: every core file is the target's now
     w.h.chip.run(1500);
     const olds = Object.keys(older());
-    const s = w.req({ type: "sums", names: [...F.core, ...olds] }, 60000);
-    const off = F.core.filter((n) => s?.sums?.[n] !== sha(fileOf(n)));
-    const left = olds.filter((n) => s?.sums?.[n]);
+    // Two questions, as the site asks (the files of a job, never twice that): one answer for the new core and
+    // the old names together is a 2.4 KB line, and with Jiro running there's no piece of heap that long (0.3.91,
+    // the 24th core file: MemoryError in wedgie.send, and every file read as "not the new one").
+    const s = w.req({ type: "sums", names: F.core }, 60000), o = w.req({ type: "sums", names: olds }, 60000);
+    const off = !s?.sums ? [`no answer: ${JSON.stringify(s).slice(0, 200)}`] : F.core.filter((n) => s.sums[n] !== sha(fileOf(n)));
+    const left = !o?.sums ? [`no answer: ${JSON.stringify(o).slice(0, 200)}`] : olds.filter((n) => o.sums[n]);
     if (off.length) r = `after the update these aren't the new ones: ${off.join(" ")}`;
     else if (left.length) r = `the old .py is still there (it would run instead): ${left.join(" ")}`;
   }

@@ -15,14 +15,14 @@ or an ATECC608) **wedged** between the boards on I2C. It runs MicroPython plus t
 into one app, and asks on its own screen before anything that matters. Games, tools, and a hardware signer for a
 Safe multisig. Everything is MIT. Home: https://wedgie.dev
 
-**The current firmware is 0.3.90.** If a wedgie's `hello` says older, update it first: everything here assumes
+**The current firmware is 0.3.91.** If a wedgie's `hello` says older, update it first: everything here assumes
 current firmware.
 
 ```yaml
 name: wedgie
 site: https://wedgie.dev
 skill_index: https://wedgie.dev/skill.md          # this file
-firmware: 0.3.90
+firmware: 0.3.91
 license: MIT (hardware design, case, firmware, site, art)
 source: https://github.com/clawdbotatg/wedgie-dev
 made_by: Austin Griffith and Gus Griffith, with @ClawdBotATG; sold by BuidlGuidl DAO LLC
@@ -237,7 +237,7 @@ https://instantwallet.io. Details: safe.md.
 
 # Talk to a wedgie over USB
 
-Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.90**; if `hello`
+Part of the wedgie skills. Index: https://wedgie.dev/skill.md. **The current firmware is 0.3.91**; if `hello`
 says older, run `wedgie.py update` first.
 
 ## Talk to it directly
@@ -369,7 +369,7 @@ from answering. Hold **Y**: no WEDGIE drive this time (debugging only).
 
 ## The USB requests
 
-    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.90","fw":"wedgie-0.3.90","uid":...,"short":"023277",
+    {"id":1,"type":"hello"}              -> {"type":"hello","version":"0.3.91","fw":"wedgie-0.3.91","uid":...,"short":"023277",
                                              "board":...,"chip":"OPTIGA Trust M","running":"buttons","sealed":true,"open":false,
                                              "ram":63000,"free":1118208,"slot":1,"jobs":3,"bin":4096,...}
     {"id":2,"type":"shot"}               -> {"type":"shot","i":0,"n":38,"w":240,"h":240,"fmt":"rgb565be","data":"<base64>"} x n
@@ -763,7 +763,7 @@ recovery. A reflash, /reset or /test never erases the chip.
 - No battery built in, except the atomic wedgie (above). A LiPo on VSYS works: off USB the firmware (0.3.28+) shows the charge top right and sleeps
   after 20 s with no press; any button or USB wakes it, and that press goes to nobody.
   **Off for the mail** (0.3.88+): on battery, hold the four front buttons 10 s. It says "Off" and stays off
-  (no button wakes it, RESET too) till USB is plugged in, which boots it fresh. A mailed lithium battery needs
+  (no button wakes it; RESET restarts the chip, which goes straight back off with the screen dark, 0.3.91+) till USB is plugged in, which boots it fresh. A mailed lithium battery needs
   a device that can't turn on in the box (USPS Pub 52 349.221).
 - No real-time clock. WiFi only on W boards (never used by wallet apps).
 

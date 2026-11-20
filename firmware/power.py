@@ -10,7 +10,8 @@
 # shows in the corner, until unplug.
 # Ship mode (0.3.88): hold the four front buttons (green, both grey, red) 10 s on battery and it's off till USB
 # comes: buttons can't wake it. All of it is in shipmode.py, loaded only then (0.3.90: in here it cost every
-# wedgie 1 KB of heap, and two installs on the virtual chip ran out). Here: the 10 s watch and a look for its flag.
+# wedgie 1 KB of heap, and two installs on the virtual chip ran out). Here: only the 10 s watch. Its flag is
+# boot.py's to find, before the screen lights (0.3.91).
 # Runs in one real Timer (never an app's: slot._RealTimer), every TICK_MS. Integers only: nothing grows.
 import sys, time, machine
 from machine import Pin, ADC
@@ -89,12 +90,6 @@ def start(d, Timer):
             p.irq(_touch, Pin.IRQ_FALLING, hard=True)
         names = list(L.KEYS)
         _four = [_pins[names.index(k)] for k in ("A", "B", "X", "Y")]
-        try:
-            open("/.ship").close()                  # ship mode's flag (shipmode.py): a reset in the mail, or USB came
-            import shipmode
-            shipmode.boot()
-        except OSError:
-            pass
         _touch()
         L._on_frame = corner
         _tick()
@@ -192,12 +187,12 @@ def corner(d, x0, y0, x1, y1):
     d.fill_rect(bx + 2, y + 3, 12 * pct // 100 or 1, 5, ui.RED if pct <= 15 else ui.GREEN)
 
 
-def _wake(on, keys=True):
+def _wake(on):
     """Which pins end dormant (RP2040 IO_BANK0 DORMANT_WAKE_INTE0-3; MicroPython has no call for it):
-    any button going low (keys), VBUS (GP24) going high. Edges latched before are cleared first."""
+    any button going low, VBUS (GP24) going high. Edges latched before are cleared first."""
     r = [0, 0, 0, 0]
     if on:
-        for g in (L.KEYS.values() if keys else ()):
+        for g in L.KEYS.values():
             r[g >> 3] |= 4 << (4 * (g & 7))         # EDGE_LOW
         r[3] |= 8 << 0                              # GP24 EDGE_HIGH
     for i in range(4):

@@ -5,6 +5,12 @@
 # end boot.py early: every failure is caught, BaseException too.
 import micropython
 micropython.kbd_intr(-1)
+try:                                    # ship mode (shipmode.py) and a RESET press in the mail: off again before the
+    open("/.ship").close()              # screen lights. No flag (every other start): OSError, on we go
+    import shipmode
+    shipmode.boot()
+except BaseException:
+    pass
 try:                                    # a computer was let in and main.py hasn't run since (wedgie.WAS_OPEN): a soft
     import machine, sys                 # reset from the raw REPL would skip main.py and leave it in, so start over for real
     _s3 = (0x400D8000 if "RP2350" in sys.implementation._machine else 0x40058000) + 0x18
