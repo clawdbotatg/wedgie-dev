@@ -194,7 +194,10 @@ export async function mountWedgie3D(el: HTMLElement, opts: Wedgie3DOptions = {})
   // ---- sizing, pointer lean, render loop --------------------------------------------------------
   let W = 0, H = 0;
   const resize = () => {
-    W = el.clientWidth; H = Math.round(W * 0.62);
+    // Turned to show its side, its corners swing past the usual frame: a taller frame, the wedgie the same size.
+    const tall = opts.pose ? 1.3 : 1;
+    W = el.clientWidth; H = Math.round(W * 0.62 * tall);
+    camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(11)) * tall));
     renderer.setSize(W, H, false);
     cv.style.width = W + "px"; cv.style.height = H + "px";
     camera.aspect = W / H; camera.updateProjectionMatrix();
