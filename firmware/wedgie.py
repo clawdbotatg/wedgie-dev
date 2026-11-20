@@ -3,7 +3,7 @@
 # interrupted; from the REPL they are plain calls:  import wedgie; wedgie.shot(); wedgie.press("A")
 import sys, os, json, machine
 
-VERSION = "0.3.49"
+VERSION = "0.3.50"
 
 # The lock. main.py turns Ctrl-C off before anything else and never ends by itself, so a computer
 # can only send the slot's JSON lines: it can't stop the app, reach the REPL, or make the secure chip
@@ -78,7 +78,9 @@ def set_open():
 
 
 def uid():
-    return machine.unique_id().hex()
+    """"<board>-<chip>" (ident.py): the flash ID alone isn't unique on every RP2040."""
+    import ident
+    return ident.uid()
 
 
 def short():

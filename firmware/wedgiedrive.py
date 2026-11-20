@@ -403,5 +403,7 @@ class Drive(usbdev.Interface):
 def start():
     global drive
     drive = Drive(Image())
-    usbdev.get().init(drive, builtin_driver=True, product_str="wedgie", manufacturer_str="wedgie.dev")
+    import ident
+    usbdev.get().init(drive, builtin_driver=True, product_str="wedgie", manufacturer_str="wedgie.dev",
+                      serial_str=ident.uid())   # the USB serial = the wedgie's ID, not the flash chip's
     return drive

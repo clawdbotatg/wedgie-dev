@@ -113,14 +113,16 @@ try:
 except ImportError:
     pass
 v = None
+u = machine.unique_id().hex()
 if "wedgie.py" in os.listdir() or "wedgie.mpy" in os.listdir():
     try:
         import wedgie
         v = wedgie.VERSION
+        u = wedgie.uid()
     except Exception:
         pass
 import json
-print("@id", json.dumps({"uid": machine.unique_id().hex(), "machine": m, "mp": os.uname().release, "files": sorted(os.listdir()), "wifi": w, "wedgie": v}))`;
+print("@id", json.dumps({"uid": u, "machine": m, "mp": os.uname().release, "files": sorted(os.listdir()), "wifi": w, "wedgie": v}))`;
 
 const STUCK = "It isn't answering. Unplug it, then hold X on the wedgie while you plug it back in (that skips its app), or hold the Pico's BOOTSEL button while plugging in and open wedgie.dev/connect.";
 
