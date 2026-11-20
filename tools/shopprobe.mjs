@@ -101,7 +101,7 @@ async function newOrder(kits = 0, abroad = false) {
 
 // 0: stock (api/_shop.ts stockLeft). Never set: sold out. 8 of each; the probe buys 4 wedgies and 1 kit.
 const env = { ...process.env, SHOP_URL: SITE, SHOP_ADMIN_TOKEN: ADMIN, SHOP_KEY: dir + "/key.pem" };
-const py = (...a) => { try { return execFileSync("uv", ["run", "--quiet", "--with", "cryptography", "python3", ORDERS_PY, ...a], { env, encoding: "utf8" }); }
+const py = (...a) => { try { return execFileSync("uv", ["run", "--quiet", "--with", "cryptography", "--with", "eth-utils", "--with", "pycryptodome", "python3", ORDERS_PY, ...a], { env, encoding: "utf8" }); }
   catch { return execFileSync("python3", [ORDERS_PY, ...a], { env, encoding: "utf8" }); } };
 const leftNow = async () => { const l = (await (await fetch(SITE + "/api/order")).json()).left; return `${l.wedgie}w ${l.kit}k`; };
 ok(await leftNow() === "0w 0k", "stock never set: sold out");
