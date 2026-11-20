@@ -1,10 +1,10 @@
-/* The atomic wedgie's picture (ui/atomic.ts): a comic burst behind the 3D wedgie. Comic art has its own yellow
-   (the red base shows against it); the red, ink and white are the site's. */
-.atom-art, .atomic-hero { --atom-yellow: #ffd23c; }
+/* The atomic wedgie's picture (ui/atomic.ts): a comic burst behind the 3D wedgie, in the site's own colors only
+   (Austin, 11-19: no new color): the dark grey of the grey buttons, the red, ink and white. */
+.atom-art, .atomic-hero { --atom-grey: #58595b; }   /* between --grey-fill's two greys */
 .atom-art { position: relative; display: grid; place-items: center; min-height: 380px; isolation: isolate; }
 .atom-burst { position: absolute; inset: -4% -6%; width: 112%; height: 108%; z-index: -1; overflow: visible; }
 .atom-shadow { fill: var(--ink); }
-.atom-star { fill: var(--atom-yellow); stroke: var(--ink); stroke-width: 5; stroke-linejoin: round; }
+.atom-star { fill: var(--atom-grey); stroke: var(--ink); stroke-width: 5; stroke-linejoin: round; }
 .atom-core { fill: var(--coral); stroke: var(--ink); stroke-width: 4; stroke-linejoin: round; }
 .atom-orbits ellipse { fill: none; stroke: var(--ink); stroke-width: 3.5; stroke-dasharray: 2 9; stroke-linecap: round; }
 .atom-orbits .e { fill: var(--card); stroke: var(--ink); stroke-width: 4; offset-path: ellipse(212px 64px at 0 0); offset-rotate: 0deg; animation: atom-go 7s linear infinite; }

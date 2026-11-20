@@ -26,7 +26,7 @@ function burst(n: number, r0: number, r1: number, seed: number) {
 
 const BURST = burst(17, 150, 232, 7), INNER = burst(17, 128, 196, 7);
 const ART = `<svg class="atom-burst" viewBox="-260 -200 520 400" aria-hidden="true">
-  <defs><pattern id="atom-dots" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(28)"><circle cx="4.5" cy="4.5" r="2" fill="var(--ink)" opacity=".2"/></pattern></defs>
+  <defs><pattern id="atom-dots" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(28)"><circle cx="4.5" cy="4.5" r="2" fill="var(--card)" opacity=".22"/></pattern></defs>
   <polygon class="atom-shadow" points="${BURST}" transform="translate(9 11)"/>
   <polygon class="atom-star" points="${BURST}"/>
   <polygon points="${INNER}" fill="url(#atom-dots)"/>
