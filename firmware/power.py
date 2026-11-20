@@ -23,9 +23,12 @@ SHIP_MS = 10000
 SHIP = "/.ship"                 # ship mode is on (survives a reset; USB clears it)
 TICK_MS = 1000
 BOX = (184, 2, 55, 11)          # x, y, w, h: the corner the battery takes
-# LiPo volts (mV at VSYS) -> percent, resting. Below the last: 0.
-CURVE = ((4150, 100), (4050, 90), (3970, 80), (3900, 70), (3840, 60), (3790, 50), (3750, 40),
-         (3710, 30), (3670, 20), (3600, 10), (3450, 0))
+# mV read at VSYS -> percent. Below the last: 0. Set from a real atomic wedgie (0.3.89; Austin, 11-20): after
+# a night on USB it read about 3720 mV with the screen on, which the resting-LiPo table called 30%. The small
+# cell sags under the screen's load, so the whole table sits 450 mV under a resting one. The low end is that
+# same shift, not yet measured.
+CURVE = ((3700, 100), (3600, 90), (3520, 80), (3450, 70), (3390, 60), (3340, 50), (3300, 40),
+         (3260, 30), (3220, 20), (3150, 10), (3000, 0))
 
 on_battery = False
 pct = None          # 0-100 while on battery
@@ -127,13 +130,17 @@ def _tick(_=None):
     on_battery = False
     if _vbus.value() == 0:
         mv = _read_mv()
-        on_battery = 3000 < mv < 4500               # a LiPo; USB's VSYS is ~4.8 V (a clone whose GP24 isn't VBUS)
+        on_battery = 2500 < mv < 4500               # a LiPo; USB's VSYS is ~4.8 V (a clone whose GP24 isn't VBUS)
     if on_battery:
+        if not was:
+            _touch()                                # just unplugged: IDLE_MS from now, not asleep at once (0.3.89)
         _mv = mv if not was or not _mv else (_mv * 7 + mv) // 8
         p = _percent(_mv)
         pct = p if before is None or abs(p - before) > 1 or p in (0, 100) else before    # no flicker
-    if L._busy:                                     # the app is mid-push: next tick
-        return
+    if was and not on_battery and not phone:        # USB is back: corner() drew the charge into the app's
+        _d.fill_rect(BOX[0], BOX[1], BOX[2], BOX[3], _d.pixel(239, 0))  # frame, and an app that never
+    if L._busy:                                     # repaints up there kept "0%" on USB (Austin, 11-19)
+        return                                      # the app is mid-push: next tick
     if (on_battery != was or pct != before) and not L._on_show:
         _d.show_rect(*BOX)                          # a still screen gets it too (corner() draws it)
     _ship_check()
