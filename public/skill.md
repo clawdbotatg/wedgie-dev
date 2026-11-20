@@ -46,7 +46,7 @@ Each (but lore.md) is its own skill file with frontmatter. Fetch it by URL.
 | **usb.md** | https://wedgie.dev/usb.md | a plugged-in wedgie: find its port, `hello`, `wedgie.py`, the lock and the green-button press, every USB request, requests as files on the drive (iPhone) |
 | **build.md** | https://wedgie.dev/build.md | building or fixing one: parts and where to buy, the kit, all 21 assembly steps, which wire goes where, pinout, the case, first boot, troubleshooting in order |
 | **safe.md** | https://wedgie.dev/safe.md | the wedgie as a Safe signer: Safe Signer app, its key, wedgie.dev/safe, clear signing, WalletConnect, and **Instant Wallet** |
-| **shop.md** | https://wedgie.dev/shop.md | buying one: wedgie vs kit, the atomic wedgie and its kit, what's in the box, surge pricing, shipping, card or USDC, privacy, tracking, terms |
+| **shop.md** | https://wedgie.dev/shop.md | buying one: wedgie vs kit, what's in the box, surge pricing, shipping, card or USDC, privacy, tracking, terms |
 | **virtual.md** | https://wedgie.dev/virtual.md | the virtual wedgie at wedgie.dev/virtual: real firmware in a browser tab, no hardware; `window.wedgie` for agents |
 | **security.md** | https://wedgie.dev/security.md | is it safe: the two rules, what each party can and can't do, signed releases, known gaps, history by version |
 | **code.md** | https://wedgie.dev/code.md | making apps and games: `wedgie.json`, the template, fast graphics with measured numbers, screen/button/`ui` API, saves, the emulator, publishing |
@@ -68,23 +68,10 @@ newest is always here).
 | "sign my Safe", "Safe Signer", "my Safe key", "GS021", "use Uniswap with my wedgie" | safe.md |
 | "Instant Wallet", "passkey wallet", "harden my wallet" | safe.md (Instant Wallet) |
 | "buy one", "how much", "where's my order", "pay with USDC" | shop.md |
-| "atomic wedgie", "one with a battery", "does it work unplugged", "can it sign without the cable" | The atomic wedgie below, then build.md (build one) or shop.md (buy one) |
 | "try one without hardware", "test on a wedgie" | virtual.md |
 | "is it safe", "can a computer steal my key", "I lost my wedgie" | security.md |
 | "make an app/game", "make my game faster", "put my game on my wedgie" | code.md |
 | "use the secure chip", "store a secret", "sign with the chip" | trustm.md |
-
-## The atomic wedgie
-
-A wedgie with a battery inside (https://wedgie.dev/atomic). Red base, a RESET button.
-
-- **Unplugged:** the app on it keeps running. Good for air-gapped games. The charge shows top right; the screen
-  sleeps after 20 s with no press and any button wakes it.
-- **Air-gapped:** no Wi-Fi, no Bluetooth. Signing, installing, updating and an app's internet all need the USB
-  cable, like any wedgie. It can't sign unplugged: nothing can reach it.
-- **Plugged in:** it's a wedgie. Everything in these guides works the same. It charges while plugged in.
-- **Parts:** a Waveshare RP2040-Plus where the Pico goes, a 601120 LiPo (3.7 V, 100 mAh), its own red base and
-  RESET plunger. Build one: build.md ("The atomic wedgie"). Buy one or its kit: shop.md.
 
 ## Just got one? Start here
 
@@ -154,7 +141,6 @@ key), so those could be changed. How: code.md, "The internet".
 | /secret | Secrets: share your wedgie's link, chat |
 | /virtual | the virtual wedgie (virtual.md); /emu redirects here |
 | /code | make apps: prompt for your AI, an emulator that reruns on save (served from emu.wedgie.dev/code) |
-| /atomic | the atomic wedgie: a battery inside. Its parts, its case, how to build it, order |
 | /assemble, /assemble/3d | the build, step by step with photos, and in 3D |
 | /assemble.pdf, /manual.pdf | printable assembly manual; the owner's manual in every box |
 | /reset | BOOTSEL, wipe, latest MicroPython + firmware + Welcome. Saves go |
@@ -226,6 +212,5 @@ https://instantwallet.io. Details: safe.md.
 | BOOTSEL | the Pico's button for flashing; reached through a hole in the base |
 | Trust M | the Infineon OPTIGA Trust M secure chip |
 | virtual wedgie | the real firmware in a browser tab (virtual.md) |
-| atomic wedgie | a wedgie with a battery inside: plays unplugged, air-gapped; plug it in to sign |
 | Safe Signer | the app that makes a wedgie a Safe owner (safe.md) |
 | wedge | the chip and its wires, pushed in between the boards (lore.md) |

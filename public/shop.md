@@ -13,8 +13,6 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md. Or build one your
 |---|---|---|
 | **wedgie** | **$67** shipped (US) | Assembled: Pico, screen hat, Trust M secure chip, printed case. Firmware and the Welcome app already on. Comes with a USB cable (USB-C and USB-A). Plug it in and go. |
 | **wedgie kit** | **$57** shipped (US) | Every part and the case, with assembly instructions (also in 3D at wedgie.dev/assemble/3d). Comes with a USB cable (USB-C and USB-A). No soldering. You need a wire stripper, electrical tape, tweezers, and a stiff wire or pin. |
-| **atomic wedgie** | **$77** shipped (US) | A wedgie with a battery inside: air-gapped games with no cable. No Wi-Fi or Bluetooth: plug it in to sign or go online. Charges over USB-C. Red base, RESET button. Assembled, with a USB cable. US only for now. https://wedgie.dev/atomic |
-| **atomic wedgie kit** | **$67** shipped (US) | Every part for an atomic wedgie: the Waveshare RP2040-Plus board, the battery, the red case, the rest, a USB cable, and assembly instructions. US only for now. |
 
 - Order: https://wedgie.dev/order. Up to 3 boxes per order (every kind together). Stock is shown; "Sold out"
   when it's gone.
@@ -40,7 +38,7 @@ Part of the wedgie skills. Index: https://wedgie.dev/skill.md. Or build one your
 ## The price moves (surge pricing)
 
 - Each box sold adds **$5** to the next one. The extra melts away evenly: a full day with no sales and it's back
-  to $67 (kit $57, atomic $77, atomic kit $67). Every kind shares it: any sale raises them all. Open quotes count while they last. It's a VRGDA-style rule: sell faster than two people can
+  to $67 (kit $57). Every kind shares it: any sale raises them all. Open quotes count while they last. It's a VRGDA-style rule: sell faster than two people can
   build and the price climbs.
 - During a surge, the price box (the green `*` or the green surge amount) has a red **Email alert**: one email the
   next time it's back to list, then the address is deleted.
