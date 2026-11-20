@@ -101,18 +101,6 @@ export function home(main: HTMLElement): Promise<unknown> {
     </div>
   </section>
 
-  <section id="atomic" class="sec">
-    <div class="card wide atomic-card">
-      <a href="/atomic" id="atomic-art" aria-label="The atomic wedgie"></a>
-      <div>
-        <span class="kicker">New</span>
-        <h2>Cut the cord.</h2>
-        <p>The atomic wedgie has a battery inside. Air-gapped games, anywhere. Plug it in to sign. $${ITEMS.atomic.cents / 100}.</p>
-        <div class="row"><a class="btn btn-sm" href="/atomic">Meet the atomic wedgie →</a></div>
-      </div>
-    </div>
-  </section>
-
   <div class="band roomy" aria-hidden="true"><i></i><i></i><i></i></div>
 
   <section id="get" class="sec">
@@ -152,6 +140,20 @@ export function home(main: HTMLElement): Promise<unknown> {
       <div class="teaser-box">
         <video playsinline preload="none" poster="/video/safe.jpg" src="/video/safe.mp4"></video>
         <button class="teaser-play" aria-label="Play"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg></button>
+      </div>
+    </div>
+  </section>
+
+  <div class="band roomy" aria-hidden="true"><i></i><i></i><i></i></div>
+
+  <section id="atomic" class="sec">
+    <div class="card wide atomic-card">
+      <a href="/atomic" id="atomic-art" aria-label="The atomic wedgie"></a>
+      <div>
+        <span class="kicker">New</span>
+        <h2>Cut the cord.</h2>
+        <p>The atomic wedgie has a battery inside. Air-gapped games, anywhere. Plug it in to sign. $${ITEMS.atomic.cents / 100}.</p>
+        <div class="row"><a class="btn btn-sm" href="/atomic">Meet the atomic wedgie →</a></div>
       </div>
     </div>
   </section>
