@@ -26,6 +26,7 @@ import { emu } from "./pages/emu";
 import { telegram } from "./pages/telegram";
 import { sandbox } from "./pages/sandbox";
 import { atomic } from "./pages/atomic";
+import { ATOMIC_ON } from "./shop/catalog";
 
 // safe.wedgie.eth (the IPFS copy): its front page is /safe
 if (location.hostname.startsWith("safe.") && location.pathname === "/") history.replaceState(null, "", "/safe" + location.hash);
@@ -39,7 +40,8 @@ const onUpdate = path === "/update";
 const onPrepare = path === "/prepare";
 const onReset = path === "/reset";
 const onBuild = path === "/build";
-const onAtomic = path === "/atomic";       // the atomic wedgie: a battery inside
+if (path === "/atomic" && !ATOMIC_ON) location.replace("/");   // hidden for now (catalog.ts ATOMIC_ON)
+const onAtomic = ATOMIC_ON && path === "/atomic";       // the atomic wedgie: a battery inside
 const onCode = path === "/code";
 const onDebug = path === "/debug";
 const onSafe = path === "/safe" || path.startsWith("/safe/");   // the list, or one Safe (/safe/<chain>:<address>)

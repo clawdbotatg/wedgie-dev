@@ -8,7 +8,7 @@
 // quotes it again at today's price.
 // An order's token (its proof you made it) stays in this browser and in the link we show; the server keeps
 // only its hash. api/order.ts is the other side.
-import { ITEMS, ITEM_KEYS, boxes, noAbroad, MAX_EACH, MAX_BOXES, SHIPS, ABROAD_NOTE, STATES, COUNTRIES, PAY_CHAINS, SHOP_ENS, cartLines, cartCents, nameOf, type Cart, type Item, type ShipTo } from "../shop/catalog";
+import { ITEMS, ITEM_KEYS, FOR_SALE, boxes, noAbroad, MAX_EACH, MAX_BOXES, SHIPS, ABROAD_NOTE, STATES, COUNTRIES, PAY_CHAINS, SHOP_ENS, cartLines, cartCents, nameOf, type Cart, type Item, type ShipTo } from "../shop/catalog";
 import { addressQr } from "../safe/qr";
 import { WHY, STAR, wire } from "../shop/why";
 import { seal, SEAL_KEY } from "../shop/seal";
@@ -229,11 +229,11 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
   const q = new URLSearchParams(location.search);
   const cart: Cart = { wedgie: 0, kit: 0, atomic: 0, atomickit: 0 };
   const want = q.get("item") as Item;      // /order?item=kit | atomic | atomickit
-  cart[ITEM_KEYS.includes(want) ? want : "wedgie"] = 1;
+  cart[FOR_SALE.includes(want) ? want : "wedgie"] = 1;
   count("view");
   box.innerHTML = `
     <div class="safe-box recess" id="o-cart">
-      ${(Object.keys(ITEMS) as Item[]).map((k) => `
+      ${FOR_SALE.map((k) => `
         <div class="order-line" data-item="${k}">
           <div><b>${esc(ITEMS[k].name)}</b> <span class="fine price"></span><br><span class="fine">${esc(ITEMS[k].what)}</span><br><b class="fine stock"></b></div>
           <div class="qty"><button class="btn btn-sm" data-d="-1" aria-label="fewer">−</button><b class="n"></b><button class="btn btn-sm" data-d="1" aria-label="more">+</button></div>
@@ -285,7 +285,7 @@ function form(box: HTMLElement, say: (s: string, bad?: boolean) => void) {
   const openEl = box.querySelector<HTMLElement>("#o-open")!;
   let shop: { card: boolean; usdc: boolean } = { card: false, usdc: false };
   api().then((r) => {
-    const l = left = Object.fromEntries(ITEM_KEYS.map((k) => [k, r.left?.[k] || 0])) as Record<Item, number>;
+    const l = left = Object.fromEntries(ITEM_KEYS.map((k) => [k, FOR_SALE.includes(k) ? r.left?.[k] || 0 : 0])) as Record<Item, number>;
     for (const k of ITEM_KEYS) cart[k] = Math.min(cart[k], l[k]);   // sold out: not in the cart
     const first = ITEM_KEYS.find((k) => l[k]);                      // what they came for is gone: the first kind there is
     if (!boxes(cart) && first) cart[first] = 1;

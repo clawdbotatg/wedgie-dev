@@ -9,7 +9,7 @@
 //                                             renew: an expired order quoted again at today's price
 // A quote holds 10 minutes (catalog.ts QUOTE); then the order is 'expired'.
 // The token is the buyer's: only its hash is kept. See _shop.ts for what is and isn't stored.
-import { PAY_CHAINS, ITEM_KEYS, boxes, noAbroad, cartOk, cartLines, type Cart } from "../src/shop/catalog.js";
+import { PAY_CHAINS, ITEM_KEYS, FOR_SALE, boxes, noAbroad, cartOk, cartLines, type Cart } from "../src/shop/catalog.js";
 import { depositOf } from "../src/shop/deposits.js";
 import { EMAIL, emailHash, lock, tokenOf, mailPaid } from "./_mail.js";
 import { cvOpen, cvCost, cvBalance, cvSigned, cvSpend, cvClaimed, cvAlarm, fmtCv } from "./_cv.js";
@@ -21,7 +21,7 @@ export async function GET(req: Request) {
   const sql = env("SHOP_DATABASE_URL") ? await db() : null;
   const extra = sql ? await extraNow(sql).catch(() => -1) : 0;
   const l = sql ? await stockLeft(sql).catch(() => null) : null;
-  const left = Object.fromEntries(ITEM_KEYS.map((k) => [k, Math.max(0, l?.[k] || 0)]));
+  const left = Object.fromEntries(ITEM_KEYS.map((k) => [k, FOR_SALE.includes(k) ? Math.max(0, l?.[k] || 0) : 0]));
   return json({ ...open(), extra: Math.max(0, extra), left, cv: await cvView(sql, new URL(req.url).searchParams.get("wallet")) });
 }
 

@@ -3,6 +3,7 @@ import { readFileSync, statSync, existsSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 // @ts-ignore plain JS build helper
 import { buildFirmware } from "./tools/fw.mjs";
+import { ATOMIC_ON } from "./src/shop/catalog";
 
 // The page paints the underwear and the loading bar from the first byte of HTML (index.html inlines
 // both). Everything else is fetched by the inline loader with byte-level progress, like the
@@ -101,6 +102,7 @@ function cards(): Plugin {
           return html.replace(re, (_, a, b) => a + v.replace(/&/g, "&amp;").replace(/"/g, "&quot;") + b);
         };
         let h = readFileSync(dir + "/index.html", "utf8");
+        if (name === "atomic" && !ATOMIC_ON) { writeFileSync(`${dir}/${name}.html`, h); continue; }   // hidden: the front page's preview
         h = set(h, "property", "og:url", c.url);
         for (const [k, v] of [["title", c.title], ["description", c.desc], ["image", c.img], ["image:alt", c.alt]]) {
           h = set(h, "property", "og:" + k, v);

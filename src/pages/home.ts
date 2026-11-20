@@ -1,6 +1,6 @@
 // The front page: give yourself a wedgie. Get one, or build one; a virtual one at the bottom.
 import { place3D, pageShown } from "../ui/place3d";
-import { ITEMS, type Item } from "../shop/catalog";
+import { ITEMS, ATOMIC_ON, type Item } from "../shop/catalog";
 import { WHY, STAR, wire } from "../shop/why";
 import { blo } from "blo";
 import { atomicArt } from "../ui/atomic";
@@ -64,7 +64,7 @@ export function home(main: HTMLElement): Promise<unknown> {
         <p>A snap-together shell with no screws, designed from scratch and MIT licensed. PETG, 0.16 mm layers, 4 walls, no supports. Print the lid face down, the base floor down, and the caps flange down.</p>
         <p class="note bad"><b>The joystick needs <a href="https://github.com/clawdbotatg/clawd-pico-case/blob/main/stl/current/JOYSTICK-PRINT.md" target="_blank" rel="noopener">special settings</a>.</b> Printed like the rest, it comes out bad.</p>
         <div class="row"><a class="btn btn-sm" href="https://github.com/clawdbotatg/clawd-pico-case/tree/main/stl/current" target="_blank" rel="noopener">The case files →</a></div>
-        <p class="fine">White lid, black base, grey joystick; buttons 2 grey, 1 green, 1 red. <b><a href="/atomic">Atomic wedgie</a></b>: its own <a href="https://github.com/clawdbotatg/clawd-pico-case/tree/main/stl/atomic-wedgie" target="_blank" rel="noopener">base and RESET plunger</a>.</p>
+        <p class="fine">White lid, black base, grey joystick; buttons 2 grey, 1 green, 1 red.${ATOMIC_ON ? ` <b><a href="/atomic">Atomic wedgie</a></b>: its own <a href="https://github.com/clawdbotatg/clawd-pico-case/tree/main/stl/atomic-wedgie" target="_blank" rel="noopener">base and RESET plunger</a>.` : ""}</p>
         <p class="fine">Source, measurements, and every iteration: <a href="https://github.com/clawdbotatg/clawd-pico-case" target="_blank" rel="noopener">clawd-pico-case</a>. Why it's called a wedgie: <a href="/lore.md" target="_blank">the lore</a>.</p>
       </div>
     </div>
@@ -144,7 +144,7 @@ export function home(main: HTMLElement): Promise<unknown> {
     </div>
   </section>
 
-  <div class="band roomy" aria-hidden="true"><i></i><i></i><i></i></div>
+  ${ATOMIC_ON ? `<div class="band roomy" aria-hidden="true"><i></i><i></i><i></i></div>
 
   <section id="atomic" class="sec">
     <div class="card wide atomic-card">
@@ -156,7 +156,7 @@ export function home(main: HTMLElement): Promise<unknown> {
         <div class="row"><a class="btn btn-sm" href="/atomic">Meet the atomic wedgie →</a></div>
       </div>
     </div>
-  </section>
+  </section>` : ""}
 
   <div class="band roomy" aria-hidden="true"><i></i><i></i><i></i></div>
 
@@ -271,7 +271,7 @@ export function home(main: HTMLElement): Promise<unknown> {
   main.querySelector<HTMLButtonElement>("#pop-emu")!.onclick = () => {
     if (!open("/virtual", "wedgie-emu", "popup,width=420,height=640")) location.href = "/virtual";
   };
-  atomicArt(main.querySelector<HTMLElement>("#atomic-art")!, { words: true });
+  if (ATOMIC_ON) atomicArt(main.querySelector<HTMLElement>("#atomic-art")!, { words: true });
   assembly(main.querySelector<HTMLElement>("#assembly")!);
   safeTx(main.querySelector<HTMLElement>(".stx")!);
   library(main.querySelector<HTMLElement>("#lib")!);

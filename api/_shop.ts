@@ -9,7 +9,7 @@
 // Env: SHOP_DATABASE_URL, STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET (card), SHOP_PAY_TO (USDC),
 // CV_* (claims, api/_cv.ts), SHOP_ADMIN_TOKEN (omen's orders.py), SHOP_STATS_TOKEN (api/stats.ts, counts only), SHOP_RPC_<chainId> (an Alchemy URL: never a public RPC).
 import { neon } from "@neondatabase/serverless";
-import { ITEMS, ITEM_KEYS, MANY, boxes, nameOf, PAY_CHAINS, QUOTE, cartLines, extraAt, type Cart, type Item, type Line } from "../src/shop/catalog.js";
+import { ITEMS, ITEM_KEYS, FOR_SALE, NOT_FOR_SALE, MANY, boxes, nameOf, PAY_CHAINS, QUOTE, cartLines, extraAt, type Cart, type Item, type Line } from "../src/shop/catalog.js";
 export { boxes };
 
 declare const process: { env: Record<string, string | undefined> };
@@ -150,6 +150,7 @@ export async function stockLeft(sql: Awaited<ReturnType<typeof db>>): Promise<Le
 }
 /** Why this cart can't be had ("Only 2 kits left.", "Wedgies are sold out."), or "" if it can. */
 export const short = (c: Partial<Cart>, left: Left) => {
+  if (ITEM_KEYS.some((k) => !FOR_SALE.includes(k) && (c[k] || 0) > 0)) return NOT_FOR_SALE;
   for (const k of Object.keys(STOCK_ROW) as Item[]) {
     const n = Math.max(0, left[k]), many = MANY[k];
     if ((c[k] || 0) > n) return n ? `Only ${n} ${n === 1 ? ITEMS[k].name : many} left.` : `${many[0].toUpperCase() + many.slice(1)} are sold out.`;

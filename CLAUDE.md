@@ -21,6 +21,10 @@ background tab) or `node tools/sign.mjs --gate-only` (firmware/apps). A FAIL mea
 
 ## The atomic wedgie (wedgie.dev/atomic)
 
+**Hidden for now (Austin, 11-20: the battery may charge too fast).** `ATOMIC_ON = false` in `src/shop/catalog.ts`: no
+/atomic page, nothing on the front page, not on /order, the server refuses it. All the code is kept. Bring it back: set
+it `true`, `git revert 15f5a6bf` (the public docs, the sitemap, loadprobe's page), push.
+
 A wedgie with a battery inside: Waveshare RP2040-Plus, a 601120 LiPo, the red base, a RESET plunger. Shop items `atomic`
 and `atomickit` ($10 more, own stock, shared surge, US only: `src/shop/catalog.ts`). The picture: `src/ui/atomic.ts`.
 **Words (Austin, 11-19):** it plays unplugged and it's air-gapped (no Wi-Fi, no Bluetooth). It can't sign unplugged:

@@ -11,6 +11,13 @@ export const ITEMS = {
 } as const;
 export type Item = keyof typeof ITEMS;
 export const ITEM_KEYS = Object.keys(ITEMS) as Item[];
+// The atomic wedgie is hidden (Austin, 11-20: the battery may charge too fast). false: no /atomic page, nothing on the
+// front page, not on /order, the server refuses it, no link preview. Orders already made still show. Bring it back:
+// set this true and put the docs back (CLAUDE.md, "The atomic wedgie").
+export const ATOMIC_ON: boolean = false;
+/** What the shop sells right now. ITEM_KEYS stays every kind: old orders and the stock count still need them. */
+export const FOR_SALE = ITEM_KEYS.filter((k) => ATOMIC_ON || (k !== "atomic" && k !== "atomickit"));
+export const NOT_FOR_SALE = "The atomic wedgie isn't for sale right now.";
 /** "wedgies", "kits": for "Only 2 kits left." and the stock line. */
 export const MANY: Record<Item, string> = { wedgie: "wedgies", kit: "kits", atomic: "atomic wedgies", atomickit: "atomic wedgie kits" };
 /** Boxes in a cart, all kinds together. A cart from before a kind existed has no count for it: 0. */

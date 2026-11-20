@@ -17,6 +17,7 @@ Object.assign(process.env, { SHOP_DATABASE_URL: "pglite", SHOP_PAY_TO: "0x" + "1
   SHOP_ADMIN_TOKEN: "t".repeat(40), SHOP_MAIL_KEY: "", STRIPE_SECRET_KEY: "" });
 const shop = await import("../api/_shop.ts"), order = await import("../api/order.ts"), admin = await import("../api/admin.ts");
 const sql = await shop.db();
+const { ATOMIC_ON } = await import("../src/shop/catalog.ts");
 const ok = (c, m) => { if (!c) { console.error("FAIL:", m); process.exit(1); } console.log("ok:", m); };
 let ip = 0;
 const post = (h, body, auth) => h.POST(new Request("http://x/api", { method: "POST", body: JSON.stringify(body),
@@ -54,11 +55,20 @@ const k2 = await post(order, { cart: { wedgie: 0, kit: 2 }, sealed: "v1." + "a".
 ok(k2.status === 409 && (await k2.json()).error === "Only 1 wedgie kit left.", "2 kits from 1: refused");
 await buy();
 ok(await both() === '{"wedgie":1,"kit":1,"atomic":1,"atomickit":1}', "a wedgie takes a wedgie, not a kit");
-ok(JSON.stringify((await (await order.GET(new Request("http://x/api/order"))).json()).left) === '{"wedgie":1,"kit":1,"atomic":1,"atomickit":1}', "GET /api/order shows every kind");
+ok(JSON.stringify((await (await order.GET(new Request("http://x/api/order"))).json()).left) === (ATOMIC_ON ? '{"wedgie":1,"kit":1,"atomic":1,"atomickit":1}' : '{"wedgie":1,"kit":1,"atomic":0,"atomickit":0}'), "GET /api/order shows every kind on sale");
 await stock(0, "kit");
 const k0 = await post(order, { cart: { wedgie: 0, kit: 1 }, sealed: "v1." + "a".repeat(60), email: "a@b.co", pay: "usdc", chain: 8453 });
 ok(k0.status === 409 && (await k0.json()).error === "Kits are sold out.", "kits sold out, wedgies still on sale");
 
+// 4: hidden (catalog.ts ATOMIC_ON false): no order takes one, and the shop shows none in stock
+if (!ATOMIC_ON) {
+  await stock(2, "atomic");
+  const h = await post(order, { cart: { wedgie: 0, kit: 0, atomic: 1, atomickit: 0 }, sealed: "v1." + "a".repeat(60), email: "a@b.co", pay: "usdc", chain: 8453 });
+  ok(h.status === 409 && (await h.json()).error === "The atomic wedgie isn't for sale right now.", "hidden: an atomic order is refused, even with stock");
+  ok((await (await order.GET(new Request("http://x/api/order"))).json()).left.atomic === 0, "hidden: the shop shows no atomic wedgies");
+  console.log("stocktest: all passed");
+  process.exit(0);
+}
 // 4: the atomic wedgie and its kit: their own stock, $10 more, the same surge as everything else, US only
 const cartOf = (c) => ({ cart: { wedgie: 0, kit: 0, atomic: 0, atomickit: 0, ...c }, sealed: "v1." + "a".repeat(60), email: "a@b.co", pay: "usdc", chain: 8453 });
 await stock(0, "atomic");
