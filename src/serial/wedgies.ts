@@ -140,7 +140,7 @@ async function identify(w: Wedgie) {
     const stuck = new Promise<never>((_, rej) => setTimeout(() => rej(new Error(STUCK)), 30000));
     for (let tries = 0; ; tries++) {
       try { await Promise.race([talk(w), stuck]); break; } catch (e: any) {
-        if (tries >= 5 || !/failed to open|busy|access denied|already open/i.test(e?.message || "")) throw e;
+        if (tries >= 12 || !/failed to open|busy|access denied|already open/i.test(e?.message || "")) throw e;
         await new Promise((res) => setTimeout(res, 700));
       }
     }
@@ -153,6 +153,7 @@ async function identify(w: Wedgie) {
     if ((w.state as string) === "gone") return;   // set by the disconnect listener while talk() ran
     w.state = "error";
     w.error = e?.message || String(e);
+    console.warn("[wedgie] identify failed:", w.error);
     if (/failed to open|busy|access denied|already open/i.test(w.error || "")) w.error = "Another tab has your wedgie. Close other wedgie.dev tabs (or mpremote, Thonny), then try again." + (isLinux() ? " " + LINUX_FIX : "");
   }
   emit();
