@@ -16,7 +16,7 @@
 import sys, os, gc, time, machine, framebuf, micropython
 from machine import Pin, SPI, ADC, PWM
 
-VERSION = "batt-1"
+VERSION = "batt-2"
 DC, CS, SCK, MOSI, RST, BL = 8, 9, 10, 11, 12, 13
 KEY_A, KEY_B = 15, 17
 LOG, OLD = "batt.csv", "batt.old.csv"
@@ -239,7 +239,7 @@ t0 = time.time()
 load = True
 usb = None              # None: not read yet
 since = 0               # when this stretch (on battery, or on USB) began
-mv = rest = sag = lo = first = 0
+mv = rest = sag = lo = first = rlog = 0
 temp = 0
 hist = []               # (seconds, mV) every LOG_S on battery, the last 10: the drop per minute
 next_log = next_rest = 0
@@ -327,17 +327,16 @@ while True:
                 last = [now - since, first, mv]
             usb, since, mv = u, now, v
             first = lo = v
-            rest = sag = 0
+            rest = sag = rlog = 0
             hist = []
             next_rest = now + 5
             next_log = now
         mv = v if changed else (mv * 3 + v) // 4
         if not usb:
             lo = min(lo, mv)
-        r = 0
         if not usb and load and now >= next_rest:
             next_rest = now + REST_S
-            r = rest = measure_rest()
+            rlog = rest = measure_rest()    # rlog: it goes in the next log line
             sag = max(0, rest - mv)
         if now >= next_log:
             next_log = now + LOG_S
@@ -345,7 +344,8 @@ while True:
                 hist.append((now, mv))
                 if len(hist) > 10:
                     hist.pop(0)
-            log("%d,%d,%d,%d,%d,%d" % (now, 1 if usb else 0, mv, r, temp, 1 if load else 0))
+            log("%d,%d,%d,%d,%d,%d" % (now, 1 if usb else 0, mv, 0 if usb else rlog, temp, 1 if load else 0))
+            rlog = 0
             gc.collect()
         draw(now)
     if load:

@@ -1,7 +1,7 @@
 // The battery firmware (public/device/batt.py, wedgie.dev/batt) on a virtual RP2040 (tools/rp2040/chip.mjs):
 // it boots, draws, reads a battery this script plays on GP29 and GP24, logs, and its log reads back.
 // The virtual chip has one core and no real clock, so the load itself (core 1, 250 MHz) isn't tested here.
-//   node tools/battchip.mjs [--shots <dir>]
+//   node tools/battchip.mjs [--shots <dir>]      (~45 min: every frame goes out byte by byte)
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { deflateSync } from "node:zlib";
 import { host } from "./rp2040/chip.mjs";
@@ -69,7 +69,7 @@ check(!/Traceback|Error/.test(h.out), "no error while it ran" + (/Traceback|Erro
 const csv = h.exec("print(open('batt.csv').read())", 30000).replace(/\r/g, "");
 console.log(csv.trim());
 const rows = csv.trim().split("\n");
-check(/^#boot,1,batt-1,/.test(rows[0]), "the log starts with its boot line");
+check(/^#boot,1,batt-\d+,/.test(rows[0]), "the log starts with its boot line");
 const data = rows.slice(1).map((r) => r.split(",").map(Number));
 check(data.length >= 5 && data.every((r) => r.length === 6 && r.every(Number.isFinite)), `${data.length} log lines, six numbers each`);
 check(data.some((r) => r[1] === 0 && Math.abs(r[2] - 3650) < 40), "on battery it logged about 3650 mV");
