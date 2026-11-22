@@ -19,6 +19,13 @@ background tab) or `node tools/sign.mjs --gate-only` (firmware/apps). A FAIL mea
   Our own descriptors live in clawdbotatg/clear-descriptors (a checkout beside this repo), never here; write them
   there, then PR them to the EF registry.
 
+## Battery test (wedgie.dev/batt)
+
+Ours, not linked anywhere. Puts a special firmware on a wedgie (BOOTSEL, like /reset): `public/device/batt.py`, one file,
+plain MicroPython, no wedgie firmware. It never sleeps, burns all the power it can (backlight, screen pushed non-stop, both
+cores, 250 MHz), shows the battery and logs it to `batt.csv` every 30 s. The page (`src/pages/batt.ts`) reads the log back
+and draws each run. Test: `node tools/battchip.mjs --shots <dir>` (virtual chip, ~10 min; one core, so not the load). Back to a wedgie: /reset.
+
 ## The atomic wedgie (wedgie.dev/atomic)
 
 **Hidden for now (Austin, 11-20: the battery may charge too fast).** `ATOMIC_ON = false` in `src/shop/catalog.ts`: no

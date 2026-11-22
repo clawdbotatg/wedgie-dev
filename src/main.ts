@@ -13,6 +13,7 @@ import { format } from "./pages/format";
 import { update } from "./pages/update";
 import { prepare } from "./pages/prepare";
 import { reset } from "./pages/reset";
+import { batt } from "./pages/batt";
 import { build } from "./pages/build";
 import { code } from "./pages/code";
 import { debug } from "./pages/debug";
@@ -40,6 +41,7 @@ if (path === "/format") history.replaceState(null, "", "/test");
 const onUpdate = path === "/update";
 const onPrepare = path === "/prepare";
 const onReset = path === "/reset";
+const onBatt = path === "/batt";             // ours: the battery test firmware
 const onBuild = path === "/build";
 if (path === "/atomic" && !ATOMIC_ON) location.replace("/");   // hidden for now (catalog.ts ATOMIC_ON)
 const onAtomic = ATOMIC_ON && path === "/atomic";       // the atomic wedgie: a battery inside
@@ -153,6 +155,6 @@ if (Drive.inApp()) {
 const top = document.getElementById("top")!;
 // Ready when the page's first screen is really there: on the home page that includes the hero wedgie
 // (its files are in the loader's byte count, and it has drawn a frame). Other 3D waits for the page.
-if (onFormat || onUpdate || onPrepare || onReset || onTelegram) document.body.classList.add("test-mode");
-const up = onFormat ? (format(top), Promise.resolve()) : onUpdate ? (update(top), Promise.resolve()) : onPrepare ? (prepare(top), Promise.resolve()) : onReset ? (reset(top), Promise.resolve()) : onConnect ? (connect(top), Promise.resolve()) : onAssemble3d ? (assemble3d(top), Promise.resolve()) : onAssemble ? (assemble(top), Promise.resolve()) : onBuild ? (build(top), Promise.resolve()) : onCode ? (code(top), Promise.resolve()) : onDebug ? (debug(top), Promise.resolve()) : onSafe ? (safe(top), Promise.resolve()) : onSecret ? (secret(top), Promise.resolve()) : onOrder ? (order(top), Promise.resolve()) : onLegal ? (legal(top, path.slice(1) as "terms" | "privacy"), Promise.resolve()) : onEmu ? (emu(top), Promise.resolve()) : onTelegram ? (telegram(top), Promise.resolve()) : onSandbox ? (sandbox(top), Promise.resolve()) : onAtomic ? atomic(top) : home(top);
+if (onFormat || onUpdate || onPrepare || onReset || onBatt || onTelegram) document.body.classList.add("test-mode");
+const up = onFormat ? (format(top), Promise.resolve()) : onUpdate ? (update(top), Promise.resolve()) : onPrepare ? (prepare(top), Promise.resolve()) : onReset ? (reset(top), Promise.resolve()) : onBatt ? (batt(top), Promise.resolve()) : onConnect ? (connect(top), Promise.resolve()) : onAssemble3d ? (assemble3d(top), Promise.resolve()) : onAssemble ? (assemble(top), Promise.resolve()) : onBuild ? (build(top), Promise.resolve()) : onCode ? (code(top), Promise.resolve()) : onDebug ? (debug(top), Promise.resolve()) : onSafe ? (safe(top), Promise.resolve()) : onSecret ? (secret(top), Promise.resolve()) : onOrder ? (order(top), Promise.resolve()) : onLegal ? (legal(top, path.slice(1) as "terms" | "privacy"), Promise.resolve()) : onEmu ? (emu(top), Promise.resolve()) : onTelegram ? (telegram(top), Promise.resolve()) : onSandbox ? (sandbox(top), Promise.resolve()) : onAtomic ? atomic(top) : home(top);
 up.then(() => (window as any).__wedgieReady?.(), () => (window as any).__wedgieReady?.());

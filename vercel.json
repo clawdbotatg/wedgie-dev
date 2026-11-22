@@ -231,6 +231,10 @@
       "destination": "/index.html"
     },
     {
+      "source": "/batt",
+      "destination": "/index.html"
+    },
+    {
       "source": "/reset",
       "destination": "/reset.html"
     },

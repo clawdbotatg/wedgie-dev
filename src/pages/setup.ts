@@ -11,6 +11,7 @@
 // tapped Connect once (wedgies.ts armed), except "a new Pico", which is a tap.
 import * as W from "../serial/wedgies";
 import { installCore, useApp, firmwareManifest } from "../serial/install";
+import { busy, writeFile } from "../serial/files";
 import { usbSupported, bootDevices, isBoot, pickBoot, flashMicroPython, BOOT_PIDS } from "../serial/picoboot";
 import { esc } from "../ui/device";
 
@@ -28,8 +29,9 @@ const other = (w: W.Wedgie) => w.state === "error" && /No MicroPython/.test(w.er
 /** Boards the card owns: /connect leaves them out of its rows. */
 export const needsSetup = (w: W.Wedgie) => other(w);
 
-/** reset: /reset's copy (a wedgie someone put in boot mode to start over), not /connect's. */
-export function setupCard(el: HTMLElement, opts: { reset?: boolean } = {}) {
+/** reset: /reset's copy (a wedgie someone put in boot mode to start over), not /connect's.
+ *  batt: /batt's: after MicroPython it gets the battery firmware (public/device/batt.py as main.py), not the wedgie firmware. */
+export function setupCard(el: HTMLElement, opts: { reset?: boolean; batt?: boolean } = {}) {
   let job: Job | null = null;
   let boots: USBDevice[] = [];
   let alive = true;
@@ -49,14 +51,14 @@ export function setupCard(el: HTMLElement, opts: { reset?: boolean } = {}) {
       return;
     }
     const items = [
-      ...boots.map((d, i) => ({ id: `b${i}`, what: opts.reset ? `Found it: a wedgie in boot mode (${BOOT_PIDS[d.productId]})` : `A new Pico (${BOOT_PIDS[d.productId]}, in boot mode)`, go: () => flash(d) })),
+      ...boots.map((d, i) => ({ id: `b${i}`, what: opts.reset || opts.batt ? `Found it: a wedgie in boot mode (${BOOT_PIDS[d.productId]})` : `A new Pico (${BOOT_PIDS[d.productId]}, in boot mode)`, go: () => flash(d) })),
       ...W.wedgies().filter(other).map((w) => ({ id: `o${w.key}`, what: "A board with something else on it (not MicroPython)", go: () => knock(w) })),
       ...W.wedgies().filter(bare).map((w) => ({ id: `m${w.key}`, what: `${w.short} · ${w.board}: MicroPython, no wedgie firmware`, go: () => install(w) })),
     ];
     if (!items.length) { el.innerHTML = ""; return; }
-    el.innerHTML = `<div class="setup card"><h3>${opts.reset ? "Ready to reset" : "Not set up yet"}</h3>
-      ${items.map((x) => `<div class="setup-item"><span>${esc(x.what)}</span><button class="btn btn-green setup-go" data-id="${x.id}">${opts.reset ? "Reset it" : "Set up"}</button></div>`).join("")}
-      <p class="fine">${opts.reset ? "Wipes its apps and saves, then puts on MicroPython and the latest wedgie firmware. The chip and its keys stay." : "Set up wipes it, then puts on MicroPython and the wedgie firmware. Pick its app after."}</p></div>`;
+    el.innerHTML = `<div class="setup card"><h3>${opts.batt ? "Ready" : opts.reset ? "Ready to reset" : "Not set up yet"}</h3>
+      ${items.map((x) => `<div class="setup-item"><span>${esc(x.what)}</span><button class="btn btn-green setup-go" data-id="${x.id}">${opts.batt ? "Install battery firmware" : opts.reset ? "Reset it" : "Set up"}</button></div>`).join("")}
+      <p class="fine">${opts.batt ? "Wipes its apps and saves, then puts on MicroPython and the battery firmware. The chip and its keys stay." : opts.reset ? "Wipes its apps and saves, then puts on MicroPython and the latest wedgie firmware. The chip and its keys stay." : "Set up wipes it, then puts on MicroPython and the wedgie firmware. Pick its app after."}</p></div>`;
     for (const x of items) el.querySelector<HTMLElement>(`[data-id="${x.id}"]`)!.onclick = () => void x.go();
   };
   const set = (j: Partial<Job>) => { job = { ...(job || { stage: "boot", text: "", detail: "", p: null, since: Date.now(), wifi: false }), ...j }; paint(); };
@@ -108,7 +110,25 @@ export function setupCard(el: HTMLElement, opts: { reset?: boolean } = {}) {
     needPick("back", "serial");
   }
 
+  // /batt: one file, main.py, on plain MicroPython. Never the WiFi build: it doesn't use the radio.
+  async function installBatt(w: W.Wedgie) {
+    set({ stage: "install", text: "Installing the battery firmware…", detail: "Don't unplug it.", p: 0, pick: undefined });
+    try {
+      const res = await fetch("/device/batt.py", { cache: "no-cache" });
+      if (!res.ok) throw new Error("batt.py missing");
+      const src = new Uint8Array(await res.arrayBuffer());
+      await W.withRepl(w, async (r) => {
+        await r.enter({ reset: true });          // bare MicroPython: no drive, a reset is safe
+        await busy(r, "Battery firmware");
+        await writeFile(r, "/main.py", src, { onChunk: (p) => set({ p }) });
+        await r.leave();                         // the soft reset: main.py runs
+      });
+    } catch (e) { return fail(e, "The battery firmware didn't go on"); }
+    set({ stage: "done", text: `${w.short} runs the battery firmware`, detail: "Unplug it to start a test. Back to a normal wedgie: wedgie.dev/reset", p: null });
+  }
+
   async function install(w: W.Wedgie) {
+    if (opts.batt) return installBatt(w);
     set({ stage: "install", text: "Installing the wedgie firmware…", detail: "Don't unplug it.", p: 0, pick: undefined });
     let reboot = false, before: USBDevice[] = [];
     try {

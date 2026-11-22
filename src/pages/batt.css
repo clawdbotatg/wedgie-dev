@@ -1,0 +1,16 @@
+/* /batt: the battery test page (batt.ts) */
+.batt-page { justify-content: flex-start; }
+.batt-how, .batt-run { width: 100%; max-width: 720px; text-align: left; }
+.batt-how p { margin: 6px 0; }
+.batt-run { margin: 0 auto 22px; }
+.batt-run h3 { margin: 0 0 14px; }
+.batt-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.batt-stat { display: flex; flex-direction: column; }
+.batt-stat b { font-size: 22px; font-weight: 900; color: var(--ink); }
+.batt-stat span { font-size: 13px; color: var(--muted); }
+.batt-chart { width: 100%; height: auto; display: block; }
+.batt-chart .g { stroke: var(--muted); stroke-opacity: .25; stroke-width: 1; }
+.batt-chart .ax { font: 500 11px "DM Mono", monospace; fill: var(--muted); }
+.batt-chart .load { fill: none; stroke: var(--mint-d); stroke-width: 2.5; stroke-linejoin: round; }
+.batt-chart .rest { fill: var(--coral); }
+#b-log { width: 100%; }
