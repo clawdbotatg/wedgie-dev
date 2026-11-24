@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createECDH, createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { p256 } from "@noble/curves/nist";
 import { boot, flashFromUf2 } from "../src/chip/sim.ts";
 import { newTrustM, trustM } from "../src/chip/trustm.ts";
 
@@ -260,6 +261,86 @@ function finalPair() {
   checkStockDisabled();
 }
 
+function checkWalletApprovals() {
+  const sha256 = data => createHash("sha256").update(data).digest();
+  const eth = request("hello").safe;
+  const ethKey = Buffer.from("04" + eth.x.slice(2) + eth.y.slice(2), "hex");
+  const text = "Local updater QA";
+  const safeMessageHash = "5dea276c880998492ab2ccbe0a46218cfa15f7e189ea65de138944e97695b36e";
+  const messageFields = {
+    chainId: 84532, safe: "0x1234567890123456789012345678901234567890", hex: Buffer.from(text).toString("hex"),
+  };
+  let ethereumReviewFrame;
+
+  function review(type, fields, button) {
+    assert(request("hello").sealed);
+    const before = hash(sim.frame);
+    const id = send(type, fields);
+    const terminal = () => replies.find(row => row.id === id && row.type !== "sol_prompt");
+    if (type === "sol_sign") {
+      until(() => reply(id, "sol_prompt"), 14000, "Solana approval did not open");
+    } else if (ethereumReviewFrame) {
+      assert.notEqual(before, ethereumReviewFrame, "Previous Ethereum review did not clear");
+      until(() => hash(sim.frame) === ethereumReviewFrame, 14000, "Ethereum approval did not return");
+    } else {
+      until(() => hash(sim.frame) !== before, 14000, "Ethereum approval was not displayed");
+    }
+    sim.run(1100);
+    if (type === "safe_message" && !ethereumReviewFrame) ethereumReviewFrame = hash(sim.frame);
+    assert.equal(terminal(), undefined, "An update approval must not authorize a wallet request");
+    key(button);
+    return until(terminal, 18000, "Wallet review did not respond to its own GPIO input");
+  }
+
+  const rejectedMessage = review("safe_message", messageFields, "Y");
+  assert.equal(rejectedMessage.type, "refused");
+  assert.equal(rejectedMessage.r, undefined);
+  assert.equal(rejectedMessage.s, undefined);
+  sim.run(1200);
+  const signed = review("safe_message", messageFields, "A");
+  assert.equal(signed.type, "safe_sig");
+  assert.equal(signed.messageHash, "0x91d50e348e9bfff41f1722f852adc103955b9c19ba6e82c106aef0c7da4cdf49");
+  assert.equal(signed.safeMessageHash, "0x" + safeMessageHash);
+  assert.equal(signed.x, eth.x);
+  assert.equal(signed.y, eth.y);
+  const clientFields = '"origin":"https://wedgie.dev"';
+  const auth = Buffer.concat([sha256("wedgie.dev"), Buffer.from([5, 0, 0, 0, 0])]);
+  assert.equal(signed.authenticatorData, "0x" + auth.toString("hex"));
+  assert.equal(signed.clientDataFields, clientFields);
+  const challenge = Buffer.from(safeMessageHash, "hex").toString("base64url");
+  const client = sha256(`{"type":"webauthn.get","challenge":"${challenge}",${clientFields}}`);
+  const ethSignature = Buffer.from(signed.r.slice(2) + signed.s.slice(2), "hex");
+  assert(p256.verify(ethSignature, sha256(Buffer.concat([auth, client])), ethKey, { prehash: false, lowS: true }));
+
+  // Golden SignV2 digests for the fixed public profiles made by the fixture builder.
+  const cases = [
+    { network: "local", kind: "sol", expected: "caed1725a65ff3da9228d71dd1ffb4e2354686b44a4595dcc3cb0ef7f54f249e" },
+    { network: "devnet", kind: "token", expected: "19c4e85a84390478e21d8abd3dd1fa2352f390a3a4ff7049dba02e23f180055a" },
+  ];
+  for (const { network, kind, expected } of cases) {
+    const profile = fixture.profiles[network];
+    const fields = { network, kind, swig: profile.swig, wallet: profile.wallet,
+      recipient: "7MFRphJW7sMR6PmN9KEpi8ReJTakP6KMDibiM5DpZx7W", amount: 100000,
+      slot: 123456, counter: 1, expected, prompt_events: 1 };
+    if (kind === "token") {
+      fields.source = "4d3mJSf83fVWk2vYkNYajG3hw2T4m65v4JT9d67vamST";
+      fields.mint = profile.mint;
+    }
+    const denied = review("sol_sign", fields, "Y");
+    assert.equal(denied.type, "refused");
+    assert.equal(denied.reason, "declined");
+    assert.equal(denied.signature, undefined);
+    sim.run(950);
+    const result = review("sol_sign", fields, "A");
+    assert.equal(result.type, "sol_ok");
+    assert.equal(result.message, expected);
+    assert(p256.verify(Buffer.from(result.signature, "hex"), sha256(Buffer.from(expected, "hex")),
+      Buffer.from(profile.key, "hex"), { prehash: false, lowS: true }));
+  }
+  return { ethereumText: true, localSol: true, devnetSpl: true,
+    rejectedWithoutSignature: 3, signedOnlyAfterFreshApproval: 3 };
+}
+
 booted(0);
 const fixtureUid = health();
 phase(fixture.initial);
@@ -291,12 +372,15 @@ phase(fixture.active);
 console.log("The second stock job activated the paired policy without changing the cartridge or saves.");
 const pairedDigest = stagePair();
 let pairedResets = 0;
+let walletApprovals;
 if (fixture.actual) {
   assert.equal(health(), fixtureUid);
   console.log(`Staged exact v${fixture.new_app_version} and signed executable core; live v${fixture.old_app_version} remains sealed.`);
   pairedResets = pairedCommit(pairedDigest);
   finalPair();
   console.log("One paired green and two resets restored sealed v78, 0.3.92, all profiles, and mainnet refusal.");
+  walletApprovals = checkWalletApprovals();
+  console.log("Ethereum, local SOL, and Devnet SPL each required separate GPIO approval after the paired update.");
 } else {
   assert.equal(request("paired_stage_abort").type, "paired_stage_aborted");
 }
@@ -327,5 +411,5 @@ writeFileSync(report, JSON.stringify({
     exact_app_bytes_preserved_across_pair: JSON.stringify(fixture.old_cartridge) === JSON.stringify(fixture.new_cartridge), verified_paired_files: Object.keys(fixture.probe.hashes).length,
     ethereum_signer_preserved: true, solana_profiles_preserved: true, fixture_saves_preserved: Object.keys(fixture.saves).length,
     mainnet_status_enroll_sign_refused: true, signed_executable_core_exercised: true,
-    cold_boot_preserves_paired_release: true } : {}),
+    cold_boot_preserves_paired_release: true, post_update_wallet_approvals: walletApprovals } : {}),
 }, null, 2) + "\n");

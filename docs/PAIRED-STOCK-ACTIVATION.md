@@ -98,8 +98,12 @@ It starts with the exact v77 app bytes, stock boot and slot, and disposable
 Trust M profiles. The two stock jobs preserve the running v77 app and saves.
 The following paired job installs the exact v78 app bytes and the signed test
 core 0.3.92 with one simulated GPIO approval. The test interrupts the paired
-commit, verifies sealed state, identities and mainnet refusal, then checks the
-restored state again after a simulated power cycle.
+commit and verifies sealed state, identities and mainnet refusal. After the
+update, it requests an Ethereum message signature, a local SOL signature,
+and a Devnet SPL signature using disposable fixtures. Each request must
+wait for its own GPIO input. Red returns no signature. A fresh green press
+produces a signature that verifies against the saved key. The test checks
+the restored state again after a simulated power cycle.
 
 ```sh
 uv run --offline --with littlefs-python --with mpy-cross==1.29.0.post2 \
