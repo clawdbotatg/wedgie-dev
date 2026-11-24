@@ -57,6 +57,21 @@ uv run --with 'mpy-cross==1.29.0.post2' --with 'littlefs-python==0.19.0' \
 node tools/fido-lab/test_transport_probe.mjs /tmp/spare-pico-fido-transport-only.uf2
 ```
 
-This image replaces the filesystem of a spare RP2040 Pico. It contains the CDC and HID probe, with INIT and PING only. The emulator exercises the exact image over emulated USB. Hardware enumeration remains a separate check.
+This image replaces the filesystem of a spare RP2040 Pico. It contains the CDC and HID probe, with INIT and PING only. To exercise the exact image through the python-fido2 host implementation, run:
+
+```sh
+uv run --with 'fido2==2.2.1' --with 'cryptography==50.0.2' \
+  python -B tools/fido-lab/probe_native_hid.py \
+  --emulator-uf2 /tmp/spare-pico-fido-transport-only.uf2
+```
+
+After flashing the transport probe to a disposable Pico and confirming its USB serial, use the same host client with the operating system's HID backend:
+
+```sh
+uv run --with 'fido2==2.2.1' --with 'cryptography==50.0.2' \
+  python -B tools/fido-lab/probe_native_hid.py --usb-serial '<spare-Pico serial>'
+```
+
+The native probe checks that exactly one HID interface matches the bench product and serial before opening it. The client checks the INIT nonce, PING across report boundaries, and refusal of CTAP2 GetInfo. The emulator can verify those exchanges before hardware enumeration is available.
 
 [FIDO Alliance CTAP USB transport](https://fidoalliance.org/specs/fido-v2.1-ps-20210615/fido-client-to-authenticator-protocol-v2.1-ps-20210615.html#usb) · [MicroPython USBDevice](https://docs.micropython.org/en/v1.29.0/library/machine.USBDevice.html) · [Yubico Python FIDO](https://github.com/Yubico/python-fido2) · [UF2 format](https://github.com/microsoft/uf2)

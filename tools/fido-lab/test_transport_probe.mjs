@@ -1,5 +1,6 @@
 // Boot the transport-only UF2 on the existing RP2040 simulator and exercise HID endpoints.
 import assert from 'node:assert/strict';
+import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
 
 const harness = process.env.WEDGIE_RP2040_HARNESS
@@ -42,18 +43,45 @@ usb.onEndpointWrite = (endpoint, data) => {
   else originalWrite(endpoint, data);
 };
 
+function writeReport(report) {
+  assert.equal(report.length, 64);
+  assert(rig.until(() => usb.armed[out] === 64, 300), 'No HID OUT arm');
+  delete usb.armed[out];
+  usb.endpointReadDone(out, report);
+}
+
+function readReport() {
+  assert(rig.until(() => replies.length > 0, 300), 'No HID reply');
+  const reply = replies.shift();
+  assert.equal(reply.length, 64);
+  return reply;
+}
+
+if (process.argv[3] === '--stdio') {
+  // Let the independent host library own message framing and reassembly.
+  const lines = createInterface({ input: process.stdin });
+  for await (const line of lines) {
+    if (line === 'read') {
+      process.stdout.write(readReport().toString('hex') + '\n');
+    } else {
+      assert.match(line, /^[0-9a-f]{128}$/);
+      writeReport(Buffer.from(line, 'hex'));
+      process.stdout.write('written\n');
+    }
+  }
+  assert.equal(replies.length, 0);
+  assert.doesNotMatch(rig.out, /Traceback|MemoryError|AttributeError/);
+  process.exit(0);
+}
+
 function exchange(channel, command, payload) {
   const request = Buffer.alloc(64);
   channel.copy(request);
   request[4] = 0x80 | command;
   request.writeUInt16BE(payload.length, 5);
   payload.copy(request, 7);
-  assert(rig.until(() => usb.armed[out] === 64, 300), 'No HID OUT arm');
-  delete usb.armed[out];
-  usb.endpointReadDone(out, request);
-  assert(rig.until(() => replies.length === 1, 300), `No HID reply for command ${command}`);
-  const reply = replies.shift();
-  assert.equal(reply.length, 64);
+  writeReport(request);
+  const reply = readReport();
   assert.deepEqual(reply.subarray(0, 4), channel);
   return { command: reply[4] & 0x7f, body: reply.subarray(7, 7 + reply.readUInt16BE(5)) };
 }
