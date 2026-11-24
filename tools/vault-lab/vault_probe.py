@@ -1,6 +1,8 @@
 """RP2040 emulator cartridge for a disposable vault derivation test."""
 from binascii import hexlify, unhexlify
+import lcd
 import optiga
+import ui
 import wedgie
 
 # Both OIDs are volatile. This fixture doesn't use the wallet's long-lived ECC slots.
@@ -24,6 +26,18 @@ def derive_key(chip, peer, vault_id):
 
 
 def run():
+    if not wedgie.SEALED or wedgie.is_open():
+        raise RuntimeError("Vault fixture requires a sealed device")
+
+    def prompt_ready(_tick):
+        wedgie.send({"type": "vault-fixture-prompt"})
+
+    if not ui.ask(lcd.LCD(), "Derive test key?", ("Disposable KeePassXC vault",),
+                  yes="derive", no="reject", ms=15000, keys=lcd.Keys(physical=True),
+                  sig=prompt_ready):
+        wedgie.send({"type": "vault-fixture-refused"})
+        return
+
     chip = optiga.Chip()
     try:
         public = chip.genkey(KEY, optiga.P256, optiga.KEY_AGREE)

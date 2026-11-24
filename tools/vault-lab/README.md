@@ -5,6 +5,11 @@ The firmware creates a volatile P-256 key in E102, keeps its ECDH shared
 coordinate in E103, and uses the Trust M TLS 1.2 PRF to derive a 32-byte
 key for one fixture vault context.
 
+The cartridge asks for physical approval before starting the chip session.
+The emulator checks that a synthetic USB press leaves the prompt pending
+and that red returns a refusal without key material. A fresh boot and green
+GPIO press allow the disposable derivation to run.
+
 An independent OpenSSL ECDH and HMAC-SHA256 reference checks each
 derivation. The fixture also checks session reset and compares persistent
 chip state before and after. KeePassXC opens a newly created dummy database

@@ -33,7 +33,8 @@ const flash = flashFromUf2(readFileSync(join(core, 'public/mp/RPI_PICO.uf2')));
 flash.set(fileSystem, 0xa0000);
 const state = newTrustM();
 const persistentSnapshot = JSON.stringify({ keys: state.keys, data: state.data, meta: state.meta });
-let sim, pending = '', receipt, changes = 0;
+const events = [];
+let sim, pending = '', changes = 0;
 sim = boot({ rom: readFileSync(join(core, 'tools/rp2040/bootrom-b1.bin')), flash,
   uid: Uint8Array.of(0xee, 0xe0, 0, 0, 0, 0, 0, 0x21),
   i2c: trustM(state, () => sim?.ms ?? 0, () => { changes += 1; }),
@@ -46,13 +47,46 @@ sim = boot({ rom: readFileSync(join(core, 'tools/rp2040/bootrom-b1.bin')), flash
       if (!line.startsWith('{')) continue;
       try {
         const value = JSON.parse(line);
-        if (value.type === 'vault-fixture-result') receipt = value;
+        if (value.type?.startsWith('vault-fixture-')) events.push(value);
       } catch {}
     }
   },
 });
-while (!receipt && sim.ms < 25000) sim.run(25);
-assert(receipt, 'The virtual cartridge did not finish the derivation');
+function waitForEvent(type, since, milliseconds) {
+  const deadline = sim.ms + milliseconds;
+  while (sim.ms < deadline) {
+    const event = events.slice(since).find(value => value.type === type);
+    if (event) return event;
+    sim.run(25);
+  }
+  assert.fail('Missing event: ' + type);
+}
+
+function press(key) {
+  sim.key(key, true);
+  sim.run(180);
+  sim.key(key, false);
+  sim.run(180);
+}
+
+waitForEvent('vault-fixture-prompt', 0, 25000);
+sim.run(800);
+assert(sim.connected, 'The virtual USB endpoint is unavailable');
+sim.write(Buffer.from('{"type":"press","key":"A","ms":1000}\n'));
+sim.run(1600);
+assert.deepEqual(events.map(event => event.type), ['vault-fixture-prompt'],
+  'A synthetic USB press resolved the approval');
+press('Y');
+assert.deepEqual(waitForEvent('vault-fixture-refused', 0, 10000), { type: 'vault-fixture-refused' });
+assert(!events.some(event => event.type === 'vault-fixture-result'), 'Red released vault key material');
+
+const restarted = events.length;
+sim.powerCycle();
+waitForEvent('vault-fixture-prompt', restarted, 25000);
+sim.run(800);
+assert.deepEqual(events.slice(restarted).map(event => event.type), ['vault-fixture-prompt']);
+press('A');
+const receipt = waitForEvent('vault-fixture-result', restarted, 15000);
 assert(receipt.repeated && receipt.reset_erased_secret, 'The volatile session lifetime check failed');
 assert(!changes && JSON.stringify({ keys: state.keys, data: state.data, meta: state.meta }) === persistentSnapshot,
   'The virtual cartridge changed persistent Trust M state');
@@ -73,6 +107,7 @@ console.log(verified.trim());
 writeFileSync(receiptPath, JSON.stringify({ core: '0.3.91', virtualRP2040: true,
   stockMicroPython: true, virtualTrustM: true, ecdhKeySlot: 'E102', sharedSecretSlot: 'E103',
   agreementSecretExported: false, tlsPrfSha256: true, independentHostReferenceMatches: true,
+  physicalGpioApprovalRequired: true, syntheticUsbApprovalRefused: true, redReleasedNoKeyMaterial: true,
   sameSessionDeterministic: true, closeAndResetClearedSharedSecret: true, persistentStateUnchanged: true,
   keepassxcUnlockedDummyVault: true, wrongContextRefused: true, wrongDeviceRefused: true,
   disposableRecoveryKeyUnlocked: true, noNamedUnlockKeyRetained: true, physicalHardwareTest: false }, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
