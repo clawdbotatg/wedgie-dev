@@ -58,13 +58,16 @@ def require_options(request, field, registration=False):
 class BenchAuthenticator:
     """Discoverable ES256 credentials with explicit test presence."""
 
-    def __init__(self, user_presence, store=None, *, rp_ids=(RP_ID,), pin=None):
+    def __init__(self, user_presence, store=None, *, rp_ids=(RP_ID,), pin=None, key_factory=None):
         self.user_presence = user_presence
         self._rps = frozenset(rp_ids)
         if not self._rps or self._rps - BENCH_RPS:
             raise ValueError("Expected reserved fixture RPs")
+        if key_factory is not None and store is not None:
+            raise ValueError("External fixture keys use the in-memory store")
         self._store = CredentialStore() if store is None else store
         self._pin = pin
+        self._key_factory = key_factory
 
     def handle(self, payload):
         """Return a CTAP status byte followed by canonical CBOR on success."""
@@ -142,7 +145,15 @@ class BenchAuthenticator:
         self._require_presence("register", rp_id)
         flags = self._verification_flags(request, rp_id, client_hash, PK_REGISTRATION, 8, 9)
 
-        key = ec.generate_private_key(ec.SECP256R1())
+        if self._key_factory is None:
+            key = ec.generate_private_key(ec.SECP256R1())
+        else:
+            existing = self._store.get(rp_id)
+            if existing is not None:
+                if excluded and existing.id in excluded:
+                    raise CtapError(ERR.CREDENTIAL_EXCLUDED)
+                raise CtapError(ERR.KEY_STORE_FULL)
+            key = self._key_factory(rp_id)
         credential = Credential(token_bytes(32), user_id, key)
         credential_data = AttestedCredentialData.create(
             bytes(16), credential.id, ES256.from_cryptography_key(key.public_key()))

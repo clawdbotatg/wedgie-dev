@@ -31,6 +31,22 @@ The opt-in bench uses Yubico's protocol 2 key derivation, encryption, and authen
 
 The simulated secure element retains the test PIN verifier and the eight-attempt limit when the authenticator reopens. Three consecutive failures require a simulated power cycle. The total retry count survives that cycle, and successful PIN verification restores the retry budget. PIN changes use the same retry budget as token requests. A successful change invalidates existing tokens and preserves enrolled credentials. Reopening invalidates active tokens, and storage corruption causes the operation to fail. Host process exit discards all mock state. PIN reset and hardware-backed PIN and retry storage remain separate milestones. The previously built Pico UF2 remains a transport-only probe.
 
+## Volatile Trust M credential fixture
+
+The host CTAP2 fixture can use the virtual RP2040 cartridge for ES256. Each reserved RP uses its own volatile Trust M key. Registration shows separate virtual GPIO reviews for key generation and self-attestation. Assertion signing also requires a fresh GPIO review. The FIDO verifier checks registration and sign-in for both RPs. Closing the virtual chip session clears the keys. The host keeps public credential metadata in memory.
+
+Build the bench cartridge and run it with an emulator checkout that contains the volatile Trust M signing support from the sealed SSH bench.
+
+```sh
+uv run --with 'mpy-cross==1.29.0.post2' mpy-cross -s fido_bench.py \
+  -o /tmp/fido-trustm-bench.mpy tools/fido-lab/virtual/fido_bench.py
+uv run --with 'fido2==2.2.1' --with 'cryptography==50.0.2' \
+  python -B tools/fido-lab/test_trustm_credentials.py /tmp/fido-trustm-bench.mpy \
+  --emulator-checkout EMULATOR_CHECKOUT
+```
+
+The CTAP client still uses the host loopback for HID framing. Native USB enumeration, persistent protected credentials, and hardware PIN storage remain separate checks.
+
 ## Spare-board transport wiring
 
 On a dedicated disposable MicroPython Pico build, a boot harness can configure the interface alongside built-in CDC and call `hid.poll()` from its main loop. The transport-only factory below advertises FIDO HID framing with INIT and PING and has no credential operations. This example is a wiring reference. Physical enumeration and OS behavior remain the next checks.
