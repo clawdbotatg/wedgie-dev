@@ -39,6 +39,20 @@ class InstallerGuardTests(unittest.TestCase):
         namespace["_handle"](request)
         self.assertEqual(len(stock), 2)
 
+    def test_lend_only_asks_the_known_signer_to_release_its_two_idle_buffers(self):
+        source = Path(__file__).resolve().parents[1] / "firmware" / "slot.py"
+        tree = ast.parse(source.read_text())
+        fn = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
+                  and node.name == "_lend_paired_scratch")
+        calls = []
+        namespace = {"app": {"mod": "safe"}, "mod": SimpleNamespace(_lend=lambda: calls.append("idle buffer"))}
+        exec(compile(ast.Module(body=[fn], type_ignores=[]), str(source), "exec"), namespace)
+        namespace["_lend_paired_scratch"]()
+        self.assertEqual(len(calls), 2)
+        namespace["app"] = {"mod": "another-app"}
+        namespace["_lend_paired_scratch"]()
+        self.assertEqual(len(calls), 2)
+
     def test_file_read_does_not_reserve_a_full_chunk_for_a_short_save(self):
         source = Path(__file__).resolve().parents[1] / "firmware" / "wedgie.py"
         tree = ast.parse(source.read_text())

@@ -63,6 +63,13 @@ class Bundle:
 
 
 def healthy(hello, uid):
+    if isinstance(hello, dict) and hello.get("type") == "paired_recovery_status":
+        check(hello.get("sealed") is True and hello.get("open") is False and hello.get("writes") is False,
+              "Invalid Wedgie recovery status")
+        reason = hello.get("reason")
+        if reason not in ("integrity_check_failed", "paired_replay_incomplete", "legacy_job_pending"):
+            reason = "integrity_check_failed"
+        raise ValueError("Wedgie is in sealed read-only recovery (" + reason + ")")
     check(isinstance(hello, dict) and hello.get("type") == "hello" and hello.get("sealed") is True
           and hello.get("open") is False and hello.get("uid") == uid, "Expected the selected sealed Wedgie")
 
@@ -85,10 +92,12 @@ def stage(peer, bundle):
         reply = response(peer, "paired_stage_begin", **bundle.header)
         has_stage = (reply.get("type") == "paired_stage_meta" and type(reply.get("offset")) is int
                      and reply["offset"] == 0)
-        for offset in range(0, len(bundle.metadata), CHUNK):
+        chunk_size = reply.get("chunk", CHUNK)
+        check(type(chunk_size) is int and 256 <= chunk_size <= CHUNK, "Unexpected staging chunk size")
+        for offset in range(0, len(bundle.metadata), chunk_size):
             check(reply.get("type") == "paired_stage_meta" and type(reply.get("offset")) is int
                   and reply["offset"] == offset, "Unexpected metadata cursor")
-            chunk = bundle.metadata[offset:offset + CHUNK]
+            chunk = bundle.metadata[offset:offset + chunk_size]
             reply = response(peer, "paired_stage_meta", offset=offset, data=tagged_bytes(chunk))
 
         visited = set()
@@ -106,7 +115,7 @@ def stage(peer, bundle):
                   "Unexpected payload cursor")
             check(type(reply.get("size")) is int and reply["size"] == len(content)
                   and reply.get("digest") == bundle.pair.files[name], "Payload cursor differs from signed file")
-            chunk = content[offset:offset + CHUNK]
+            chunk = content[offset:offset + chunk_size]
             reply = response(peer, "paired_stage_put", name=name, offset=offset, data=tagged_bytes(chunk))
             offset += len(chunk)
 

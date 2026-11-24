@@ -37,8 +37,17 @@ def _hex(digest):
     return binascii.hexlify(digest).decode()
 
 
+def _hash(data):
+    if not isinstance(data, str):
+        return hashlib.sha256(data).digest()
+    digest = hashlib.sha256()
+    for start in range(0, len(data), 256):
+        digest.update(data[start:start + 256].encode())
+    return digest.digest()
+
+
 def _digest(data):
-    return _hex(hashlib.sha256(data).digest())
+    return _hex(_hash(data))
 
 
 def _json(data):
@@ -57,6 +66,19 @@ def _json(data):
     return json.loads(data, object_pairs_hook=strict)
 
 
+def _envelope_lines(raw):
+    text = isinstance(raw, str)
+    newline = "\n" if text else b"\n"
+    if not raw.endswith(newline):
+        raise ValueError("incomplete signed text")
+    start = 0
+    while start < len(raw):
+        end = raw.find(newline, start)
+        line = raw[start:end]
+        yield line if text else line.decode()
+        start = end + 1
+
+
 def _file_line(line, files):
     digest, sep, name = line.partition("  ")
     stem, dot, ext = name.partition(".")
@@ -64,17 +86,18 @@ def _file_line(line, files):
             or stem[0] not in LETTERS or not dot or ext not in ("py", "mpy", "bin", "json")
             or name in files or name == "apps.json" or name.startswith("saves")):
         raise ValueError("invalid or duplicate payload name")
+    if ((ext == "mpy" and stem + ".py" in files) or (ext == "py" and stem + ".mpy" in files)):
+        raise ValueError("colliding payload module")
     files[name] = digest
+    return name
 
 
-def _app_record(shelf, mod, name, v):
+def _app_record(shelf, mod, name, v, payload):
     selected = None
-    app_files = {}
+    app_files = set()
     seen = set()
     current = None
-    if not shelf.endswith(b"\n"):
-        raise ValueError("incomplete shelf")
-    for line in shelf.decode().split("\n")[:-1]:
+    for line in _envelope_lines(shelf):
         if line.startswith("@app  "):
             app = _json(line[6:])
             current = app["mod"]
@@ -84,12 +107,12 @@ def _app_record(shelf, mod, name, v):
             if current == mod:
                 selected = app
         elif current == mod:
-            _file_line(line, app_files)
+            app_files.add(_file_line(line, payload))
     if not selected or selected["name"] != name:
         raise ValueError("signed pair and shelf name disagree")
     files = selected["files"]
     if (not isinstance(files, list) or not all(isinstance(name, str) for name in files)
-            or not files or len(files) != len(app_files) or set(files) != set(app_files)):
+            or not files or len(files) != len(app_files) or set(files) != app_files):
         raise ValueError("signed app files are incomplete")
     # This prototype is for namespaced apps such as Safe Signer. Stock apps
     # that share top-level files need separate reviewed namespace rules.
@@ -105,7 +128,7 @@ def _app_record(shelf, mod, name, v):
         if not _word(selected["entry"], DIGITS + "_", 30):
             raise ValueError("invalid signed app entry")
         record["entry"] = selected["entry"]
-    return record, app_files
+    return record
 
 
 class Pair:
@@ -121,15 +144,15 @@ class Pair:
     def parse(cls, release, signature, shelf, verify):
         if not verify(release, signature):
             raise ValueError("release signature rejected")
-        lines = release.decode().split("\n")
-        if len(lines) < 6 or lines[0] != "wedgie-release 1" or lines[-1] != "":
+        lines = _envelope_lines(release)
+        if next(lines, None) != "wedgie-release 1":
             raise ValueError("invalid release header")
-        prefix, _, core = lines[1].partition(" ")
+        prefix, _, core = next(lines, "").partition(" ")
         if prefix != "version":
             raise ValueError("invalid core version")
         _version(core)
         core_files, tags = {}, {}
-        for line in lines[2:-1]:
+        for line in lines:
             if line.startswith("@"):
                 key, sep, value = line.partition("  ")
                 if not sep or key in tags or key not in ("@apps", "@serial", "@pair", "@sizes"):
@@ -148,24 +171,19 @@ class Pair:
                 or not _word(pair["name"], DIGITS + " ._()+-", 32)
                 or not _word(pair["v"], DIGITS + "._+-", 16)):
             raise ValueError("missing or invalid signed pair")
-        app, app_files = _app_record(shelf, pair["mod"], pair["name"], pair["v"])
-        boot_files = {"boot.py", "main.py", "wedgie.mpy"}
-        stems = [n.rsplit(".", 1)[0] for names in (core_files, app_files)
-                 for n in names if n.endswith(".py") or n.endswith(".mpy")]
-        if (not all(n in core_files for n in boot_files) or any(n in core_files for n in app_files)
-                or len(set(stems)) != len(stems)):
-            raise ValueError("incomplete core or colliding payload files")
-        core_files.update(app_files)
+        if not all(name in core_files for name in ("boot.py", "main.py", "wedgie.mpy")):
+            raise ValueError("incomplete core payload")
+        app = _app_record(shelf, pair["mod"], pair["name"], pair["v"], core_files)
         sizes_hash = tags.get("@sizes")
         if sizes_hash is not None and not _valid(sizes_hash, HEX, 64, 64):
             raise ValueError("invalid sizes digest")
         return cls(core, int(serial), app, core_files, _digest(release), sizes_hash)
 
     def sizes(self, raw):
-        if self.sizes_hash != _digest(raw) or not raw.endswith(b"\n"):
+        if self.sizes_hash != _digest(raw):
             raise ValueError("signed sizes hash mismatch")
         expected = {}
-        for line in raw.decode().split("\n")[:-1]:
+        for line in _envelope_lines(raw):
             nbytes, sep, name = line.partition("  ")
             if not sep or name not in self.files or name in expected or not _decimal(nbytes, 7):
                 raise ValueError("invalid or duplicate signed size")
@@ -228,9 +246,14 @@ def _check_files(pair, stage, live):
 
 
 def _parse_offer(receipt, verify):
-    pair = Pair.parse(receipt["release"].encode(), receipt["sig"], receipt["shelf"].encode(), verify)
+    release, shelf = receipt["release"], receipt["shelf"]
+    # The hosted verify hook is a byte-oriented API. On the board our
+    # measured verifier hashes the stored text in bounded UTF-8 pieces.
+    if sys.implementation.name != "micropython":
+        release, shelf = release.encode(), shelf.encode()
+    pair = Pair.parse(release, receipt["sig"], shelf, verify)
     if pair.sizes_hash is not None or "sizes" in receipt:
-        pair.sizes(receipt.get("sizes", "").encode())
+        pair.sizes(receipt.get("sizes", ""))
     return pair
 
 

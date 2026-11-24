@@ -39,9 +39,14 @@ function upload(req, fixture, filenames, mismatch = false) {
   const digest = (body) => createHash("sha256").update(body).digest("hex");
   const offer = { release_size: parts[0].length, shelf_size: parts[1].length,
     sizes_size: parts[2].length, sig: fixture.sig };
-  const begin = () => req("paired_stage_begin", offer);
+  let chunkSize = 1024;
+  const begin = () => {
+    const reply = req("paired_stage_begin", offer);
+    if (reply?.type === "paired_stage_meta") chunkSize = reply.chunk ?? 1024;
+    return reply;
+  };
   const transfer = (type, bytes, offset, fields = {}) => req(type, {
-    ...fields, offset, data: bytes.subarray(offset, offset + 1024).toString("base64"),
+    ...fields, offset, data: bytes.subarray(offset, offset + chunkSize).toString("base64"),
   });
 
   assert.equal(begin()?.type, "paired_stage_meta");
@@ -50,14 +55,14 @@ function upload(req, fixture, filenames, mismatch = false) {
   assert.equal(begin()?.type, "paired_stage_meta");
   assert.match(transfer("paired_stage_meta", metadata, 1)?.error, /out-of-order/);
   let cursor = begin();
-  for (let offset = 0; offset < metadata.length; offset += 1024) {
+  for (let offset = 0; offset < metadata.length; offset += chunkSize) {
     assert.equal(cursor?.type, "paired_stage_meta", JSON.stringify(cursor));
     assert.equal(cursor.offset, offset);
     cursor = transfer("paired_stage_meta", metadata, offset);
   }
   for (const name of filenames) {
     const data = Buffer.from(fixture.payload[name], "base64");
-    for (let offset = 0; offset < data.length; offset += 1024) {
+    for (let offset = 0; offset < data.length; offset += chunkSize) {
       assert.deepEqual({ type: cursor?.type, name: cursor?.name, offset: cursor?.offset,
         size: cursor?.size, digest: cursor?.digest },
       { type: "paired_stage_put", name, offset, size: data.length, digest: digest(data) });

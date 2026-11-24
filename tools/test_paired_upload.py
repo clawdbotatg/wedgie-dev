@@ -46,7 +46,10 @@ class Peer:
         if kind == "paired_stage_begin":
             if self.override == "refused_begin":
                 return {"type": "error", "error": "busy"}
-            return {"type": "paired_stage_meta", "offset": 0}
+            reply = {"type": "paired_stage_meta", "offset": 0}
+            if self.override == "bounded_chunk":
+                reply["chunk"] = 512
+            return reply
         if kind == "paired_stage_meta":
             assert message["offset"] == len(self.meta)
             self.meta.extend(base64.b64decode(message["data"], validate=True))
@@ -108,6 +111,11 @@ class PairedUploadTests(unittest.TestCase):
         self.assertEqual(peer.calls.count("paired_stage_put"), 3)
         self.assertNotIn("paired_update", peer.calls)
         self.assertNotIn("press", peer.calls)
+
+    def test_smaller_device_chunk_applies_to_metadata_and_payload(self):
+        peer = Peer(self.bundle, override="bounded_chunk")
+        self.assertEqual(stage(peer, self.bundle)["digest"], self.release_hash)
+        self.assertEqual(peer.calls.count("paired_stage_put"), 6)
 
     def test_already_matching_pair_skips_payload(self):
         peer = Peer(self.bundle, change=False)
@@ -203,6 +211,14 @@ class PairedUploadTests(unittest.TestCase):
         self.assertEqual(port.opens, 3)
         with self.assertRaisesRegex(ValueError, "selected sealed"):
             wait_for_install(Port([dict(new, uid="1" * 16)]), self.bundle, UID, seconds=1)
+
+    def test_recovery_status_stops_normal_host_operations(self):
+        status = {"type": "paired_recovery_status", "sealed": True, "open": False,
+                  "writes": False, "reason": "paired_replay_incomplete"}
+        with self.assertRaisesRegex(ValueError, "sealed read-only recovery"):
+            healthy(status, UID)
+        with self.assertRaisesRegex(ValueError, "Invalid Wedgie recovery"):
+            healthy({**status, "writes": True}, UID)
 
     def test_readback_refuses_app_crash_with_unchanged_cart_record(self):
         peer = Peer(self.bundle, override="fallback")

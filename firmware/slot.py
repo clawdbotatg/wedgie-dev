@@ -232,6 +232,16 @@ failed = W.failed
 _PAIRED_STAGE = ("paired_stage_begin", "paired_stage_meta", "paired_stage_put", "paired_stage_abort")
 
 
+def _lend_paired_scratch():
+    # The installed Safe v77/v78 already knows when its two reserved
+    # transaction buffers are idle. Its _lend never discards data in use.
+    if app and app["mod"] == "safe":
+        lend = getattr(mod, "_lend", None)
+        if lend:
+            lend()
+            lend()
+
+
 def _handle(m):
     mid, t = m.get("id"), m.get("type")
     if _q and (t in ("rm", "open", "job", "stop", "home", "reboot", "phone", "paired_update") or t in _PAIRED_STAGE):
@@ -310,9 +320,11 @@ def _handle(m):
             failed(mid, e)
         _restart()                      # a no: start again
     elif t == "paired_update" and "paired_bridge" in sys.modules:
+        _lend_paired_scratch()
         if _asking(lambda: sys.modules["paired_bridge"].offer(W, d, m)):
             _restart()                  # a red or timed-out review: restore the app screen
     elif t in _PAIRED_STAGE and "paired_bridge" in sys.modules:
+        _lend_paired_scratch()
         import paired_staging
         _asking(lambda: paired_staging.handle(W, m))
     elif t == "sums" and not m.get("names"):    # only which files are there: no job.py needed

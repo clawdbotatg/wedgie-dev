@@ -156,6 +156,7 @@ def main():
                     "cart_fingerprint": bundle.pair.app["v"],
                     "core_version": bundle.pair.core, "files_verified": files, "save_preserved": True,
                     "staging_preserved_cart_identity": True, "actual_signer_binary": actual,
+                    "initial_paired_state_seeded_by_boot": metadata.get("initial_paired_state_seeded_by_boot", False),
                     **({"ethereum_signer_preserved": True, "solana_profiles_preserved": True,
                         "mainnet_refused": True, "baseline_free_heap": first.get("ram"),
                         "after_free_heap": final.get("ram")} if actual else {}),

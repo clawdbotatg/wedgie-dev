@@ -214,6 +214,14 @@ class StageChecks(unittest.TestCase):
         self.assertEqual(stage._active["metadata"][0][:50], self.metadata[:50])
         self.assertEqual(self.chunk("meta", 50, self.metadata[50:80])["offset"], 80)
 
+    def test_noncanonical_base64_is_rejected_before_decoding(self):
+        for value in ("Y=Jj", "YWJj\n", "YQ=/", "YR==", "YWJ=", "YWJj!"):
+            with self.subTest(value=value), patch.object(stage.binascii, "a2b_base64", side_effect=AssertionError):
+                with self.assertRaises(ValueError):
+                    stage._chunk({"offset": 0, "data": value}, 0, stage.MAX_CHUNK)
+        for value, expected in (("YQ==", b"a"), ("YWI=", b"ab"), ("YWJj", b"abc")):
+            self.assertEqual(stage._chunk({"offset": 0, "data": value}, 0, stage.MAX_CHUNK), expected)
+
     def test_invalid_metadata_never_attempts_a_flash_write(self):
         with patch.object(stage, "_append", side_effect=AssertionError("unauthenticated flash write")), \
              patch.object(stage, "open", side_effect=AssertionError("unauthenticated offer write"), create=True):

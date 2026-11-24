@@ -7,6 +7,7 @@ from pathlib import Path
 import tempfile
 
 from littlefs import LittleFS
+from paired_bootstrap_gate import MEASURED, activation_boot
 from test_paired_staged_bridge_image import BENCH_MODULES, FW, HERE, PINNED, compile_text, reserved_modules, stock_files
 from test_paired_update import p256, release_pair, wedgie
 
@@ -36,7 +37,7 @@ def load_app(directory):
     return app, files, str(desc["version"])
 
 
-def main(old_dir, new_dir, output, versioned_core=False):
+def main(old_dir, new_dir, output, versioned_core=False, stock_activation=False):
     old_app, before, old_version = load_app(old_dir)
     new_app, after, new_version = load_app(new_dir)
     assert old_version == "77" and new_version == "78"
@@ -45,8 +46,10 @@ def main(old_dir, new_dir, output, versioned_core=False):
     with tempfile.TemporaryDirectory(prefix="paired-actual-signer-") as directory:
         work = Path(directory)
         core = stock_files()
-        core["boot.py"] = core["boot.py"].replace(b"PAIRED_UPDATE_BENCH = False", b"PAIRED_UPDATE_BENCH = True")
-        assert b"PAIRED_UPDATE_BENCH = True" in core["boot.py"]
+        if not stock_activation:
+            core["boot.py"] = core["boot.py"].replace(b"PAIRED_UPDATE_BENCH = False", b"PAIRED_UPDATE_BENCH = True")
+            assert b"PAIRED_UPDATE_BENCH = True" in core["boot.py"]
+        modules_to_pin = BENCH_MODULES + (("pair_activate",) if stock_activation else ())
         trust_override = (FW / "wedgie.py").read_text() + "\nRELEASE_KEYS = " + repr(wedgie.RELEASE_KEYS) + "\n"
         if versioned_core:
             trust_override += (
@@ -65,22 +68,16 @@ def main(old_dir, new_dir, output, versioned_core=False):
         if versioned_core:
             core["pair_core.py"] = b'VERSION = "0.3.91"\ndef status():\n    return "original core " + VERSION\n'
             new_core["pair_core.py"] = b'VERSION = "0.3.92"\ndef status():\n    return "executed new core " + VERSION\n'
-        payload = {**new_core, **after}
-        sizes = "".join(f"{len(content)}  {name}\n" for name, content in sorted(payload.items()))
-        requested = {n: new_app[n] for n in ("mod", "name", "v")}
-        shelf_app = {n: value for n, value in new_app.items() if n != "v"}
-        release, sig, shelf = release_pair(
-            new_core, shelf_app, after, serial=121, target=requested, version=version,
-            extra="@sizes  " + sha256(sizes.encode()).hexdigest() + "\n")
         old_record = {key: value for key, value in old_app.items() if key != "files"}
         initial = {"core": "0.3.91", "serial": 120, "app": old_record}
         policy = ("RELEASE_KEYS = " + repr(wedgie.RELEASE_KEYS) + "\nPINNED = " + repr(PINNED)
-                  + "\nNO_WRITE = " + repr(tuple(m + ext for m in BENCH_MODULES for ext in (".py", ".mpy")))
+                  + "\nNO_WRITE = " + repr(tuple(m + ext for m in modules_to_pin for ext in (".py", ".mpy")))
                   + "\nSHADOW = " + repr(reserved_modules())
                   + "\nVERSIONED = " + repr(versioned_core)
                   + "\ndef checkpoint(name):\n    pass\n")
         if versioned_core:
-            baseline = {name: sha256(body).hexdigest() for name, body in {**core, **before}.items()}
+            baseline = {name: sha256(body).hexdigest() for name, body in {**core, **before}.items()
+                        if not stock_activation or name != "boot.py"}
             policy += "\nBASELINE_STATE = " + repr(initial) + "\nBASELINE_HASHES = " + repr(baseline) + "\n"
             policy += (
                 "\ndef checkpoint(name):\n"
@@ -99,14 +96,28 @@ def main(old_dir, new_dir, output, versioned_core=False):
                    "paired_update_boot": (HERE / "paired_update_boot.py").read_text(),
                    "paired_staging": (HERE / "fixtures/paired_staging.py").read_text(),
                    "pair_verify": (FW / "p256.py").read_text(), "pair_policy": policy}
+        if stock_activation:
+            modules["pair_activate"] = (HERE / "fixtures/pair_activate.py").read_text()
         files = {**core, **before, **{name + ".mpy": compile_text(name, source, work) for name, source in modules.items()}}
+        if stock_activation:
+            hashes = {name: sha256(files[name]).hexdigest() for name in MEASURED}
+            active_boot = activation_boot(core["boot.py"], hashes, 119, 120)
+            files["boot.py"] = new_core["boot.py"] = active_boot
+        payload = {**new_core, **after}
+        sizes = "".join(f"{len(content)}  {name}\n" for name, content in sorted(payload.items()))
+        requested = {n: new_app[n] for n in ("mod", "name", "v")}
+        shelf_app = {n: value for n, value in new_app.items() if n != "v"}
+        release, sig, shelf = release_pair(
+            new_core, shelf_app, after, serial=121, target=requested, version=version,
+            extra="@sizes  " + sha256(sizes.encode()).hexdigest() + "\n")
         files.update({
             "serial": b"120", "apps.json": json.dumps([old_record]).encode(),
-            "._paired/installed.json": json.dumps(initial).encode(),
             "saves/safe/solana_profile.json": json.dumps(profiles["local"]).encode(),
             "saves/safe/solana_devnet_profile.json": json.dumps(profiles["devnet"]).encode(),
             "saves/safe/pair-fixture.json": b"fixture: leave intact",
         })
+        if not stock_activation:
+            files["._paired/installed.json"] = json.dumps(initial).encode()
         if versioned_core:
             files["._paired/test_reset"] = b"1"
         fs = LittleFS(block_size=4096, block_count=352, prog_size=256)
@@ -125,8 +136,9 @@ def main(old_dir, new_dir, output, versioned_core=False):
             "payload": {key: b64encode(content).decode() for key, content in payload.items()},
             "profiles": profiles, "old_cart": {"mod": "safe", "v": old_app["v"]},
             "new_app_version": new_version,
+            "initial_paired_state_seeded_by_boot": stock_activation,
             "pinned": {name: sha256(files[name]).hexdigest()
-                       for name in (*PINNED, *(module + ".mpy" for module in BENCH_MODULES))},
+                       for name in (*PINNED, *(module + ".mpy" for module in modules_to_pin))},
             "old_cartridge_files": {name: sha256(data).hexdigest() for name, data in before.items()},
             "new_cartridge_files": {name: sha256(data).hexdigest() for name, data in after.items()},
         }))
@@ -138,5 +150,8 @@ if __name__ == "__main__":
     parser.add_argument("new_dir", type=Path)
     parser.add_argument("output", type=Path)
     parser.add_argument("--versioned-core", action="store_true")
+    parser.add_argument("--stock-activation", action="store_true", help="boot from an exact committed stock activation snapshot")
     args = parser.parse_args()
-    main(args.old_dir, args.new_dir, args.output, args.versioned_core)
+    if args.stock_activation and not args.versioned_core:
+        parser.error("--stock-activation requires --versioned-core")
+    main(args.old_dir, args.new_dir, args.output, args.versioned_core, args.stock_activation)

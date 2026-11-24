@@ -26,8 +26,8 @@ def versioned():
 
 
 def _verify(data, signature):
-    import hashlib
     import pair_verify
+    from paired_update_boot import _hash
     from pair_policy import RELEASE_KEYS
 
     pieces = signature.split()
@@ -41,7 +41,7 @@ def _verify(data, signature):
         r, s = (int(q, 16) for q in pieces[:2])
     except ValueError:
         return False
-    return pair_verify.verify(x, y, hashlib.sha256(data).digest(), r, s)
+    return pair_verify.verify(x, y, _hash(data), r, s)
 
 
 def _policy(pair, previous):
@@ -103,10 +103,10 @@ def checked_offer(W, signed):
         raise ValueError("installed release-key policy changed")
     if set(signed) not in ({"release", "sig", "shelf"}, {"release", "sig", "shelf", "sizes"}):
         raise ValueError("unexpected offer metadata")
-    pair = _parse_offer(signed, _verify)
     previous = {"core": W.VERSION, "serial": W.serial(), "app": W.active()}
     if not previous["app"] or previous != _read(STATE):
         raise ValueError("staged pair does not match installed firmware and app")
+    pair = _parse_offer(signed, _verify)
     pair.check_upgrade(previous)
     _policy(pair, previous)
     return pair, previous
@@ -260,6 +260,11 @@ def offer(W, display, request):
     if not (0 < length <= MAX_OFFER):
         raise ValueError("staged offer exceeds size limit")
     _reserve(length)
+    # The offer only exists after the upload is durable. Its RAM-only
+    # transport can be loaded again for a later upload.
+    import sys
+    sys.modules.pop("paired_staging", None)
+    gc.collect()
     signed = _read(OFFER)
     pair, previous = checked_offer(W, signed)
     _check_files(pair, STAGE, LIVE)

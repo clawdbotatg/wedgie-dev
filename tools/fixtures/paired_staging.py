@@ -11,7 +11,8 @@ import paired_bridge as bridge
 from paired_update_boot import HASH_BUFFER, _digest, _exists, _flash_replace, _sum
 
 
-MAX_CHUNK = 1024
+MAX_CHUNK = 512
+BASE64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 MAX_META = 8192
 MAX_FILES = 96
 IDLE_MS = 15000
@@ -52,19 +53,23 @@ def _chunk(message, offset, remaining, require_full=False):
     if type(message["offset"]) is not int or message["offset"] != offset:
         raise ValueError("out-of-order stage offset")
     coded = message["data"]
-    if not isinstance(coded, str) or len(coded) > 4 * ((MAX_CHUNK + 2) // 3):
+    if not isinstance(coded, str) or not 0 < len(coded) <= 4 * ((MAX_CHUNK + 2) // 3):
         raise ValueError("staged chunk too large")
-    try:
-        raw = binascii.a2b_base64(coded.encode())
-    except Exception:
+    padding = 2 if coded.endswith("==") else int(coded.endswith("="))
+    end = len(coded) - padding
+    if len(coded) % 4 or end <= 0 or any(coded[i] not in BASE64 for i in range(end)):
         raise ValueError("invalid staged base64")
-    if binascii.b2a_base64(raw).strip().decode() != coded:
+    if padding and BASE64.find(coded[end - 1]) & ((1 << (padding * 2)) - 1):
         raise ValueError("invalid staged base64")
+    length = len(coded) // 4 * 3 - padding
     size = min(MAX_CHUNK, remaining)
-    if not 0 < len(raw) <= size:
+    if not 0 < length <= size:
         raise ValueError("staged chunk exceeds signed length")
-    if require_full and len(raw) != size:
+    if require_full and length != size:
         raise ValueError("payload chunk must fill the signed cursor")
+    raw = binascii.a2b_base64(coded)
+    if len(raw) != length:
+        raise ValueError("invalid staged base64")
     return raw
 
 
@@ -81,7 +86,7 @@ def _begin(W, mid, message):
     bridge._reserve(sum(lengths))
     _active = {"metadata": [bytearray(n) for n in lengths], "total": sum(lengths),
                "sig": signature, "offset": 0, "last": time.ticks_ms()}
-    _reply(W, mid, "paired_stage_meta", offset=0)
+    _reply(W, mid, "paired_stage_meta", offset=0, chunk=MAX_CHUNK)
 
 
 def _cursor(W, mid, state):
@@ -130,11 +135,13 @@ def _meta(W, mid, state, message):
 
     buffers = state.pop("metadata")
     del part, field
-    signed = {name: bytes(buffers.pop(0)).decode() for name in ("release", "shelf", "sizes")}
-    signed["sig"] = state["sig"]
+    signed = {"sig": state["sig"]}
+    for name in ("release", "shelf", "sizes"):
+        signed[name] = buffers.pop(0).decode()
+        gc.collect()
     gc.collect()
     pair, _ = bridge.checked_offer(W, signed)
-    sizes = pair.sizes(signed["sizes"].encode())
+    sizes = pair.sizes(signed["sizes"])
     if len(sizes) > MAX_FILES:
         raise ValueError("too many signed files")
     pending = []
