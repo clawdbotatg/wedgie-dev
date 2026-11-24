@@ -16,8 +16,9 @@ import { buildApprovedNamespaces, getSdkError } from "@walletconnect/utils";
 // Scaffold-ETH 2's public project id, like Instant Wallet
 const PROJECT_ID = "3a8170812b534d0ff9d794f19a901d64";
 const METHODS = ["eth_sendTransaction", "wallet_sendCalls", "wallet_getCallsStatus", "wallet_showCallsStatus",
-  "wallet_getCapabilities", "wallet_switchEthereumChain", "personal_sign", "eth_signTypedData", "eth_signTypedData_v4"];
+  "wallet_getCapabilities", "wallet_switchEthereumChain"];
 const EVENTS = ["chainChanged", "accountsChanged"];
+const EVM_ACCOUNT = /^0x[\da-f]{40}$/i;
 
 export type Dapp = { name: string; url: string; icon?: string };
 export type Call = { to: string; value: bigint; data: string };
@@ -102,8 +103,8 @@ async function approve(k: Kit, p: WalletKitTypes.SessionProposal, w: { safe: str
     namespaces = buildApprovedNamespaces({ proposal: p.params,
       supportedNamespaces: { eip155: { chains: [chain], methods: METHODS, events: EVENTS, accounts: [`${chain}:${w.safe}`] } } });
   } catch {
-    await k.rejectSession({ id: p.id, reason: getSdkError("UNSUPPORTED_CHAINS") });
-    throw new Error(`${p.params.proposer.metadata.name || "The app"} wants a chain this Safe isn't on. Switch the app to this Safe's chain and try again.`);
+    await k.rejectSession({ id: p.id, reason: getSdkError("USER_REJECTED") });
+    throw new Error(`${p.params.proposer.metadata.name || "The app"} requires a chain or method this Safe cannot approve.`);
   }
   const s = await k.approveSession({ id: p.id, namespaces });
   // Approved isn't connected: wait for the app to confirm, or say so and drop the session.
@@ -144,10 +145,30 @@ async function respond(topic: string, id: number, r: Response) {
 }
 
 async function onRequest(k: Kit, e: WalletKitTypes.SessionRequest) {
-  const { topic, id } = e, { method, params } = e.params.request, p = params as any[];
+  const { topic, id } = e, { method, params } = e.params.request;
+  const session = k.getActiveSessions()[topic];
+  const { chainId, safe } = accountOf(k, topic);
+  if (!session?.acknowledged || !Number.isSafeInteger(chainId) || chainId <= 0 || !EVM_ACCOUNT.test(safe)) {
+    throw Object.assign(new Error("Connect this app to a Safe first."), { code: 4100 });
+  }
+  if (e.params.chainId !== `eip155:${chainId}`) {
+    throw Object.assign(new Error("This Safe is on another chain."), { code: 4902 });
+  }
+  if (!METHODS.includes(method) || !session.namespaces.eip155?.methods?.includes(method)) {
+    throw Object.assign(new Error(`${method}: a wedgie Safe can't do this yet.`), { code: 4200 });
+  }
+  const p = Array.isArray(params) ? params : [];
+  const from = method === "wallet_getCapabilities" ? p[0]
+    : method === "wallet_sendCalls" || method === "eth_sendTransaction" ? p[0]?.from : undefined;
+  if (from !== undefined && (typeof from !== "string" || from.toLowerCase() !== safe.toLowerCase())) {
+    throw Object.assign(new Error("This app is connected to a different Safe."), { code: 4100 });
+  }
+  if ((method === "eth_sendTransaction" || method === "wallet_sendCalls")
+      && p[0]?.chainId !== undefined && Number(p[0].chainId) !== chainId) {
+    throw Object.assign(new Error("This Safe is on another chain."), { code: 4902 });
+  }
   const old = sent()[`${topic}:${id}`];
   if (old) return respond(topic, id, "error" in old ? { error: old.error } : { result: old.result });
-  const { chainId, safe } = accountOf(k, topic);
   switch (method) {
     case "wallet_getCapabilities":
       return answer(topic, id, { [hex(chainId)]: { atomic: { status: "supported" }, atomicBatch: { supported: true } } });
@@ -160,13 +181,13 @@ async function onRequest(k: Kit, e: WalletKitTypes.SessionRequest) {
       return answer(topic, id, null);
     case "eth_sendTransaction":
     case "wallet_sendCalls": {
-      const req = method === "wallet_sendCalls" ? p[0] : { calls: [p[0]] };
-      if (req.chainId && Number(req.chainId) !== chainId) throw Object.assign(new Error("This Safe is on another chain."), { code: 4902 });
-      const calls: Call[] = (req.calls || []).map((c: any) => {
-        if (!c.to) throw new Error("Making contracts isn't supported.");
+      if (p.length !== 1) throw new Error("Expected one call request.");
+      const requested = method === "wallet_sendCalls" ? p[0]?.calls : [p[0]];
+      if (!Array.isArray(requested) || !requested.length) throw new Error("No calls.");
+      const calls: Call[] = requested.map((c: any) => {
+        if (typeof c?.to !== "string" || !EVM_ACCOUNT.test(c.to)) throw new Error("Each call needs a recipient address.");
         return { to: c.to, value: c.value ? BigInt(c.value) : 0n, data: c.data || "0x" };
       });
-      if (!calls.length) throw new Error("No calls.");
       hooks?.onAsk({ id, topic, chainId, safe, method, dapp: dappOf(k, topic), calls });
       return;
     }
