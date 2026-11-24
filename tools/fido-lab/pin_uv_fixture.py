@@ -93,6 +93,8 @@ class PinUvFixture:
                 return {1: {1: 2, 3: -25, -1: 1, -2: point.x.to_bytes(32, "big"), -3: point.y.to_bytes(32, "big")}}
             if command == ClientPin.CMD.SET_PIN:
                 return self._set_pin(request)
+            if command == ClientPin.CMD.CHANGE_PIN:
+                return self._change_pin(request)
             if command == ClientPin.CMD.GET_TOKEN_USING_PIN:
                 return self._get_token(request, allowed_rps)
             raise CtapError(ERR.INVALID_SUBCOMMAND)
@@ -117,6 +119,10 @@ class PinUvFixture:
         auth = field(request, 4, bytes, 32)
         if not compare_digest(auth, self._protocol.authenticate(secret, encrypted)):
             raise CtapError(ERR.PIN_AUTH_INVALID)
+        self._state.pin_hash = self._new_pin_hash(secret, encrypted)
+        return None
+
+    def _new_pin_hash(self, secret, encrypted):
         raw = self._protocol.decrypt(secret, encrypted)
         pin, delimiter, padding = raw.partition(b"\x00")
         try:
@@ -125,10 +131,9 @@ class PinUvFixture:
             valid_length = False
         if not valid_length or not delimiter or any(padding):
             raise CtapError(ERR.PIN_POLICY_VIOLATION)
-        self._state.pin_hash = sha256(pin).digest()[:16]
-        return None
+        return sha256(pin).digest()[:16]
 
-    def _get_token(self, request, allowed_rps):
+    def _check_pin_available(self):
         state = self._state
         if state.pin_hash is None:
             raise CtapError(ERR.PIN_NOT_SET)
@@ -136,12 +141,9 @@ class PinUvFixture:
             raise CtapError(ERR.PIN_BLOCKED)
         if state.consecutive >= POWER_CYCLE_LIMIT:
             raise CtapError(ERR.PIN_AUTH_BLOCKED)
-        permissions = field(request, 9, int)
-        rp = field(request, 10, str)
-        if not permissions or permissions & ~(PK_REGISTRATION | PK_ASSERTION) or rp not in allowed_rps:
-            raise CtapError(ERR.UNAUTHORIZED_PERMISSION)
-        secret = self._shared_secret(request)
-        encrypted = field(request, 6, bytes, 32)
+
+    def _verify_current_pin(self, secret, encrypted):
+        state = self._state
         pin_hash = self._protocol.decrypt(secret, encrypted)
         if not compare_digest(pin_hash, state.pin_hash):
             self._token = None
@@ -155,6 +157,28 @@ class PinUvFixture:
             raise CtapError(ERR.PIN_INVALID)
         state.retries = RETRIES
         state.consecutive = 0
+
+    def _change_pin(self, request):
+        self._check_pin_available()
+        secret = self._shared_secret(request)
+        new_pin = field(request, 5, bytes, 80)
+        current = field(request, 6, bytes, 32)
+        auth = field(request, 4, bytes, 32)
+        if not compare_digest(auth, self._protocol.authenticate(secret, new_pin + current)):
+            raise CtapError(ERR.PIN_AUTH_INVALID)
+        self._verify_current_pin(secret, current)
+        self._state.pin_hash = self._new_pin_hash(secret, new_pin)
+        self._token = None
+        return None
+
+    def _get_token(self, request, allowed_rps):
+        self._check_pin_available()
+        permissions = field(request, 9, int)
+        rp = field(request, 10, str)
+        if not permissions or permissions & ~(PK_REGISTRATION | PK_ASSERTION) or rp not in allowed_rps:
+            raise CtapError(ERR.UNAUTHORIZED_PERMISSION)
+        secret = self._shared_secret(request)
+        self._verify_current_pin(secret, field(request, 6, bytes, 32))
         self._token = Token(token_bytes(32), rp, permissions, self._clock() + TOKEN_SECONDS)
         return {2: self._protocol.encrypt(secret, self._token.secret)}
 

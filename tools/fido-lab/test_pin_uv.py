@@ -1,5 +1,6 @@
 """Exercise a sealed passkey fixture with the real Yubico ClientPIN protocol."""
 
+from hashlib import sha256
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -206,6 +207,45 @@ class PinUvTests(unittest.TestCase):
         params[-2] = params[-3] = bytes(32)
         self.assert_error(ERR.INVALID_PARAMETER, self.ctap.client_pin, 2, ClientPin.CMD.SET_PIN,
             params, bytes(32), wrapped)
+        self.assertEqual(self.pin.get_pin_retries(), (8, False))
+
+    def test_pin_change_revokes_tokens_and_preserves_credentials_on_reopen(self):
+        credential = self.enroll()
+        old_token = self.pin.get_pin_token(PIN, GA, ALPHA)
+        head = self.element.head
+        self.pin.change_pin(PIN, OTHER_PIN)
+        self.assertEqual(self.element.head, head)
+        prompts = len(self.prompts)
+        self.assert_error(ERR.PUAT_REQUIRED, self.ctap.get_assertion, ALPHA, DIGEST,
+                          **self.auth(old_token, DIGEST))
+        self.assertEqual(len(self.prompts), prompts)
+        self.open()
+        self.assert_error(ERR.PIN_INVALID, self.pin.get_pin_token, PIN, GA, ALPHA)
+        token = self.pin.get_pin_token(OTHER_PIN, GA, ALPHA)
+        self.assertEqual(self.pin.get_pin_retries(), (8, False))
+        self.approval = ("authenticate", ALPHA)
+        response = self.ctap.get_assertion(ALPHA, DIGEST, **self.auth(token, DIGEST))
+        self.assertEqual(response.credential["id"], credential.credential_id)
+        self.assertEqual(response.auth_data.counter, 1)
+        credential.public_key.verify(response.auth_data + DIGEST, response.signature)
+
+    def test_pin_change_checks_both_ciphertexts_and_shares_the_retry_budget(self):
+        self.pin.set_pin(PIN)
+        params, secret = self.pin._get_shared_secret()
+        new_pin = self.pin.protocol.encrypt(secret, OTHER_PIN.encode().ljust(64, b"\x00"))
+        current = self.pin.protocol.encrypt(secret, sha256(PIN.encode()).digest()[:16])
+        old_mac = self.pin.protocol.authenticate(secret, new_pin)
+        self.assert_error(ERR.PIN_AUTH_INVALID, self.ctap.client_pin, 2, ClientPin.CMD.CHANGE_PIN,
+                          params, old_mac, new_pin, current)
+        self.assertEqual(self.pin.get_pin_retries(), (8, False))
+        self.assert_error(ERR.PIN_INVALID, self.pin.change_pin, OTHER_PIN, PIN)
+        self.assert_error(ERR.PIN_INVALID, self.pin.get_pin_token, OTHER_PIN, GA, ALPHA)
+        self.assert_error(ERR.PIN_AUTH_BLOCKED, self.pin.change_pin, OTHER_PIN, PIN)
+        self.assert_error(ERR.PIN_AUTH_BLOCKED, self.pin.change_pin, PIN, OTHER_PIN)
+        self.assertEqual(self.pin.get_pin_retries(), (5, True))
+        self.element.pin.power_cycle()
+        self.open()
+        self.pin.change_pin(PIN, OTHER_PIN)
         self.assertEqual(self.pin.get_pin_retries(), (8, False))
 
 
