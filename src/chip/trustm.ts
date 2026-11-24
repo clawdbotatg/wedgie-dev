@@ -71,7 +71,7 @@ export function trustM(state: TrustMState, now: () => number, onChange: () => vo
   let out: Uint8Array | null = null, readyAt = 0;       // the frame the host reads next, and when it's ready
   let myFr = 0, open = false, lastError = 0, chain: Uint8Array[] = [];
   let hashing: Uint8Array[] | null = null;
-  const sessions = new Map<number, Uint8Array>();
+  const sessions = new Map<number, { bytes: Uint8Array; signingKey?: Omit<Key, "priv"> }>();
   const changed = () => onChange();
 
   // ---- metadata and access rules ----
@@ -136,7 +136,7 @@ export function trustM(state: TrustMState, now: () => number, onChange: () => vo
     if (oid === 0xe0f0) return { alg: 3, priv: state.factory, usage: 0x01 };
     return keys[oid] || null;
   }
-  const secretOf = (oid: number) => (SESSIONS.includes(oid) ? sessions.get(oid) : (meta[oid]?.[0xe8] === "21" ? unhex(data[oid] || "") : undefined));
+  const secretOf = (oid: number) => (SESSIONS.includes(oid) ? sessions.get(oid)?.bytes : (meta[oid]?.[0xe8] === "21" ? unhex(data[oid] || "") : undefined));
 
   function run(cmd: number, p: number, d: Uint8Array): [Uint8Array, number] {
     if (cmd !== 0x70) need(open, 0x0b);
@@ -198,7 +198,11 @@ export function trustM(state: TrustMState, now: () => number, onChange: () => vo
       }
       case 0x31: {                                  // CalcSign, ECDSA over a digest
         need(p === 0x11, 0x0a);
-        const t = tlvs(d), o = (t[0x03][0] << 8) | t[0x03][1], k = keyAt(o);
+        const t = tlvs(d), o = (t[0x03][0] << 8) | t[0x03][1];
+        const session = sessions.get(o);
+        const k = SESSIONS.includes(o)
+          ? session?.signingKey && { ...session.signingKey, priv: hex(session.bytes) }
+          : keyAt(o);
         need(k && CURVE[k.alg], 0x07);
         need(k!.usage & 0x11 && allows(o, 0xd3), 0x07);
         const n = SIZE[k!.alg], sig = CURVE[k!.alg].sign(t[0x01], unhex(k!.priv), { prehash: false, lowS: false }).toCompactRawBytes();
@@ -217,11 +221,11 @@ export function trustM(state: TrustMState, now: () => number, onChange: () => vo
       case 0x33: {                                  // CalcSSec, ECDH
         const t = tlvs(d), o = (t[0x01][0] << 8) | t[0x01][1];
         let priv: Uint8Array, alg = t[0x05][0];
-        if (SESSIONS.includes(o)) { const s = sessions.get(o); need(s, 0x07); priv = s!; }
+        if (SESSIONS.includes(o)) { const s = sessions.get(o); need(s, 0x07); priv = s!.bytes; }
         else { const k = keyAt(o); need(k && k.usage & 0x20, 0x07); priv = unhex(k!.priv); alg = k!.alg; }
         need(CURVE[alg], 0x25);
         const x = CURVE[alg].getSharedSecret(priv, bits(t[0x06])).slice(1);
-        if (t[0x08]) { sessions.set((t[0x08][0] << 8) | t[0x08][1], x); return [new Uint8Array(0), 60]; }
+        if (t[0x08]) { sessions.set((t[0x08][0] << 8) | t[0x08][1], { bytes: x }); return [new Uint8Array(0), 60]; }
         return [x, 60];
       }
       case 0x34: {                                  // DeriveKey
@@ -229,7 +233,7 @@ export function trustM(state: TrustMState, now: () => number, onChange: () => vo
         need(sec, 0x07);
         need(p === 0x08 || p === 0x01, 0x25);         // HKDF-SHA256 or the TLS PRF with SHA-256
         const outB = p === 0x08 ? hkdf(sha256, sec!, t[0x02] || new Uint8Array(0), t[0x04] || new Uint8Array(0), n) : prf(sec!, t[0x02] || new Uint8Array(0), n);
-        if (t[0x08]) { sessions.set((t[0x08][0] << 8) | t[0x08][1], outB); return [new Uint8Array(0), 30]; }
+        if (t[0x08]) { sessions.set((t[0x08][0] << 8) | t[0x08][1], { bytes: outB }); return [new Uint8Array(0), 30]; }
         return [outB, 30];
       }
       case 0x14: {                                  // EncryptSym: HMAC-SHA256 only
@@ -243,7 +247,10 @@ export function trustM(state: TrustMState, now: () => number, onChange: () => vo
         const t = tlvs(d), priv = CURVE[p].utils.randomPrivateKey(), pub = CURVE[p].getPublicKey(priv, false);
         if (t[0x07]) return [cat(tlv(0x01, cat([0x04, priv.length], priv)), tlv(0x02, bitstring(pub))), 60];
         const o = (t[0x01][0] << 8) | t[0x01][1];
-        if (SESSIONS.includes(o)) { sessions.set(o, priv); return [tlv(0x02, bitstring(pub)), 60]; }
+        if (SESSIONS.includes(o)) {
+          sessions.set(o, { bytes: priv, signingKey: { alg: p, usage: t[0x02]?.[0] ?? 0x10 } });
+          return [tlv(0x02, bitstring(pub)), 60];
+        }
         need(KEYS.includes(o) && o !== 0xe0f0, 0x07);
         need(allows(o, 0xd0), 0x07);
         keys[o] = { alg: p, priv: hex(priv), usage: t[0x02]?.[0] ?? 0x10 };

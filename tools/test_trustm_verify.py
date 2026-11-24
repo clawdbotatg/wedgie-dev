@@ -97,7 +97,17 @@ for i in range(200):
     assert c.verify(d, r, s, n.x, n.y) is True, i
     assert c.verify(d, r, s + 1, n.x, n.y) is False, i
     assert c.verify(hashlib.sha256(d).digest(), r, s, n.x, n.y) is False, i
-assert hi and lo, (hi, lo)
+# An RFC 6979 P-256 signature from the test scalar 19 covers these encodings
+# even when the randomized run above happens not to produce a short scalar.
+edge = ec.derive_private_key(19, ec.SECP256R1()).public_key()
+edge_point = edge.public_numbers()
+edge_digest = bytes.fromhex("ed69c579956719b1f0b4ba60a5ca5def14b16124d832dea032c89f855dce0ca8")
+edge_r = 0xa38f1de8aa0e1475d819a88c868591ae4897a5a81ffc4557a6e564dffcdabb
+edge_s = 0xf64686910ccccf347c51de053d691675c53381e9b20729eab81282f9f3f099f7
+assert edge_r < 1 << 248 and edge_s >= 1 << 255
+edge.verify(encode_dss_signature(edge_r, edge_s), edge_digest, ec.ECDSA(Prehashed(hashes.SHA256())))
+assert c.verify(edge_digest, edge_r, edge_s, edge_point.x, edge_point.y) is True
+assert c.verify(edge_digest, edge_r + 1, edge_s, edge_point.x, edge_point.y) is False
 other = ec.generate_private_key(ec.SECP256R1()).public_key().public_numbers()
 assert c.verify(d, r, s, other.x, other.y) is False
-print("ok trustm.verify: 200 signatures (%d with a top bit set, %d short), tampered ones and another key refused, %d chip checks" % (hi, lo, chip["seen"]))
+print("ok trustm.verify: 200 signatures (%d with a top bit set, %d short), fixed short/high vector checked, tampered ones and another key refused, %d chip checks" % (hi, lo, chip["seen"]))

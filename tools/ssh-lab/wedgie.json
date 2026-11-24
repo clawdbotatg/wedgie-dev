@@ -1,0 +1,28 @@
+{
+  "apps": [
+    {
+      "mod": "ssh_bench",
+      "name": "SSH Bench",
+      "about": "Test one physically approved SSH login with a disposable key on a spare board.",
+      "files": ["ssh_bench.py"],
+      "entry": "run",
+      "fw": "0.3.91",
+      "usb": true,
+      "label": "#d7e9ff",
+      "icon": [
+        "............",
+        "............",
+        "..kkkkkkkk..",
+        "..k......k..",
+        "..k.kk...k..",
+        "..k...k..k..",
+        "..k.kk...k..",
+        "..k...kk.k..",
+        "..k......k..",
+        "..kkkkkkkk..",
+        "............",
+        "............"
+      ]
+    }
+  ]
+}
