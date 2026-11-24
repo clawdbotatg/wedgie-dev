@@ -56,9 +56,11 @@ export function ensName(a: string, chain?: number): Promise<string | null> {
     const name = await tries(async () => {
       const main = client!.getEnsName({ address });
       if (chain && chain !== 1) {
+        // Observe a fast fallback failure while the chain-specific lookup is still pending.
+        void main.catch(() => {});
         const n = await Promise.race([client!.getEnsName({ address, coinType: v!.toCoinType(chain) }).catch(() => null),
           wait(3000).then(() => null)]);
-        if (n) { main.catch(() => {}); return n; }
+        if (n) return n;
       }
       return main;
     }).catch(() => undefined);
