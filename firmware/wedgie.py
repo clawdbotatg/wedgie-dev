@@ -686,7 +686,8 @@ def get(path, mid=None):
     n = max(1, (size + step - 1) // step)
     with open(path, "rb") as f:
         for i in range(n):
-            d = {"type": "file", "i": i, "n": n, "size": size, "data": binascii.b2a_base64(f.read(step)).decode().strip()}
+            count = min(step, size - i * step)
+            d = {"type": "file", "i": i, "n": n, "size": size, "data": binascii.b2a_base64(f.read(count)).decode().strip()}
             if mid is not None:
                 d["id"] = mid
             print(json.dumps(d))

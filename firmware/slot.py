@@ -229,11 +229,12 @@ def handle(line):
 
 
 failed = W.failed
+_PAIRED_STAGE = ("paired_stage_begin", "paired_stage_meta", "paired_stage_put", "paired_stage_abort")
 
 
 def _handle(m):
     mid, t = m.get("id"), m.get("type")
-    if _q and t in ("rm", "open", "job", "stop", "home", "reboot", "phone"):   # a question is up: not over it (_asking)
+    if _q and (t in ("rm", "open", "job", "stop", "home", "reboot", "phone", "paired_update") or t in _PAIRED_STAGE):
         W.send({"id": mid, "type": "error", "error": "busy: a question is on its screen"})
         return
     if t == "hello":
@@ -298,12 +299,22 @@ def _handle(m):
             time.sleep_ms(300)          # the answer gets out on USB serial first
             dr.remount()
     elif t == "job":                    # a checked install (job.py): signed files only, no REPL
+        paired = sys.modules.get("paired_bridge")
+        if paired is not None and paired.versioned():
+            W.send({"id": mid, "type": "error", "error": "This board uses checked paired updates"})
+            return
         try:
             if _asking(lambda: _job(mid, m)):
                 return                  # a yes: it restarts into install mode (_to_job)
         except Exception as e:
             failed(mid, e)
         _restart()                      # a no: start again
+    elif t == "paired_update" and "paired_bridge" in sys.modules:
+        if _asking(lambda: sys.modules["paired_bridge"].offer(W, d, m)):
+            _restart()                  # a red or timed-out review: restore the app screen
+    elif t in _PAIRED_STAGE and "paired_bridge" in sys.modules:
+        import paired_staging
+        _asking(lambda: paired_staging.handle(W, m))
     elif t == "sums" and not m.get("names"):    # only which files are there: no job.py needed
         W.send({"id": mid, "type": "sums", "sums": _there(m.get("exists")), "apps": W.apps()})
     elif t == "sums":                   # wedgie.sums: no job.py to compile on the app's heap
@@ -578,6 +589,9 @@ def serve(_=None):
     and the app keeps running (it never reaches main.py's "wedgie broke")."""
     global _breath, _kbd
     _breath = True
+    stage = sys.modules.get("paired_staging")
+    if stage and not _q:
+        stage.expire()
     R = W.lines()
     for _ in range(8):
         line = R.pump(_poll)

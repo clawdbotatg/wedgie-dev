@@ -5,6 +5,23 @@
 # end boot.py early: every failure is caught, BaseException too.
 import micropython
 micropython.kbd_intr(-1)
+
+# An isolated image may provision a pinned paired-update boot worker. Stock
+# firmware has neither the module nor an active early-boot hook.
+PAIRED_UPDATE_BENCH = False
+if PAIRED_UPDATE_BENCH:
+    try:
+        import paired_bridge
+        checked_core = paired_bridge.early_boot()
+        if checked_core:
+            import wedgie
+            wedgie.VERSION = checked_core
+    except BaseException as e:
+        import time
+        print("PAIR SEALED RECOVERY", e)
+        while True:
+            time.sleep_ms(100)
+
 try:                                    # ship mode (shipmode.py) and a RESET press in the mail: off again before the
     open("/.ship").close()              # screen lights. No flag (every other start): OSError, on we go
     import shipmode
