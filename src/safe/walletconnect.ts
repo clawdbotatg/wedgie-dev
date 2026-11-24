@@ -20,6 +20,22 @@ const METHODS = ["eth_sendTransaction", "wallet_sendCalls", "wallet_getCallsStat
 const EVENTS = ["chainChanged", "accountsChanged"];
 const EVM_ACCOUNT = /^0x[\da-f]{40}$/i;
 
+/** Safe batches support atomicRequired. Extra capabilities need explicit opt-in support. */
+function requireOptionalCapabilities(capabilities: unknown) {
+  if (capabilities === undefined) return;
+  if (!capabilities || typeof capabilities !== "object" || Array.isArray(capabilities)) {
+    throw Object.assign(new Error("Expected a capabilities object."), { code: -32602 });
+  }
+  for (const [name, capability] of Object.entries(capabilities)) {
+    if (!capability || typeof capability !== "object" || Array.isArray(capability)) {
+      throw Object.assign(new Error("Expected a capability object."), { code: -32602 });
+    }
+    if (capability.optional !== true) {
+      throw Object.assign(new Error(`This Safe does not support the required capability ${name}.`), { code: 5700 });
+    }
+  }
+}
+
 export type Dapp = { name: string; url: string; icon?: string };
 export type Call = { to: string; value: bigint; data: string };
 /** A request that needs the person: calls to run from the Safe. */
@@ -182,10 +198,13 @@ async function onRequest(k: Kit, e: WalletKitTypes.SessionRequest) {
     case "eth_sendTransaction":
     case "wallet_sendCalls": {
       if (p.length !== 1) throw new Error("Expected one call request.");
-      const requested = method === "wallet_sendCalls" ? p[0]?.calls : [p[0]];
+      const batch = method === "wallet_sendCalls";
+      const requested = batch ? p[0]?.calls : [p[0]];
       if (!Array.isArray(requested) || !requested.length) throw new Error("No calls.");
+      if (batch) requireOptionalCapabilities(p[0]?.capabilities);
       const calls: Call[] = requested.map((c: any) => {
         if (typeof c?.to !== "string" || !EVM_ACCOUNT.test(c.to)) throw new Error("Each call needs a recipient address.");
+        if (batch) requireOptionalCapabilities(c.capabilities);
         return { to: c.to, value: c.value ? BigInt(c.value) : 0n, data: c.data || "0x" };
       });
       hooks?.onAsk({ id, topic, chainId, safe, method, dapp: dappOf(k, topic), calls });

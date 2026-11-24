@@ -73,3 +73,36 @@ test("wrong chain, sender, unsupported methods, and disconnected topics cannot r
   assert.equal((await request("eth_sendTransaction", [call, call])).error.code, 4001);
   assert.equal(asks.length, 2);
 });
+
+test("required batch capabilities are refused before queuing any call", async () => {
+  const before = asks.length;
+  const requestBody = { version: "2.0.0", chainId: "0x2105", atomicRequired: true, calls: [{ to: OTHER }] };
+  const requiredTop = await request("wallet_sendCalls", [{
+    ...requestBody, capabilities: { paymasterService: { url: "https://example.invalid" } },
+  }]);
+  const requiredPerCall = await request("wallet_sendCalls", [{
+    ...requestBody, calls: [{ to: OTHER }, { to: SAFE, capabilities: { sponsorship: { optional: false } } }],
+  }]);
+  assert.equal(requiredTop.error.code, 5700);
+  assert.equal(requiredPerCall.error.code, 5700);
+  assert.equal(asks.length, before);
+});
+
+test("optional capabilities preserve the ordered atomic calls", async () => {
+  const before = asks.length;
+  const response = await request("wallet_sendCalls", [{
+    version: "2.0.0", chainId: "0x2105", atomicRequired: true,
+    capabilities: { paymasterService: { optional: true } },
+    calls: [{ to: OTHER, value: "0x1" }, { to: SAFE, capabilities: { sponsorship: { optional: true } } }],
+  }]);
+  assert.equal(response, undefined);
+  assert.equal(asks.length, before + 1);
+  assert.deepEqual(asks.at(-1).calls, [{ to: OTHER, value: 1n, data: "0x" }, { to: SAFE, value: 0n, data: "0x" }]);
+});
+
+test("malformed capability containers cannot reach approval", async () => {
+  const before = asks.length;
+  assert.equal((await request("wallet_sendCalls", [{ calls: [{ to: OTHER }], capabilities: [] }])).error.code, -32602);
+  assert.equal((await request("wallet_sendCalls", [{ calls: [{ to: OTHER, capabilities: { paymasterService: true } }] }])).error.code, -32602);
+  assert.equal(asks.length, before);
+});
