@@ -45,7 +45,22 @@ uv run --with 'fido2==2.2.1' --with 'cryptography==50.0.2' \
   --emulator-checkout EMULATOR_CHECKOUT
 ```
 
-The CTAP client still uses the host loopback for HID framing. Native USB enumeration, persistent protected credentials, and hardware PIN storage remain separate checks.
+By default, the test uses in-process HID framing. The same test can exercise
+the emulated RP2040 HID endpoints with the emulator-only LittleFS image below.
+The image routes CTAP CBOR over its CDC port to the Python fixture. A separate
+virtual wedgie runs the Trust M cartridge and its GPIO approval prompts.
+
+```sh
+uv run --with 'mpy-cross==1.29.0.post2' --with 'littlefs-python==0.19.0' \
+  python -B tools/fido-lab/build_credential_hid_fixture.py /tmp/fido-credential-hid.img
+uv run --with 'fido2==2.2.1' --with 'cryptography==50.0.2' \
+  python -B tools/fido-lab/test_trustm_credentials.py /tmp/fido-trustm-bench.mpy \
+  --emulator-checkout EMULATOR_CHECKOUT --hid-filesystem /tmp/fido-credential-hid.img
+```
+
+This image is a host test fixture. Native USB enumeration, on-device CTAP
+processing, persistent protected credentials, and hardware PIN storage
+remain separate checks.
 
 ## Spare-board transport wiring
 

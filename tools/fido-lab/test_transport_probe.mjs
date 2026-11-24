@@ -1,5 +1,6 @@
 // Boot the transport-only UF2 on the existing RP2040 simulator and exercise HID endpoints.
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
 
@@ -7,10 +8,12 @@ const harness = process.env.WEDGIE_RP2040_HARNESS
   ? pathToFileURL(process.env.WEDGIE_RP2040_HARNESS)
   : new URL('../rp2040/chip.mjs', import.meta.url);
 const { host } = await import(harness);
-const uf2 = process.argv[2];
-if (!uf2) throw new Error('Provide the path to the transport probe UF2');
+const [image, mode] = process.argv.slice(2);
+const bridge = mode === '--ctap-bridge';
+if (!image) throw new Error('Provide a transport probe UF2 or an emulator-only CTAP LittleFS image');
 
-const rig = host({ uf2, drive: true }); // The harness records non-CDC OUT endpoints as they are armed.
+// The harness records non-CDC OUT endpoints as they are armed.
+const rig = host({ ...(bridge ? { fs: readFileSync(image) } : { uf2: image }), drive: true });
 assert(rig.until(() => rig.chip.connected && Object.values(rig.chip.mcu.usbCtrl.armed).includes(64), 1000),
   `Probe startup missing: ${rig.out.slice(-250)}`);
 assert.doesNotMatch(rig.out, /Traceback|MemoryError|AttributeError/);
@@ -57,18 +60,39 @@ function readReport() {
   return reply;
 }
 
-if (process.argv[3] === '--stdio') {
+if (mode === '--stdio' || bridge) {
   // Let the independent host library own message framing and reassembly.
   const lines = createInterface({ input: process.stdin });
+  let waitingCbor = false;
+  const request = /^FIDO_C ([0-9a-f]{2,2048})\r?$/m;
   for await (const line of lines) {
     if (line === 'read') {
+      assert(!waitingCbor);
+      if (bridge) {
+        assert(rig.until(() => replies.length || request.test(rig.out), 1000), 'No HID reply or CDC CBOR request');
+        const received = rig.out.match(request);
+        if (received) {
+          assert.equal(replies.length, 0);
+          rig.take();
+          waitingCbor = true;
+          process.stdout.write('cbor ' + received[1] + '\n');
+          continue;
+        }
+      }
       process.stdout.write(readReport().toString('hex') + '\n');
+    } else if (line.startsWith('reply ')) {
+      assert(bridge && waitingCbor);
+      assert.match(line, /^reply (?:[0-9a-f]{2}){1,1024}$/);
+      rig.chip.write('RES ' + line.slice(6) + '\n');
+      waitingCbor = false;
+      process.stdout.write('written\n');
     } else {
       assert.match(line, /^[0-9a-f]{128}$/);
       writeReport(Buffer.from(line, 'hex'));
       process.stdout.write('written\n');
     }
   }
+  assert(!waitingCbor);
   assert.equal(replies.length, 0);
   assert.doesNotMatch(rig.out, /Traceback|MemoryError|AttributeError/);
   process.exit(0);

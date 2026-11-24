@@ -61,13 +61,12 @@ def make_uf2(image_pages):
         for number, (address, data) in enumerate(image_pages))
 
 
-def main(output):
+def build_filesystem(boot, main):
     lab = Path(__file__).resolve().parent
     repo = lab.parents[1]
-    micros = list(pages((repo / "public/mp/RPI_PICO.uf2").read_bytes(), FILESYSTEM))
     with TemporaryDirectory(prefix="fido-probe-") as scratch:
         directory = Path(scratch)
-        sources = {"boot.py": PROBE_BOOT.encode(), "main.py": PROBE_MAIN.encode()}
+        sources = {"boot.py": boot.encode(), "main.py": main.encode()}
         for name, source in (("usbdev", repo / "firmware/usbdev.py"), ("ctaphid", lab / "ctaphid.py"),
                               ("fido_usb", lab / "fido_usb.py")):
             compiled = directory / f"{name}.mpy"
@@ -82,14 +81,8 @@ def main(output):
 
     if len(fs_image) != END - FILESYSTEM:
         raise ValueError("Unexpected Pico LittleFS size")
-    filesystem = [(FILESYSTEM + offset, fs_image[offset:offset + PAGE])
-                  for offset in range(0, len(fs_image), PAGE)]
-    result = make_uf2(micros + filesystem)
-    decoded = list(pages(result, END))
-    if decoded != micros + filesystem:
-        raise ValueError("UF2 failed round-trip validation")
     fs = LittleFS(mount=False, block_size=4096, block_count=352, prog_size=256)
-    fs.context.buffer[:] = b"".join(data for _, data in decoded[len(micros):])
+    fs.context.buffer[:] = fs_image
     fs.mount()
     if set(fs.listdir("/")) != set(sources):
         raise ValueError("Unexpected files in the readback")
@@ -97,9 +90,23 @@ def main(output):
         with fs.open(name, "rb") as file:
             if file.read() != data:
                 raise ValueError(f"LittleFS readback failed for {name}")
+    return fs_image, len(sources)
+
+
+def main(output):
+    lab = Path(__file__).resolve().parent
+    repo = lab.parents[1]
+    micros = list(pages((repo / "public/mp/RPI_PICO.uf2").read_bytes(), FILESYSTEM))
+    fs_image, file_count = build_filesystem(PROBE_BOOT, PROBE_MAIN)
+    filesystem = [(FILESYSTEM + offset, fs_image[offset:offset + PAGE])
+                  for offset in range(0, len(fs_image), PAGE)]
+    result = make_uf2(micros + filesystem)
+    decoded = list(pages(result, END))
+    if decoded != micros + filesystem:
+        raise ValueError("UF2 failed round-trip validation")
     with output.open("xb") as file:
         file.write(result)
-    print(f"Verified {len(decoded)} RP2040 blocks and {len(sources)} LittleFS files")
+    print(f"Verified {len(decoded)} RP2040 blocks and {file_count} LittleFS files")
     print(f"SHA-256 {sha256(result).hexdigest()}")
 
 

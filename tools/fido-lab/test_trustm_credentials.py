@@ -21,6 +21,7 @@ from fido2.webauthn import (
 )
 
 from bench_ctap2 import BenchAuthenticator
+from probe_native_hid import EmulatorConnection
 from test_bench_ctap2 import PacketConnection
 
 
@@ -71,6 +72,45 @@ class TokenKey:
         assert len(signature) == 64
         return utils.encode_dss_signature(int.from_bytes(signature[:32], "big"),
                                           int.from_bytes(signature[32:], "big"))
+
+
+class CredentialHidConnection(EmulatorConnection):
+    def __init__(self, process, authenticator):
+        super().__init__(process)
+        self.authenticator = authenticator
+        self.commands = []
+
+    def read_packet(self):
+        report = self.exchange("read")
+        if report.startswith("cbor "):
+            payload = bytes.fromhex(report[5:])
+            self.commands.append(payload[0])
+            response = self.authenticator.handle(payload)
+            if self.exchange("reply " + response.hex()) != "written":
+                raise OSError("Virtual CDC bridge did not accept the CTAP reply")
+            report = self.exchange("read")
+        return bytes.fromhex(report)
+
+
+@contextmanager
+def hid_transport(authenticator, image):
+    if image is None:
+        yield PacketConnection(authenticator)
+        return
+    driver = Path(__file__).with_name("test_transport_probe.mjs")
+    with Popen(["node", driver, image, "--ctap-bridge"], text=True, stdin=PIPE, stdout=PIPE) as process:
+        connection = CredentialHidConnection(process, authenticator)
+        try:
+            yield connection
+        finally:
+            if not process.stdin.closed:
+                connection.close()
+            try:
+                if process.wait(timeout=10) != 0:
+                    raise RuntimeError("Virtual USB fixture failed")
+            except TimeoutExpired:
+                process.terminate()
+                raise
 
 
 @contextmanager
@@ -134,32 +174,39 @@ if __name__ == "__main__":
     cli = argparse.ArgumentParser(description=__doc__)
     cli.add_argument("cartridge", type=Path)
     cli.add_argument("--emulator-checkout", type=Path, required=True, help="Simulator with volatile Trust M signing support")
+    cli.add_argument("--hid-filesystem", type=Path, help="Route CTAP through the emulator-only USB bridge image")
     args = cli.parse_args()
     alpha, beta = "alpha.invalid", "beta.invalid"
     with open_token(args.cartridge.resolve(), args.emulator_checkout.resolve()) as token:
         auth = BenchAuthenticator(lambda _op, _rp: True, rp_ids=(alpha, beta), key_factory=token.new_key)
         descriptor = HidDescriptor("fixture", 0, 0, 64, 64, "Virtual Trust M bench", None)
-        device = CtapHidDevice(descriptor, PacketConnection(auth))
-        client = Ctap2(device)
-        a, key_a, params = register(client, alpha, PublicKeyCredentialUserEntity(name="alpha", id=b"local-a"))
-        b, key_b, _ = register(client, beta, PublicKeyCredentialUserEntity(name="beta", id=b"local-b"))
-        assert key_a.public_key != key_b.public_key
-        assert not hasattr(auth._store.get(alpha).key, "private_bytes")
-        assert authenticate(client, alpha, a, key_a) == 1
-        assert authenticate(client, beta, b, key_b) == 1
-        other = [{"type":"public-key","id":key_b.credential_id}]
-        no_ctap_result(CtapError.ERR.NO_CREDENTIALS, client.get_assertion, alpha, bytes(32), allow_list=other)
-        no_ctap_result(CtapError.ERR.KEY_STORE_FULL, client.make_credential, bytes(32), **params)
-        token.next_button = "Y"
-        no_ctap_result(CtapError.ERR.OPERATION_DENIED, client.get_assertion, alpha, bytes(32))
-        assert authenticate(client, alpha, a, key_a) > 1
-        assert token.exchange("fido_close")["type"] == "fido_closed"
-        no_ctap_result(CtapError.ERR.NO_CREDENTIALS, client.get_assertion, alpha, bytes(32))
-        device.close()
+        with hid_transport(auth, args.hid_filesystem) as connection:
+            device = CtapHidDevice(descriptor, connection)
+            client = Ctap2(device)
+            a, key_a, params = register(client, alpha, PublicKeyCredentialUserEntity(name="alpha", id=b"local-a"))
+            b, key_b, _ = register(client, beta, PublicKeyCredentialUserEntity(name="beta", id=b"local-b"))
+            assert key_a.public_key != key_b.public_key
+            assert not hasattr(auth._store.get(alpha).key, "private_bytes")
+            assert authenticate(client, alpha, a, key_a) == 1
+            assert authenticate(client, beta, b, key_b) == 1
+            other = [{"type":"public-key","id":key_b.credential_id}]
+            no_ctap_result(CtapError.ERR.NO_CREDENTIALS, client.get_assertion, alpha, bytes(32), allow_list=other)
+            no_ctap_result(CtapError.ERR.KEY_STORE_FULL, client.make_credential, bytes(32), **params)
+            token.next_button = "Y"
+            no_ctap_result(CtapError.ERR.OPERATION_DENIED, client.get_assertion, alpha, bytes(32))
+            assert authenticate(client, alpha, a, key_a) > 1
+            assert token.exchange("fido_close")["type"] == "fido_closed"
+            no_ctap_result(CtapError.ERR.NO_CREDENTIALS, client.get_assertion, alpha, bytes(32))
+            device.close()
+        commands = getattr(connection, "commands", [])
+        if args.hid_filesystem:
+            assert commands.count(1) == 3 and commands.count(2) == 6
+            assert commands.count(4) >= 1 and set(commands) == {1, 2, 4}
         token.process.stdin.close()
         receipt = token.receive()
         assert receipt == {"type":"receipt", "approvals":7, "denials":1, "signatures":5, "persistentKeysUnchanged":True}
         print(json.dumps({"registeredAndAuthenticatedRps":[alpha,beta], "isolatedCredentialKeys":True,
             "crossRpRefused":True, "repeatedEnrollmentRefused":True, "physicalGpioDenialRefused":True,
             "closedSessionRefusedOldCredential":True,"persistedPrivateKeys":False,"physicalBoard":False,
-            "ctapTransport":"host loopback", **receipt}))
+            "ctapTransport":"RP2040 USB HID via test CDC bridge" if args.hid_filesystem else "host loopback",
+            "usbCborRequestCount":len(commands), **receipt}))
