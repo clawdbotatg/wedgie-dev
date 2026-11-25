@@ -59,8 +59,10 @@ const PAGE = `
   <tr><td>Signature</td><td>17 KB</td><td>7.9 KB</td></tr>
   <tr><td>Make the key, once</td><td>0.35 s</td><td>22 s</td></tr>
   <tr><td>Sign</td><td>8.2 s</td><td>170 s</td></tr>
+  <tr><td>Gas for a Safe to send</td><td>2.75M</td><td>1.1M</td></tr>
 </table>
 <p>The hashing is plain C, not tuned yet.</p>
+<p>The <a href="https://github.com/clawdbotatg/wedgie-pq/blob/master/contracts/src/SlhSigner.sol" target="_blank" rel="noopener">owner contract</a> is written: a Safe owner that is an SLH-DSA key. A Safe with it as its only owner sent ETH on a copy of Base. Not audited. No wedgie has sent real money with it yet.</p>
 
 <h2>Try it</h2>
 <div class="pq-try">
@@ -72,7 +74,7 @@ const PAGE = `
 <h2>What's left</h2>
 <ol>
   <li>Pick one: one-time keys or SLH-DSA.</li>
-  <li>The owner contract and its tests.</li>
+  <li>The owner contract and its tests. SLH-DSA's is written.</li>
   <li>Lock the seed in the secure chip. That write is permanent.</li>
   <li>An address that stays the same when the key changes.</li>
   <li>Safe Signer and <a href="/safe">/safe</a>.</li>
