@@ -1,6 +1,6 @@
 ---
 name: wedgie-virtual
-description: The virtual wedgie at wedgie.dev/virtual - the real wedgie firmware running on a virtual RP2040 with a software Trust M in a browser tab, plugged into wedgie.dev's other tabs. No hardware needed. How to open it, press its buttons and read its screen (keyboard, window.wedgie for agents), install apps, sign Safe transactions, and what it can't do. Use for "try a wedgie without one", "test my app on a wedgie", "virtual wedgie", "emulator", "drive a wedgie from a script without hardware".
+description: The virtual wedgie at wedgie.dev/virtual - the real wedgie firmware running on a virtual RP2040 with a software Trust M in a browser tab, plugged into wedgie.dev's other tabs. No hardware needed. How to open it, press its buttons and read its screen (keyboard, window.wedgie for agents), install apps, sign Safe transactions, see how any transaction reads on a wedgie (clear signing), and what it can't do. Use for "try a wedgie without one", "test my app on a wedgie", "virtual wedgie", "emulator", "drive a wedgie from a script without hardware", "how does this transaction look on a wedgie", "test clear signing".
 ---
 
 # The virtual wedgie
@@ -19,6 +19,7 @@ it, /safe signs with it, /secret chats with it. On the front page: **Pop out a v
 | Speed | 20-70% of a real wedgie |
 | Storage | that browser's IndexedDB (flash and chip keys) |
 | Page buttons | Screenshot (3x PNG), Replug, Wipe (flash only: ID and chip keys stay, like reflashing a real one) |
+| Top right | How it works (this guide) |
 | Just the screen | https://wedgie.dev/virtual?no3d |
 
 ## Press buttons
@@ -55,6 +56,39 @@ Details: `docs/EMU.md` in the repo.
 2. Click the app on the shelf. The virtual wedgie asks **Install**, the app's name big under it. Its yes is grey while it checks the
    signature: wait for green, then press A.
 3. Its page says it runs that app.
+
+## See how a transaction reads (clear signing)
+
+The Safe Signer app shows every transaction in words before it signs (safe.md). Two ways to see those pages
+with no hardware. The pages of every transaction in the public ERC-7730 registry are already at
+https://wedgie.dev/clear.
+
+**One transaction, no browser, no Safe** (from the repo; needs Node and `uv`). Write the transaction to a file:
+
+```json
+[{"name": "send 25 USDC", "chainId": 1, "to": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", "value": "0",
+  "data": "0xa9059cbb000000000000000000000000d8da6bf26964af9d7eed9e03e53415d37aa9604500000000000000000000000000000000000000000000000000000000017d7840"}]
+```
+
+```
+git clone https://github.com/clawdbotatg/wedgie-dev && cd wedgie-dev && npm install
+node tools/safechip.mjs --txs tx.json --shots shots/
+```
+
+It runs the shelf's Safe Signer on a virtual RP2040, presses A through every page and saves each one as
+`shots/<name>-<n>.png` (240x240), about 40 s for one. The first PNGs are the "Reading the transaction" screen;
+the pages follow. Optional per transaction: `"safe"` (the Safe's address: "this Safe" reads right), `"operation": 1`
+(a delegatecall, as MultiSend). It ends in an error at the chip step ("none answered"): right, there is no secure
+chip in it. `all checks passed` means no page crashed.
+
+**The real path, in a browser** (a real Safe, a real dapp):
+
+1. Install Safe Signer on the virtual wedgie (above).
+2. At https://wedgie.dev/safe make a Safe with the virtual wedgie as an owner (safe.md). Keep it near empty.
+3. Connect a dapp over WalletConnect (safe.md, "Connect app"), start a transaction in the dapp, then on /safe
+   press **Sign with wedgie**.
+4. In the /virtual tab read each page with `wedgie.screen()`. `wedgie.press("A")` is next, then sign;
+   `wedgie.press("Y")` is no. Say no unless you mean it.
 
 ## Know
 

@@ -6,6 +6,8 @@ body.emu-page .top, body.emu-page .foot { display: none; }
 .emu #emu-3d { width: 100%; max-width: 1000px; }
 .emu-tag { position: fixed; bottom: 20px; left: 26px; font-size: 30px; font-weight: 900; color: #e9e9e6; opacity: .3; pointer-events: none; }
 .emu-id { position: fixed; bottom: 20px; right: 26px; font-family: var(--mono); font-size: 22px; letter-spacing: .08em; color: #e9e9e6; opacity: .5; }
+.emu-how { position: fixed; top: 14px; right: 26px; font-weight: 800; color: #e9e9e6; opacity: .6; }
+.emu-how:hover { opacity: 1; }
 .emu-note { min-height: 1.5em; color: #e9e9e6; font-weight: 800; text-align: center; }
 .emu-bar { width: 100%; max-width: 480px; margin: 8px auto; height: 10px; border-radius: 5px; background: #48494b; overflow: hidden; }
 .emu-bar > div { height: 100%; width: 0; background: var(--green-fill); transition: width .3s; }

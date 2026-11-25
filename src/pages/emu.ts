@@ -43,6 +43,7 @@ export function emu(main: HTMLElement) {
   main.innerHTML = `
   <section class="emu">
     <b class="emu-tag">Virtual wedgie</b>
+    <a class="emu-how" href="/virtual.md" target="_blank" rel="noopener">How it works</a>
     <div id="emu-3d"></div>
     <div class="emu-note" id="emu-note"></div>
     <div class="emu-bar" hidden><div id="emu-bar-fill"></div></div>

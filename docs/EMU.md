@@ -33,6 +33,11 @@ curl -s localhost:4190/wipe -d '{}'                  # flash back to new; ID and
 The same calls exist in the page: `window.wedgie.press(k, ms)`, `.hold(k, down)`, `.screen()`,
 `.history(n)`. In Austin's own browser (when he hands you his browser bridge), `eval` those on his /virtual tab.
 
+## See one transaction's pages
+
+`node tools/safechip.mjs --txs tx.json --shots <dir>`: the Safe Signer on a virtual RP2040, no browser, each page a
+PNG. The file format and the options: skill `virtual-wedgie`, part C.
+
 ## Install an app
 
 1. Open `/connect/<ID>` (the ID is on /status), click the app's cartridge (`#d-shelf [data-mod=<mod>] button.cart`).

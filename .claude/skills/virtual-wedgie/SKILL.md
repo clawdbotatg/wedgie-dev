@@ -10,7 +10,7 @@ RP2040, a software Trust M, the screen and 9 buttons. wedgie.dev tabs in the sam
 in, tagged **virtual**. Its ID is `EEE` + 3 digits. Its flash, ID and chip keys live in that browser's
 storage: Wipe erases only the flash. Code and details: `docs/EMU.md`, `src/chip/`.
 
-Two ways to run one:
+Three ways to run one. Just want to see how one transaction reads? Use C.
 
 ## A. Headless, your own (no one's browser)
 
@@ -66,6 +66,26 @@ dapp for the Safe's balance before pairing again.
    next/sign, `press("Y")` is no. Report what each page says and what's unclear.
 4. /safe then says "Signed. That's enough: press Execute." **Austin presses Execute** (his wallet pays
    gas). Never press it yourself.
+
+## C. One transaction, headless (the quick way to check clear signing)
+
+No browser, no Safe, no WalletConnect: the Safe Signer on a virtual RP2040, A pressed through every page,
+each page saved as a PNG. About 40 s for one transaction.
+
+```
+node tools/safechip.mjs --txs tx.json --shots <dir>     # then Read <dir>/<name>-<n>.png
+```
+
+`tx.json` is a list: `[{"name", "chainId", "to", "value", "data"}]`. Optional: `"safe"` (the Safe's address),
+`"operation": 1` (delegatecall), `"keys": ["down", "wait", ...]` (pressed first, one a second, before the A's),
+`"sim": "live"` (ask sim.wedgie.dev, as /safe does). The first PNGs are "Reading the transaction"; the pages follow.
+
+- A registry test file's real transactions: `python3 tools/clear_txs.py <registry>/registry/<dapp>/tests*/<file>.tests.json > tx.json`.
+- Default: the shelf's Safe Signer (`community/`) and the live data (`public/clear`). A wedgie-safe checkout:
+  `--app ../wedgie-safe`. New data from `wire/release.py`: `--clear <its output dir>`, with the `--app` whose
+  `safe_roots.py` it made.
+- It ends in an error at the chip step ("none answered"): right, no secure chip. `all checks passed` = no crash.
+- Every registry transaction at once, and wedgie.dev/clear: `tools/clear_gallery.py`, `docs/CLEAR-GALLERY.md`.
 
 ## Know
 
