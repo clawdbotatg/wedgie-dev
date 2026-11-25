@@ -10,7 +10,8 @@ RP2040, a software Trust M, the screen and 9 buttons. wedgie.dev tabs in the sam
 in, tagged **virtual**. Its ID is `EEE` + 3 digits. Its flash, ID and chip keys live in that browser's
 storage: Wipe erases only the flash. Code and details: `docs/EMU.md`, `src/chip/`.
 
-Three ways to run one. Just want to see how one transaction reads? Use C.
+Three ways to run one. Just want to see how one transaction reads? Paste it at
+wedgie.dev/sandbox (Austin, or anyone: no Safe, no setup, it can't sign), or use C (from a script).
 
 ## A. Headless, your own (no one's browser)
 

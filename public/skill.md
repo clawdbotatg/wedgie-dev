@@ -140,6 +140,7 @@ key), so those could be changed. How: code.md, "The internet".
 | /safe, /safe/&lt;chainId&gt;:&lt;address&gt; | the wedgie's Safes: make, send, receive, sign, execute, WalletConnect (`?wc=<link>` connects a dapp in one step; safe.md) |
 | /secret | Secrets: share your wedgie's link, chat |
 | /virtual | the virtual wedgie (virtual.md); /emu redirects here |
+| /sandbox | paste a transaction or a hash, see how a wedgie shows it (clear signing); can't sign |
 | /code | make apps: prompt for your AI, an emulator that reruns on save (served from emu.wedgie.dev/code) |
 | /assemble, /assemble/3d | the build, step by step with photos, and in 3D |
 | /assemble.pdf, /manual.pdf | printable assembly manual; the owner's manual in every box |

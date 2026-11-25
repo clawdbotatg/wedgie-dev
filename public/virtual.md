@@ -59,9 +59,15 @@ Details: `docs/EMU.md` in the repo.
 
 ## See how a transaction reads (clear signing)
 
-The Safe Signer app shows every transaction in words before it signs (safe.md). Two ways to see those pages
+The Safe Signer app shows every transaction in words before it signs (safe.md). Three ways to see those pages
 with no hardware. The pages of every transaction in the public ERC-7730 registry are already at
 https://wedgie.dev/clear.
+
+**The easy way: https://wedgie.dev/sandbox.** Paste a transaction (chain, to, value, data) or a transaction hash,
+or click an example, then **Show it on a wedgie**. A wedgie in that tab (the real firmware and Safe Signer) shows
+it page by page. No Safe, no setup. It can't sign. For an agent: wait for `window.sandbox.ready`, fill `#sb-chain`,
+`#sb-to`, `#sb-value`, `#sb-data`, click `#sb-run`, wait for `window.sandbox.done` to go up; the pages are the
+canvases in `#sb-pages`.
 
 **One transaction, no browser, no Safe** (from the repo; needs Node and `uv`). Write the transaction to a file:
 
