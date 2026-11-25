@@ -1084,6 +1084,11 @@ p.surge, .order-body > p.surge { margin: 4px 0 0; font-size: 22px; color: var(--
 .legal-page h1 { margin: 16px 0 4px; }
 .legal-page h2 { font-size: 19px; margin: 26px 0 6px; }
 .legal-page p { line-height: 1.55; margin: 0 0 10px; }
+.legal-page ul, .legal-page ol { margin: 0 0 10px; padding-left: 22px; }
+.legal-page li { line-height: 1.55; margin: 0 0 6px; }
+.legal-page table { border-collapse: collapse; margin: 0 0 12px; }
+.legal-page td { padding: 6px 18px 6px 0; border-bottom: 1px solid var(--line, #e3e3e3); line-height: 1.4; }
+.legal-page td:last-child { padding-right: 0; font-weight: 700; white-space: nowrap; }
 .chat-msgs { max-height: 50vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin: 8px 0 12px; }
 .chat-in, .chat-out { max-width: 80%; padding: 8px 12px; border-radius: 14px; display: flex; flex-direction: column; gap: 2px; }
 .chat-in { align-self: flex-start; background: var(--shell); box-shadow: var(--shell-shadow); }

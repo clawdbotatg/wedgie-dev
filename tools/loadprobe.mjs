@@ -13,7 +13,7 @@ import { readdirSync } from "node:fs";
 import { homedir } from "node:os";
 
 const PAGES = ["/", "/connect", "/safe", "/order", "/orders", "/signin", "/virtual", "/sandbox", "/code", "/build", "/assemble",
-  "/test", "/update", "/prepare", "/reset", "/batt", "/debug", "/terms", "/privacy"];
+  "/test", "/update", "/prepare", "/reset", "/batt", "/debug", "/terms", "/privacy", "/pq"];
 let base = process.argv[2]?.replace(/\/$/, ""), server;
 setTimeout(() => { console.log("FAIL: timed out"); server?.kill(); process.exit(1); }, 180000);
 if (!base) {

@@ -299,6 +299,10 @@
       "destination": "/privacy.html"
     },
     {
+      "source": "/pq",
+      "destination": "/pq.html"
+    },
+    {
       "source": "/virtual",
       "destination": "/virtual.html"
     },

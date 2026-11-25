@@ -7,6 +7,6 @@ export const TITLES: Record<string, string> = {
   atomic: "Atomic wedgie", code: "Code: make apps for a wedgie", debug: "Debug",
   safe: "Safe hardware signer: sign a Safe multisig with a wedgie", secret: "Secret chat",
   order: "Order a wedgie hardware wallet", orders: "Your orders", signin: "Sign in", claim: "Free wedgie",
-  terms: "Terms", privacy: "Privacy", sandbox: "Clear signing sandbox",
+  terms: "Terms", privacy: "Privacy", pq: "Post-quantum plan for the wedgie hardware signer", sandbox: "Clear signing sandbox",
   virtual: "Virtual wedgie: try the hardware signer in your browser", emu: "Virtual wedgie", telegram: "Telegram",
 };
