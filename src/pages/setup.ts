@@ -21,11 +21,16 @@ import { esc } from "../ui/device";
 // flashed Pico's USB serial, else the only new one. Two candidates: it stops and says so (codex review: it
 // wiped the wrong board).
 type Job = { stage: "boot" | "flash" | "back" | "install" | "done" | "fail"; text: string; detail: string; p: number | null; since: number; wifi: boolean; pick?: "boot" | "serial";
-  before?: USBDevice[]; serial?: string };
+  before?: USBDevice[]; serial?: string; keys?: number[] };
+// A board that came back from its flash but couldn't be identified sits in "error", which this card never showed:
+// /reset waited on "Restarting it…" forever, nothing in the console. It's asked again this often, then the card says why.
+const BACK_RETRIES = 3;
 let bench: Promise<string> | null = null;
 const benchPy = () => (bench ??= fetch("/device/bench.py").then((r) => { if (!r.ok) throw new Error("bench.py missing"); return r.text(); }));
 const bare = (w: W.Wedgie) => w.state === "ready" && w.kind === "micropython" && w.firmware === "nothing yet";
 const other = (w: W.Wedgie) => w.state === "error" && /No MicroPython/.test(w.error || "");
+/** Already has wedgie firmware (or its Wallet runs): /reset offers a reinstall on its own page. */
+const hasFw = (w: W.Wedgie) => w.state === "ready" && (w.kind === "wedgie" || w.kind === "wallet") && !!w.uid;
 /** Boards the card owns: /connect leaves them out of its rows. */
 export const needsSetup = (w: W.Wedgie) => other(w);
 
@@ -36,6 +41,7 @@ export function setupCard(el: HTMLElement, opts: { reset?: boolean; batt?: boole
   let boots: USBDevice[] = [];
   let alive = true;
   let usb = false;                // may look at WebUSB: armed, or a new Pico was picked here
+  const retried = new Map<number, number>();   // wedgie key -> times identified again while it was coming back
 
   const paint = () => {
     if (!alive) return;
@@ -46,7 +52,7 @@ export function setupCard(el: HTMLElement, opts: { reset?: boolean; batt?: boole
         ${job.pick ? `<div class="row"><button class="btn btn-green" id="setup-pick">Pick it</button><span class="fine">It's called <b>${job.pick === "boot" ? "RP2 Boot or RP2350 Boot" : "Board in FS mode"}</b>.</span></div>` : ""}
         ${job.stage === "done" || job.stage === "fail" ? `<div class="row"><button class="btn" id="setup-ok">Done</button></div>` : ""}</div>`;
       el.querySelector<HTMLElement>("#setup-pick")?.addEventListener("click", () =>
-        void (job?.pick === "boot" ? pickBoot().then(() => { usb = true; if (job) job.pick = undefined; look(); }) : W.connectNew().then(() => { if (job) job.pick = undefined; paint(); })).catch(() => {}));
+        void (job?.pick === "boot" ? pickBoot().then(() => { usb = true; if (job) job.pick = undefined; look(); }) : W.connectNew().then(() => { if (job) job.pick = undefined; paint(); if (job?.stage === "back") needPick("back", "serial"); })).catch(() => {}));
       el.querySelector<HTMLElement>("#setup-ok")?.addEventListener("click", () => { job = null; look(); });
       return;
     }
@@ -54,10 +60,12 @@ export function setupCard(el: HTMLElement, opts: { reset?: boolean; batt?: boole
       ...boots.map((d, i) => ({ id: `b${i}`, what: opts.reset || opts.batt ? `Found it: a wedgie in boot mode (${BOOT_PIDS[d.productId]})` : `A new Pico (${BOOT_PIDS[d.productId]}, in boot mode)`, go: () => flash(d) })),
       ...W.wedgies().filter(other).map((w) => ({ id: `o${w.key}`, what: "A board with something else on it (not MicroPython)", go: () => knock(w) })),
       ...W.wedgies().filter(bare).map((w) => ({ id: `m${w.key}`, what: `${w.short} · ${w.board}: MicroPython, no wedgie firmware`, go: () => install(w) })),
-    ];
+      ...(opts.reset ? W.wedgies().filter(hasFw).map((w) => ({ id: `f${w.key}`, label: "Reinstall", what: `${w.short} · ${w.firmware || "wedgie firmware"}. Reinstall puts the latest on (its app and saves stay); for a full wipe, hold BOOTSEL and plug it in again.`,
+        go: () => { location.href = `/connect/${w.short}`; } })) : []),   // its page: Update/Reinstall, the checked install
+    ] as { id: string; what: string; go: () => unknown; label?: string }[];
     if (!items.length) { el.innerHTML = ""; return; }
     el.innerHTML = `<div class="setup card"><h3>${opts.batt ? "Ready" : opts.reset ? "Ready to reset" : "Not set up yet"}</h3>
-      ${items.map((x) => `<div class="setup-item"><span>${esc(x.what)}</span><button class="btn btn-green setup-go" data-id="${x.id}">${opts.batt ? "Install battery firmware" : opts.reset ? "Reset it" : "Set up"}</button></div>`).join("")}
+      ${items.map((x) => `<div class="setup-item"><span>${esc(x.what)}</span><button class="btn btn-green setup-go" data-id="${x.id}">${x.label || (opts.batt ? "Install battery firmware" : opts.reset ? "Reset it" : "Set up")}</button></div>`).join("")}
       <p class="fine">${opts.batt ? "Wipes its apps and saves, then puts on MicroPython and the battery firmware. The chip and its keys stay." : opts.reset ? "Wipes its apps and saves, then puts on MicroPython and the latest wedgie firmware. The chip and its keys stay." : "Set up wipes it, then puts on MicroPython and the wedgie firmware. Pick its app after."}</p></div>`;
     for (const x of items) el.querySelector<HTMLElement>(`[data-id="${x.id}"]`)!.onclick = () => void x.go();
   };
@@ -81,6 +89,18 @@ export function setupCard(el: HTMLElement, opts: { reset?: boolean; batt?: boole
       const w = (sn && back.find((x) => x.uid?.toLowerCase() === sn)) || (back.length === 1 ? back[0] : null);
       if (w) return void install(w);
       if (back.length > 1) return void fail(new Error("more than one board came back"), "Stopped before the firmware");
+      const fresh = W.wedgies().filter((x) => !(job!.keys || []).includes(x.key) || (x.readyAt || 0) > job!.since);
+      // Back, but on wedgie firmware, not the plain MicroPython just flashed (the flash didn't take): say so.
+      const old = fresh.find((x) => x.state === "ready" && x.kind !== "micropython" && !!sn && x.uid?.toLowerCase() === sn);
+      if (old) return void fail(new Error(`it came back running ${old.firmware || "its old firmware"}`), "MicroPython didn't go on");
+      // Back, but identify failed (Windows: the new COM port won't open for a few seconds): ask again, then say why.
+      for (const x of fresh.filter((x) => x.state === "error")) {
+        const n = retried.get(x.key) || 0;
+        console.warn(`[wedgie reset] board came back but wasn't identified (try ${n + 1}):`, x.error);
+        if (n >= BACK_RETRIES) return void fail(new Error(x.error || "it didn't answer"), "It restarted on MicroPython but didn't answer");
+        retried.set(x.key, n + 1);
+        setTimeout(() => { if (alive && job?.stage === "back") W.reidentify(x); }, 1500);
+      }
     }
     paint();
   }
@@ -106,7 +126,7 @@ export function setupCard(el: HTMLElement, opts: { reset?: boolean; batt?: boole
     set({ stage: "flash", text: wifi ? "It has WiFi: WiFi MicroPython going on…" : "Wiping it, putting MicroPython on…", detail: "Don't unplug it.", p: 0, pick: undefined });
     try { await flashMicroPython(dev, (p) => set({ p }), wifi); }
     catch (e) { return fail(e, "MicroPython didn't go on"); }
-    set({ stage: "back", text: "Restarting it…", detail: "A few seconds.", p: null, since: Date.now(), serial: dev.serialNumber || undefined });
+    set({ stage: "back", text: "Restarting it…", detail: "A few seconds.", p: null, since: Date.now(), serial: dev.serialNumber || undefined, keys: W.wedgies().map((x) => x.key) });
     needPick("back", "serial");
   }
 

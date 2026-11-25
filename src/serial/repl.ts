@@ -195,7 +195,11 @@ export class Repl {
     let got: any = null;
     const prev = this.onJson;
     const p = new Promise<void>((res) => {
-      this.onJson = (v) => { if (v && v.type === "hello") { got = v; res(); } };
+      // Not our own line echoed back: plain MicroPython's REPL echoes what we type, and when its ">>> " prompt
+      // was printed before the port opened, the echo is a bare {"id":1,"type":"hello"} line that parses as
+      // JSON. Taken as an answer it made a fresh MicroPython board a "wallet" with no ID (/connect/??????, no
+      // Install, and /reset stuck on "Restarting it…"). A real hello always says more than id and type.
+      this.onJson = (v) => { if (v && v.type === "hello" && Object.keys(v).some((k) => k !== "id" && k !== "type")) { got = v; res(); } };
       setTimeout(res, ms);
     });
     await this.write('{"id":1,"type":"hello"}\n');
