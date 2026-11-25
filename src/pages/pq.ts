@@ -22,20 +22,21 @@ const PAGE = `
 <p>A quantum computer can't undo a hash. So the wedgie signs with hashes alone (WOTS one-time signatures), the same family Ethereum's researchers picked for validators.</p>
 <ul>
   <li><b>One key per signature.</b> Each signature also names the next key, so the key changes with every transaction.</li>
-  <li><b>The seed stays in the secure chip.</b> Nothing can read it. Every key is made from it.</li>
-  <li><b>No key signs twice.</b> Key numbers come from a counter in the chip that only goes up.</li>
-  <li><b>The main chip does the hashing.</b> The secure chip can't do it. One key sits in memory for a moment, and it is dead once its transaction lands. A wedgie has no Wi-Fi or Bluetooth.</li>
+  <li><b>The seed sits in the secure chip.</b> Every key is made from it. A lock stops anything reading it. That lock is not set yet.</li>
+  <li><b>No key signs twice.</b> Key numbers come from a counter in the chip that only goes up. The firmware has to follow it: the chip makes any key the firmware asks for.</li>
+  <li><b>The main chip does the hashing.</b> The secure chip can't do it. One key sits in memory for a moment. Once its transaction lands, the contract takes only the next key. A wedgie has no Wi-Fi or Bluetooth.</li>
   <li><b>On chain,</b> the Safe's owner is a small contract that holds the hash of the next key and checks each signature.</li>
 </ul>
 
 <h2>What works</h2>
-<p>Measured on a real wedgie in October 2026. The signature matches the reference code.</p>
+<p>Measured on a real wedgie in October 2026, with Poseidon2 hashes (the kind the proof under "What's left" needs). The signature matches the reference code.</p>
 <table>
   <tr><td>Sign</td><td>0.55 s</td></tr>
-  <tr><td>Check</td><td>0.59 s</td></tr>
+  <tr><td>Check, on the wedgie</td><td>0.59 s</td></tr>
   <tr><td>Sign with the seed in the secure chip, next key included</td><td>6.4 s</td></tr>
   <tr><td>Signature size</td><td>2 KB</td></tr>
 </table>
+<p>The simple contract above would use SHA-256. That version is not built or timed yet.</p>
 <p>The code: ${out(PQ, "clawdbotatg/wedgie-pq")}. A prototype, not audited. Don't put money on it.</p>
 
 <h2>What's left</h2>
@@ -52,7 +53,7 @@ const PAGE = `
 <ul>
   <li>The Safe's other owners. Every owner needs this.</li>
   <li>The account that pays gas. It holds only gas money.</li>
-  <li>Our firmware and app release signatures (P-256).</li>
+  <li>Bad firmware. It could ask the chip for every future key. Our firmware and app updates are signed with P-256, so a post-quantum wedgie needs hash-signed updates, or no updates at all.</li>
 </ul>
 
 <h2>More</h2>

@@ -116,7 +116,7 @@ const PAGES: Record<string, Page> = {
   privacy: { desc: "What wedgie.dev knows about you: as little as it can. Your address is sealed in your browser and wiped after delivery.", text: ["Privacy at wedgie.dev. The shop never holds an address it can read: your browser seals it, and it is wiped after delivery."] },
   pq: { desc: "How a wedgie hardware signer goes post-quantum: one-time hash signatures for a Safe. What works on a real wedgie today and what is left.",
     text: ["The post-quantum plan for the wedgie hardware signer. A quantum computer breaks P-256, so a wedgie signs for a Safe with one-time hash signatures (WOTS), a new key for every transaction.",
-      "A prototype signs on a real wedgie in 0.55 s. Left: the owner contract, an address that keeps when the key changes, and an audit."] },
+      "A prototype (Poseidon2 hashes) signs on a real wedgie in 0.55 s. Left: the owner contract, an address that keeps when the key changes, and an audit."] },
   claim: { desc: "Staked CLAWD on larv.ai? Burn CV for a free wedgie, shipped. One per wallet.", text: ["Staked CLAWD on larv.ai? Burn CV for a free wedgie, shipped. One per wallet."],
     card: { title: "Free wedgie for CLAWD stakers.", desc: "Staked CLAWD on larv.ai? Burn CV for a free wedgie, shipped. One per wallet.",
       img: "https://wedgie.dev/img/og-claim.png?v=1", alt: "Clawd, the red diamond in a tuxedo, holding up a wedgie with a pixel heart on its screen, next to the words Free wedgie." } },
