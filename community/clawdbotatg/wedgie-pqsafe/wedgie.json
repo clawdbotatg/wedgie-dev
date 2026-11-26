@@ -1,0 +1,34 @@
+{
+  "apps": [
+    {
+      "mod": "pqsafe",
+      "name": "PQ Safe Signer",
+      "about": "A test: sign Safe transactions with a post-quantum key (SLH-DSA). Small money only. Use it at wedgie.dev/pqsafe.",
+      "files": [
+        "pqsafe.py",
+        "pqsafe_keccak.py",
+        "pqsafe_slh.mpy"
+      ],
+      "version": "1",
+      "entry": "run",
+      "fw": "0.3.36",
+      "usb": true,
+      "chip": "OPTIGA Trust M",
+      "label": "#1a1b1a",
+      "icon": [
+        "............",
+        ".kkkkkkkkkk.",
+        ".kggggggggk.",
+        ".kg......gk.",
+        ".kg.kkkk.gk.",
+        ".kg.kwwk.gk.",
+        ".kg.kwwk.gk.",
+        ".kg.kkkk.gk.",
+        ".kg......gk.",
+        ".kggggggggk.",
+        ".kkkkkkkkkk.",
+        "..kk....kk.."
+      ]
+    }
+  ]
+}

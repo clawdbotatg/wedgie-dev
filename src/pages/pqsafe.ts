@@ -1,13 +1,10 @@
-// /pqsafe: a Safe whose only owner is an SLH-DSA key made on a wedgie (the plan: /pq). Make the key, make
-// the Safe, put ETH in, send it. A test: the contracts (clawdbotatg/wedgie-pq, contracts/) are not audited.
-// The key: 48 bytes the secure chip derives from a seed in its data slot 9 (the seed never leaves the chip;
-// the derived key is in the wedgie's memory while it signs). Signing takes the wedgie over (full control)
-// each time; the signer (/device/pq_slh.mpy) is copied on and removed after. A browser wallet pays the gas.
+// /pqsafe: a Safe whose only owner is an SLH-DSA key made on a wedgie (the plan: /pq). Install PQ Safe Signer
+// (clawdbotatg/wedgie-pqsafe, an app on the shelf), make the key, make the Safe, put ETH in, send it.
+// A test: the contracts (clawdbotatg/wedgie-pq, contracts/) are not audited. The app works out the Safe
+// transaction hash itself, shows what it signs, and signs on a green press. A browser wallet pays the gas.
 import * as W from "../serial/wedgies";
 import * as E from "../safe/eth";
-import { takeOver } from "../serial/install";
-import { busy, writeFile } from "../serial/files";
-import type { Repl } from "../serial/repl";
+import { firmwareManifest, takeOver, useApp } from "../serial/install";
 
 /** SlhSafeFactory (wedgie-pq contracts/src), the same address on both chains. */
 const FACTORY = "0xc7bdA0EF354ff3F547c0DFa15Cd56cfdD6746f62";
@@ -16,7 +13,7 @@ const CHAINS: Record<number, { name: string; scan: string }> = {
   8453: { name: "Base", scan: "https://basescan.org" },
 };
 const SIG = 17088;          // SLH-DSA-SHA2-128f
-const FILE = "/pq_slh.mpy";
+const APP = "pqsafe";
 const KEY = "wedgie.pqsafe";
 
 const PAGE = `
@@ -30,65 +27,13 @@ const PAGE = `
 <h2>Know this first</h2>
 <ul>
   <li>Not audited. Small money only.</li>
+  <li>PQ Safe Signer replaces the app on your wedgie. Put Safe Signer back any time at <a href="/connect">/connect</a>. Its key stays in the chip.</li>
+  <li>Its screens are black. Safe Signer's are white. So you can tell which one is asking.</li>
   <li>The key's seed is in the secure chip but not locked. If something rewrites that slot, the key is gone and so is the Safe's money.</li>
-  <li>Each step on the wedgie takes it over: hold green for 3 seconds. An app you install comes next.</li>
-  <li>The wedgie's question is black, not white: that is PQ Safe Signer, not the usual Safe Signer.</li>
-  <li>The wedgie shows what this page tells it. It does not check the transaction itself yet.</li>
+  <li>It reads plain ETH sends. That is all this page makes.</li>
   <li>Your browser wallet pays the gas. It can't move the Safe's money.</li>
   <li>A send is about 2.75M gas: the signature is 17 KB.</li>
 </ul>`;
-
-// On the wedgie. Two 32-byte derives (a size every Trust M does); the first 48 bytes are SK.seed, SK.prf, PK.seed.
-const PY = String.raw`
-import gc, binascii, optiga
-import pq_slh as _S
-_D = optiga.DATA[9]
-def _ready():
-    m = optiga.Chip().metadata(_D)
-    print('@ready %d' % (1 if m.get(0xE8) == b"\x21" and m.get(0xD1) == b"\xff" else 0))
-def _setup():
-    c = optiga.Chip()
-    c.write(_D, c.random(64), erase=True)
-    c.set_metadata(_D, {0xE8: b"\x21", 0xD1: b"\xff", 0xD3: b"\x00"})
-def _parts():
-    c = optiga.Chip()
-    return c.derive(_D, 32, b"slh-dsa safe owner 0 a", method="prf256") + c.derive(_D, 32, b"slh-dsa safe owner 0 b", method="prf256")
-def _pub():
-    k = _parts(); st = bytearray(_S.size()); root = bytearray(16)
-    _S.root(st, 1, k[:16], k[32:48], root)
-    print('@key "%s"' % binascii.hexlify(k[32:48] + root).decode())
-def _ask(q, lines, yes):
-    # PQ Safe Signer's own look: a black screen, so it can't be taken for the usual Safe Signer's white one
-    import time, lcd, ui
-    d = lcd.LCD(); k = lcd.Keys(physical=True); k.pressed()
-    d.fill(ui.INK)
-    ui.band(d)
-    d.center_text("PQ SAFE SIGNER", 46, ui.GREEN)
-    y = ui.title(d, q, 68, 2, ui.WHITE) + 12
-    for s in lines:
-        d.center_text(s[:28], y, ui.GREY)
-        y += 14
-    ui.buttons(d, yes, "no")
-    d.show()
-    ui.drawn = time.ticks_ms()
-    print('@yes %d' % (1 if ui.wait(k, 120000) else 0))
-def _sign(msg, title):
-    gc.collect()
-    p = _parts(); st = bytearray(_S.size()); root = bytearray(16); r = bytearray(16)
-    part = bytearray(608)
-    def out(b):
-        for i in range(0, len(b), 512):
-            print('@sig "%s"' % binascii.hexlify(b[i:i + 512]).decode())
-    _S.root(st, 1, p[:16], p[32:48], root)
-    _S.begin(st, 1, p[:16], p[16:32], p[32:48], root, msg, r)
-    out(r)
-    for i in range(33):
-        out(memoryview(part)[:_S.fors(st, i, part)])
-    for i in range(22):
-        _ins(title, "part %d of 23" % (i + 2), (i + 1) / 23)
-        _S.layer(st, part)
-        out(memoryview(part)[:608])
-`;
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -160,29 +105,49 @@ export function pqsafe(main: HTMLElement) {
     if (saved?.chain === chain && saved.pk === pk) safe = { chain, pk, owner: addr(o), addr: a, made, balance: BigInt(bal), nonce };
   }
 
+  const asked = new Set<number>();
+  /** A wedgie running the app: ask it for its key, once. */
+  function readKeys() {
+    for (const w of W.wedgies()) {
+      if (w.state !== "ready" || w.running !== APP || asked.has(w.key) || working) continue;
+      asked.add(w.key);
+      W.withRepl(w, (r) => r.request({ type: "pq_key" }, 6000)).then((m) => {
+        pks[w.key] = m?.pk || "";
+        if (m?.pk && (!saved || saved.pk !== m.pk)) { saved = { pk: m.pk, wedgie: w.short || "", chain: saved?.chain || 1 }; safe = null; keep(); refresh(); }
+        paint();
+      }, () => { asked.delete(w.key); });
+    }
+  }
+  const pks: Record<number, string> = {};
+
   function paint() {
     $("ps-text").innerHTML = note;
     const ws = W.wedgies(), off = working ? " disabled" : "";
-    const wedgieBtns = (label: string, act: string, green = true) => ws.length ? ws.map((w) =>
-      `<button class="btn${green ? " btn-green" : " btn-sm"}" data-act="${act}" data-k="${w.key}"${working || w.state !== "ready" ? " disabled" : ""}>${label} ${esc(w.short || "…")}</button>`).join(" ")
-      : `<span class="fine">No wedgie yet. <a href="/connect">Connect</a> one first if this browser hasn't.</span>`;
+    const btn = (w: W.Wedgie, label: string, act: string) =>
+      `<button class="btn btn-green" data-act="${act}" data-k="${w.key}"${working || w.state !== "ready" ? " disabled" : ""}>${label} ${esc(w.short || "…")}</button>`;
+    const has = ws.filter((w) => w.running === APP), signers = has.filter((w) => saved && pks[w.key] === saved.pk);
     let h = "";
-    if (!saved) {
-      h = `<p><b>1. The key.</b> Your wedgie makes it. The first time it writes a new secret into its secure chip.</p><p>${wedgieBtns("Make the key on", "key")}</p>`;
-    } else {
+    // 1. the app
+    if (!ws.length) h += `<p><b>1. The app.</b> PQ Safe Signer goes on your wedgie.</p><p class="fine">No wedgie yet. <a href="/connect">Connect</a> one first if this browser hasn't.</p>`;
+    else if (!has.length) h += `<p><b>1. The app.</b> PQ Safe Signer goes on your wedgie. It replaces the app that is on it.</p><p>${ws.map((w) => btn(w, "Install PQ Safe Signer on", "install")).join(" ")}</p>`;
+    else h += `<p class="fine">PQ Safe Signer is on ${has.map((w) => esc(w.short || "…")).join(", ")}.${ws.length > has.length ? " " + ws.filter((w) => w.running !== APP).map((w) => `<a href="#" data-act="install" data-k="${w.key}">Install on ${esc(w.short || "…")}</a>`).join(" ") : ""}</p>`;
+    // 2. the key
+    const keyless = has.filter((w) => pks[w.key] === "");
+    if (keyless.length) h += `<p><b>2. The key.</b> Your wedgie makes it and asks first.</p><p>${keyless.map((w) => btn(w, "Make the key on", "key")).join(" ")}</p>`;
+    if (saved) {
       const c = CHAINS[saved.chain];
-      h = `<p class="fine pq-hex">Key from wedgie ${esc(saved.wedgie)}: ${esc(saved.pk)} · <a href="#" data-act="forget">forget it</a></p>
+      h += `<p class="fine pq-hex">Key from wedgie ${esc(saved.wedgie)}: ${esc(saved.pk)} · <a href="#" data-act="forget">forget it</a></p>
         <p>${Object.entries(CHAINS).map(([id, x]) => `<button class="btn btn-sm${+id === saved!.chain ? " btn-green" : ""}" data-act="chain" data-chain="${id}"${off}>${x.name}</button>`).join(" ")}</p>`;
       if (!safe || safe.chain !== saved.chain) h += `<p class="fine">Looking on ${c.name}…</p>`;
       else {
         const link = `<a class="pq-hex" href="${c.scan}/address/${safe.addr}" target="_blank" rel="noopener">${safe.addr}</a>`;
-        if (!safe.made) h += `<p><b>2. The Safe.</b> It will be at ${link}. One transaction makes it and its owner contract.</p><p><button class="btn btn-green" data-act="make"${off}>Make the Safe on ${c.name}</button></p>`;
+        if (!safe.made) h += `<p><b>3. The Safe.</b> It will be at ${link}. One transaction makes it and its owner contract.</p><p><button class="btn btn-green" data-act="make"${off}>Make the Safe on ${c.name}</button></p>`;
         else {
           h += `<p><b>Your Safe:</b> ${link}<br><b>${E.fmt(safe.balance, 18)} ETH</b> · owner contract <a class="pq-hex" href="${c.scan}/address/${safe.owner}" target="_blank" rel="noopener">${short(safe.owner)}</a> · <a href="#" data-act="look">refresh</a></p>
-            <p><b>3. Put ETH in.</b> Send to the address above from anywhere, or: <button class="btn btn-sm" data-act="fund"${off}>Put 0.0005 ETH in</button></p>
-            <p><b>4. Send.</b></p>
+            <p><b>4. Put ETH in.</b> Send to the address above from anywhere, or: <button class="btn btn-sm" data-act="fund"${off}>Put 0.0005 ETH in</button></p>
+            <p><b>5. Send.</b></p>
             <p><input id="ps-to" placeholder="to 0x…" size="44" value="${esc((document.getElementById("ps-to") as HTMLInputElement | null)?.value || "")}"> <input id="ps-amt" placeholder="ETH" size="10" value="${esc((document.getElementById("ps-amt") as HTMLInputElement | null)?.value || "")}"></p>
-            <p>${wedgieBtns("Sign on", "send")}</p>`;
+            <p>${signers.length ? signers.map((w) => btn(w, "Sign on", "send")).join(" ") : `<span class="fine">Plug in the wedgie with this key, running PQ Safe Signer.</span>`}</p>`;
         }
       }
     }
@@ -194,11 +159,13 @@ export function pqsafe(main: HTMLElement) {
       if (act === "forget") { saved = null; safe = null; last = ""; keep(); say(""); paint(); }
       else if (act === "chain") { saved!.chain = +b.dataset.chain!; safe = null; keep(); paint(); refresh(); }
       else if (act === "look") refresh();
+      else if (act === "install" && w) job(() => install(w));
       else if (act === "key" && w) job(() => makeKey(w));
       else if (act === "make") job(make);
       else if (act === "fund") job(fund);
       else if (act === "send" && w) job(() => sendFrom(w));
     });
+    readKeys();
   }
   const refresh = () => look().then(paint, (e) => { say(`<b class="bad">Couldn't read the chain:</b> ${esc(e?.message || String(e))}`); });
 
@@ -209,52 +176,28 @@ export function pqsafe(main: HTMLElement) {
     await refresh();
   }
 
-  /** Take the wedgie over, copy the signer on, run f, remove the signer, let go. */
-  async function onWedgie<T>(w: W.Wedgie, question: string, f: (r: Repl, got: Record<string, any>) => Promise<T>): Promise<T> {
-    const got = await fetch("/device/pq_slh.mpy", { cache: "no-cache" });
-    if (!got.ok) throw new Error("the signer didn't load");
-    const mpy = new Uint8Array(await got.arrayBuffer());
-    return W.withRepl(w, async (r) => {
-      const seen: Record<string, any> = { sig: "" };
-      r.onLine = (t, v) => {
-        if (t === "sig") { seen.sig += v; say(`Signing: ${Math.round((seen.sig.length / 2 / SIG) * 100)}%. About 10 seconds.`); }
-        else seen[t] = v;
-      };
-      await takeOver(r, (s) => { if (s) say(`<b>${esc(s)}.</b> It asks: ${esc(question)}?`); }, question, "PQ Safe Signer");
-      try {
-        say("Copying the signer to the wedgie.");
-        await writeFile(r, FILE, mpy, { span: [0, 0.3] });
-        await r.exec(PY, 10000);
-        return await f(r, seen);
-      } finally {
-        await r.exec(`import os\ntry:\n    os.remove(${JSON.stringify(FILE)})\nexcept OSError:\n    pass`, 8000).catch(() => {});
-        await r.leave({ reset: false });
-      }
-    });
+  async function install(w: W.Wedgie) {
+    say("Getting PQ Safe Signer.");
+    const m = await firmwareManifest(), cart = m.carts.find((c) => c.mod === APP);
+    if (!cart) throw new Error("PQ Safe Signer isn't on wedgie.dev's shelf yet");
+    // the local test rig's shelf isn't signed: there, and only there, it goes on through full control
+    if (fork) await W.withRepl(w, async (r) => { await takeOver(r, () => {}, "Install PQ Safe Signer"); try { await useApp(r, cart, () => {}, { launcher: false, manifest: m }); } finally { await r.leave({ reset: true }); } });
+    else await W.withRepl(w, (r) => useApp(r, cart, (p, what) => say(`Installing PQ Safe Signer: ${Math.round(p * 100)}%${what ? " · " + esc(what) : ""}. <b>Press green on the wedgie if it asks.</b>`), { manifest: m }));
+    say("Installed. The wedgie is starting it.");
+    asked.delete(w.key);
+    for (let i = 0; i < 90 && w.running !== APP; i++) { if (i % 10 === 5) W.reidentify(w); await sleep(1000); }
+    say(w.running === APP ? "<b>PQ Safe Signer is on.</b>" : "Installed. Unplug the wedgie and plug it back in.");
   }
-  const yes = async (r: Repl, seen: Record<string, any>, q: string, lines: string[], word: string) => {
-    delete seen.yes;
-    await r.exec(`_ask(${JSON.stringify(q)}, ${JSON.stringify(lines)}, ${JSON.stringify(word)})`, 130000);
-    if (seen.yes !== 1) throw new Error("the wedgie said no");
-  };
 
   async function makeKey(w: W.Wedgie) {
-    const pk = await onWedgie(w, "Make a post-quantum key", async (r, seen) => {
-      await r.exec("_ready()", 15000);
-      if (seen.ready !== 1) {
-        say("<b>Look at the wedgie.</b> It asks before it writes the new secret.");
-        await yes(r, seen, "Make a new key?", ["It writes a new secret", "into the secure chip."], "make it");
-        await busy(r, "Making the key", "writing the secret");
-        await r.exec("_setup()", 30000);
-      }
-      say("Making the key.");
-      await r.exec("_pub()", 60000);
-      if (!/^[0-9a-f]{64}$/.test(seen.key || "")) throw new Error("the wedgie gave no key");
-      return seen.key as string;
-    });
-    saved = { pk, wedgie: w.short || "", chain: saved?.chain || 1 };
+    say("<b>Look at the wedgie.</b> It asks: Make a new key?");
+    const m = await W.withRepl(w, (r) => r.request({ type: "pq_make" }, 200000));
+    if (m.type === "refused") throw new Error("the wedgie said no");
+    if (m.type !== "pq_key" || !/^[0-9a-f]{64}$/.test(m.pk || "")) throw new Error(m.error || "the wedgie gave no key");
+    pks[w.key] = m.pk;
+    saved = { pk: m.pk, wedgie: w.short || "", chain: saved?.chain || 1 };
     keep();
-    say("<b>The key is made.</b> The wedgie is back on its app, locked.");
+    say("<b>The key is made.</b>");
   }
 
   async function make() {
@@ -282,17 +225,15 @@ export function pqsafe(main: HTMLElement) {
     const hash = E.safeTxHash(s.chain, s.addr, tx);
     const slh = await import("../pq/slh");
     const msg = slh.wrap(E.bytes(hash));
-    const sigHex = await onWedgie(w, "Sign with a post-quantum key", async (r, seen) => {
-      say("Checking it is the same key.");
-      await r.exec("_pub()", 60000);
-      if (seen.key !== s.pk) throw new Error("this wedgie has a different key");
-      say(`<b>Look at the wedgie.</b> It asks: Send ${esc(amt)} ETH?`);
-      await yes(r, seen, `Send ${amt} ETH?`, ["to " + short(E.checksum(to)), "on " + c.name, "from your post-quantum Safe"], "sign");
-      await busy(r, "Signing", "starting");
-      say("Signing. About 10 seconds.");
-      await r.exec(`_sign(bytes.fromhex("${E.hex(msg).slice(2)}"), "Signing")`, 180000);
-      return seen.sig as string;
+    say(`<b>Look at the wedgie.</b> It asks: Send ${esc(amt)} ETH? Green signs.`);
+    let sigHex = "";
+    const m = await W.withRepl(w, async (r) => {
+      r.onLine = (t, v) => { if (t === "sig") { sigHex += v; say(`Signing: ${Math.round((sigHex.length / 2 / SIG) * 100)}%. About 10 seconds.`); } };
+      try { return await r.request({ type: "pq_sign", tx: { chainId: s.chain, safe: s.addr, ...tx } }, 300000); } finally { r.onLine = null; }
     });
+    if (m.type === "refused") throw new Error("the wedgie said no");
+    if (m.type !== "pq_sig") throw new Error(m.error || "the wedgie didn't sign");
+    if (String(m.safeTxHash).toLowerCase() !== hash.toLowerCase()) throw new Error("the wedgie worked out a different transaction hash");
     const sig = E.bytes("0x" + sigHex);
     if (sig.length !== SIG || !slh.verify("128f", E.bytes("0x" + s.pk), msg, sig)) throw new Error("the signature didn't check in this browser");
     say("Signed, and this browser checked it.");

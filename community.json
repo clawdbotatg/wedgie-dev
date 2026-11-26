@@ -1092,6 +1092,18 @@
       "v": {
         "jiro": "8d6c5d64a621"
       }
+    },
+    {
+      "repo": "clawdbotatg/wedgie-pqsafe",
+      "sha": "234122810eba41b52c180cccba6d50742a2b777e",
+      "at": "2026-11-26T03:26:35Z",
+      "approved": "2026-11-26",
+      "v": {
+        "pqsafe": "ad8aede078cd"
+      },
+      "version": {
+        "pqsafe": "1"
+      }
     }
   ]
 }
