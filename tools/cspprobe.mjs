@@ -8,7 +8,7 @@ import { readdirSync } from "node:fs";
 import { homedir } from "node:os";
 
 const PAGES = ["/", "/connect", "/safe", "/safe/8453/0xcf589969582dd70544978114c9e5521f61fbe8e5", "/order", "/orders", "/signin", "/virtual", "/sandbox", "/code", "/build",
-  "/assemble", "/assemble/3d", "/test", "/update", "/prepare", "/reset", "/debug", "/terms", "/privacy", "/pq", "/claim", "/clear"];
+  "/assemble", "/assemble/3d", "/test", "/update", "/prepare", "/reset", "/debug", "/terms", "/privacy", "/pq", "/pqsafe", "/claim", "/clear"];
 const server = spawn("npx", ["vite", "preview", "--port", "4197", "--strictPort"], { stdio: "ignore" });
 const base = "http://localhost:4197";
 for (let i = 0; i < 80 && !(await fetch(base).then(() => true, () => false)); i++) await new Promise((r) => setTimeout(r, 100));

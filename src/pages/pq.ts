@@ -62,7 +62,7 @@ const PAGE = `
   <tr><td>Gas for a Safe to send</td><td>2.75M</td><td>1.1M</td></tr>
 </table>
 <p>The hashing is plain C, not tuned yet.</p>
-<p>The <a href="https://github.com/clawdbotatg/wedgie-pq/blob/master/contracts/src/SlhSigner.sol" target="_blank" rel="noopener">owner contract</a> is written: a Safe owner that is an SLH-DSA key. A Safe with it as its only owner sent ETH on a copy of Base. Not audited. No wedgie has sent real money with it yet.</p>
+<p>The <a href="https://github.com/clawdbotatg/wedgie-pq/blob/master/contracts/src/SlhSigner.sol" target="_blank" rel="noopener">owner contract</a> is written: a Safe owner that is an SLH-DSA key. A Safe with it as its only owner sent ETH on a copy of Base. Not audited. Try it with small money: <a href="/pqsafe">make a post-quantum Safe</a>.</p>
 
 <h2>Try it</h2>
 <div class="pq-try">

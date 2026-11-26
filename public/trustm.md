@@ -89,7 +89,8 @@ Everything on the chip lives in an object with a 2-byte ID (OID). `optiga` names
 **Who uses which slot.** `KEY2` and `DATA[11]` are **Safe Signer's**: the person's key and its public key,
 locked for good once made (below). Never write, re-key or lock them. Your app: `KEY3` or `KEY4`, and any
 other `DATA`. Two slots for every other app: check `c.metadata(KEY3)` isn't locked before you use one, and
-say in your README which you take.
+say in your README which you take. `DATA[9]` is taken: the seed of the post-quantum Safe test
+(wedgie.dev/pqsafe). Writing it loses that key.
 
 Who can do what to each slot is in its **metadata** (`c.metadata(oid)`). As shipped, the key slots,
 data, counters and certificates are open to everyone (rule: "while its lifecycle is below

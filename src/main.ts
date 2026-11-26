@@ -25,6 +25,7 @@ import { order, session } from "./pages/order";
 import "./ui/report";             // from the start: it keeps the page's errors for a bug report
 import { legal } from "./pages/legal";
 import { pq } from "./pages/pq";
+import { pqsafe } from "./pages/pqsafe";
 import { emu } from "./pages/emu";
 import { telegram } from "./pages/telegram";
 import { sandbox } from "./pages/sandbox";
@@ -52,6 +53,7 @@ const onSafe = path === "/safe" || path.startsWith("/safe/");   // the list, or 
 const onSecret = path === "/secret";
 const onOrder = path === "/order" || path.startsWith("/order/") || path === "/orders" || path === "/signin" || path === "/claim";   // buy, one order (/order/<id>), yours, sign in
 const onLegal = path === "/terms" || path === "/privacy";
+const onPqSafe = path === "/pqsafe";         // a Safe owned by a post-quantum key (a test)
 const onPq = path === "/pq";                 // the post-quantum plan
 const onTelegram = path === "/telegram";
 const onSandbox = path === "/sandbox";       // paste a transaction, see a wedgie's pages
@@ -158,5 +160,5 @@ const top = document.getElementById("top")!;
 // Ready when the page's first screen is really there: on the home page that includes the hero wedgie
 // (its files are in the loader's byte count, and it has drawn a frame). Other 3D waits for the page.
 if (onFormat || onUpdate || onPrepare || onReset || onBatt || onTelegram) document.body.classList.add("test-mode");
-const up = onFormat ? (format(top), Promise.resolve()) : onUpdate ? (update(top), Promise.resolve()) : onPrepare ? (prepare(top), Promise.resolve()) : onReset ? (reset(top), Promise.resolve()) : onBatt ? (batt(top), Promise.resolve()) : onConnect ? (connect(top), Promise.resolve()) : onAssemble3d ? (assemble3d(top), Promise.resolve()) : onAssemble ? (assemble(top), Promise.resolve()) : onBuild ? (build(top), Promise.resolve()) : onCode ? (code(top), Promise.resolve()) : onDebug ? (debug(top), Promise.resolve()) : onSafe ? (safe(top), Promise.resolve()) : onSecret ? (secret(top), Promise.resolve()) : onOrder ? (order(top), Promise.resolve()) : onPq ? (pq(top), Promise.resolve()) : onLegal ? (legal(top, path.slice(1) as "terms" | "privacy"), Promise.resolve()) : onEmu ? (emu(top), Promise.resolve()) : onTelegram ? (telegram(top), Promise.resolve()) : onSandbox ? (sandbox(top), Promise.resolve()) : onAtomic ? atomic(top) : home(top);
+const up = onFormat ? (format(top), Promise.resolve()) : onUpdate ? (update(top), Promise.resolve()) : onPrepare ? (prepare(top), Promise.resolve()) : onReset ? (reset(top), Promise.resolve()) : onBatt ? (batt(top), Promise.resolve()) : onConnect ? (connect(top), Promise.resolve()) : onAssemble3d ? (assemble3d(top), Promise.resolve()) : onAssemble ? (assemble(top), Promise.resolve()) : onBuild ? (build(top), Promise.resolve()) : onCode ? (code(top), Promise.resolve()) : onDebug ? (debug(top), Promise.resolve()) : onSafe ? (safe(top), Promise.resolve()) : onSecret ? (secret(top), Promise.resolve()) : onOrder ? (order(top), Promise.resolve()) : onPqSafe ? (pqsafe(top), Promise.resolve()) : onPq ? (pq(top), Promise.resolve()) : onLegal ? (legal(top, path.slice(1) as "terms" | "privacy"), Promise.resolve()) : onEmu ? (emu(top), Promise.resolve()) : onTelegram ? (telegram(top), Promise.resolve()) : onSandbox ? (sandbox(top), Promise.resolve()) : onAtomic ? atomic(top) : home(top);
 up.then(() => (window as any).__wedgieReady?.(), () => (window as any).__wedgieReady?.());

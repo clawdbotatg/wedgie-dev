@@ -28,6 +28,19 @@
       ]
     },
     {
+      "source": "/pqsafe",
+      "headers": [
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin-allow-popups"
+        },
+        {
+          "key": "Cross-Origin-Embedder-Policy",
+          "value": "unsafe-none"
+        }
+      ]
+    },
+    {
       "source": "/safe(.*)",
       "headers": [
         {
@@ -301,6 +314,10 @@
     {
       "source": "/pq",
       "destination": "/pq.html"
+    },
+    {
+      "source": "/pqsafe",
+      "destination": "/pqsafe.html"
     },
     {
       "source": "/virtual",

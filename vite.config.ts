@@ -117,6 +117,8 @@ const PAGES: Record<string, Page> = {
   pq: { desc: "How a wedgie hardware signer goes post-quantum: one-time hash signatures for a Safe. What works on a real wedgie today and what is left.",
     text: ["The post-quantum plan for the wedgie hardware signer. A quantum computer breaks P-256, so a wedgie signs for a Safe with one-time hash signatures (WOTS), a new key for every transaction.",
       "Two ways are measured on a real wedgie: one-time keys (0.55 s to sign) and SLH-DSA, the NIST standard (8.2 s). Plug in a wedgie and try SLH-DSA on the page. Left: the owner contract, an address that keeps when the key changes, and an audit."] },
+  pqsafe: { desc: "A test: a Safe whose only owner is an SLH-DSA hash-signature key made on a wedgie. Make it, fund it and send from it.",
+    text: ["A Safe whose only owner is a post-quantum key (SLH-DSA, NIST FIPS 205) made on a wedgie hardware signer. Make the key, make the Safe on Ethereum or Base, put ETH in and send it. A test, not audited: small money only."] },
   claim: { desc: "Staked CLAWD on larv.ai? Burn CV for a free wedgie, shipped. One per wallet.", text: ["Staked CLAWD on larv.ai? Burn CV for a free wedgie, shipped. One per wallet."],
     card: { title: "Free wedgie for CLAWD stakers.", desc: "Staked CLAWD on larv.ai? Burn CV for a free wedgie, shipped. One per wallet.",
       img: "https://wedgie.dev/img/og-claim.png?v=1", alt: "Clawd, the red diamond in a tuxedo, holding up a wedgie with a pixel heart on its screen, next to the words Free wedgie." } },
