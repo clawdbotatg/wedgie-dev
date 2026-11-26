@@ -286,7 +286,7 @@ export async function build(main: HTMLElement) {
     const cart = m?.carts.find((c) => c.mod === b.app);
     // Software: every app, as a row of little carts.
     if (m) {
-      $("#bld-apps").innerHTML = m.carts.map((c) => `<button class="bld-app${c.mod === b.app ? " on" : ""}" data-app="${esc(c.mod)}" aria-pressed="${c.mod === b.app}">
+      $("#bld-apps").innerHTML = m.carts.filter((c) => !c.test).map((c) => `<button class="bld-app${c.mod === b.app ? " on" : ""}" data-app="${esc(c.mod)}" aria-pressed="${c.mod === b.app}">
         ${miniCart(c)}<span><b>${esc(c.name)}</b><span class="fine">${esc(c.about || "")}</span></span></button>`).join("");
       $("#bld-apps").querySelectorAll<HTMLButtonElement>("[data-app]").forEach((x) => (x.onclick = () => {
         const app = x.dataset.app!;

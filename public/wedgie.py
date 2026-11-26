@@ -1071,6 +1071,8 @@ def main():
             act = active_of(m, have)
             on = {a["mod"]: a.get("v") for a in have["apps"]}
             for cart in m["carts"]:
+                if cart.get("test") and cart["mod"] != act:      # a test-only app: on no list
+                    continue
                 state = "%d KB" % max(1, cart["size"] // 1024)
                 if cart["mod"] == act:
                     # an app's version is its repo's commit; known: every version wedgie.dev ever published

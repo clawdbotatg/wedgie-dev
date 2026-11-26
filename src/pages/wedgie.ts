@@ -521,10 +521,11 @@ Not covered: apps and MicroPython itself.
     else if (x.kind === "wedgie" && !slot()) note.innerHTML = "Update the firmware above first. From 0.2 a wedgie runs one app: it boots straight into it, and the app gets every button.";
     else note.innerHTML = a ? `It runs <b>${esc(a.name)}</b>. Tap another to switch. Saves stay.` : "Nothing on it yet. Tap one: it goes on and the wedgie restarts into it.";
     const shelf = $("#d-shelf");
-    const mods = new Set(m.carts.map((c) => c.mod));
+    const listed = m.carts.filter((c) => !c.test || c.mod === active());      // a test-only app shows only on a wedgie that runs it
+    const mods = new Set(listed.map((c) => c.mod));
     shelf.querySelectorAll<HTMLElement>(".cart-slot").forEach((el) => { if (!mods.has(el.dataset.mod!)) el.remove(); });
     // red cartridges (they use the secure chip) first; the rest keep their order
-    [...m.carts.filter((c) => c.chipuse), ...m.carts.filter((c) => !c.chipuse)].forEach((c, i) => {
+    [...listed.filter((c) => c.chipuse), ...listed.filter((c) => !c.chipuse)].forEach((c, i) => {
       let slotEl = shelf.querySelector<HTMLElement>(`.cart-slot[data-mod="${c.mod}"]`);
       if (slotEl && slotEl.dataset.v !== c.v) { slotEl.remove(); slotEl = null; }   // a reloaded repo: a new cart
       if (!slotEl) {

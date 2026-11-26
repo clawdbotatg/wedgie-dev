@@ -384,7 +384,7 @@ function library(box: HTMLElement) {
     o.disconnect();
     try {
       const [{ cartHtml }, m] = await Promise.all([import("../ui/cart"), fetch("/fw/manifest.json", { cache: "no-cache" }).then((r) => r.json())]);
-      carts = m.carts || [];
+      carts = (m.carts || []).filter((c: any) => !c.test);       // a test-only app is on no list
       if (!carts.length) { box.closest("section")!.hidden = true; return; }
       box.style.setProperty("--n", String(carts.length));
       row.innerHTML = carts.map((c) => `<div class="lib-item"><a class="cart" href="/code" aria-label="${c.name.replace(/"/g, "&quot;")}">${cartHtml(c)}</a></div>`).join("");

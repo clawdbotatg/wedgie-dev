@@ -20,6 +20,7 @@ import { published, releaseText, appsText, shelf } from "./release.mjs";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const sha = (buf) => createHash("sha256").update(buf).digest("hex");
 /** A cart's version: the same function as cartV in src/serial/install.ts. */
+const TEST_ONLY = ["pqsafe"];
 export const cartV = (hashes) => sha(hashes.join("\n")).slice(0, 12);
 
 export function buildFirmware() {
@@ -59,6 +60,9 @@ export function buildFirmware() {
     }
     shelfCarts.push({ ...a, v: cartV(hashes), size: a.files.reduce((s, n) => s + byName.get(n).size, 0) });
   }
+  // Test-only apps: signed and installable from their own page, but on no list of apps (Austin, 11-26: PQ Safe
+  // Signer stays on the /pq side until it's tested and audited). The lists skip a cart with test: true.
+  for (const c of shelfCarts) if (TEST_ONLY.includes(c.mod)) c.test = true;
   carts.unshift(...shelfCarts);        // the shelf's apps first on the site
   // An app's number: its wedgie.json's "version", or else which time this is on the shelf (v1, v2, ...)
   const known = {}, num = {};
