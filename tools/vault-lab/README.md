@@ -1,9 +1,10 @@
 # KeePassXC and virtual Trust M
 
 The RP2040 emulator starts stock MicroPython with a disposable vault fixture.
-The firmware creates a volatile P-256 key in E102, keeps its ECDH shared
-coordinate in E103, and uses the Trust M TLS 1.2 PRF to derive a 32-byte
-key for one fixture vault context.
+The firmware creates a volatile P-256 key in E102, runs one ECDH into E103
+per ephemeral keypair (matching real OPTIGA Trust M V1 forward-secrecy
+behavior), and uses the Trust M TLS 1.2 PRF to derive 32-byte keys from
+E103 for each fixture vault context.
 
 The cartridge asks for physical approval before starting the chip session.
 The emulator checks that a synthetic USB press leaves the prompt pending
