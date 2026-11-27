@@ -54,7 +54,7 @@ cmds = sorted(set(re.findall(r"python3 wedgie\.py (\w+)", usage)))
 missing = [c for c in cmds if "wedgie.py " + c not in usb]
 check(not missing, "every wedgie.py command is in usb.md (%d)%s" % (len(cmds), ": missing " + " ".join(missing) if missing else ""))
 
-INTERNAL = {"home", "job", "sums"}      # 0.1.x compatibility, and installs (skill.md: "use wedgie.py")
+INTERNAL = {"home", "job", "paired_update", "sums"}      # 0.1.x compatibility, and installs (skill.md: "use wedgie.py")
 slot = (root / "firmware/slot.py").read_text()
 handler = slot[slot.index("def _handle"):slot.index("\ndef ", slot.index("def _handle") + 5)]
 types = set(re.findall(r't == "(\w+)"', handler)) | {x for g in re.findall(r"t in \(([^)]*)\)", handler) for x in re.findall(r'"(\w+)"', g)}
